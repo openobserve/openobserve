@@ -42,6 +42,7 @@ import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
 import { isHtmlPanel, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
 import { isGaugeAutoRange } from "@/utils/dashboard/gaugeDial";
+import { isBarGaugeAutoRange } from "@/utils/dashboard/convertBarGaugeData";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,6 +71,7 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "gauge",
   "metric",
   "state-timeline",
+  "bar-gauge",
   "hostmap",
 ];
 
@@ -101,6 +103,7 @@ export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
   "pie",
   "donut",
   "gauge",
+  "bar-gauge",
   "metric",
   "state-timeline",
 ];
@@ -186,6 +189,14 @@ export function useConfigPanel(
 
   const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
   const isRowChart = computed(() => isRowTimeline(dashboardPanelData.data.type));
+  const isBarGauge = computed(() => dashboardPanelData.data.type === "bar-gauge");
+  // An auto-range gauge picks its own bounds; a bar gauge is auto until the user picks Fixed.
+  const showGaugeBounds = computed(() => {
+    const queryConfig =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config;
+    if (isBarGauge.value) return !isBarGaugeAutoRange(queryConfig);
+    return dashboardPanelData.data.type === "gauge" && !isGaugeAutoRange(queryConfig);
+  });
   const isPieOrDonut = computed(
     () => dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut",
   );
@@ -711,25 +722,33 @@ export function useConfigPanel(
         label: t("dashboard.gaugeRangeMode"),
         visible: dashboardPanelData.data.type === "gauge",
       },
+      "bar-gauge-range-mode": {
+        label: t("dashboard.gaugeRangeMode"),
+        visible: isBarGauge.value,
+      },
       "gauge-min": {
         label: t("dashboard.gaugeMinValue"),
-        visible:
-          dashboardPanelData.data.type === "gauge" &&
-          !isGaugeAutoRange(
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
-          ),
+        visible: showGaugeBounds.value,
       },
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
-        visible:
-          dashboardPanelData.data.type === "gauge" &&
-          !isGaugeAutoRange(
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
-          ),
+        visible: showGaugeBounds.value,
       },
       "gauge-end-labels": {
         label: t("dashboard.showGaugeEndLabels"),
         visible: dashboardPanelData.data.type === "gauge",
+      },
+      "bar-gauge-mode": {
+        label: t("dashboard.barGaugeMode"),
+        visible: isBarGauge.value,
+      },
+      "bar-gauge-orientation": {
+        label: t("dashboard.barGaugeOrientation"),
+        visible: isBarGauge.value,
+      },
+      "bar-gauge-show-unfilled": {
+        label: t("dashboard.barGaugeShowUnfilled"),
+        visible: isBarGauge.value,
       },
       "gauge-style": {
         label: t("dashboard.gaugeStyle"),

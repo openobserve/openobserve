@@ -182,6 +182,12 @@ describe("defaultFields", () => {
       const { y } = buildDefaultBuilderFields("bar", "metrics", grouped, "m1");
       expect(y[0].functionName).toBe("avg");
     });
+
+    it("bar gauge seeds a count with no time label", () => {
+      const { x, y } = buildDefaultBuilderFields("bar-gauge", "logs", logsSchema, "logs");
+      expect(x).toEqual([]);
+      expect(y[0].functionName).toBe("count");
+    });
   });
 
   describe("firstNumericField", () => {

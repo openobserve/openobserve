@@ -509,6 +509,25 @@ describe("usePanelAggregation", () => {
       });
     });
 
+    describe("bar gauge chart type", () => {
+      const yField = (functionName: string | null) => ({
+        functionName,
+        args: [{ type: "field" }, { type: "extra" }],
+      });
+
+      it("resets like a gauge", () => {
+        const panelData = makePanelData("bar-gauge");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x1" }, { alias: "x2" }];
+        fields.y = [yField("avg"), yField("sum")];
+        fields.breakdown = [{ alias: "b1" }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toHaveLength(1);
+        expect(fields.y).toHaveLength(1);
+        expect(fields.breakdown).toEqual([]);
+      });
+    });
+
     describe("starter queries", () => {
       it("leaves hand-written SQL in custom mode on a switch to a builder chart", () => {
         const panelData = makePanelData("state-timeline");

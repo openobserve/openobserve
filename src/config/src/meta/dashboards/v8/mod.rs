@@ -766,6 +766,12 @@ pub struct PanelConfig {
     #[schema(value_type = Option<f64>)]
     map_cluster_radius: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    bar_gauge_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bar_gauge_orientation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bar_gauge_show_unfilled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_group_by: Option<Vec<String>>,
@@ -2954,7 +2960,10 @@ mod tests {
             "heatmap_hide_below": 0.5,
             "state_value_align": "center",
             "map_cluster": true,
-            "map_cluster_radius": 40.0
+            "map_cluster_radius": 40.0,
+            "bar_gauge_mode": "lcd",
+            "bar_gauge_orientation": "vertical",
+            "bar_gauge_show_unfilled": false
         });
         let rest3 = serde_json::json!({});
         for part in [rest, rest2, rest3] {
@@ -2986,6 +2995,7 @@ mod tests {
         assert_eq!(cfg.y_axis_log_base, Some(OrdF64::from(2.0)));
         assert_eq!(cfg.stack_mode.as_deref(), Some("percent"));
         assert_eq!(cfg.gauge_round_cap, Some(true));
+        assert_eq!(cfg.bar_gauge_show_unfilled, Some(false));
         assert_eq!(
             cfg.table_footer_calcs,
             Some(vec!["sum".into(), "mean".into(), "last".into()])

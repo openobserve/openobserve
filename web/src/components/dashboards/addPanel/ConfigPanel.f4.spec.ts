@@ -150,6 +150,10 @@ describe("ConfigPanel chart type settings", { timeout: 30_000 }, () => {
     await flushPromises();
   };
   const has = (test: string) => wrapper!.find(`[data-test="${test}"]`).exists();
+  const select = (test: string) =>
+    wrapper!
+      .findAllComponents({ name: "OSelect" })
+      .find((c: any) => c.attributes("data-test") === test);
   const type = async (test: string, value: string) => {
     await wrapper!.find(`[data-test="${test}-field"]`).setValue(value);
     await flushPromises();
@@ -161,6 +165,72 @@ describe("ConfigPanel chart type settings", { timeout: 30_000 }, () => {
     control!.vm.$emit("update:modelValue", value);
     await flushPromises();
   };
+
+  it("mounting a bar gauge writes none of the new keys", async () => {
+    const panel = mountPanel("bar-gauge");
+    const before = JSON.stringify(panel.data.config);
+    await flushPromises();
+    expect(JSON.stringify(panel.data.config)).toBe(before);
+  });
+
+  it("bar gauge: scales to its data by default and shows min and max only once Fixed is picked", async () => {
+    const panel = mountPanel("bar-gauge");
+    await flushPromises();
+    const rangeMode = wrapper!
+      .findAllComponents({ name: "OSelect" })
+      .find((c: any) => c.attributes("data-test") === "dashboard-config-bar-gauge-range-mode");
+    expect(rangeMode, "range mode select").toBeTruthy();
+    expect(isShown("dashboard-config-bar-gauge-range-mode")).toBe(true);
+    expect(isShown("dashboard-config-gauge-range-mode")).toBe(false);
+    expect(isShown("dashboard-config-gauge-max")).toBe(false);
+    rangeMode!.vm.$emit("update:modelValue", "fixed");
+    await flushPromises();
+    expect(panel.data.queries[0].config.range_mode).toBe("fixed");
+    expect(isShown("dashboard-config-gauge-min")).toBe(true);
+    expect(isShown("dashboard-config-gauge-max")).toBe(true);
+    rangeMode!.vm.$emit("update:modelValue", "__auto__");
+    await flushPromises();
+    expect("range_mode" in panel.data.queries[0].config).toBe(false);
+    expect(isShown("dashboard-config-gauge-max")).toBe(false);
+  });
+
+  it("bar gauge: writes its own mode, orientation and unfilled keys", async () => {
+    const panel = mountPanel("bar-gauge");
+    await flushPromises();
+    expect(isShown("dashboard-config-gauge_style")).toBe(false);
+    expect(isShown("dashboard-config-gauge_round_cap")).toBe(false);
+    select("dashboard-config-bar_gauge_mode")!.vm.$emit("update:modelValue", "lcd");
+    select("dashboard-config-bar_gauge_orientation")!.vm.$emit("update:modelValue", "vertical");
+    await flushPromises();
+    await emitSwitch("dashboard-config-bar_gauge_show_unfilled", false);
+    expect(panel.data.config).toMatchObject({
+      bar_gauge_mode: "lcd",
+      bar_gauge_orientation: "vertical",
+      bar_gauge_show_unfilled: false,
+    });
+    await emitSwitch("dashboard-config-bar_gauge_show_unfilled", true);
+    expect("bar_gauge_show_unfilled" in panel.data.config).toBe(false);
+    select("dashboard-config-bar_gauge_mode")!.vm.$emit("update:modelValue", "__auto__");
+    await flushPromises();
+    expect("bar_gauge_mode" in panel.data.config).toBe(false);
+  });
+
+  it("bar gauge: each Default choice names what an unset option falls back to", async () => {
+    mountPanel("bar-gauge");
+    await flushPromises();
+    const firstLabel = (test: string) => select(test)!.props("options")[0].label;
+    expect(firstLabel("dashboard-config-bar_gauge_mode")).toBe("Default (Gradient)");
+    expect(firstLabel("dashboard-config-bar_gauge_orientation")).toBe("Default (Horizontal)");
+    expect(firstLabel("dashboard-config-bar-gauge-range-mode")).toBe("Default (auto from data)");
+  });
+
+  it("gauge: hides the bar gauge controls", async () => {
+    mountPanel("gauge");
+    await flushPromises();
+    expect(isShown("dashboard-config-gauge_style")).toBe(true);
+    expect(isShown("dashboard-config-bar_gauge_mode")).toBe(false);
+    expect(isShown("dashboard-config-bar_gauge_show_unfilled")).toBe(false);
+  });
 
   it("state timeline: keeps its own controls and writes the value alignment", async () => {
     const panel = mountPanel("state-timeline");

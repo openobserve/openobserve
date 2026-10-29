@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import { use as echartsUse } from "echarts/core";
-import { LineChart } from "echarts/charts";
+import { LineChart, PictorialBarChart } from "echarts/charts";
 import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
 import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
@@ -66,6 +66,7 @@ vi.mock("echarts/charts", () => ({
   SankeyChart: vi.fn(),
   TreeChart: vi.fn(),
   GraphChart: vi.fn(),
+  PictorialBarChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -120,6 +121,10 @@ const registeredAtImport = vi.mocked(echartsUse).mock.calls.flat(2);
 describe("ChartRenderer series registration", () => {
   it("registers the line series", () => {
     expect(registeredAtImport).toContain(LineChart);
+  });
+
+  it("registers the pictorial bar series the bar gauge draws in LCD mode", () => {
+    expect(registeredAtImport).toContain(PictorialBarChart);
   });
 });
 

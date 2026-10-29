@@ -66,6 +66,7 @@ export const usePanelFields = ({
       case "donut":
       case "heatmap":
       case "gauge":
+      case "bar-gauge":
       case "state-timeline":
       case "hostmap":
       case "area":
@@ -131,6 +132,7 @@ export const usePanelFields = ({
       case "pie":
       case "donut":
       case "gauge":
+      case "bar-gauge":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1

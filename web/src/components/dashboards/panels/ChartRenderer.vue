@@ -97,6 +97,7 @@ import {
   SankeyChart,
   TreeChart,
   GraphChart,
+  PictorialBarChart,
 } from "echarts/charts";
 import {
   TitleComponent,
@@ -164,6 +165,7 @@ echarts.use([
   SankeyChart,
   TreeChart,
   GraphChart,
+  PictorialBarChart,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,
