@@ -224,6 +224,7 @@ const updateUserTable = async (value: string) => {
 const fetchOrgServiceAccounts = async () => {
   // fetch group users
   hasFetchedOrgServiceAccounts.value = true;
+  forbidden.value = false;
   let data: Array<{ email: string; is_system?: boolean }>;
   try {
     data = (await serviceAccountsState.getServiceAccounts(
