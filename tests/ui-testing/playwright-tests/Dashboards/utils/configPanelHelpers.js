@@ -170,9 +170,12 @@ export async function setupBarPanelWithBreakdownAndConfig(page, pm, dashboardNam
 }
 
 /**
- * Stacked or h-stacked panel WITH a breakdown field — config sidebar opened and ready.
+ * Stacked-family panel (stacked / h-stacked / area-stacked) broken down by host so each bucket stacks several series — config sidebar opened and ready.
  */
-export async function setupStackedPanelWithBreakdownAndConfig(page, pm, dashboardName, chartType = "stacked", panelName = "Test Panel") {
+export async function setupStackedPanelWithConfig(page, pm, dashboardName, {
+  chartType = "stacked",
+  panelName = "Test Panel",
+} = {}) {
   await buildPanel(page, pm, dashboardName, {
     chartType,
     panelName,
@@ -418,6 +421,16 @@ export async function setupPromQLChartWithConfig(page, pm, dashboardName, { char
   await buildPromQLPanel(page, pm, dashboardName, { chartType, query, panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL panel with config ready", { chartType, query, dashboardName, panelName });
+}
+
+/**
+ * PromQL stacked panel over the seeded cpu_usage metric — config sidebar opened and ready.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLStackedPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "stacked", panelName, query: "cpu_usage" });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL stacked panel with config ready", { dashboardName, panelName });
 }
 
 /**

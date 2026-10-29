@@ -104,6 +104,67 @@ pub fn active_for_alert(
     None
 }
 
+/// [active_for_alert] for one group of a multi-alert, so a group mute (R-118) applies.
+#[cfg(feature = "enterprise")]
+pub fn active_for_alert_group(
+    org: &str,
+    alert_id: &str,
+    folder_id: &str,
+    dims: &HashMap<String, String>,
+    group_key: &str,
+    now: i64,
+) -> Option<ActiveDowntime> {
+    use o2_enterprise::enterprise::downtimes::scope::GroupScope;
+
+    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    enterprise::active_scoped(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::Alerts,
+        &item,
+        now,
+        None,
+        GroupScope::Group(group_key),
+    )
+}
+
+/// The group key decides only for a multi-alert, whose groups a downtime can name.
+#[cfg(feature = "enterprise")]
+pub fn active_for_alert_key(
+    org: &str,
+    alert_id: &str,
+    folder_id: &str,
+    dims: &HashMap<String, String>,
+    group_key: Option<&str>,
+    now: i64,
+) -> Option<ActiveDowntime> {
+    match group_key {
+        Some(key) => active_for_alert_group(org, alert_id, folder_id, dims, key, now),
+        None => active_for_alert(org, alert_id, folder_id, dims, now),
+    }
+}
+
+/// The Muted chip of an alert row: a mute of only some of its groups shows too.
+#[cfg(feature = "enterprise")]
+pub fn chip_for_alert(
+    org: &str,
+    alert_id: &str,
+    folder_id: &str,
+    dims: &HashMap<String, String>,
+    now: i64,
+) -> Option<ActiveDowntime> {
+    use o2_enterprise::enterprise::downtimes::scope::GroupScope;
+
+    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    enterprise::active_scoped(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::Alerts,
+        &item,
+        now,
+        None,
+        GroupScope::Any,
+    )
+}
+
 /// [active_for_alert] without row `except`, which a cancel or delete just took out of force.
 #[cfg(feature = "enterprise")]
 pub fn active_for_alert_except(
@@ -297,7 +358,7 @@ pub(crate) mod enterprise {
     };
     use o2_enterprise::enterprise::downtimes::{
         schedule,
-        scope::{self, TargetItem},
+        scope::{self, GroupScope, TargetItem},
     };
 
     const MICROS: i64 = 1_000_000;
@@ -374,6 +435,18 @@ pub(crate) mod enterprise {
         now: i64,
         except: Option<&str>,
     ) -> Option<ActiveDowntime> {
+        active_scoped(rows, module, item, now, except, GroupScope::Alert)
+    }
+
+    /// [active_in_except] for the alert groups `scope` names.
+    pub(crate) fn active_scoped(
+        rows: &[Downtime],
+        module: TargetModule,
+        item: &TargetItem<'_>,
+        now: i64,
+        except: Option<&str>,
+        group: GroupScope<'_>,
+    ) -> Option<ActiveDowntime> {
         rows.iter()
             .filter(|row| {
                 row.cancelled_at.is_none_or(|cancelled| cancelled > now)
@@ -382,14 +455,33 @@ pub(crate) mod enterprise {
             .filter_map(|row| {
                 let window = schedule::window_at(&row.schedule, now)?;
                 let target = scope::target_for(&row.targets, module)?;
-                scope::matches(target, row.condition.as_ref(), item).then(|| ActiveDowntime {
-                    id: row.id.clone(),
-                    name: row.name.clone(),
-                    ends_at: window.end,
-                    incident_mode: target.incident_mode,
-                })
+                scope::matches_group(
+                    target,
+                    row.condition.as_ref(),
+                    row.alert_groups.as_deref(),
+                    item,
+                    group,
+                )
+                .then(|| active_of(row, window.end, target.incident_mode))
             })
             .reduce(merged)
+    }
+
+    pub(crate) fn active_of(
+        row: &Downtime,
+        ends_at: i64,
+        incident_mode: IncidentMode,
+    ) -> ActiveDowntime {
+        ActiveDowntime {
+            id: row.id.clone(),
+            name: row.name.clone(),
+            ends_at,
+            incident_mode,
+            version: row.version,
+            alert_groups: row.alert_groups.clone(),
+            end_on_clear: row.end_on_clear.clone(),
+            source: row.source,
+        }
     }
 
     /// Overlapping downtimes in any order: the latest end names the chip, any muted mode mutes.
@@ -425,15 +517,11 @@ pub(crate) mod enterprise {
             row.id == id
                 && row.cancelled_at.is_none_or(|cancelled| cancelled > at)
                 && scope::target_for(&row.targets, module).is_some()
+                && scope::covers_group(row.alert_groups.as_deref(), "", GroupScope::Alert)
         })?;
         let window = schedule::window_at(&row.schedule, at)?;
         let target = scope::target_for(&row.targets, module)?;
-        Some(ActiveDowntime {
-            id: row.id.clone(),
-            name: row.name.clone(),
-            ends_at: window.end,
-            incident_mode: target.incident_mode,
-        })
+        Some(active_of(row, window.end, target.incident_mode))
     }
 
     /// The span of slice starts `[start, end)` corrects, in micros; `None` when it holds none.
@@ -550,6 +638,9 @@ mod tests {
 
     fn row(id: &str, targets: Vec<DowntimeTarget>, start: i64, end: i64) -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: id.to_string(),
             org: "acme".to_string(),
             folder_id: "default".to_string(),
@@ -585,6 +676,42 @@ mod tests {
 
     fn payments() -> HashMap<String, String> {
         HashMap::from([("service".to_string(), "payments".to_string())])
+    }
+
+    #[test]
+    fn a_group_mute_mutes_its_group_shows_on_the_chip_and_never_mutes_the_whole_alert() {
+        use config::meta::downtimes::{AlertGroupRef, EndOnClear, MuteSource};
+        use o2_enterprise::enterprise::downtimes::scope::GroupScope;
+
+        let mut grouped = row("d1", vec![target(TargetModule::Alerts)], 0, 10 * HOUR);
+        grouped.condition = None;
+        grouped.version = 3;
+        grouped.alert_groups = Some(vec![AlertGroupRef {
+            alert_id: "a1".to_string(),
+            group_key: "k1".to_string(),
+            group_labels: None,
+        }]);
+        grouped.end_on_clear = Some(EndOnClear {
+            alert_id: "a1".to_string(),
+            group_key: Some("k1".to_string()),
+        });
+        grouped.source = Some(MuteSource::Slack);
+        let rows = vec![grouped];
+        let dims = HashMap::new();
+        let alert = item("a1", "default", &dims, &[]);
+        let at = |scope| active_scoped(&rows, TargetModule::Alerts, &alert, HOUR, None, scope);
+        let hit = at(GroupScope::Group("k1")).expect("the listed group is muted");
+        assert_eq!(hit.version, 3);
+        assert_eq!(hit.source, Some(MuteSource::Slack));
+        assert_eq!(
+            hit.end_on_clear.and_then(|e| e.group_key).as_deref(),
+            Some("k1")
+        );
+        assert!(at(GroupScope::Group("k2")).is_none());
+        assert!(at(GroupScope::Alert).is_none());
+        assert!(at(GroupScope::Any).is_some(), "the chip shows a group mute");
+        assert!(active_in(&rows, TargetModule::Alerts, &alert, HOUR).is_none());
+        assert!(active_by_id_in(&rows, TargetModule::Alerts, "d1", HOUR).is_none());
     }
 
     fn slo() -> Slo {
@@ -825,12 +952,14 @@ mod tests {
             name: "a".to_string(),
             ends_at: 10,
             incident_mode: IncidentMode::Muted,
+            ..Default::default()
         };
         let late = ActiveDowntime {
             id: "b".to_string(),
             name: "b".to_string(),
             ends_at: 12,
             incident_mode: IncidentMode::None,
+            ..Default::default()
         };
         for merged in [
             merged(early.clone(), late.clone()),

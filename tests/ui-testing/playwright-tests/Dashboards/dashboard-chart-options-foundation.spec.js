@@ -9,7 +9,7 @@ import { ingestion } from "./utils/dashIngestion.js";
 import {
   generateDashboardName,
   setupPromQLChartWithConfig,
-  setupStackedPanelWithBreakdownAndConfig,
+  setupStackedPanelWithConfig,
   setupMapsPanelWithConfig,
   reopenPanelConfig,
   waitForPanelRenderSettled,
@@ -156,7 +156,7 @@ test.describe("Dashboard chart options — stacked thresholds and maps pan/zoom"
       const configs = pm.dashboardPanelConfigs;
       const dashboardName = generateDashboardName();
 
-      await setupStackedPanelWithBreakdownAndConfig(page, pm, dashboardName, chartType);
+      await setupStackedPanelWithConfig(page, pm, dashboardName, { chartType });
 
       await configs.selectThresholdsShowAs("Shaded band");
       await configs.addThresholdStep(5);

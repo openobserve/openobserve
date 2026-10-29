@@ -116,6 +116,52 @@ async fn save(
     get(org_id, id).await
 }
 
+async fn acknowledge_in(
+    client: &impl ConnectionTrait,
+    org_id: &str,
+    id: &str,
+    user_email: &str,
+    previous_holder: Option<&str>,
+) -> Result<Option<Response>, errors::Error> {
+    let now = now_micros();
+    let mut query = oncall_responses::Entity::update_many()
+        .col_expr(
+            oncall_responses::Column::AckedBy,
+            Expr::value(user_email.to_string()),
+        )
+        .col_expr(oncall_responses::Column::AckedAt, Expr::value(now))
+        .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
+        .filter(oncall_responses::Column::Id.eq(id))
+        .filter(oncall_responses::Column::OrgId.eq(org_id));
+    query = if let Some(previous_holder) = previous_holder {
+        query
+            .filter(oncall_responses::Column::State.eq(ResponseState::Acknowledged.to_i32()))
+            .filter(
+                Expr::expr(sea_orm::sea_query::Func::lower(Expr::col(
+                    oncall_responses::Column::AckedBy,
+                )))
+                .eq(previous_holder.to_ascii_lowercase()),
+            )
+    } else {
+        query
+            .col_expr(
+                oncall_responses::Column::State,
+                Expr::value(ResponseState::Acknowledged.to_i32()),
+            )
+            .filter(oncall_responses::Column::State.is_in(escalating_states()))
+    };
+    let result = query.exec(client).await?;
+    if previous_holder.is_some() && result.rows_affected == 0 {
+        return Ok(None);
+    }
+    // Read back whether we won or lost: after a lost race, "who has it now" is somebody else.
+    Ok(oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+        .and_then(to_response))
+}
+
 fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
     Some(ResponseEvent {
         kind: ResponseEventKind::from_i32(m.kind)?,
@@ -798,25 +844,23 @@ pub async fn acknowledge(
     user_email: &str,
 ) -> Result<Option<Response>, errors::Error> {
     let client = get_orm_client_rw().await;
-    let now = now_micros();
-    oncall_responses::Entity::update_many()
-        .col_expr(
-            oncall_responses::Column::State,
-            Expr::value(ResponseState::Acknowledged.to_i32()),
-        )
-        .col_expr(
-            oncall_responses::Column::AckedBy,
-            Expr::value(user_email.to_string()),
-        )
-        .col_expr(oncall_responses::Column::AckedAt, Expr::value(now))
-        .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
-        .filter(oncall_responses::Column::Id.eq(id))
-        .filter(oncall_responses::Column::OrgId.eq(org_id))
-        .filter(oncall_responses::Column::State.is_in(escalating_states()))
-        .exec(client)
-        .await?;
-    // Read back whether we won or lost: after a lost race, "who has it now" is somebody else.
-    get(org_id, id).await
+    acknowledge_in(client, org_id, id, user_email, None).await
+}
+
+pub async fn take_over_acknowledgement(
+    org_id: &str,
+    id: &str,
+    previous_holder: &str,
+    user_email: &str,
+) -> Result<Option<Response>, errors::Error> {
+    acknowledge_in(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        user_email,
+        Some(previous_holder),
+    )
+    .await
 }
 
 /// The states a record is still climbing its ladder in. Mirrors
@@ -1597,6 +1641,66 @@ pub async fn deepest_rungs(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn takeover_moves_only_the_previous_holders_acknowledged_page() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(
+            backend.build(&Schema::new(backend).create_table_from_entity(oncall_responses::Entity)),
+        )
+        .await
+        .unwrap();
+        for (id, state, holder) in [
+            ("held", ResponseState::Acknowledged, "alice@example.com"),
+            ("other", ResponseState::Acknowledged, "carol@example.com"),
+            ("open", ResponseState::Triggered, "alice@example.com"),
+            ("closed", ResponseState::Resolved, "alice@example.com"),
+        ] {
+            let mut row = model();
+            row.id = id.into();
+            row.state = state.to_i32();
+            row.acked_by = Some(holder.into());
+            row.acked_at = Some(900);
+            oncall_responses::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+            let updated = acknowledge_in(
+                &db,
+                "default",
+                id,
+                "bob@example.com",
+                Some("ALICE@example.com"),
+            )
+            .await
+            .unwrap();
+            assert_eq!(updated.is_some(), id == "held");
+            let result = oncall_responses::Entity::find_by_id(id)
+                .one(&db)
+                .await
+                .unwrap()
+                .and_then(to_response)
+                .unwrap();
+            assert_eq!(result.state, state);
+            assert_eq!(
+                result.acked_by.as_deref(),
+                Some(if id == "held" {
+                    "bob@example.com"
+                } else {
+                    holder
+                })
+            );
+            assert_eq!(result.ladder_run, Some(FIRST_LADDER_RUN));
+            if id == "held" {
+                assert!(result.acked_at.unwrap() > 900);
+            } else {
+                assert_eq!(result.acked_at, Some(900));
+            }
+        }
+    }
 
     fn model() -> oncall_responses::Model {
         oncall_responses::Model {

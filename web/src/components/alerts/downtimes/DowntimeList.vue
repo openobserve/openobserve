@@ -186,6 +186,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`downtime-list-${row.id}-name`"
                 >
                   <span
+                    v-if="isQuickMute(row)"
+                    class="rounded-default bg-surface-subtle grid h-6 w-6 shrink-0 place-items-center"
+                    :data-test="`downtime-list-${row.id}-quick-mute`"
+                  >
+                    <OIcon name="notifications-paused" size="sm" class="text-text-secondary" />
+                    <OTooltip :content="t('alerts.downtimes.quickMuteTooltip')" />
+                  </span>
+                  <span
+                    v-else
                     class="rounded-default bg-surface-subtle grid h-6 w-6 shrink-0 place-items-center"
                   >
                     <OIcon
@@ -217,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <DowntimeTargetsCell
                   :condition="row.condition"
                   :targets="row.targets"
+                  :alert-groups="row.alert_groups"
                   :folder-name="targetFolderName"
                   :max-chips="2"
                   :data-test="`downtime-list-${row.id}-targets`"
@@ -224,17 +234,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-schedule="{ row }">
-                <span class="text-text-body truncate text-xs">
-                  {{ scheduleSentence(row.schedule, t) }}
+                <span
+                  v-if="row.end_on_clear"
+                  class="flex min-w-0 flex-col text-xs"
+                  :data-test="`downtime-list-${row.id}-schedule`"
+                >
+                  <span class="text-text-body truncate">
+                    {{ t("alerts.downtimes.untilClear.schedule") }}
+                  </span>
+                  <span class="text-text-secondary truncate">
+                    {{ t("alerts.downtimes.untilClear.atMost") }}
+                  </span>
                 </span>
+                <span
+                  v-else
+                  class="text-text-body truncate text-xs"
+                  :data-test="`downtime-list-${row.id}-schedule`"
+                  >{{ scheduleText(row) }}</span
+                >
               </template>
 
               <template #cell-when="{ row }">
-                <span v-if="whenOf(row)" class="inline-flex items-center gap-1 text-xs">
+                <span
+                  v-if="endedOnClear(row) && row.cancelled_at"
+                  class="flex min-w-0 flex-col text-xs"
+                  :data-test="`downtime-list-${row.id}-when`"
+                >
+                  <span class="inline-flex items-center gap-1">
+                    <span class="text-text-secondary">{{ t("alerts.downtimes.endedLabel") }}</span>
+                    <OTimeCell :value="row.cancelled_at" unit="us" :timezone="viewerZone" />
+                  </span>
+                  <span class="text-text-secondary truncate">
+                    {{ t("alerts.downtimes.untilClear.whenCleared") }}
+                  </span>
+                </span>
+                <span
+                  v-else-if="row.end_on_clear && row.status === 'active' && row.current_window"
+                  class="flex min-w-0 flex-col text-xs"
+                  :data-test="`downtime-list-${row.id}-when`"
+                >
+                  <span class="text-text-body truncate">
+                    {{ t("alerts.downtimes.untilClear.endsWhenClears") }}
+                  </span>
+                  <span class="text-text-secondary truncate">
+                    {{ safetyEndText(row.current_window.end) }}
+                  </span>
+                </span>
+                <span
+                  v-else-if="whenOf(row)"
+                  class="inline-flex items-center gap-1 text-xs"
+                  :data-test="`downtime-list-${row.id}-when`"
+                >
                   <span class="text-text-secondary">{{ whenOf(row)?.label }}</span>
                   <OTimeCell :value="whenOf(row)?.at" unit="us" :timezone="viewerZone" />
                 </span>
-                <span v-else class="text-text-muted">—</span>
+                <span v-else class="text-text-muted" :data-test="`downtime-list-${row.id}-when`"
+                  >—</span
+                >
               </template>
 
               <template #cell-matched="{ row }">
@@ -246,7 +302,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-created_by="{ row }">
-                <OUserCell :value="row.created_by" local-part />
+                <span v-if="endedOnClear(row)" class="flex min-w-0 flex-col text-xs">
+                  <OUserCell :value="row.created_by" local-part />
+                  <span class="text-text-secondary truncate">{{ endedByText }}</span>
+                </span>
+                <OUserCell v-else :value="row.created_by" local-part />
               </template>
 
               <template #cell-actions="{ row }">
@@ -519,7 +579,8 @@ import { getFoldersListByType } from "@/utils/commons";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useToast } from "@/lib/feedback/Toast/useToast";
-import { scheduleSentence } from "@/utils/downtimes/schedule";
+import { formatDuration, scheduleSentence } from "@/utils/downtimes/schedule";
+import { endTimeText, endedOnClear, isQuickMute } from "@/utils/downtimes/quickMute";
 import type { FolderNameFn } from "@/utils/downtimes/targetSummary";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -863,7 +924,7 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     header: t("alerts.downtimes.columns.name"),
     sortable: true,
     size: 260,
-    minSize: 200,
+    minSize: 150,
     meta: { isName: true, flex: true },
   },
   {
@@ -872,14 +933,14 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     header: t("alerts.downtimes.columns.status"),
     cell: " ",
     sortable: true,
-    size: 120,
+    size: 110,
   },
   {
     id: "targets",
     header: t("alerts.downtimes.columns.targets"),
     cell: " ",
     hideable: true,
-    size: 240,
+    size: 200,
     maxSize: 320,
   },
   {
@@ -887,7 +948,7 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     header: t("alerts.downtimes.columns.schedule"),
     cell: " ",
     hideable: true,
-    size: 220,
+    size: 150,
   },
   {
     id: "when",
@@ -896,14 +957,14 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     cell: " ",
     sortable: true,
     hideable: true,
-    size: 150,
+    size: 180,
   },
   {
     id: "matched",
     header: t("alerts.downtimes.columns.matched"),
     cell: " ",
     hideable: true,
-    size: 160,
+    size: 130,
   },
   {
     id: "folder_id",
@@ -922,10 +983,11 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     hideable: true,
     size: COL.owner,
   },
-  { id: "actions", header: raw(""), isAction: true, size: 184, pinned: "right" },
+  { id: "actions", header: raw(""), isAction: true, size: 176, pinned: "right" },
 ]);
 
-const defaultColumnVisibility = { folder_id: false, created_by: false };
+// MK-19 hides Matched for width; a viewer can turn any hidden column on.
+const defaultColumnVisibility = { matched: false, folder_id: false, created_by: false };
 
 const rowStyle = (row: DowntimeListItem): Record<string, string> => ({
   boxShadow: `var(--shadow-rail-geom) ${RAIL_COLORS[row.status] ?? RAIL_COLORS.ended}`,
@@ -940,6 +1002,22 @@ const whenOf = (row: DowntimeListItem): { label: I18nText; at: number } | null =
   }
   return null;
 };
+
+const scheduleText = (row: DowntimeListItem): I18nText =>
+  isQuickMute(row)
+    ? t("alerts.downtimes.schedule.onceFor", {
+        duration: formatDuration(row.schedule.duration_secs, t),
+      })
+    : scheduleSentence(row.schedule, t);
+
+const safetyEndText = (at: number): I18nText =>
+  t("alerts.downtimes.untilClear.byTime", {
+    time: endTimeText(at, Date.now() * 1000, viewerZone.value, t),
+  });
+
+const endedByText = computed(() =>
+  t("alerts.downtimes.untilClear.endedBy", { product: raw("OpenObserve") }),
+);
 
 const matchedText = (row: DowntimeListItem): string => {
   const modules = new Set(row.targets.map((tg) => tg.module));

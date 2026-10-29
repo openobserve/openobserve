@@ -43,6 +43,8 @@ export default class DashboardPanelConfigs {
     );
     this.yAxisMin = page.locator('[data-test="dashboard-config-y_axis_min"]');
     this.yAxisMax = page.locator('[data-test="dashboard-config-y_axis_max"]');
+    this.yAxisMinField = this.yAxisMin.locator('[data-test$="-field"]');
+    this.yAxisMaxField = this.yAxisMax.locator('[data-test$="-field"]');
     this.valuePosition = page.locator(
       '[data-test="dashboard-config-label-position"]'
     );

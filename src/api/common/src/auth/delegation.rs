@@ -25,6 +25,7 @@ use std::{
 };
 
 use axum::http::Method;
+use config::utils::delegation::SCOPE_SLACK_ACTION;
 #[cfg(any(feature = "enterprise", test))]
 use config::{
     meta::slack::{DisabledReason, ExternalIdentityLink, SlackInstallation},
@@ -32,7 +33,7 @@ use config::{
 };
 use openobserve_core::auth::AuthExtractor;
 
-use self::Seg::{Lit, Param, Stream};
+use self::Seg::{Id, Lit, Param, Stream};
 use super::validator::{AuthError, AuthValidationResult, check_permissions};
 use crate::common::meta::user::get_default_user_role;
 
@@ -79,6 +80,19 @@ const RESERVED_STREAM_SLOTS: &[&str] = &[
     "users",
     "workflows",
 ];
+/// Router literals that axum hands to their own routes instead of the `{alert_id}` slot.
+const ALERT_ID_LITERALS: &[&str] = &[
+    "auto_investigate",
+    "bulk",
+    "composites",
+    "dedup",
+    "generate_sql",
+    "history",
+    "incidents",
+    "move",
+    "tags",
+];
+const ALERT_ID: Seg = Id(ALERT_ID_LITERALS);
 const GET: &[&str] = &["GET"];
 const POST: &[&str] = &["POST"];
 const GET_POST: &[&str] = &["GET", "POST"];
@@ -148,6 +162,22 @@ const ASSISTANT_SCOPE: &[ScopeRoute] = &[
     v2(&[Param, Lit("downtimes"), Param, Lit("cancel")], POST),
 ];
 
+/// The alert buttons' routes (spec 8.1); segments start at `{org_id}`, below `/api` and `/v2`.
+#[rustfmt::skip]
+const SLACK_ACTION_SCOPE: &[ScopeRoute] = &[
+    v2(&[Param, Lit("alerts"), ALERT_ID], GET),
+    v2(&[Param, Lit("alerts"), ALERT_ID, Lit("acks")], GET),
+    v2(&[Param, Lit("alerts"), ALERT_ID, Lit("groups")], GET),
+    v2(&[Param, Lit("alerts"), ALERT_ID, Lit("ack")], POST),
+    v2(&[Param, Lit("alerts"), ALERT_ID, Lit("unack")], POST),
+    v2(&[Param, Lit("alerts"), ALERT_ID, Lit("mute")], POST),
+    v2(&[Param, Lit("alerts"), ALERT_ID, Lit("mute"), Param, Lit("extend")], POST),
+    v2(&[Param, Lit("alerts"), ALERT_ID, Lit("mute"), Param, Lit("cancel")], POST),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), Param, Lit("update")], PATCH),
+    v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("resolve")], POST),
+    v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("snooze")], POST),
+];
+
 /// Set only by the validator; a request extension, so a client can never supply it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DelegatedCaller {
@@ -155,6 +185,13 @@ pub struct DelegatedCaller {
     pub installation_id: String,
     pub org: String,
     pub jti: String,
+    pub scope: String,
+}
+
+impl DelegatedCaller {
+    pub fn is_slack_action(&self) -> bool {
+        self.scope == SCOPE_SLACK_ACTION
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -162,6 +199,7 @@ enum Seg {
     Lit(&'static str),
     Param,
     Stream,
+    Id(&'static [&'static str]),
 }
 
 struct ScopeRoute {
@@ -278,6 +316,7 @@ pub async fn validate_delegated(
             installation_id: facts.installation_id,
             org: claims.org,
             jti: claims.jti,
+            scope: claims.scope,
         }),
     })
 }
@@ -294,22 +333,12 @@ pub async fn validate_delegated(
 
 /// Whether a delegated token may call `method` on `path` (relative to `/api`, starting at the org).
 pub fn in_assistant_scope(method: &Method, path: &str) -> bool {
-    if method == Method::DELETE {
-        return false;
-    }
-    let (is_v2, rest) = match path
-        .strip_prefix(V2_API_PREFIX)
-        .and_then(|r| r.strip_prefix('/'))
-    {
-        Some(rest) => (true, rest),
-        None => (false, path),
-    };
-    let columns: Vec<&str> = rest.split('/').collect();
-    ASSISTANT_SCOPE.iter().any(|route| {
-        route.v2 == is_v2
-            && route.methods.contains(&method.as_str())
-            && segments_match(route.segments, &columns)
-    })
+    in_scope(ASSISTANT_SCOPE, method, path)
+}
+
+/// Whether a `slack_action` token may call `method` on `path` (relative to `/api`).
+pub fn in_slack_action_scope(method: &Method, path: &str) -> bool {
+    in_scope(SLACK_ACTION_SCOPE, method, path)
 }
 
 /// Validation step 6 (as the validator's own permission check), then step 7's usage touch.
@@ -376,7 +405,7 @@ fn verified_claims(
         log::debug!("delegated token refused: Slack is off ({reason:?})");
         return Err(unauthorized());
     }
-    if claims.scope != SCOPE_ASSISTANT {
+    if scope_routes(&claims.scope).is_none() {
         return Err(forbidden("unknown token scope"));
     }
     Ok(claims)
@@ -392,14 +421,24 @@ fn check_route(
     if path_prefix == PROXY_PREFIX {
         return Err(forbidden("proxy routes are not delegated"));
     }
+    let routes = scope_routes(&claims.scope).ok_or_else(|| forbidden("unknown token scope"))?;
     let relative = relative_path(path);
     match path_org(relative) {
         None => Err(forbidden("route has no org")),
         Some(org) if org != claims.org => Err(forbidden("token is for another org")),
-        Some(_) if !in_assistant_scope(method, relative) => {
-            Err(forbidden("route is outside the assistant scope"))
+        Some(_) if !in_scope(routes, method, relative) => {
+            Err(forbidden("route is outside the token scope"))
         }
         Some(_) => Ok(()),
+    }
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn scope_routes(scope: &str) -> Option<&'static [ScopeRoute]> {
+    match scope {
+        SCOPE_ASSISTANT => Some(ASSISTANT_SCOPE),
+        SCOPE_SLACK_ACTION => Some(SLACK_ACTION_SCOPE),
+        _ => None,
     }
 }
 
@@ -420,12 +459,32 @@ fn path_org(relative: &str) -> Option<&str> {
     (!org.is_empty() && !rest.is_empty()).then_some(org)
 }
 
+fn in_scope(routes: &[ScopeRoute], method: &Method, path: &str) -> bool {
+    if method == Method::DELETE {
+        return false;
+    }
+    let (is_v2, rest) = match path
+        .strip_prefix(V2_API_PREFIX)
+        .and_then(|r| r.strip_prefix('/'))
+    {
+        Some(rest) => (true, rest),
+        None => (false, path),
+    };
+    let columns: Vec<&str> = rest.split('/').collect();
+    routes.iter().any(|route| {
+        route.v2 == is_v2
+            && route.methods.contains(&method.as_str())
+            && segments_match(route.segments, &columns)
+    })
+}
+
 fn segments_match(patterns: &[Seg], columns: &[&str]) -> bool {
     patterns.len() == columns.len()
         && patterns.iter().zip(columns).all(|(pat, col)| match pat {
             Lit(lit) => col == lit,
             Param => !col.is_empty(),
             Stream => !col.is_empty() && !RESERVED_STREAM_SLOTS.contains(col),
+            Id(literals) => !col.is_empty() && !literals.contains(col),
         })
 }
 
@@ -581,6 +640,17 @@ mod tests {
 
     fn route(path: &str, prefix: &str, method: Method) -> u16 {
         status(check_route(path, prefix, &method, &claims("acme")))
+    }
+
+    fn slack_action(org: &str) -> Claims {
+        Claims {
+            scope: SCOPE_SLACK_ACTION.to_string(),
+            ..claims(org)
+        }
+    }
+
+    fn action_route(method: Method, path: &str) -> u16 {
+        status(check_route(path, "/api/", &method, &slack_action("acme")))
     }
 
     fn link() -> ExternalIdentityLink {
@@ -763,6 +833,90 @@ mod tests {
             )),
             403
         );
+    }
+
+    #[test]
+    fn a_slack_action_token_is_refused_on_chat_stream_and_every_unlisted_route() {
+        let token = token(&slack_action("acme"));
+        assert_eq!(
+            status(verified_claims(
+                &token,
+                true,
+                || Ok(keys()),
+                NOW_SECS,
+                |_| None
+            )),
+            200
+        );
+        for (method, path) in [
+            (Method::GET, "/v2/acme/alerts/a1"),
+            (Method::GET, "/v2/acme/alerts/a1/acks"),
+            (Method::GET, "/v2/acme/alerts/a1/groups"),
+            (Method::POST, "/v2/acme/alerts/a1/ack"),
+            (Method::POST, "/v2/acme/alerts/a1/unack"),
+            (Method::POST, "/v2/acme/alerts/a1/mute"),
+            (Method::POST, "/v2/acme/alerts/a1/mute/d1/extend"),
+            (Method::POST, "/v2/acme/alerts/a1/mute/d1/cancel"),
+            (Method::PATCH, "/v2/acme/alerts/incidents/i1/update"),
+            (Method::POST, "/acme/oncall/responses/r1/resolve"),
+            (Method::POST, "/acme/oncall/responses/r1/snooze"),
+        ] {
+            assert_eq!(action_route(method.clone(), path), 200, "{method} {path}");
+        }
+        for (method, path) in [
+            (Method::POST, "/acme/ai/chat_stream"),
+            (Method::POST, "/acme/ai/chat"),
+            (Method::POST, "/acme/ai/confirm/s1"),
+            (Method::GET, "/acme/mcp"),
+            (Method::POST, "/acme/mcp"),
+            (Method::POST, "/acme/_search"),
+            (Method::GET, "/acme/streams"),
+            (Method::POST, "/v2/acme/downtimes"),
+            (Method::POST, "/v2/acme/downtimes/d1/cancel"),
+            (Method::POST, "/acme/oncall/responses/r1/acknowledge"),
+            (Method::GET, "/acme/oncall/responses/r1"),
+            (Method::POST, "/v2/acme/alerts/incidents/i1/events/comment"),
+            (Method::GET, "/v2/acme/alerts/incidents/i1"),
+            (Method::GET, "/v2/acme/alerts"),
+            (Method::GET, "/v2/acme/alerts/history"),
+            (Method::GET, "/v2/acme/alerts/incidents"),
+            (Method::GET, "/v2/acme/alerts/tags"),
+            (Method::GET, "/v2/acme/alerts/incidents/groups"),
+            (Method::GET, "/v2/acme/alerts/a1/groups/transitions"),
+            (Method::PUT, "/v2/acme/alerts/a1"),
+            (Method::DELETE, "/v2/acme/alerts/a1"),
+            (Method::DELETE, "/v2/acme/alerts/a1/mute/d1/cancel"),
+            (Method::GET, "/v2/acme/alerts/a1/ack"),
+            (Method::PATCH, "/v2/acme/alerts/a1/enable"),
+            (Method::POST, "/v2/acme/alerts/a1/trigger"),
+            (Method::POST, "/v2/other/alerts/a1/ack"),
+            (Method::POST, "/acme/alerts/a1/ack"),
+        ] {
+            assert_eq!(action_route(method.clone(), path), 403, "{method} {path}");
+        }
+        assert_eq!(
+            status(check_route(
+                "/proxy/acme/v2/acme/alerts/a1/ack",
+                "/proxy/",
+                &Method::POST,
+                &slack_action("acme")
+            )),
+            403
+        );
+    }
+
+    #[test]
+    fn an_assistant_token_is_refused_on_ack_and_a_slack_action_token_is_not() {
+        for path in [
+            "/v2/acme/alerts/a1/ack",
+            "/v2/acme/alerts/a1/unack",
+            "/v2/acme/alerts/a1/mute",
+            "/v2/acme/alerts/a1/mute/d1/extend",
+            "/v2/acme/alerts/a1/mute/d1/cancel",
+        ] {
+            assert_eq!(route(path, "/api/", Method::POST), 403, "assistant {path}");
+            assert_eq!(action_route(Method::POST, path), 200, "slack_action {path}");
+        }
     }
 
     #[test]

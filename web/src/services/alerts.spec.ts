@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import alerts from "@/services/alerts";
+import alerts, { alertActionErrorOf } from "@/services/alerts";
 import http from "@/services/http";
 import analytics from "@/services/product_analytics";
 
@@ -636,6 +636,96 @@ describe("alerts service", () => {
         `/api/v2/${params.org_identifier}/alerts/move`,
         params.data,
       );
+    });
+  });
+
+  describe("ack and mute", () => {
+    const BASE = "/api/v2/acme/alerts/a%2F1";
+
+    it("acks a group of the firing the caller saw", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { changed: true, acks: [] } });
+      const body = { group_key: "k1", firing_started_at: 1_790_000_000_000_000 };
+      await alerts.ackAlert("acme", "a/1", body);
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`${BASE}/ack`, body, {});
+    });
+
+    it("acks every firing group and takes over, with the folder for the permission check", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { changed: true, acks: [] } });
+      await alerts.ackAlert("acme", "a/1", { all_groups: true, take_over: true }, "payments");
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        `${BASE}/ack`,
+        { all_groups: true, take_over: true },
+        { params: { folder: "payments" } },
+      );
+    });
+
+    it("unacks one group", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { changed: true } });
+      await alerts.unackAlert("acme", "a/1", { group_key: "" });
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`${BASE}/unack`, { group_key: "" }, {});
+    });
+
+    it("lists the acks in force", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { acks: [] } });
+      await alerts.listAlertAcks("acme", "a/1");
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`${BASE}/acks`, {});
+    });
+
+    it("mutes through the alert route", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { downtime_id: "d1" } });
+      const body = { until_clear: true, group_keys: ["k1"] };
+      await alerts.muteAlert("acme", "a/1", body);
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`${BASE}/mute`, body, {});
+    });
+
+    it("extends a quick mute with the version the caller saw", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { version: 3 } });
+      await alerts.extendAlertMute("acme", "a/1", "d 1", { version: 2, minutes: 60 });
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        `${BASE}/mute/d%201/extend`,
+        { version: 2, minutes: 60 },
+        {},
+      );
+    });
+
+    it("cancels a quick mute", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+      await alerts.cancelAlertMute("acme", "a/1", "d1", "payments");
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`${BASE}/mute/d1/cancel`, undefined, {
+        params: { folder: "payments" },
+      });
+    });
+  });
+
+  describe("alertActionErrorOf", () => {
+    const failure = (status: number, data: unknown) => ({ response: { status, data } });
+
+    it("reads a refusal with who is on call and who can act", () => {
+      const data = {
+        code: "ack_refused",
+        message: "Ack needs Admin or Editor",
+        rule: "role",
+        on_call: [{ email: "dana@acme.io", team: "Payments" }],
+        can_act: [{ email: "lee@acme.io", name: "Lee" }],
+      };
+      expect(alertActionErrorOf(failure(403, data))).toEqual(data);
+    });
+
+    it("reads the 409 codes", () => {
+      expect(alertActionErrorOf(failure(409, { code: "not_firing" }))).toEqual({
+        code: "not_firing",
+      });
+      expect(
+        alertActionErrorOf(failure(409, { code: "firing_changed", firing_started_at: 7 })),
+      ).toEqual({ code: "firing_changed", firing_started_at: 7 });
+    });
+
+    it("ignores an error that carries no known code", () => {
+      expect(alertActionErrorOf(failure(403, { message: "Unauthorized Access" }))).toBeNull();
+      expect(alertActionErrorOf(failure(409, { code: "something_else" }))).toBeNull();
+      expect(alertActionErrorOf(failure(500, { code: "not_firing" }))).toBeNull();
+      expect(alertActionErrorOf(new Error("network"))).toBeNull();
+      expect(alertActionErrorOf(undefined)).toBeNull();
     });
   });
 

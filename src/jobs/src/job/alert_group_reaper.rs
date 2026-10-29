@@ -44,6 +44,7 @@ use config::{
     spawn_pausable_job,
     utils::time::now_micros,
 };
+use openobserve_core::alerts::lifecycle::{self, ClearKind};
 
 /// Start the sweep. Alert-manager nodes only, one leader at a time — the work
 /// is a whole-table scan of group state, and running it on every node would
@@ -86,6 +87,10 @@ pub fn run() {
                 log::debug!("[ALERT_GROUP_REAPER] not leader, skipping this pass");
                 continue;
             }
+
+            // Before the job-cluster gate: ack retention deletes are not replicated, so each
+            // region sweeps its own copy.
+            sweep_ended_acks().await;
 
             // Within-cluster election is not enough once state rows replicate
             // across a super cluster: every region's leader would then sweep
@@ -241,7 +246,17 @@ async fn sweep_alert(
             .collect();
         let stale = opt_out_evictions(&tracked);
         let n = stale.len();
+        let firing: Vec<(String, i64)> = stale
+            .iter()
+            .filter_map(|key| Some((key.clone(), tracked.get(key)?.firing_started_at?)))
+            .collect();
         db::alerts::alert_states::delete_groups(alert_id, &stale).await?;
+        // A deleted alert already reported its clears when it was deleted.
+        if let Some(a) = alert {
+            let cleared =
+                lifecycle::deleted_clears(&firing, now_micros(), ClearKind::GroupUntracked);
+            lifecycle::on_all_cleared(&a.org_id, alert_id, &cleared).await;
+        }
         return Ok((0, 0, n));
     }
     let alert = alert.expect("still_multi implies the alert is cached");
@@ -291,6 +306,14 @@ async fn sweep_alert(
                     // ledger history at all (D65).
                     db::alerts::alert_states::persist(&update, None).await?;
                     resolved += 1;
+                    if let Some(c) = lifecycle::update_clear(
+                        Some(state),
+                        &update,
+                        now,
+                        ClearKind::ReaperResolved,
+                    ) {
+                        lifecycle::on_all_cleared(&alert.org_id, alert_id, &[c]).await;
+                    }
                 }
             }
             GroupFate::Reap => to_reap.push(state.group_key.clone()),
@@ -302,6 +325,22 @@ async fn sweep_alert(
         db::alerts::alert_states::delete_groups(alert_id, &to_reap).await?;
     }
     Ok((resolved, reaped, 0))
+}
+
+/// Deletes the acks of firings that are no longer current, once the reap grace has passed.
+async fn sweep_ended_acks() {
+    let grace_secs = get_config().limit.alert_group_reap_grace_secs;
+    let cutoff = ended_ack_cutoff(now_micros(), grace_secs);
+    match infra::table::alert_acks::delete_ended_before(cutoff).await {
+        Ok(0) => {}
+        Ok(n) => log::info!("[ALERT_GROUP_REAPER] deleted {n} acks of ended firings"),
+        Err(e) => log::error!("[ALERT_GROUP_REAPER] ack sweep failed: {e}"),
+    }
+}
+
+/// The instant before which an ack of an ended firing may go: the reap grace before `now`. [pure]
+fn ended_ack_cutoff(now: i64, grace_secs: i64) -> i64 {
+    now.saturating_sub(grace_secs.saturating_mul(1_000_000))
 }
 
 /// PromQL series grouping also keeps per-group state rows alive.
@@ -352,6 +391,16 @@ mod tests {
         alert.query_condition.query_type = QueryType::PromQL;
         alert.query_condition.promql_multi_alert = true;
         assert!(still_multi(Some(&alert)));
+    }
+
+    #[test]
+    fn an_ended_firings_ack_goes_once_the_reap_grace_has_passed() {
+        let now = 1_750_000_000_000_000;
+        assert_eq!(ended_ack_cutoff(now, 3600), now - 3600 * 1_000_000);
+        assert_eq!(
+            ended_ack_cutoff(now, i64::MAX),
+            now.saturating_sub(i64::MAX)
+        );
     }
 
     #[test]
