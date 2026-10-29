@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey, TranslateFn } from "@/types/i18n";
-import type { V2Group } from "@/utils/alerts/alertDataTransforms";
 import type {
+  DimensionCondition,
   Downtime,
   DowntimeNotifications,
   DowntimeRequest,
@@ -27,12 +27,7 @@ import type {
   SloCorrectionMode,
   TargetModule,
 } from "@/services/downtimes";
-import {
-  andEqPairs,
-  builderToCondition,
-  conditionToBuilder,
-  emptyBuilderGroup,
-} from "./conditionBridge";
+import { andEqPairs } from "./conditionBridge";
 import { MODULE_ORDER, type FolderNameFn } from "./targetSummary";
 import {
   durationInput,
@@ -113,7 +108,7 @@ export interface DowntimeFormValues extends Record<string, unknown> {
   folder_id: string;
   modules: TargetModule[];
   condition_open: boolean;
-  condition: V2Group | null;
+  condition: DimensionCondition | null;
   targets: Record<TargetModule, TargetFormValues>;
   schedule: ScheduleFormValues;
   reason: string;
@@ -173,7 +168,7 @@ export function defaultDowntimeValues(nowMs: number, timezone: string): Downtime
     folder_id: "default",
     modules: ["alerts"],
     condition_open: false,
-    condition: emptyBuilderGroup(),
+    condition: null,
     targets: {
       alerts: emptyTarget(),
       anomaly_detections: emptyTarget(),
@@ -299,7 +294,7 @@ export function buildTargets(values: DowntimeFormValues): DowntimeTarget[] {
 /** The shared condition is sent only while its block is open and a module has an identity. */
 export function buildCondition(values: DowntimeFormValues) {
   if (!values.condition_open || !values.modules.some(hasIdentity)) return undefined;
-  return builderToCondition(values.condition) ?? undefined;
+  return values.condition ?? undefined;
 }
 
 /** A recurring row starts at the loaded `starts_at` while its day and zone are unchanged, else at 00:00 of `start_date`. */
@@ -432,7 +427,7 @@ export function downtimeToFormValues(d: Downtime): DowntimeFormValues {
     folder_id: d.folder_id || "default",
     modules: MODULE_ORDER.filter((m) => byModule.has(m)),
     condition_open: !!d.condition,
-    condition: d.condition ? conditionToBuilder(d.condition) : emptyBuilderGroup(),
+    condition: d.condition ?? null,
     targets: {
       alerts: targetValues(byModule.get("alerts")),
       anomaly_detections: targetValues(byModule.get("anomaly_detections")),

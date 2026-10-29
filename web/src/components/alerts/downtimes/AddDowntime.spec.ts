@@ -280,13 +280,15 @@ describe("AddDowntime", () => {
     wrapper.unmount();
   });
 
-  it("shows the condition rule under the builder when a row is empty", async () => {
+  it("shows the condition rule under the builder when the block is empty", async () => {
     const { wrapper } = await mountPage();
     await wrapper.get('[data-test="downtime-condition-add"]').trigger("click");
     await flushPromises();
     await save(wrapper);
     expect(downtimes.create).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain("Choose a dimension for every row.");
+    expect(wrapper.get('[data-test="downtime-condition-builder-issues"]').text()).toContain(
+      "Add a condition, or remove the condition block.",
+    );
     wrapper.unmount();
   });
 

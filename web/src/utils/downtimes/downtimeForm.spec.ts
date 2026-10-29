@@ -3,7 +3,6 @@
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { Downtime } from "@/services/downtimes";
-import { conditionToBuilder } from "./conditionBridge";
 import {
   ALL_FOLDERS,
   applyPrefill,
@@ -279,12 +278,12 @@ describe("prefill and the mute-all rule", () => {
     const values: DowntimeFormValues = defaultDowntimeValues(NOW, "UTC");
     expect(unnarrowedModules(values)).toEqual(["alerts"]);
     values.condition_open = true;
-    values.condition = conditionToBuilder({
+    values.condition = {
       type: "pair",
       key: "service",
       operator: "=",
       value: "x",
-    });
+    };
     expect(unnarrowedModules(values)).toEqual([]);
   });
 });
