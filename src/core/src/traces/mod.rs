@@ -842,7 +842,7 @@ pub async fn handle_otlp_request(
     let otel_processor = OtelIngestionProcessor::new();
 
     // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
-    // When ZO_MODEL_PRICING_ENABLED=false, skip DB pricing and fall back to hardcoded values.
+    // When ZO_MODEL_PRICING_ENABLED=false, no pricing applies and spans keep only reported costs.
     static EMPTY_PRICING: std::sync::OnceLock<
         std::sync::Arc<Vec<crate::db::model_pricing::CachedModelPricing>>,
     > = std::sync::OnceLock::new();

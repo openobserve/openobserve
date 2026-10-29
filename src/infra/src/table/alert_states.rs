@@ -39,6 +39,15 @@ use crate::{
     errors,
 };
 
+/// What [`persist_group_plan`] wrote, for the replication gate and the clear hook.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GroupPlanWrite {
+    /// False when the opt-out gate dropped the plan.
+    pub written: bool,
+    /// `(group_key, firing_started_at)` of each evicted row that was mid-firing.
+    pub evicted_firing: Vec<(String, i64)>,
+}
+
 /// Convert a stored row into the domain type. An unrecognised `last_outcome`
 /// integer degrades to `None` ("never evaluated") rather than failing the read —
 /// a value we cannot interpret is not worth taking the list endpoint down for.
@@ -67,6 +76,7 @@ impl From<alert_states::Model> for AlertState {
             episode_opened_at: m.episode_opened_at,
             episode_incident_id: m.episode_incident_id,
             recovering_since: m.recovering_since,
+            firing_started_at: m.firing_started_at,
         }
     }
 }
@@ -299,7 +309,10 @@ pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
 /// super-cluster wrapper must not broadcast a plan this region refused, or a
 /// region that has not yet seen the opt-out would materialise exactly the rows
 /// the toggle promised to remove.
-pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<bool, errors::Error> {
+pub async fn persist_group_plan(
+    plan: &GroupPlan,
+    alert_id: &str,
+) -> Result<GroupPlanWrite, errors::Error> {
     let client = get_orm_client_rw().await;
     persist_group_plan_with(client, plan, alert_id).await
 }
@@ -309,7 +322,7 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     conn: &C,
     plan: &GroupPlan,
     alert_id: &str,
-) -> Result<bool, errors::Error> {
+) -> Result<GroupPlanWrite, errors::Error> {
     let txn = conn.begin().await?;
 
     // §5.3 opt-out race: this evaluation may have read the alert BEFORE a save
@@ -324,7 +337,7 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
             "alert {alert_id}: per-group alerting was turned off mid-evaluation; dropping this \
              evaluation's group writes"
         );
-        return Ok(false);
+        return Ok(GroupPlanWrite::default());
     }
 
     for update in &plan.updates {
@@ -334,7 +347,9 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     // Evicted rows are deleted outright with NO transition (M-6): an eviction
     // is bookkeeping, not a level change — the group may well still be firing,
     // so a recovery row would be a lie.
+    let mut evicted_firing = Vec::new();
     if !plan.evicted.is_empty() {
+        evicted_firing = firing_groups_with(&txn, alert_id, Some(&plan.evicted)).await?;
         alert_states::Entity::delete_many()
             .filter(alert_states::Column::AlertId.eq(alert_id))
             .filter(alert_states::Column::GroupKey.is_in(plan.evicted.clone()))
@@ -343,7 +358,46 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     }
 
     txn.commit().await?;
-    Ok(true)
+    Ok(GroupPlanWrite {
+        written: true,
+        evicted_firing,
+    })
+}
+
+/// `(group_key, firing_started_at)` of the alert's group rows mid-firing, optionally only `keys`.
+pub async fn firing_groups(
+    alert_id: &str,
+    keys: Option<&[String]>,
+) -> Result<Vec<(String, i64)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    firing_groups_with(client, alert_id, keys).await
+}
+
+/// [`firing_groups`] against a caller-supplied connection.
+pub async fn firing_groups_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    keys: Option<&[String]>,
+) -> Result<Vec<(String, i64)>, errors::Error> {
+    let mut query = alert_states::Entity::find()
+        .select_only()
+        .column(alert_states::Column::GroupKey)
+        .column(alert_states::Column::FiringStartedAt)
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.ne(ROLLUP_GROUP_KEY))
+        .filter(alert_states::Column::FiringStartedAt.is_not_null());
+    if let Some(keys) = keys {
+        query = query.filter(alert_states::Column::GroupKey.is_in(keys.to_vec()));
+    }
+    let rows = query
+        .order_by_asc(alert_states::Column::GroupKey)
+        .into_tuple::<(String, Option<i64>)>()
+        .all(conn)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(key, started)| started.map(|s| (key, s)))
+        .collect())
 }
 
 /// Record a per-group delivery outcome (§5.5 MN-6/MN-7), conditionally.
@@ -500,6 +554,45 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
     }
     txn.commit().await?;
     Ok(true)
+}
+
+/// After an unack, repeats wait out one silence window from the unack (§5.5).
+pub async fn set_silence_after_unack(
+    alert_id: &str,
+    group_key: &str,
+    firing_started_at: i64,
+    until: i64,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    set_silence_after_unack_with(client, alert_id, group_key, firing_started_at, until).await
+}
+
+/// [`set_silence_after_unack`] against a caller-supplied connection; false when nothing moved.
+pub async fn set_silence_after_unack_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    group_key: &str,
+    firing_started_at: i64,
+    until: i64,
+) -> Result<bool, errors::Error> {
+    // Only the silence column: the delivered level stays the escalation baseline (one-writer rule).
+    let affected = alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::SilencedUntil,
+            sea_orm::sea_query::Expr::value(until),
+        )
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.eq(group_key))
+        .filter(alert_states::Column::FiringStartedAt.eq(firing_started_at))
+        .filter(
+            sea_orm::Condition::any()
+                .add(alert_states::Column::SilencedUntil.is_null())
+                .add(alert_states::Column::SilencedUntil.lt(until)),
+        )
+        .exec(conn)
+        .await?
+        .rows_affected;
+    Ok(affected > 0)
 }
 
 /// Which delivery outcome [`advance_delivery_state`] should record.
@@ -668,6 +761,7 @@ where
         episode_incident_id: Set(state.episode_incident_id.clone()),
         recovering_since: Set(state.recovering_since),
         last_downtime_id: sea_orm::ActiveValue::NotSet,
+        firing_started_at: Set(state.firing_started_at),
     };
 
     // Upsert on the composite primary key — rows are created lazily on an
@@ -698,6 +792,8 @@ where
                 alert_states::Column::EpisodeOpenedAt,
                 alert_states::Column::EpisodeIncidentId,
                 alert_states::Column::RecoveringSince,
+                // Evaluation-owned like the episode: only apply_outcome and the planners move it.
+                alert_states::Column::FiringStartedAt,
                 // `silenced_until` / `last_notified_level` are DELIBERATELY
                 // absent (§5.5 MN-2, one-writer rule). An evaluation carries
                 // stale copies — it read them before it ran — so listing them
@@ -846,6 +942,18 @@ pub async fn list_transitions_between(
     limit: u64,
 ) -> Result<Vec<StateTransition>, errors::Error> {
     let client = get_orm_client_ro().await;
+    list_transitions_between_with(client, alert_id, group_key, from, to, limit).await
+}
+
+/// [`list_transitions_between`] against a caller-supplied connection.
+pub async fn list_transitions_between_with<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    alert_id: &str,
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    limit: u64,
+) -> Result<Vec<StateTransition>, errors::Error> {
     let mut query = alert_state_transitions::Entity::find()
         .filter(alert_state_transitions::Column::AlertId.eq(alert_id))
         .filter(alert_state_transitions::Column::At.gte(from))
@@ -996,6 +1104,7 @@ mod tests {
             episode_incident_id: None,
             recovering_since: None,
             last_downtime_id: None,
+            firing_started_at: None,
         }
     }
 
@@ -1416,6 +1525,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_unack_opens_a_silence_window_only_on_its_own_firing_and_never_shortens_one() {
+        let db = db().await;
+        let mut update = update_at("host=web-1", 1_000);
+        if let Some(state) = update.state.as_mut() {
+            state.firing_started_at = Some(1_000);
+            state.silenced_until = Some(1_500);
+        }
+        persist_with(&db, &update, None).await.unwrap();
+        async fn silence(db: &sea_orm::DatabaseConnection) -> Option<i64> {
+            get_with(db, "alert-1", "host=web-1")
+                .await
+                .unwrap()
+                .unwrap()
+                .silenced_until
+        }
+
+        assert!(
+            !set_silence_after_unack_with(&db, "alert-1", "host=web-1", 999, 9_000)
+                .await
+                .unwrap(),
+            "an unack of an older firing must not silence the current one"
+        );
+        assert!(
+            set_silence_after_unack_with(&db, "alert-1", "host=web-1", 1_000, 9_000)
+                .await
+                .unwrap()
+        );
+        assert_eq!(silence(&db).await, Some(9_000));
+        assert!(
+            !set_silence_after_unack_with(&db, "alert-1", "host=web-1", 1_000, 5_000)
+                .await
+                .unwrap()
+        );
+        assert_eq!(silence(&db).await, Some(9_000), "a later window holds");
+    }
+
+    #[tokio::test]
     async fn a_replayed_delivery_advance_does_not_move_the_silence_window() {
         let db = db().await;
         persist_with(&db, &update_at("host=web-1", 1_000), None)
@@ -1594,6 +1740,94 @@ mod tests {
         );
     }
 
+    fn firing_update(group_key: &str, at: i64, started: Option<i64>) -> StateUpdate {
+        let mut update = update_at(group_key, at);
+        update.state.as_mut().unwrap().firing_started_at = started;
+        update
+    }
+
+    #[tokio::test]
+    async fn the_firing_cycle_is_written_cleared_and_left_alone_by_delivery_callbacks() {
+        let db = db().await;
+        persist_with(
+            &db,
+            &firing_update(ROLLUP_GROUP_KEY, 1_000, Some(1_000)),
+            None,
+        )
+        .await
+        .unwrap();
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.firing_started_at, Some(1_000));
+
+        let episode = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+        assert!(
+            advance_delivery_state_with(
+                &db,
+                "alert-1",
+                ROLLUP_GROUP_KEY,
+                episode,
+                DeliveryOutcome::Failed { at: 1_500 },
+            )
+            .await
+            .unwrap()
+        );
+        let failed = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(failed.last_outcome, Some(RunOutcome::NotifyFailed));
+        assert_eq!(
+            failed.firing_started_at,
+            Some(1_000),
+            "a delivery write never moves it"
+        );
+
+        persist_with(&db, &firing_update(ROLLUP_GROUP_KEY, 2_000, None), None)
+            .await
+            .unwrap();
+        let cleared = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            cleared.firing_started_at, None,
+            "the upsert must clear it, not keep it"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_eviction_reports_the_firing_groups_it_deleted() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        persist_with(&db, &firing_update("host=web-8", 500, Some(400)), None)
+            .await
+            .unwrap();
+        persist_with(&db, &firing_update("host=web-9", 500, None), None)
+            .await
+            .unwrap();
+
+        let plan = GroupPlan {
+            updates: vec![firing_update("host=web-1", 1_000, Some(1_000))],
+            evicted: vec!["host=web-8".to_string(), "host=web-9".to_string()],
+        };
+        let write = persist_group_plan_with(&db, &plan, "alert-1")
+            .await
+            .unwrap();
+        assert!(write.written);
+        assert_eq!(write.evicted_firing, vec![("host=web-8".to_string(), 400)]);
+        assert_eq!(
+            firing_groups_with(&db, "alert-1", None).await.unwrap(),
+            vec![("host=web-1".to_string(), 1_000)]
+        );
+    }
+
     /// The forward-only consequence, recorded deliberately: the gate re-reads
     /// the alert on the *receiving* cluster, so a plan that outruns its alert
     /// row is dropped rather than stranding group rows under an alert that
@@ -1608,7 +1842,8 @@ mod tests {
         assert!(
             !persist_group_plan_with(&db, &plan, "alert-1")
                 .await
-                .unwrap(),
+                .unwrap()
+                .written,
             "the drop must be reported, not silently reported as a write — the \
              super-cluster wrapper decides whether to broadcast on this"
         );

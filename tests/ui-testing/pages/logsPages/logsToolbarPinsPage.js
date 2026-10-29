@@ -14,10 +14,13 @@ export class LogsToolbarPinsPage {
     // ===== STORAGE KEYS (useToolbarPins.ts) =====
     this.pinsKey = 'logs_toolbar_pinned_items';
     this.histogramDecidedKey = 'logs_toolbar_histogram_pin_decided';
+    this.savedViewsDecidedKey = 'logs_toolbar_saved_views_pin_decided';
     this.tracesPinsKey = 'traces_toolbar_pinned_items';
 
     // ===== LOCATORS =====
     this.moreMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
+    // The bar clips its overflow, so its box is what decides "clipped" below.
+    this.searchBar = '#searchBarComponent';
 
     // Traces uses the same composable under its own scope. Cross-scope tests move
     // by nav-rail click, never page.goto, so both scopes share one document.
@@ -67,13 +70,10 @@ export class LogsToolbarPinsPage {
 
   // ===== SETUP =====
 
-  /**
-   * Seeds pin storage before the app boots. A string `pins` is written verbatim,
-   * so a test can seed corrupt JSON; `decided` sets the histogram default flag.
-   */
+  /** Seeds pin storage before boot; a string `pins` is written verbatim, `decided` sets both default-pin flags. */
   async seedPinStorage({ pins, decided } = {}) {
     await this.page.addInitScript(
-      ([key, value, decidedKey, decidedValue]) => {
+      ([key, value, decidedKeys, decidedValue]) => {
         try {
           // addInitScript re-runs on every navigation, so seed once or a reload
           // would wipe what the test just pinned.
@@ -81,8 +81,10 @@ export class LogsToolbarPinsPage {
           sessionStorage.setItem('__pinSeedApplied', '1');
           if (value === null) localStorage.removeItem(key);
           else localStorage.setItem(key, value);
-          if (decidedValue === null) localStorage.removeItem(decidedKey);
-          else localStorage.setItem(decidedKey, decidedValue);
+          for (const decidedKey of decidedKeys) {
+            if (decidedValue === null) localStorage.removeItem(decidedKey);
+            else localStorage.setItem(decidedKey, decidedValue);
+          }
         } catch (_) {
           // Private mode / quota — the app falls back to in-memory pins.
         }
@@ -90,7 +92,7 @@ export class LogsToolbarPinsPage {
       [
         this.pinsKey,
         pins === undefined ? null : typeof pins === 'string' ? pins : JSON.stringify(pins),
-        this.histogramDecidedKey,
+        [this.histogramDecidedKey, this.savedViewsDecidedKey],
         decided === undefined ? null : String(decided),
       ],
     );
@@ -226,6 +228,10 @@ export class LogsToolbarPinsPage {
     return this.page.evaluate((key) => localStorage.getItem(key), this.histogramDecidedKey);
   }
 
+  async readSavedViewsDecidedFlag() {
+    return this.page.evaluate((key) => localStorage.getItem(key), this.savedViewsDecidedKey);
+  }
+
   async readTracesPins() {
     return this.page.evaluate((key) => localStorage.getItem(key), this.tracesPinsKey);
   }
@@ -256,6 +262,22 @@ export class LogsToolbarPinsPage {
 
   async expectPinnedHidden(key) {
     await expect(this.page.locator(this.pinnedControl[key])).toBeHidden();
+  }
+
+  /** Visible AND inside the bar's clip box: the bar is `overflow-hidden`, so a
+   * control pushed past its right edge still satisfies toBeVisible(). */
+  async expectPinnedUnclipped(key) {
+    const control = this.page.locator(this.pinnedControl[key]);
+    await expect(control).toBeVisible();
+    const box = await control.boundingBox();
+    const bar = await this.page.locator(this.searchBar).boundingBox();
+    expect(box, `${key} is pinned but has no layout box`).not.toBeNull();
+    const within = box.x >= bar.x - 1 && box.x + box.width <= bar.x + bar.width + 1;
+    expect(
+      within,
+      `${key} is clipped by the toolbar: control spans ${Math.round(box.x)}-${Math.round(box.x + box.width)}px,` +
+        ` bar spans ${Math.round(bar.x)}-${Math.round(bar.x + bar.width)}px`,
+    ).toBe(true);
   }
 
   /** A collapsed control must still be pinned — only its rendering moved. */

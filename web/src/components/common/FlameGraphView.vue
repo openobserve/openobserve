@@ -254,6 +254,8 @@ import { cssToken } from "@/utils/theme";
 import { paletteIndexFor } from "./flameGraphPackage";
 import { parseColor } from "@/lib/styles/tokens/colorMath";
 import { useI18nTyped } from "@/types/i18n";
+import { useThemeRevision } from "@/composables/useTheme";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 export interface FlameGraphNode {
   name: string;
@@ -261,7 +263,7 @@ export interface FlameGraphNode {
   self?: number;
   /** Baseline side of a diff tree; total and self are then the comparison side. */
   before_total?: number;
-  /** Comparison side, set when the drawn tree is the baseline side (Side by Side). */
+  /** Comparison side, set when the drawn tree is the baseline side (Side by side). */
   after_total?: number;
   children?: FlameGraphNode[];
 }
@@ -356,6 +358,9 @@ const chartRendererRef = ref<{
     setOption: (option: object) => void;
     dispatchAction: (action: object) => void;
     getDom: () => HTMLElement;
+    getWidth?: () => number;
+    getHeight?: () => number;
+    resize: () => void;
   };
 } | null>(null);
 
@@ -364,22 +369,9 @@ const BLOCK_PADDING = 2;
 const tokenColor = (token: string, fallbackToken: string) =>
   cssToken(token, cssToken(fallbackToken, ""));
 
-// Cool hues of the dashboard series palette only: no red, pink, amber or green (mint included), which read as status.
-const palette = [1, 5, 7, 9].map((step) =>
-  tokenColor(`--color-chart-series-${step}`, "--color-chart-series-1"),
-);
-
-// Dark in both themes, because the frame fills are light in both.
-const textColor = tokenColor("--color-flame-frame-text", "--color-text-heading");
-const groupedFill = tokenColor("--color-border-strong", "--color-border-default");
 // Synthetic frame names from the merge API (src/core/src/profiles/query.rs).
 const OTHER_FRAME = "other";
 const TRUNCATED_FRAME = "[truncated]";
-const borderColor = tokenColor("--color-border-default", "--color-border-strong");
-const matchTextBg = tokenColor("--color-status-warning-bg", "--color-warning-500");
-// Diff colours: a bigger share reads as more cost, a smaller share as less, grey for no change.
-const diffMore = tokenColor("--color-status-negative", "--color-chart-series-3");
-const diffLess = tokenColor("--color-chart-series-1", "--color-chart-series-5");
 // Changes under a tenth of a point draw grey.
 const DIFF_FLOOR = 0.001;
 
@@ -392,7 +384,27 @@ const mixColor = (from: string, to: string, amount: number) => {
   // eslint-disable-next-line local/no-hardcoded-color -- canvas fill mixed at runtime from two token colours
   return `rgb(${channel(a.r, b.r)}, ${channel(a.g, b.g)}, ${channel(a.b, b.b)})`;
 };
-const matchBorder = tokenColor("--color-warning-600", "--color-warning-500");
+
+const themeRevision = useThemeRevision();
+// Token values change with the theme, so they are re-read whenever it switches.
+const colors = computed(() => {
+  void themeRevision.value;
+  return {
+    // Cool hues of the dashboard series palette only: no red, pink, amber or green (mint included), which read as status.
+    palette: [1, 5, 7, 9].map((step) =>
+      tokenColor(`--color-chart-series-${step}`, "--color-chart-series-1"),
+    ),
+    // Dark in both themes, because the frame fills are light in both.
+    textColor: tokenColor("--color-flame-frame-text", "--color-text-heading"),
+    groupedFill: tokenColor("--color-flame-grouped-fill", "--color-border-default"),
+    borderColor: tokenColor("--color-border-default", "--color-border-strong"),
+    matchTextBg: tokenColor("--color-status-warning-bg", "--color-warning-500"),
+    // Diff colours: a bigger share reads as more cost, a smaller share as less, grey for no change.
+    diffMore: tokenColor("--color-status-negative", "--color-chart-series-3"),
+    diffLess: tokenColor("--color-chart-series-1", "--color-chart-series-5"),
+    matchBorder: tokenColor("--color-warning-600", "--color-warning-500"),
+  };
+});
 
 const escapeRichSegment = (value: string) =>
   value.replace(/\{/g, "﹛").replace(/\}/g, "﹜").replace(/\|/g, "｜");
@@ -491,6 +503,7 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
   // Zoomed in, the callers stay on screen above the zoomed frame, full width and dimmed.
   const ancestors = focusLine.value.slice(0, -1);
   const rootDepth = ancestors.length;
+  const { palette, textColor, groupedFill, diffMore, diffLess } = colors.value;
 
   const colorFor = (name: string) => palette[paletteIndexFor(name, palette.length)];
   const diffFill = (node: FlameGraphNode) => {
@@ -786,7 +799,7 @@ const openMenuFromButton = (event: MouseEvent) => {
   nextTick(fitMenu);
 };
 
-// A one-time hint for the wheel zoom; "Don't Show Again" keeps it closed.
+// A one-time hint for the wheel zoom; "Don't show again" keeps it closed.
 const ZOOM_HINT_KEY = "o2_flame_zoom_hint_hidden";
 const zoomKey = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
 const readHintHidden = () => {
@@ -903,13 +916,40 @@ const onDocumentKeydown = (event: KeyboardEvent) => {
   if (menu.value && event.key === "Escape") closeMenu();
 };
 
+// At lg+ ChartRenderer only follows window resizes, so a side panel opening would leave the graph stale; below lg it observes its own box.
+const { lgUp } = useBreakpoint();
+let resizeObserver: ResizeObserver | null = null;
+let resizeFrame = 0;
+const resizeChart = () => {
+  resizeFrame = 0;
+  const chart = chartRendererRef.value?.chart;
+  const dom = chart?.getDom?.();
+  if (!chart || !dom) return;
+  const width = dom.clientWidth;
+  const height = dom.clientHeight;
+  // ChartRenderer may already have resized for the same change; a second resize redraws for nothing.
+  if (width <= 0 || height <= 0) return;
+  if (width === chart.getWidth?.() && height === chart.getHeight?.()) return;
+  chart.resize?.();
+};
+
 onMounted(() => {
   document.addEventListener("click", onDocumentClick, true);
   document.addEventListener("keydown", onDocumentKeydown);
+  if (!rootEl.value || typeof ResizeObserver === "undefined") return;
+  resizeObserver = new ResizeObserver(() => {
+    if (!lgUp.value) return;
+    if (!resizeFrame) resizeFrame = requestAnimationFrame(resizeChart);
+  });
+  resizeObserver.observe(rootEl.value);
 });
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocumentClick, true);
   document.removeEventListener("keydown", onDocumentKeydown);
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = 0;
 });
 
 // No hover card over an open frame menu. Set on the chart itself, so the frame blocks are not rebuilt.
@@ -959,6 +999,7 @@ const chartData = computed(() => {
   // Rebuilds when the zoom turns on or off, so the options carry the current window.
   void zoomed.value;
   const needle = props.searchQuery.trim();
+  const { borderColor, matchBorder, matchTextBg } = colors.value;
   const data: FlameSeriesDatum[] = blocks.value.map((block) => ({
     value: [block.left, block.depth, block.width, block.total],
     itemStyle: {
@@ -980,6 +1021,8 @@ const chartData = computed(() => {
   return {
     options: {
       animation: false,
+      // In dark mode the ECharts theme draws its own background, which would box the graph in.
+      backgroundColor: "transparent",
       tooltip: {
         // On the body, as dashboard charts do: the graph's scroll box would cut off a tooltip above the top row.
         appendToBody: true,

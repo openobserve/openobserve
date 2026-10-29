@@ -665,17 +665,26 @@ async fn entry_downtime(
     let alert_id = entry.alert.id.as_ref()?.to_string();
     let (folder, _) =
         crate::db::alerts::alert::get_alert_from_cache(&entry.alert.org_id, &alert_id).await?;
+    let multi = entry.alert.query_condition.multi_alert_enabled();
     let identity =
-        crate::alerts::scheduler::handlers::downtime_identity(&entry.alert, &entry.rows).await;
-    crate::alerts::scheduler::handlers::muted_in_every_group(&identity, |dims| {
-        crate::alerts::downtimes::active_for_alert(
+        crate::alerts::scheduler::handlers::downtime_identity_by_key(&entry.alert, &entry.rows)
+            .await;
+    let mut decision: Option<config::meta::downtimes::ActiveDowntime> = None;
+    for (key, dims) in &identity {
+        let downtime = crate::alerts::downtimes::active_for_alert_key(
             &entry.alert.org_id,
             &alert_id,
             &folder.folder_id,
             dims,
+            multi.then_some(key.as_str()),
             at,
-        )
-    })
+        )?;
+        decision = Some(match decision {
+            Some(merged) => crate::alerts::downtimes::enterprise::merged(merged, downtime),
+            None => downtime,
+        });
+    }
+    decision
 }
 
 /// The held-back evaluation row of a dropped entry, recorded as suppressed by its downtime.
@@ -1005,6 +1014,7 @@ mod tests {
             name: id.to_string(),
             ends_at: 0,
             incident_mode: Default::default(),
+            ..Default::default()
         }
     }
 
@@ -1063,6 +1073,9 @@ mod tests {
         const MINUTE: i64 = 60_000_000;
         let (opens, closes) = (540 * MINUTE, 600 * MINUTE);
         let only_window = Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: "dt-1".to_string(),
             org: "org-ended".to_string(),
             folder_id: "default".to_string(),

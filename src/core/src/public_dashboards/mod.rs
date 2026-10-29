@@ -3007,13 +3007,13 @@ mod tests {
 
     #[test]
     fn panels_are_counted_across_every_tab() {
-        let ten: Vec<_> = (0..10).map(|i| panel(&format!("p{i}"), None)).collect();
+        let fifty: Vec<_> = (0..50).map(|i| panel(&format!("p{i}"), None)).collect();
         let frozen = BTreeMap::new();
-        assert!(validate_dashboard(&dashboard(vec![ten.clone()]), &frozen, 0).is_ok());
-        let four: Vec<_> = (10..14).map(|i| panel(&format!("p{i}"), None)).collect();
+        assert!(validate_dashboard(&dashboard(vec![fifty.clone()]), &frozen, 0).is_ok());
+        let four: Vec<_> = (50..54).map(|i| panel(&format!("p{i}"), None)).collect();
         assert_eq!(
-            validate_dashboard(&dashboard(vec![ten, four]), &frozen, 0).unwrap_err(),
-            "This dashboard has 14 panels; a public link can show at most 10."
+            validate_dashboard(&dashboard(vec![fifty, four]), &frozen, 0).unwrap_err(),
+            "This dashboard has 54 panels; a public link can show at most 50."
         );
     }
 

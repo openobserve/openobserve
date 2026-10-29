@@ -207,6 +207,7 @@ async fn link_request_round_trip(conn: &DatabaseConnection, meta_dek: &[u8]) {
         workspace_user_id: "U1".to_string(),
         question: Some("why is checkout slow?".to_string()),
         oidc_nonce: Some("nonce-1".to_string()),
+        held_action: None,
         created_at: 10,
         expires_at: 20,
         updated_at: 10,

@@ -27,23 +27,72 @@ EOF
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
     cargo nextest --version >/dev/null || cargo install cargo-nextest
-    cargo run -- init-db
+    # nextest runs each test from its crate dir, so a relative data dir would differ per crate
+    export ZO_DATA_DIR="${ZO_DATA_DIR:-$PWD/data/openobserve/}"
+    local threads="${TEST_THREADS:-$(getconf _NPROCESSORS_ONLN)}"
+    # cargo run -- init-db
+    curl -L https://raw.githubusercontent.com/openobserve/openobserve/main/downloadO2.sh | sh -s opensource
+    ./openobserve init-db
+    _seed_slot_data_dirs "$threads"
+    if [ "${ZO_META_STORE:-}" = "postgres" ]; then
+        _seed_slot_postgres_dbs "$threads"
+    fi
+
     cargo llvm-cov nextest \
         --workspace \
         --verbose \
         --no-cfg-coverage \
         --no-cfg-coverage-nightly \
         --ignore-filename-regex 'job|.*generated.*' \
-        --test-threads=1 \
+        --test-threads "$threads" \
         --no-fail-fast \
         --retries 1 \
-        "$@"
+        --json \
+        --summary-only \
+        --output-path report.json
 }
 
-cmd_html() {
-    _cov_test --html "$@"
-    open target/llvm-cov/html/index.html # HACK: `open` is not portable
+# Gives each nextest slot its own copy of the initialised db; see .config/slot-isolation.sh.
+_seed_slot_data_dirs() {
+    local base="${ZO_DATA_DIR%/}"
+    for ((slot = 0; slot < $1; slot++)); do
+        rm -rf "$base/slot-$slot"
+        mkdir -p "$base/slot-$slot"
+        if [ -d "$base/db" ]; then
+            cp -R "$base/db" "$base/slot-$slot/"
+        fi
+    done
 }
+
+# Clones the migrated meta database once per nextest slot, under the name the wrapper points that slot at.
+_seed_slot_postgres_dbs() {
+    local dsn="${ZO_META_POSTGRES_DSN:-}" path base_db
+    path="${dsn%%\?*}"
+    case "${path#*://}" in
+    */?*) ;;
+    *)
+        echo >&2 "ZO_META_POSTGRES_DSN must name a database so each test slot can get its own copy"
+        exit 1
+        ;;
+    esac
+    base_db="${path##*/}"
+    # CREATE DATABASE ... TEMPLATE fails while anyone is connected to the template, so connect elsewhere
+    local admin_dsn="${path%/*}/template1${dsn#"$path"}"
+    for ((slot = 0; slot < $1; slot++)); do
+        local slot_dsn slot_db
+        slot_dsn=$(NEXTEST_TEST_GLOBAL_SLOT=$slot .config/slot-isolation.sh printenv ZO_META_POSTGRES_DSN)
+        slot_db="${slot_dsn%%\?*}"
+        slot_db="${slot_db##*/}"
+        psql "$admin_dsn" -v ON_ERROR_STOP=1 -q \
+            -c "DROP DATABASE IF EXISTS \"$slot_db\" WITH (FORCE)" \
+            -c "CREATE DATABASE \"$slot_db\" TEMPLATE \"$base_db\""
+    done
+}
+
+# cmd_html() {
+#     _cov_test --html "$@"
+#     open target/llvm-cov/html/index.html # HACK: `open` is not portable
+# }
 
 cmd_show_env() {
     cat <<EOF
@@ -149,7 +198,7 @@ main() {
         ;;
     run-cov)
         shift
-        _cov_test --json --summary-only --output-path report.json "$@"
+        _cov_test
         ;;
     show-env)
         cmd_show_env

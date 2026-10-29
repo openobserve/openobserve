@@ -364,6 +364,8 @@ pub enum DeliveryDecision {
     SuppressedByPending,
     /// Condition matched inside a window of this downtime.
     SuppressedByDowntime(String),
+    /// The current firing is acknowledged by this user; repeats are withheld.
+    SuppressedByAck(String),
 }
 
 impl DeliveryDecision {
@@ -380,6 +382,22 @@ impl DeliveryDecision {
         match self {
             Self::SuppressedByDowntime(id) => Some(id),
             _ => None,
+        }
+    }
+
+    pub fn acked_by(&self) -> Option<&str> {
+        match self {
+            Self::SuppressedByAck(by) => Some(by),
+            _ => None,
+        }
+    }
+
+    /// An ack withholds repeats and a first send that never landed (V-24), never a level increase.
+    pub fn ack_withholds(&self, last_notified: Option<AlertLevel>) -> bool {
+        match self {
+            Self::Deliver => true,
+            Self::DeliverEscalation => last_notified.is_none(),
+            _ => false,
         }
     }
 }
@@ -1105,6 +1123,46 @@ mod tests {
         assert!(!d.resets_silence());
         assert_eq!(d.downtime_id(), Some("2f9K"));
         assert_eq!(DeliveryDecision::Deliver.downtime_id(), None);
+    }
+
+    #[test]
+    fn an_ack_withholds_repeats_and_unlanded_first_sends_but_never_a_level_increase() {
+        let repeat = delivery_decision(
+            AlertLevel::Critical,
+            Some(AlertLevel::Critical),
+            None,
+            NOW,
+            None,
+        );
+        assert_eq!(repeat, DeliveryDecision::Deliver);
+        assert!(repeat.ack_withholds(Some(AlertLevel::Critical)));
+
+        let never_landed = delivery_decision(AlertLevel::Critical, None, None, NOW, None);
+        assert_eq!(never_landed, DeliveryDecision::DeliverEscalation);
+        assert!(never_landed.ack_withholds(None));
+
+        let level_up = delivery_decision(
+            AlertLevel::Critical,
+            Some(AlertLevel::Warning),
+            Some(NOW + 1),
+            NOW,
+            None,
+        );
+        assert_eq!(level_up, DeliveryDecision::DeliverEscalation);
+        assert!(!level_up.ack_withholds(Some(AlertLevel::Warning)));
+
+        for quiet in [
+            DeliveryDecision::SuppressedBySilence,
+            DeliveryDecision::NotFiring,
+            DeliveryDecision::SuppressedByDowntime("dt".into()),
+        ] {
+            assert!(!quiet.ack_withholds(None));
+        }
+        let acked = DeliveryDecision::SuppressedByAck("dana@acme.com".into());
+        assert!(!acked.should_deliver());
+        assert!(!acked.resets_silence());
+        assert_eq!(acked.acked_by(), Some("dana@acme.com"));
+        assert_eq!(acked.downtime_id(), None);
     }
 
     // ── D11: notify_on_warning ──────────────────────────────────────────────

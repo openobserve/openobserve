@@ -284,6 +284,51 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting, anyhow::Error
     }
 }
 
+/// Upserts another region's row with its timestamps; `None` when the stored row is newer.
+pub async fn apply_replicated(
+    setting: &SystemSetting,
+) -> Result<Option<SystemSetting>, anyhow::Error> {
+    setting.validate().map_err(|e| anyhow!(e))?;
+    let existing = get(
+        &setting.scope,
+        setting.org_id.as_deref(),
+        setting.user_id.as_deref(),
+        &setting.setting_key,
+    )
+    .await?;
+    if existing
+        .as_ref()
+        .is_some_and(|stored| stored.updated_at > setting.updated_at)
+    {
+        return Ok(None);
+    }
+    let active_model = ActiveModel {
+        id: existing
+            .as_ref()
+            .and_then(|stored| stored.id)
+            .map_or(NotSet, Set),
+        scope: Set(setting.scope.as_str().to_string()),
+        org_id: Set(setting.org_id.clone()),
+        user_id: Set(setting.user_id.clone()),
+        setting_key: Set(setting.setting_key.clone()),
+        setting_category: Set(setting.setting_category.clone()),
+        setting_value: Set(setting.setting_value.clone()),
+        description: Set(setting.description.clone()),
+        created_at: Set(setting.created_at),
+        updated_at: Set(setting.updated_at),
+        created_by: Set(setting.created_by.clone()),
+        updated_by: Set(setting.updated_by.clone()),
+    };
+    let client = get_orm_client_rw().await;
+    let model = if existing.is_some() {
+        active_model.update(client).await
+    } else {
+        active_model.insert(client).await
+    }
+    .map_err(|e| anyhow!("DbError# {e}"))?;
+    Ok(Some(model_to_setting(model)))
+}
+
 /// Delete a setting
 pub async fn delete(
     scope: &SettingScope,

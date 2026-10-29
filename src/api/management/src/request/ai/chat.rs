@@ -1998,6 +1998,7 @@ mod tests {
             installation_id: "inst_01".to_string(),
             org: "prod".to_string(),
             jti: "jti-0001".to_string(),
+            scope: config::utils::delegation::SCOPE_ASSISTANT.to_string(),
         }
     }
 

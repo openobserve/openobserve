@@ -219,10 +219,14 @@ const rootOf = (name: string, scope: Map<string, string>): string => {
 const rootsIn = (scope: Map<string, string>): string[] =>
   CANDIDATES.filter((name) => rootOf(name, scope) === name);
 
-/** A theme-scoped entry wins, so one theme can be pending while the other holds. */
-const entryFor = (fg: string, theme: "light" | "dark"): ContrastPair | undefined =>
-  CONTRAST_PAIRS.find((pair) => pair.fg === fg && (pair.themes ?? []).includes(theme)) ??
-  CONTRAST_PAIRS.find((pair) => pair.fg === fg && pair.themes === undefined);
+/** Theme-scoped entries win, so one theme can be pending while the other holds. */
+const entriesFor = (fg: string, theme: "light" | "dark"): ContrastPair[] => {
+  const scoped = CONTRAST_PAIRS.filter(
+    (pair) => pair.fg === fg && (pair.themes ?? []).includes(theme),
+  );
+  if (scoped.length > 0) return scoped;
+  return CONTRAST_PAIRS.filter((pair) => pair.fg === fg && pair.themes === undefined);
+};
 
 /** Composite the backdrop chain down onto the page, then the pair's own bg. */
 const paintOf = (pair: ContrastPair, scope: Map<string, string>): Rgba | null => {
@@ -243,13 +247,18 @@ const ratioOf = (pair: ContrastPair, scope: Map<string, string>): number | null 
   return contrastRatio(composite(fg, bg), bg);
 };
 
-/** The pair actually judged for a token: the manifest's, or the default rule. */
-const pairFor = (fg: string, theme: "light" | "dark"): ContrastPair =>
-  entryFor(fg, theme) ?? {
-    fg,
-    category: hasAny(fg, NON_TEXT_SEGMENTS) ? "non-text" : "text",
-    why: "default rule: a foreground on the page surface",
-  };
+/** The pairs actually judged for a token: every manifest entry, or the default rule. */
+const pairsFor = (fg: string, theme: "light" | "dark"): ContrastPair[] => {
+  const entries = entriesFor(fg, theme);
+  if (entries.length > 0) return entries;
+  return [
+    {
+      fg,
+      category: hasAny(fg, NON_TEXT_SEGMENTS) ? "non-text" : "text",
+      why: "default rule: a foreground on the page surface",
+    },
+  ];
+};
 
 const describePair = (pair: ContrastPair, ratio: number, need: number): string =>
   `${pair.fg} on ${pair.bg ?? SURFACE_BASE}: ${ratio.toFixed(2)}:1 (need ${need})`;
@@ -328,7 +337,7 @@ describe("design token contrast", () => {
 
   describe.each(["light", "dark"] as const)("%s theme", (theme) => {
     const scope = THEMES[theme];
-    const pairs = rootsIn(scope).map((fg) => pairFor(fg, theme));
+    const pairs = rootsIn(scope).flatMap((fg) => pairsFor(fg, theme));
 
     it("clears 4.5:1 on every text pair", () => {
       const offenders = pairs

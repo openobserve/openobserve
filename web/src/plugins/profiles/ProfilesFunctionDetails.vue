@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Function Details panel beside the Profiles results; the header copies the Traces span sidebar. -->
+<!-- Function details panel beside the Profiles results; the header copies the Traces span sidebar. -->
 <template>
   <aside class="bg-surface-panel flex min-h-0 flex-col" data-test="profiles-function-details">
     <div class="border-border-default flex h-8 shrink-0 items-center gap-1 border-b ps-3 pe-1">
@@ -43,8 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3">
       <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
-        <dt class="text-text-secondary">{{ t("profiles.package") }}</dt>
-        <dd class="text-text-body min-w-0 font-mono break-all">{{ packageOf(name) }}</dd>
+        <template v-if="packageName">
+          <dt class="text-text-secondary">{{ t("profiles.package") }}</dt>
+          <dd
+            class="text-text-body min-w-0 font-mono break-all"
+            data-test="profiles-function-details-package"
+          >
+            {{ packageName }}
+          </dd>
+        </template>
         <dt class="text-text-secondary">{{ t("profiles.self") }}</dt>
         <dd class="text-text-body font-mono" data-test="profiles-function-details-self">
           {{ valueFormatter(self) }} · {{ percentOf(self, grandTotal) }}
@@ -122,6 +129,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { packageOf } from "@/components/common/flameGraphPackage";
 import { useI18nTyped } from "@/types/i18n";
 import type { CallNode } from "./sandwich";
+import { formatPercent } from "./format";
 
 const LIST_SIZE = 5;
 
@@ -150,8 +158,13 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-const percentOf = (value: number, of: number) =>
-  of > 0 ? `${((value / of) * 100).toFixed(1)}%` : "—";
+const percentOf = (value: number, of: number) => formatPercent(value, of, "—");
+
+// packageOf falls back to the whole name when it has no package separator, which is not a package.
+const packageName = computed(() => {
+  const name = packageOf(props.name);
+  return name === props.name ? "" : name;
+});
 
 // Direct callers and callees, as a share of the samples that pass through this function.
 const lists = computed(() => [

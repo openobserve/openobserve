@@ -116,9 +116,8 @@ impl OtelIngestionProcessor {
             .extract_from_span_attributes(span_attributes)
     }
 
-    /// Process span with optional user-defined model pricing entries.
-    /// If matching pricing is found in `org_pricing_entries`, it takes priority over built-in
-    /// pricing. `span_start_nanos` is the span's `start_time_unix_nano` from the OTLP payload;
+    /// Process span, pricing it from `org_pricing_entries` only (org, meta-org and built-in
+    /// definitions). `span_start_nanos` is the span's `start_time_unix_nano` from the OTLP payload;
     /// it is used to select the most-recently-applicable pricing definition via `valid_from`
     /// and the time-of-day tier via `utc_windows`. Zero means unknown: no time restriction.
     /// In production always call `get_org_pricing_entries` to populate this slice.
@@ -308,48 +307,39 @@ impl OtelIngestionProcessor {
             // Resolve only for spans without a client-reported cost; the lookup runs regexes.
             if cost.is_empty()
                 && let Some(resolved) = extracted.model_name.as_ref().and_then(|mn| {
-                    pricing::resolve_pricing(org_pricing_entries, mn, span_ts_micros)
+                    crate::db::model_pricing::find_pricing_sync_at(
+                        org_pricing_entries,
+                        mn,
+                        span_ts_micros,
+                    )
                 })
             {
-                match resolved.pricing {
-                    pricing::ResolvedPricing::Definition(pricing_def) => {
-                        let ctx = pricing_context(
-                            &pricing_def,
-                            span_attributes,
-                            resource_attributes,
-                            &extracted.model_params,
-                        );
-                        let result =
-                            crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
-                                &pricing_def,
-                                &billable_usage,
-                                &tier_usage,
-                                span_ts_micros,
-                                &ctx,
-                            );
-                        if !result.cost.is_empty() {
-                            log::debug!(
-                                "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
-                                extracted.model_name.as_deref().unwrap_or(""),
-                                pricing_def.match_pattern,
-                                resolved.match_kind,
-                                result.tier_name,
-                                result.cost.get("total").copied().unwrap_or(0.0),
-                            );
-                            cost = result.cost;
-                            add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
-                        }
-                    }
-                    pricing::ResolvedPricing::Compiled(model_pricing) => {
-                        let input_tokens = billable_usage.get("input").cloned().unwrap_or_default();
-                        let output_tokens =
-                            billable_usage.get("output").cloned().unwrap_or_default();
-                        let (input_cost, output_cost, total_cost) =
-                            model_pricing.cost(input_tokens, output_tokens, span_ts_micros);
-                        cost.insert("input".to_string(), input_cost);
-                        cost.insert("output".to_string(), output_cost);
-                        cost.insert("total".to_string(), total_cost);
-                    }
+                let pricing_def = &resolved.definition;
+                let ctx = pricing_context(
+                    pricing_def,
+                    span_attributes,
+                    resource_attributes,
+                    &extracted.model_params,
+                );
+                let result =
+                    crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                        pricing_def,
+                        &billable_usage,
+                        &tier_usage,
+                        span_ts_micros,
+                        &ctx,
+                    );
+                if !result.cost.is_empty() {
+                    log::debug!(
+                        "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
+                        extracted.model_name.as_deref().unwrap_or(""),
+                        pricing_def.match_pattern,
+                        resolved.match_kind,
+                        result.tier_name,
+                        result.cost.get("total").copied().unwrap_or(0.0),
+                    );
+                    cost = result.cost;
+                    add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
                 }
             }
         }
@@ -666,8 +656,7 @@ impl OtelIngestionProcessor {
         }
     }
 
-    /// Test-only convenience wrapper: calls `process_span_with_pricing` with no user pricing.
-    /// Never call this from production code — user-defined pricing will be silently skipped.
+    /// Test-only convenience wrapper: prices with the small built-in catalogue in `tests`.
     #[cfg(test)]
     pub fn process_span(
         &self,
@@ -695,7 +684,7 @@ impl OtelIngestionProcessor {
             resource_attributes,
             scope_name,
             events,
-            &[],
+            tests::built_in_pricing(),
             span_start_nanos,
         );
     }
@@ -867,7 +856,49 @@ fn actual_cost_total(cost: &HashMap<String, f64>) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::LazyLock;
+
+    use config::meta::model_pricing::PricingSource;
+
     use super::*;
+
+    /// Built-in definitions, in `llm_pricing.json` form, for the models these tests price.
+    pub(super) fn built_in_pricing() -> &'static [CachedModelPricing] {
+        static ENTRIES: LazyLock<Vec<CachedModelPricing>> = LazyLock::new(|| {
+            let definitions: Vec<ModelPricingDefinition> = json::from_str(
+                r#"[
+                {"name": "GPT-4o", "match_pattern": "(?i)gpt-4o(?:-\\d{4}[-\\d]*)?$",
+                 "tiers": [{"name": "Default", "prices": {"input": 2.5e-06, "output": 1e-05}}]},
+                {"name": "Claude Sonnet 4.6", "match_pattern": "(?i)claude-sonnet-4-6",
+                 "tiers": [
+                    {"name": "Default", "prices": {"input": 3e-06, "output": 1.5e-05}},
+                    {"name": "Extended Context (200k+)",
+                     "condition": {"usage_key": "input", "operator": "gte", "value": 200000},
+                     "prices": {"input": 6e-06, "output": 2.25e-05}}]},
+                {"name": "DeepSeek V4 Pro", "match_pattern": "(?i)deepseek-v4-pro",
+                 "tiers": [
+                    {"name": "Off-Peak", "prices": {"input": 6.6e-07, "output": 1.98e-06}},
+                    {"name": "Peak",
+                     "utc_windows": [{"start_minute": 60, "end_minute": 240},
+                                     {"start_minute": 360, "end_minute": 600}],
+                     "prices": {"input": 1.32e-06, "output": 3.96e-06}}]}
+            ]"#,
+            )
+            .unwrap();
+            definitions
+                .into_iter()
+                .map(|mut definition| {
+                    definition.enabled = true;
+                    definition.source = PricingSource::BuiltIn;
+                    CachedModelPricing {
+                        compiled_regex: regex::Regex::new(&definition.match_pattern).unwrap(),
+                        definition,
+                    }
+                })
+                .collect()
+        });
+        &ENTRIES
+    }
 
     #[test]
     fn test_process_span_removes_input_output_attrs() {

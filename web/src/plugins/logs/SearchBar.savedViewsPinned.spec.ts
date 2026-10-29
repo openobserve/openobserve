@@ -91,7 +91,7 @@ describe("SearchBar — pinned saved views", () => {
     ).toBe(true);
   });
 
-  it("is as tall as the xs toolbar buttons: a hairline border around 1.625rem children", async () => {
+  it("is as tall as the 34px toolbar buttons: a hairline border around 2rem children", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
@@ -99,12 +99,12 @@ describe("SearchBar — pinned saved views", () => {
     expect(group().classes()).toContain("p-0");
     expect(
       group().find('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').classes(),
-    ).toContain("h-6.5");
+    ).toContain("h-8!");
     expect(
       group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]').classes(),
-    ).toContain("size-6.5");
+    ).toContain("size-8!");
     expect(wrapper!.find('[data-test="logs-search-bar-reset-filters-btn"]').classes()).toContain(
-      "h-7",
+      "h-[2.125rem]!",
     );
   });
 
@@ -254,4 +254,25 @@ describe("SearchBar — pinned saved views", () => {
 
     expect(group().exists()).toBe(false);
   });
+
+  // 89px = 1px border + 54px list trigger + 1px separator + 32px create button + 1px border.
+  it.each([
+    [698, false],
+    [699, true],
+  ])(
+    "budgets the group at its rendered 89px width (toolbar %ipx → shown: %s)",
+    async (width, shown) => {
+      const otherPins = (["histogram", "sqlMode", "quickMode", "syntaxGuide"] as const).filter(
+        (key) => isPinned(key),
+      );
+      otherPins.forEach((key) => togglePin(key));
+      try {
+        wrapper = mountSearchBar(width);
+        await flushPromises();
+        expect(group().exists()).toBe(shown);
+      } finally {
+        otherPins.forEach((key) => togglePin(key));
+      }
+    },
+  );
 });
