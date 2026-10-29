@@ -8,13 +8,8 @@
  *   9.3 P4 `only`     — nobody is paged, and the agent still records a verdict
  *   9.4 agent unavailable — the preview must not claim `available: true`
  *
- * THESE ARE EXPECTED RED UNTIL THE AGENT IS LIVE, AND THAT IS THE POINT.
- * On build `8401c636ea` `escalation-preview` reported `available: true` for all
- * three modes while nothing from the agent ever reached a page. They are
- * written against the documented contract rather than against that behaviour,
- * and tagged `@oncall-l0` so CI can hold them separately instead of letting a
- * known product gap block the suite. A green run here is news; a red one is the
- * status quo the plan already records.
+ * Where a case needs a reachable agent (a verdict on a real page), it skips
+ * unless the preview reports one; CI runs without an agent.
  *
  * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
  *
@@ -26,14 +21,6 @@
  * arrives ALREADY RESOLVED for the priority asked about: the server applies the
  * P1 invariant (always `parallel`) and the pages-nobody rule (P4/P5 -> `only`)
  * before answering, so nothing here re-derives it from `policy.l0.mode`.
- *
- * BLOCKED, and recorded rather than faked — the timing halves of 9.1-9.3 need a
- * page opened AT a chosen priority. An alert carries a top-level `priority`
- * field on the wire, but `createPagingAlert` in the seeding layer does not pass
- * one through, so a UI spec can only open a page at whatever priority the alert
- * path defaults to. What each case CAN assert is stated on the test. Closing the
- * rest needs either a priority argument on the seed helper or the API suite,
- * which owns per-priority ladder timing.
  *
  * Self-cleaning, worker-scoped prefix.
  */
@@ -69,16 +56,6 @@ const TRIAGE_BUDGET_SECONDS = 60;
 const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
 
 const gate = { checked: false, available: false, reason: '' };
-
-async function listOrgUsers(page) {
-  const res = await page.request.get(`${baseUrl()}/api/${orgId()}/users`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok()) return [];
-  const body = await res.json().catch(() => ({}));
-  const list = Array.isArray(body) ? body : (body?.data ?? []);
-  return Array.isArray(list) ? list : [];
-}
 
 /**
  * A dry run of one priority's ladder, agent step included.
@@ -151,11 +128,7 @@ test.describe('On-call L0 / AI SRE', {
    * below are the only ones those two accept.
    */
   async function seedTeamWithL0(page, testInfo, { p2Mode = 'gate', rungs = [1, 2, 3, 4] } = {}) {
-    // Seed our OWN member rather than borrowing listOrgUsers()[0]. The org is
-    // shared across workers and every suite now sweeps the accounts it creates,
-    // so the first user in the list can be another worker's fixture that is
-    // deleted mid-test — which surfaces as a 400 on add-members, naming an
-    // address this spec never chose.
+    // Our own member: the first org user may be another worker's fixture, deleted mid-test.
     const { email: memberEmail } = await createOrgUser(page, {
       email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'l0'),
     });
@@ -205,7 +178,9 @@ test.describe('On-call L0 / AI SRE', {
     const { team } = await seedTeamWithL0(page, testInfo);
 
     const preview = await escalationPreview(page, team.id, 1);
-    const claimed = preview?.l0?.available === true;
+    expect(preview.l0, 'the policy configured L0, so the preview must answer whether an agent is available')
+      .toBeTruthy();
+    const claimed = preview.l0.available === true;
     testLogger.info('§9.4 preview L0 block', { l0: preview?.l0 ?? null });
 
     const stream = uniqueName(`${workerPrefix(testInfo)}_stream`);
@@ -247,30 +222,16 @@ test.describe('On-call L0 / AI SRE', {
 
   // -------------------------------------------------------------------- 9.1
 
-  /**
-   * §9.1 — P1 is pinned `parallel`, and parallel means nothing waits.
-   *
-   * Holding a critical page behind a model is not a setting the product offers;
-   * the server pins P1 and 400s anything else, so the preview resolving P1 to
-   * anything but `parallel` is a server bug rather than a policy one. The
-   * paging half is read from the record that a real firing opened: the first
-   * rung must be at +0, not deferred behind a triage budget.
-   *
-   * Blocked half: the verdict is asserted only when the record this fired is
-   * itself a P1. Without a priority on the seed's alert helper the priority is
-   * the alert path's default, so it is read back rather than assumed.
-   */
-  test('§9.1 P1 is parallel — the first rung fires at +0 and the agent stays out of an alert-backed page', {
+  /** §9.1 — P1 is pinned `parallel` server-side, and parallel means the first rung does not wait on the agent. */
+  test('§9.1 P1 is parallel — the first rung fires at +0 without waiting on the agent', {
     tag: ['@P1', '@oncall-l0'],
   }, async ({ page }, testInfo) => {
     test.setTimeout(900_000);
     const { team } = await seedTeamWithL0(page, testInfo);
 
     const preview = await escalationPreview(page, team.id, 1);
-    expect(
-      preview?.l0?.mode ?? 'parallel',
-      'P1 is pinned parallel server-side — a critical page is never held',
-    ).toBe('parallel');
+    expect(preview.l0, 'the policy configured L0, so the P1 preview must carry its block').toBeTruthy();
+    expect(preview.l0.mode, 'P1 is pinned parallel server-side — a critical page is never held').toBe('parallel');
 
     const stream = uniqueName(`${workerPrefix(testInfo)}_stream`);
     await seedOnCallStream(page, stream);
@@ -283,66 +244,51 @@ test.describe('On-call L0 / AI SRE', {
       },
     });
     const record = pages[0];
-
-    const progress = await getEscalationProgress(page, record.id);
-    testLogger.info('§9.1 ladder progress', { priority: record.priority, progress });
-    const first = (progress?.fired ?? [])[0];
-    expect(first, 'a parallel priority pages immediately, so a rung must already have fired').toBeTruthy();
-    expect(
-      first?.after_micros ?? 0,
-      'parallel means the page goes out at +0 while the agent runs alongside',
-    ).toBe(0);
-
     expect(
       Number(record.priority),
       'the alert names P1, so its page must open at P1 — otherwise this asserts another rung\'s behaviour',
     ).toBe(1);
 
-    const detail = await getResponse(page, record.id);
-    const actors = new Set((detail?.events ?? []).map((e) => e?.actor).filter(Boolean));
-    testLogger.info('§9.1 actors on an alert-backed P1 page', { actors: [...actors] });
+    let progress;
+    await expect.poll(async () => {
+      progress = await getEscalationProgress(page, record.id);
+      return (progress?.fired ?? []).length;
+    }, {
+      timeout: 60000, intervals: [2000], message: 'a parallel priority pages immediately, so a rung must have fired',
+    }).toBeGreaterThan(0);
+    testLogger.info('§9.1 ladder progress', { priority: record.priority, progress });
     expect(
-      actors.has('o2-sre'),
-      'the agent does not participate on an alert-backed page — see the open P1 in o2-enterprise#2481',
-    ).toBe(false);
+      progress.fired[0].after_micros,
+      'parallel means the page goes out at +0 while the agent runs alongside',
+    ).toBe(0);
   });
 
-  /**
-   * §9.1b — the verdict half, which this deployment cannot answer.
-   *
-   * The agent only joins a page whose subject is an INCIDENT. Two things have to
-   * be true and neither is here: `/config` reports `incidents_enabled: false`, so
-   * no incident-backed page can open at all, and `ai_enabled: false` with no model
-   * provider configured, so nothing would attach a verdict even if one did.
-   *
-   * `creates_incident` is NOT the obstacle — it is a field on the ordinary alert
-   * (`entity/alerts.rs`), and a plain alert accepts and stores it. An earlier note
-   * here blamed the composite-alert entity; that was wrong, and it made the gap
-   * look structural when it is only configuration.
-   *
-   * To un-park: run against a deployment with `O2_INCIDENTS_ENABLED=true`,
-   * `O2_AI_ENABLED=true` and a real model provider, seed the alert with
-   * `createsIncident: true`, and assert the verdict as below. Measuring this on an
-   * alert-backed page instead is how the documented split gets misread as a
-   * product bug (o2-enterprise#2481, open P1).
-   */
-  test.fixme('§9.1b a parallel agent attaches its verdict on an incident-backed page. o2-enterprise#2481.', {
+  test('§9.1b a parallel agent attaches its verdict on an alert-backed P1 page', {
     tag: ['@P1', '@oncall-l0'],
   }, async ({ page }, testInfo) => {
+    test.setTimeout(900_000);
     const { team } = await seedTeamWithL0(page, testInfo);
-    const record = { id: null, team };
-    let verdicts = 0;
-    const deadline = Date.now() + (TRIAGE_BUDGET_SECONDS + 120) * 1000;
-    while (Date.now() < deadline) {
-      const detail = await getResponse(page, record.id);
-      verdicts = (detail?.events ?? []).filter((e) => e?.kind === 'ai_verdict').length;
-      if (verdicts > 0) break;
-      await page.waitForTimeout(5000);
-    }
-    expect(
-      verdicts,
-      'a parallel agent must still attach its verdict — running alongside is not running never',
-    ).toBeGreaterThan(0);
+    const preview = await escalationPreview(page, team.id, 1);
+    test.skip(!usableL0(preview), 'needs a reachable AI SRE agent (O2_AGENT_URL); this deployment has none');
+
+    const stream = uniqueName(`${workerPrefix(testInfo)}_stream`);
+    await seedOnCallStream(page, stream);
+    const { pages } = await firePageAndWait(page, {
+      alertOptions: {
+        name: uniqueName(`${workerPrefix(testInfo)}_alert`),
+        stream,
+        teamId: team.id,
+        priority: 1,
+      },
+    });
+    await expect.poll(async () => {
+      const detail = await getResponse(page, pages[0].id);
+      return (detail?.events ?? []).filter((e) => e?.kind === 'ai_verdict').length;
+    }, {
+      timeout: (TRIAGE_BUDGET_SECONDS + 120) * 1000,
+      intervals: [5000],
+      message: 'a parallel agent must still attach its verdict — running alongside is not running never',
+    }).toBeGreaterThan(0);
   });
 
   // -------------------------------------------------------------------- 9.2
@@ -350,13 +296,13 @@ test.describe('On-call L0 / AI SRE', {
   /**
    * §9.2 — a gate holds the first rung for the budget, or until the verdict.
    *
-   * What is assertable without a P2 page: the server resolves P2 to `gate` with
-   * the budget the policy set, and the screen draws the hold ONLY when an agent
-   * is actually reachable — `available: false` must draw no L0 step at all,
-   * because a hold rendered there reads as configured and is wrong.
+   * The server resolves P2 to `gate` with the budget the policy set, and the
+   * screen draws the hold ONLY when an agent is actually reachable —
+   * `available: false` must draw no L0 step at all, because a hold rendered
+   * there reads as configured and is wrong.
    *
-   * Blocked half: that the rung is genuinely deferred. It needs a page opened at
-   * P2, which the seeding layer cannot do.
+   * Not asserted: that the rung is genuinely deferred. With no reachable agent a
+   * gate holds nothing, and CI runs without one.
    */
   test('§9.2 P2 resolves to a gate with its budget, and the hold is drawn only when an agent exists', {
     tag: ['@P1', '@oncall-l0'],
@@ -396,10 +342,10 @@ test.describe('On-call L0 / AI SRE', {
    *
    * Both halves of "nobody is paged" are read from the preview, which is the
    * dry run of exactly that question: P4 resolves to `only`, and the ladder for
-   * P4 reaches nobody. That is assertable without opening a P4 page, which is
-   * why it is the one case here that is not blocked on the seed's alert helper.
+   * P4 reaches nobody.
    *
-   * Blocked half: that a verdict is still recorded. That needs a P4 page.
+   * Not asserted: that a verdict is still recorded. That needs a reachable
+   * agent, and CI runs without one.
    */
   test('§9.3 P4 is investigate-only until the team gives it a rung', {
     tag: ['@P1', '@oncall-l0'],

@@ -6,9 +6,8 @@
  *   §8.6  a shift rule with nobody in it says so
  *   §11.5 timeline bars carry display names, not raw email addresses
  *
- * ENTERPRISE-GATED (@enterprise). Skips with a reason via `isOnCallAvailable()`
- * rather than failing on an OSS build, where every on-call route is a 404 or a
- * 403 "Not Supported" and the product treats both as the same calm fact.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * Self-cleaning, worker-scoped prefix — `afterAll` runs once per worker in
  * parallel mode, so each worker sweeps only its own `_w<index>_` names.
@@ -82,7 +81,7 @@ async function listOrgUsers(page) {
   const res = await page.request.get(`${baseUrl()}/api/${orgId()}/users`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok()) return [];
+  if (!res.ok()) throw new Error(`listing org users failed: HTTP ${res.status()} — ${(await res.text()).slice(0, 200)}`);
   const body = await res.json().catch(() => ({}));
   const list = Array.isArray(body) ? body : (body?.data ?? []);
   return Array.isArray(list) ? list : [];
@@ -324,8 +323,7 @@ test.describe('On-call schedules and rotations', {
    * address, and at a dozen members two addresses clip to the same illegible
    * prefix. `nameOf()` falls back to the raw email for an account with no first
    * or last name, and that fallback is CORRECT — so this test staffs the
-   * rotation with an account that has a display name, and skips with a reason
-   * when the org has none. Asserting "no @ on the chart" against a nameless
+   * rotation with an account it seeds with a display name. Asserting "no @ on the chart" against a nameless
    * roster would be asserting the fallback is a bug.
    */
   test('§11.5 timeline bars carry display names, not raw email addresses', {
@@ -339,10 +337,8 @@ test.describe('On-call schedules and rotations', {
       email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'named'),
     });
     const named = (await listOrgUsers(page)).find((u) => u.email === seed.email);
-    test.skip(
-      !named,
-      'no account in this org has a first or last name — the timeline correctly falls back to the address, so §11.5 has nothing to assert here',
-    );
+    expect(named, 'the account this test just created must be on the org roster').toBeTruthy();
+    expect(displayNameOf(named), 'the seeded account carries a first and last name for the band to show').not.toBe('');
 
     const { team, rotationId } = await seedAllDayTeam(page, testInfo, {
       memberEmail: named.email,
