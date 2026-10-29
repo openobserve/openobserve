@@ -225,8 +225,7 @@ pub struct Destination {
     #[serde(default)]
     #[schema(example = "my_alert_webhook")]
     pub name: String,
-    /// Webhook URL for HTTP destinations. Required when `type` is `http`. Read back as its origin
-    /// by callers without PUT on the destination.
+    /// Webhook URL, required for `http`; without PUT, its origin, or empty for a keyed host.
     #[serde(default)]
     #[schema(example = "https://example.com/webhook")]
     pub url: String,
@@ -237,8 +236,7 @@ pub struct Destination {
     /// Whether to skip TLS certificate verification for HTTP destinations.
     #[serde(default)]
     pub skip_tls_verify: bool,
-    /// Optional HTTP headers to include with webhook requests. Values read back blank for callers
-    /// without PUT on the destination.
+    /// Optional HTTP headers for webhook requests; values read back blank without PUT.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     /// REQUIRED for alert destinations. Name of the template to use for formatting alert messages.
