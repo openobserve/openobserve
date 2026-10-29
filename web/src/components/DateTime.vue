@@ -1456,6 +1456,8 @@ export default defineComponent({
       selectedType.value = "absolute";
       calendarToken.value = null;
       setAbsoluteTime(startMicros, endMicros);
+      // A paste is the user's own change; setAbsoluteTime stamps it programmatic, which pages gating refetch on it ignore.
+      isUserInitiated = true;
       if (props.autoApply) {
         saveDate(null);
         recordAbsoluteRange();
@@ -1975,10 +1977,13 @@ export default defineComponent({
     // The rail sits after the header band in DOM order, so reka's default autofocus would land on a tab button.
     const onPopoverOpenAutoFocus = (event: Event) => {
       if (!showRail.value) return;
+      const firstItem = document.querySelector<HTMLElement>(
+        "#date-time-menu [data-date-time-rail-item]:not([disabled])",
+      );
+      // An empty rail keeps reka's default focus, or focus stays on the trigger and ⌘V never reaches the panel.
+      if (!firstItem) return;
       event.preventDefault();
-      document
-        .querySelector<HTMLElement>("#date-time-menu [data-date-time-rail-item]:not([disabled])")
-        ?.focus();
+      firstItem.focus();
     };
 
     // A rail pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.

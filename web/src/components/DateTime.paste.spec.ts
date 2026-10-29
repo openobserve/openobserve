@@ -29,9 +29,9 @@ const PAYLOAD = JSON.stringify({ start_date: START_US, end_date: END_US });
 describe("DateTime paste", () => {
   let wrapper: VueWrapper<InstanceType<typeof DateTime>> | null = null;
 
-  const createWrapper = () => {
+  const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true },
+      props: { autoApply: true, calendarPresets: true, ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -84,7 +84,11 @@ describe("DateTime paste", () => {
     await flushPromises();
 
     expect(event.defaultPrevented).toBe(true);
-    expect(lastEmit()).toMatchObject({ startTime: START_US, endTime: END_US });
+    expect(lastEmit()).toMatchObject({
+      startTime: START_US,
+      endTime: END_US,
+      userChangedValue: true,
+    });
     expect(lastToast()).toMatchObject({ variant: "success", message: "Date range pasted" });
   });
 
@@ -125,7 +129,33 @@ describe("DateTime paste", () => {
 
     await wrapper!.vm.pasteRange();
 
-    expect(lastEmit()).toMatchObject({ startTime: START_US, endTime: END_US });
+    expect(lastEmit()).toMatchObject({
+      startTime: START_US,
+      endTime: END_US,
+      userChangedValue: true,
+    });
     expect(lastToast()).toMatchObject({ variant: "success" });
+  });
+
+  it("keeps the default focus inside the panel when the rail has nothing to focus", async () => {
+    localStorage.clear();
+    createWrapper({ calendarPresets: false });
+    await openMenu();
+    const autoFocus = new Event("focus", { cancelable: true });
+
+    wrapper!.vm.onPopoverOpenAutoFocus(autoFocus);
+
+    expect(autoFocus.defaultPrevented).toBe(false);
+  });
+
+  it("moves focus to the first rail item when there is one", async () => {
+    createWrapper();
+    await openMenu();
+    const autoFocus = new Event("focus", { cancelable: true });
+
+    wrapper!.vm.onPopoverOpenAutoFocus(autoFocus);
+
+    expect(autoFocus.defaultPrevented).toBe(true);
+    expect(document.activeElement?.hasAttribute("data-date-time-rail-item")).toBe(true);
   });
 });
