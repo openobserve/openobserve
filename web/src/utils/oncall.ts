@@ -316,7 +316,13 @@ export type PagePhrase =
 export function pagePhrase(input: {
   record: Pick<
     OnCallResponse,
-    "state" | "opened_at" | "acked_by" | "closed_at" | "snoozed_until" | "exhausted_at"
+    | "state"
+    | "opened_at"
+    | "acked_by"
+    | "closed_at"
+    | "snoozed_until"
+    | "exhausted_at"
+    | "reached_rung_micros"
   >;
   progress?: EscalationProgress | null;
   progressLoaded: boolean;
@@ -334,19 +340,36 @@ export function pagePhrase(input: {
   if (record.state === "acknowledged") return { kind: "acknowledged", by: record.acked_by ?? "" };
   if (isSnoozed(record, nowMicros))
     return { kind: "snoozed", until: record.snoozed_until as number };
+  // Before the exhausted check: the server flags an empty ladder exhausted, and nobody can fail to answer it.
+  if (input.totalRungs === 0) return { kind: "pagesNobody" };
   if (pageState(record, progress) === "exhausted") return { kind: "nobodyAnswered" };
   const heldUntil = progress?.held_until_micros;
   if (heldUntil && heldUntil > nowMicros) {
     return { kind: "held", secondsLeft: Math.ceil((heldUntil - nowMicros) / 1_000_000) };
   }
-  if (input.totalRungs === 0) return { kind: "pagesNobody" };
-  if (!progress && !input.progressLoaded) return { kind: "unknown" };
+  // Without progress only the record speaks: its matched step, else no claim if it paged or nothing was asked.
+  const recordedRung =
+    record.reached_rung_micros !== undefined && record.reached_rung_micros !== null;
+  if (!progress && !input.reachedStep && (recordedRung || !input.progressLoaded)) {
+    return { kind: "unknown" };
+  }
   const step = progress ? progress.fired.length : (input.reachedStep ?? 0);
   if (!step) return { kind: "notPaged" };
   const total = input.totalRungs ?? null;
   const last = progress?.fired[progress.fired.length - 1];
   if (last?.reached_nobody) return { kind: "reachedNobody", step, total };
   return { kind: "paging", step, total, who: last?.reached ?? [] };
+}
+
+/** The 1-based step whose delay matches a recorded rung, `null` when none was recorded or the ladder no longer has it. [pure] */
+export function reachedStepOf(
+  steps: { after_micros: number }[] | null | undefined,
+  rungMicros: number | null | undefined,
+): number | null {
+  if (!steps || rungMicros === undefined || rungMicros === null) return null;
+  const sorted = [...steps].sort((a, b) => a.after_micros - b.after_micros);
+  const index = sorted.findIndex((step) => step.after_micros === rungMicros);
+  return index < 0 ? null : index + 1;
 }
 
 /** Clock time for today, date and time otherwise, in the given zone: a bare time from yesterday reads as minutes ago. [pure] */

@@ -45,6 +45,7 @@ import {
   isSnoozed,
   isDeletedTeam,
   pagePhrase,
+  reachedStepOf,
   pageState,
   isStaffed,
   isUnresolved,
@@ -504,6 +505,24 @@ describe("isDeletedTeam", () => {
   });
 });
 
+describe("reachedStepOf", () => {
+  it("names the 1-based step a recorded rung delay matches, or nothing", () => {
+    const steps = [{ after_micros: 900 }, { after_micros: 0 }, { after_micros: 300 }];
+    const cases: [unknown, number | null | undefined, number | null][] = [
+      [steps, 0, 1],
+      [steps, 300, 2],
+      [steps, 900, 3],
+      [steps, 450, null],
+      [steps, null, null],
+      [steps, undefined, null],
+      [null, 300, null],
+    ];
+    for (const [ladder, micros, expected] of cases) {
+      expect(reachedStepOf(ladder as any, micros), `${micros}`).toBe(expected);
+    }
+  });
+});
+
 describe("pagePhrase", () => {
   const NOW = 1_700_000_000_000_000;
   const SEC = 1_000_000;
@@ -585,6 +604,25 @@ describe("pagePhrase", () => {
         { kind: "paging", step: 2, total: 3, who: [] },
       ],
       ["not paged", {}, { progress: ladder() }, { kind: "notPaged" }],
+      [
+        "empty ladder on a list without progress, where the record says it ran out",
+        { exhausted_at: NOW },
+        { totalRungs: 0 },
+        { kind: "pagesNobody" },
+      ],
+      [
+        "no progress asked yet, but the record names its step",
+        {},
+        { progressLoaded: false, reachedStep: 2 },
+        { kind: "paging", step: 2, total: 3, who: [] },
+      ],
+      ["no progress asked, no step recorded", {}, { progressLoaded: false }, { kind: "unknown" }],
+      [
+        "the record paged a step the policy no longer has",
+        { reached_rung_micros: 300 * SEC },
+        { reachedStep: null },
+        { kind: "unknown" },
+      ],
     ];
     for (const [name, record, opts, expected] of cases) {
       const phrase = pagePhrase({

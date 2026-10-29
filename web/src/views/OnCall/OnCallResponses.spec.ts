@@ -576,6 +576,50 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(true);
     });
 
+    /// Rows past the cap have no progress: the record's own step, or no claim, never "Not paged yet".
+    it("says what it can for rows past the cap, without claiming they were not paged", async () => {
+      service.getPolicy.mockResolvedValue({
+        data: {
+          rungs: [
+            {
+              priority: 1,
+              channels: [],
+              steps: [
+                { after_micros: 0 },
+                { after_micros: 300_000_000 },
+                { after_micros: 900_000_000 },
+              ],
+            },
+          ],
+        },
+      } as any);
+      const many = Array.from({ length: 30 }, (_, i) =>
+        page(
+          {
+            id: `resp_${i}`,
+            opened_at: 1_700_000_000_000_000 + i,
+            ...(i === 29 ? { reached_rung_micros: 300_000_000 } : {}),
+          },
+          `al_${i}`,
+        ),
+      );
+      const wrapper = await withPages(many);
+      const cell = (id: string) =>
+        wrapper.find(`[data-test="oncall-escalation-cell-${id}"]`).text();
+
+      expect(cell("resp_0")).toBe("Not paged yet");
+      expect(cell("resp_29")).toBe("Paging step 2 of 3");
+      expect(cell("resp_28")).toBe("");
+    });
+
+    /// An empty 200 body is not an answer: the row makes no claim rather than "Not paged yet".
+    it("makes no claim for a row whose progress came back empty", async () => {
+      service.escalationProgress.mockResolvedValue({ data: null } as any);
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.find('[data-test="oncall-escalation-cell-resp_1"]').text()).toBe("");
+    });
+
     it("takes the rung total for the row's priority from the team's policy", async () => {
       service.getPolicy.mockResolvedValue({
         data: {

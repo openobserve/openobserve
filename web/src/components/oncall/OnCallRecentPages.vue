@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-else class="text-text-secondary text-sm">{{ t("oncall.neverAcknowledged") }}</span>
       </template>
 
-      <!-- The same one phrase the Pages list's Escalation column says; there is no progress here, so the step comes from the record. -->
+      <!-- The same one phrase the Pages list's Escalation column says; no progress is fetched here, so only the record's step is claimed. -->
       <template #cell-state="{ row }">
         <span :data-test="`oncall-recent-pages-state-${row.id}`">
           <OnCallEscalationCell
@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :record="row"
             :total-rungs="stepsFor(row)?.length ?? null"
             :reached-step="reachedStep(row)"
+            :progress-loaded="false"
           />
         </span>
       </template>
@@ -122,6 +123,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { reachedStepOf } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -152,13 +154,8 @@ function stepsFor(page: OnCallResponse) {
   return steps ? [...steps].sort((a, b) => a.after_micros - b.after_micros) : null;
 }
 
-/// Which step the record reached, as a 1-based position on its ladder; `null` when unknown.
-function reachedStep(page: OnCallResponse): number | null {
-  const micros = page.reached_rung_micros;
-  if (micros === undefined || micros === null) return null;
-  const index = stepsFor(page)?.findIndex((step) => step.after_micros === micros) ?? -1;
-  return index < 0 ? null : index + 1;
-}
+const reachedStep = (page: OnCallResponse) =>
+  reachedStepOf(stepsFor(page), page.reached_rung_micros);
 
 /// The delay before this record's ladder would have woken a SECOND person.
 function secondRungDelay(page: OnCallResponse): number | null {

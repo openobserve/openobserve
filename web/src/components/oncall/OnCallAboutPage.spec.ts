@@ -87,6 +87,18 @@ describe("OnCallAboutPage", () => {
     });
   });
 
+  it("does not link a deleted team from an unrecognised routing sentence", () => {
+    const wrapper = render({
+      routingReason: "routed to Platform SRE as an impacted caller of the failing service",
+      teamId: "tm_9",
+      teamName: "tm_9",
+      teamDeleted: true,
+    });
+
+    expect(wrapper.find('[data-test="oncall-about-routing-id-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).toBe("Deleted team");
+  });
+
   /// The winning rule was spelled as a path and the team as a ksuid — neither
   /// is read as prose. It now draws as the same key|value dimension chips the
   /// routing tab uses.

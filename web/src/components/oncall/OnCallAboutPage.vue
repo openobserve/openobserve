@@ -40,8 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex flex-col items-start gap-1">
             <span data-test="oncall-about-routing-reason">
               <!-- Unrecognised wording: show the record's team, not the server's prose. -->
+              <OTag
+                v-if="fallbackRouted && teamDeleted"
+                variant="default-soft"
+                size="sm"
+                data-test="oncall-about-routing-team-deleted"
+              >
+                {{ t("oncall.deletedTeam") }}
+              </OTag>
               <router-link
-                v-if="fallbackRouted && teamId"
+                v-else-if="fallbackRouted && teamId"
                 class="text-accent font-medium"
                 :to="{
                   name: 'onCallTeamDetail',

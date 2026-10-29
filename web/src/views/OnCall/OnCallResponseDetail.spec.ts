@@ -1275,7 +1275,8 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     service.listMembers.mockResolvedValue({ data: [] } as any);
     service.priorCauses.mockResolvedValue({ data: [] } as any);
     service.responseHistory.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+    // The page's own team exists: an empty list would make it a deleted team, which hides Escalate.
+    service.listTeams.mockResolvedValue({ data: [{ id: "team_1", name: "Platform" }] } as any);
     service.escalationProgress.mockResolvedValue({
       data: { fired: [], next_targets: [], next_at: null, exhausted: false },
     } as any);
@@ -1741,6 +1742,17 @@ describe("OnCallResponseDetail — responding", () => {
   });
 
   describe("a team that was deleted", () => {
+    /// A deleted team's ladder has no rotations to reach; Hand off is the next step, and Snooze still works.
+    it("offers no Escalate for a deleted team, but keeps Snooze", async () => {
+      service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.find('[data-test="oncall-response-escalate-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-snooze-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-handoff-btn"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("escalatable")).toBe(false);
+    });
+
     it("says so instead of the id, without a link", async () => {
       service.getTeam.mockRejectedValue({ response: { status: 404 } });
       service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
@@ -1773,6 +1785,28 @@ describe("OnCallResponseDetail — responding", () => {
         expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(expected);
       },
     );
+  });
+
+  /// The header must not say "Not paged yet" before the ladder's progress has answered.
+  it("makes no paging claim in the header while the progress is still loading", async () => {
+    service.escalationProgress.mockReturnValue(new Promise(() => {}) as any);
+    const wrapper = await renderWith({ reached_rung_micros: 300_000_000 });
+
+    const phrase = wrapper.find(
+      '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]',
+    );
+    expect(phrase.text()).toBe("");
+  });
+
+  /// An empty 200 body is not an answer either.
+  it("makes no paging claim in the header when the progress came back empty", async () => {
+    service.escalationProgress.mockResolvedValue({ data: null } as any);
+    const wrapper = await renderWith();
+
+    const phrase = wrapper.find(
+      '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]',
+    );
+    expect(phrase.text()).toBe("");
   });
 
   /// An unrouted page has `team_id: null` on the wire (04-responses R6.1); there is no team to ask about or link to.

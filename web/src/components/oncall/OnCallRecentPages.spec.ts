@@ -216,6 +216,22 @@ describe("OnCallRecentPages", () => {
     expect(wrapper.text()).not.toContain("Triggered");
   });
 
+  /// Recent pages never fetches the ladder's progress, so a page with no recorded step is not known to be unpaged.
+  it("makes no claim for an open page with no recorded step", () => {
+    const wrapper = render([page({ id: "quiet", state: "triggered" })]);
+
+    expect(wrapper.find('[data-test="oncall-recent-pages-state-quiet"]').text()).toBe("");
+  });
+
+  /// A rung the edited policy no longer has still paged; the row makes no claim rather than "Not paged yet".
+  it("makes no claim for a recorded step the policy no longer has", () => {
+    const wrapper = render([
+      page({ id: "moved", state: "triggered", reached_rung_micros: 7 * MINUTE }),
+    ]);
+
+    expect(wrapper.find('[data-test="oncall-recent-pages-state-moved"]').text()).toBe("");
+  });
+
   it("shows the empty state rather than a bare card when nothing fired", () => {
     expect(render([]).find('[data-test="o2-empty-state"]').exists()).toBe(true);
   });

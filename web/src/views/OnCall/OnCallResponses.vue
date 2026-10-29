@@ -489,8 +489,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :response-id="row.latest.id"
           :record="row.latest"
           :progress="progressById[row.latest.id] ?? null"
-          :progress-loaded="progressLoaded"
+          :progress-loaded="progressAnswered.has(row.latest.id)"
           :total-rungs="totalRungsFor(row.latest)"
+          :reached-step="reachedStepFor(row.latest)"
         />
       </template>
 
@@ -968,6 +969,7 @@ import {
   isOnCallUnavailable,
   isDeletedTeam,
   isSnoozed,
+  reachedStepOf,
   nextHandover,
   winningRule,
 } from "@/utils/oncall";
@@ -1019,11 +1021,8 @@ const policyByTeam = ref<Record<string, OnCallPolicy>>({});
 const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
 const positionsByTeam = ref<Record<string, OnCallPosition[]>>({});
 const progressById = ref<Record<string, EscalationProgress>>({});
-// False until the first escalation-progress fetch completes. Before then, an
-// absent `progressById` entry means "we haven't asked yet", not "confirmed
-// nothing has fired" — OnCallEscalationCell needs to tell those apart so a
-// climbing ladder doesn't flash "Not paged yet" on every list load.
-const progressLoaded = ref(false);
+/// Ids whose progress was asked for and answered; a row past the cap or whose read failed is not in it, so it never reads "Not paged yet".
+const progressAnswered = ref<Set<string>>(new Set());
 const escalationCapped = ref(false);
 const expandedIds = ref<string[]>([]);
 const expandedEvents = ref<OnCallResponseEvent[]>([]);
@@ -1467,6 +1466,13 @@ function channelsFor(record: OnCallResponse): Channel[] {
 function totalRungsFor(record: OnCallResponse): number | null {
   const rungs = (record.team_id ? policyByTeam.value[record.team_id] : undefined)?.rungs ?? [];
   return rungs.find((rung) => rung.priority === record.priority)?.steps.length ?? null;
+}
+
+/// The step the record says it reached, for a row whose progress was not fetched.
+function reachedStepFor(record: OnCallResponse): number | null {
+  const rungs = (record.team_id ? policyByTeam.value[record.team_id] : undefined)?.rungs ?? [];
+  const steps = rungs.find((rung) => rung.priority === record.priority)?.steps;
+  return reachedStepOf(steps, record.reached_rung_micros);
 }
 
 /// When each team's current shift hands over.
@@ -1988,14 +1994,18 @@ async function fetchEscalationProgress(force = false) {
   );
 
   const next: Record<string, EscalationProgress> = {};
+  const answered = new Set<string>();
   wanted.forEach((record, index) => {
     const result = results[index];
-    if (result.status === "fulfilled" && result.value) next[record.id] = result.value;
+    // An empty body is no answer, so the row stays unknown rather than reading "Not paged yet".
+    if (result.status !== "fulfilled" || !result.value) return;
+    answered.add(record.id);
+    next[record.id] = result.value;
   });
   // Replaced wholesale so a record that resolved since the last poll drops its
   // stale ladder instead of keeping a countdown that will never fire.
   progressById.value = next;
-  progressLoaded.value = true;
+  progressAnswered.value = answered;
 }
 
 /// The expanded row's timeline.

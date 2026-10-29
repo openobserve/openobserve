@@ -73,6 +73,8 @@
             :record="response"
             :progress="escalation"
             :total-rungs="totalRungs"
+            :progress-loaded="escalationLoaded"
+            :reached-step="headerReachedStep"
           />
         </span>
         <!-- How long it has been ringing, beside the word "ringing". The two
@@ -285,6 +287,8 @@
               :record="response"
               :progress="escalation"
               :total-rungs="totalRungs"
+              :progress-loaded="escalationLoaded"
+              :reached-step="headerReachedStep"
             />
           </span>
           <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
@@ -850,6 +854,7 @@ import {
   pageState,
   promoteSeverityFloor,
   promoteSeverityOptions,
+  reachedStepOf,
   routingReasonOf,
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -1008,6 +1013,8 @@ const subjectAlert = ref<{
   condition?: any;
 } | null>(null);
 const escalation = ref<EscalationProgress | null>(null);
+/// False until the progress has answered, so the header makes no paging claim from a missing value.
+const escalationLoaded = ref(false);
 /// Who a page to this team reaches right now, and where the pager goes next.
 const onCallPositions = ref<OnCallPosition[]>([]);
 const onCallPositionsLoading = ref(false);
@@ -1065,9 +1072,9 @@ const canAcknowledge = computed(() => !!response.value && isEscalating(response.
 /// Whether the compact header's menu has anything in it: a closed page already tied to an incident has no verb left.
 const hasMoreActions = computed(() => isOpenState.value || !response.value?.incident_id);
 
-/// The server refuses Escalate and Snooze on a page with no team (AK-4); Hand off is the next step there.
-const canEscalate = computed(() => !!response.value?.team_id);
-const canSnooze = computed(() => canAcknowledge.value && canEscalate.value);
+/// The server refuses Escalate and Snooze on a page with no team (AK-4); a deleted team's ladder reaches nobody, so Escalate goes there too.
+const canEscalate = computed(() => !!response.value?.team_id && !teamDeleted.value);
+const canSnooze = computed(() => canAcknowledge.value && !!response.value?.team_id);
 
 /// Where the team-name link in the subtitle goes — same target and tab
 /// OnCallAboutPage's own team row links to, so the two agree on what
@@ -1103,6 +1110,14 @@ const totalRungs = computed(
   () =>
     policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps.length ??
     null,
+);
+
+/// The record's own step, so the header says something true before the ladder's progress has answered.
+const headerReachedStep = computed(() =>
+  reachedStepOf(
+    policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps,
+    response.value?.reached_rung_micros,
+  ),
 );
 
 // The same progress decides the header tag; the time is the last step's, which the record's flag lags.
@@ -1705,8 +1720,11 @@ async function fetchEscalation(force = false) {
       responseProgressQuery(orgId.value, responseId.value),
       force,
     );
+    // An empty body is no answer, so the header makes no paging claim from it.
+    escalationLoaded.value = escalation.value !== null;
   } catch {
     escalation.value = null;
+    escalationLoaded.value = false;
   }
 }
 
