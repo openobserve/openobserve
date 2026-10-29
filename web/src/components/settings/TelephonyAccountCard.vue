@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OBanner>
 
     <OBanner
-      v-if="status.data.value?.state === 'unavailable'"
+      v-if="live?.state === 'unavailable'"
       variant="warning"
       dense
       data-test="telephony-card-unchecked"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OBanner>
 
     <div class="border-border-default grid grid-cols-1 gap-2 border-t pt-4">
-      <TelephonyPress4Row :available="press4Available" />
+      <TelephonyPress4Row v-if="callsWork" :available="press4Available" />
       <span
         v-if="ok && !ok.can_text"
         class="text-status-warning-text flex items-center gap-2 text-sm"
@@ -103,7 +103,13 @@ import { telephonyStatusQuery } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
 import { useI18nTyped } from "@/types/i18n";
 import TelephonyPress4Row from "./TelephonyPress4Row.vue";
-import { PROVIDER, telephonyHealth, telephonyRefusalText, type TelephonyHealth } from "./telephony";
+import {
+  PROVIDER,
+  liveTelephonyStatus,
+  telephonyHealth,
+  telephonyRefusalText,
+  type TelephonyHealth,
+} from "./telephony";
 
 const TAG_VARIANT: Record<TelephonyHealth, BadgeVariant> = {
   checking: "default-soft",
@@ -129,7 +135,9 @@ const orgId = computed<string>(() => store.state.selectedOrganization.identifier
 
 const status = useQuery(() => telephonyStatusQuery(orgId.value));
 const health = computed(() => telephonyHealth(status.data.value, status.error.value));
-const ok = computed(() => (status.data.value?.state === "ok" ? status.data.value : null));
+const live = computed(() => liveTelephonyStatus(status.data.value, status.error.value));
+const ok = computed(() => (live.value?.state === "ok" ? live.value : null));
+const callsWork = computed(() => health.value === "ok" && ok.value?.can_call === true);
 
 const tagLabel = computed<I18nText>(() => {
   const labels: Record<TelephonyHealth, I18nText> = {
@@ -142,7 +150,7 @@ const tagLabel = computed<I18nText>(() => {
 });
 
 const problem = computed<I18nText | null>(() => {
-  const state = status.data.value?.state;
+  const state = live.value?.state;
   if (state === "account_rejected" || state === "from_not_on_account" || state === "unreadable") {
     return telephonyRefusalText(t, state);
   }

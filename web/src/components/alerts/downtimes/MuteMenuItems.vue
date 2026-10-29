@@ -18,6 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODropdownGroup :label="t(LABELS[labels].menu)">
     <ODropdownItem
+      v-if="untilClear"
+      :icon-left="LABELS[labels].icon"
+      :data-test="`${dataTestPrefix}-until-clear`"
+      @select="emit('untilClear')"
+    >
+      {{ t("alerts.downtimes.mute.untilClear") }}
+    </ODropdownItem>
+    <ODropdownItem
       v-for="preset in QUICK_MUTE_PRESETS"
       :key="preset.key"
       :icon-left="LABELS[labels].icon"
@@ -39,21 +47,28 @@ import { QUICK_MUTE_PRESETS } from "@/utils/downtimes/quickMute";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
-type LabelSet = "mute" | "extend";
+type LabelSet = "mute" | "group" | "extend";
 
 const LABELS: Record<LabelSet, { menu: I18nKey; icon: IconName }> = {
   mute: { menu: "alerts.downtimes.mute.menu", icon: "notifications-paused" },
+  group: { menu: "alerts.downtimes.mute.muteGroup", icon: "notifications-paused" },
   extend: { menu: "alerts.downtimes.extend.menu", icon: "hourglass-empty" },
 };
 
-withDefaults(defineProps<{ dataTestPrefix?: string; labels?: LabelSet }>(), {
-  dataTestPrefix: "mute",
-  labels: "mute",
-});
+withDefaults(
+  defineProps<{
+    dataTestPrefix?: string;
+    labels?: LabelSet;
+    /** Only where one alert is in scope: the mute then ends when that alert clears. */
+    untilClear?: boolean;
+  }>(),
+  { dataTestPrefix: "mute", labels: "mute", untilClear: false },
+);
 
 const emit = defineEmits<{
   preset: [seconds: number];
   until: [];
+  untilClear: [];
 }>();
 
 const { t } = useI18nTyped();

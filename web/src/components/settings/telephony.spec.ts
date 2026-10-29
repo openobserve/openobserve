@@ -25,6 +25,7 @@ import type {
 import type { TranslateFn } from "@/types/i18n";
 import { makeTelephonySchema, type TelephonyForm } from "./TelephonyAccountDialog.schema";
 import {
+  liveTelephonyStatus,
   telephonyHealth,
   telephonyPageState,
   telephonyRefusalOf,
@@ -158,6 +159,12 @@ describe("telephonyHealth", () => {
     ["no answer yet", null, null, "checking"],
     ["the check itself failed", null, { response: { status: 500 } }, "unchecked"],
     ["ok", status("ok"), null, "ok"],
+    [
+      "a re-check failed after an earlier answer",
+      status("ok"),
+      { response: { status: 500 } },
+      "unchecked",
+    ],
     ["credentials refused", status("account_rejected"), null, "broken"],
     ["number not on the account", status("from_not_on_account"), null, "broken"],
     ["stored account unreadable", status("unreadable"), null, "broken"],
@@ -165,5 +172,17 @@ describe("telephonyHealth", () => {
     ["no account to check", status("none"), null, "unchecked"],
   ])("%s", (_, given, err, expected) => {
     expect(telephonyHealth(given, err)).toBe(expected);
+  });
+});
+
+describe("liveTelephonyStatus", () => {
+  const ok: TelephonyStatus = { state: "ok", trial: false, can_text: true, can_call: true };
+
+  it.each<[string, TelephonyStatus | undefined, unknown, TelephonyStatus | null]>([
+    ["the latest answer", ok, null, ok],
+    ["no answer yet", undefined, null, null],
+    ["a cached answer after a failed re-check", ok, { response: { status: 500 } }, null],
+  ])("%s", (_, cached, err, expected) => {
+    expect(liveTelephonyStatus(cached, err)).toEqual(expected);
   });
 });

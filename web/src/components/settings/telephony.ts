@@ -106,7 +106,9 @@ export function telephonyHealth(
   status: TelephonyStatus | null | undefined,
   err: unknown,
 ): TelephonyHealth {
-  if (!status) return err ? "unchecked" : "checking";
+  // A failed re-check keeps the last answer cached, which must not read as current.
+  if (err) return "unchecked";
+  if (!status) return "checking";
   switch (status.state) {
     case "ok":
       return "ok";
@@ -118,6 +120,14 @@ export function telephonyHealth(
     case "none":
       return "unchecked";
   }
+}
+
+/** The status answer the card may show: none once a re-check failed, since the cached one is stale. [pure] */
+export function liveTelephonyStatus(
+  status: TelephonyStatus | null | undefined,
+  err: unknown,
+): TelephonyStatus | null {
+  return err ? null : (status ?? null);
 }
 
 /** An Account SID cut to its first and last four characters, as the connected card shows it. [pure] */

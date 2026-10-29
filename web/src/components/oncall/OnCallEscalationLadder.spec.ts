@@ -80,8 +80,9 @@ const priorities: TeamRungSummary[] = [
     pages_anyone: true,
     nobody_after_micros: 15 * MICROS_PER_MINUTE,
     ends_with_whole_team: true,
+    channels: ["email"],
   },
-  { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+  { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false, channels: [] },
 ];
 
 const paging = (priority: string, rungs: number): TeamRungSummary => ({
@@ -90,6 +91,7 @@ const paging = (priority: string, rungs: number): TeamRungSummary => ({
   pages_anyone: true,
   nobody_after_micros: 5 * MICROS_PER_MINUTE,
   ends_with_whole_team: false,
+  channels: ["email"],
 });
 
 /// P2, P3 and P4 run one ladder; P1 runs its own and P5 wakes nobody.
@@ -98,7 +100,7 @@ const fivePriorities: TeamRungSummary[] = [
   paging("P2", 1),
   paging("P3", 1),
   paging("P4", 1),
-  { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+  { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false, channels: [] },
 ];
 
 const oneStep = [{ after_micros: 0, targets: [{ kind: "on_call_now" as const }] }];
@@ -296,8 +298,20 @@ describe("OnCallEscalationLadder", () => {
       // Two silent priorities, far enough apart not to fold, so the only
       // difference between the chips is which one is selected.
       priorities: [
-        { priority: "P3", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
-        { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+        {
+          priority: "P3",
+          rungs: 0,
+          pages_anyone: false,
+          ends_with_whole_team: false,
+          channels: [],
+        },
+        {
+          priority: "P5",
+          rungs: 0,
+          pages_anyone: false,
+          ends_with_whole_team: false,
+          channels: [],
+        },
       ],
     });
     const variantOf = (priority: string) =>
@@ -316,8 +330,20 @@ describe("OnCallEscalationLadder", () => {
     const wrapper = render({
       selected: "P1",
       priorities: [
-        { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
-        { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+        {
+          priority: "P4",
+          rungs: 0,
+          pages_anyone: false,
+          ends_with_whole_team: false,
+          channels: [],
+        },
+        {
+          priority: "P5",
+          rungs: 0,
+          pages_anyone: false,
+          ends_with_whole_team: false,
+          channels: [],
+        },
       ],
     });
 

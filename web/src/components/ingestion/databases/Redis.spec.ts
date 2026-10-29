@@ -62,7 +62,13 @@ describe("redisCard builder", () => {
       streamName: "redis",
     });
     // Redis needs no monitoring user, so there is no prepare step.
-    expect(card.steps.map((s) => s.id)).toEqual(["install", "configure", "run", "verify"]);
+    expect(card.steps.map((s) => s.id)).toEqual([
+      "quick-install",
+      "install",
+      "configure",
+      "run",
+      "verify",
+    ]);
   });
 
   it("writes a redis receiver config with the org's exporter", () => {

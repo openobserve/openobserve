@@ -88,6 +88,7 @@ const card = (id: string) =>
   document.querySelector<HTMLElement>(`[data-test="telephony-card-${id}"]`);
 const cardText = (id: string) => card(id)?.textContent?.replace(/\s+/g, " ").trim() ?? "";
 const PRESS4 = "Call keys (4 acknowledge, 6 resolve, 8 escalate)";
+const NOTE = "Set by the operator, so there is nothing to configure here.";
 const dialog = (id: string) =>
   document.querySelector<HTMLInputElement>(`[data-test="telephony-account-dialog-${id}-field"]`);
 
@@ -135,6 +136,9 @@ describe("TelephonySettings", () => {
       expect(cardText("meta")).toBe("From +18335550100 · Account ACte…0001");
       expect(body).not.toContain(SID);
       expect(text("press4")).toBe(PRESS4);
+      expect(q("press4")?.querySelector('[role="img"]')?.getAttribute("aria-label")).toBe(
+        "Available",
+      );
       expect(q("update")).not.toBeNull();
       expect(q("disconnect")).not.toBeNull();
       expect(q("hero")).toBeNull();
@@ -143,6 +147,9 @@ describe("TelephonySettings", () => {
     it("5d: without a callback URL press 4 reads not available, with the link fallback", async () => {
       await render({ ...CONNECTED, press4_available: false });
       expect(text("press4")).toContain(PRESS4);
+      expect(q("press4")?.querySelector('[role="img"]')?.getAttribute("aria-label")).toBe(
+        "Not available",
+      );
       expect(text("press4")).toContain(
         "Calls ask people to acknowledge from the link in their text.",
       );
@@ -156,9 +163,7 @@ describe("TelephonySettings", () => {
       expect(body).toContain("This deployment's Twilio account");
       expect(cardText("status")).toBe("Connected");
       expect(cardText("meta")).toBe("From +18335550199");
-      expect(body).toContain(
-        "Texts and calls already work. Set by the operator; nothing to do here.",
-      );
+      expect(body).toContain(NOTE);
       expect(text("press4")).toBe(PRESS4);
       expect(q("hero")).toBeNull();
 
@@ -217,6 +222,9 @@ describe("TelephonySettings", () => {
       expect(cardText("status")).toBe("Not working");
       expect(card("problem")).not.toBeNull();
       expect(card("problem-update")).toBeNull();
+      expect(q("press4")).toBeNull();
+      expect(text("deployment")).toContain(NOTE);
+      expect(text("deployment")).not.toContain("already work");
     });
 
     it("an unreachable Twilio reads Couldn't check, not Not working", async () => {
@@ -224,6 +232,7 @@ describe("TelephonySettings", () => {
       expect(cardText("status")).toBe("Couldn't check");
       expect(cardText("unchecked")).toBe("Twilio could not be reached just now.");
       expect(card("problem")).toBeNull();
+      expect(q("press4")).toBeNull();
     });
 
     it("a failed status read reads Couldn't check", async () => {
@@ -252,6 +261,7 @@ describe("TelephonySettings", () => {
       await render(CONNECTED, true, status("ok", over));
       expect(cardText("status")).toBe("Connected");
       expect(["cant-text", "cant-call"].filter((id) => card(id))).toEqual(shown);
+      expect(q("press4") !== null).toBe(!shown.includes("cant-call"));
       expect(cardText("cant-text") + cardText("cant-call")).toBe(
         shown
           .map((id) =>

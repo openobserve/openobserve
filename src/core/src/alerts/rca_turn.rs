@@ -2735,6 +2735,30 @@ mod tests {
         s.events
     }
 
+    /// The pytest o2-ai mock replays this file as one RCA turn (`helpers/o2ai_mock.py`).
+    const PYTEST_RCA_EVENTS: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/api-testing/helpers/o2ai_rca_events.json"
+    );
+
+    #[test]
+    fn the_pytest_o2ai_mock_replays_the_graded_run_fixture() {
+        let events: Vec<Value> =
+            reported(&ALL_STAGES, verdict(H1, "high", "root_cause_identified"))
+                .iter()
+                .map(DurableEvent::to_replay_json)
+                .collect();
+        let want = serde_json::to_string_pretty(&events).unwrap() + "\n";
+        if std::env::var_os("UPDATE_FIXTURES").is_some() {
+            std::fs::write(PYTEST_RCA_EVENTS, &want).unwrap();
+        }
+        let have = std::fs::read_to_string(PYTEST_RCA_EVENTS).unwrap_or_default();
+        assert!(
+            have == want,
+            "{PYTEST_RCA_EVENTS} drifted from the ledger fixture; regenerate it with UPDATE_FIXTURES=1"
+        );
+    }
+
     /// What the finalizer computes from `events`; `ended_at_us` comes from the stored record.
     fn expected_end(events: &[DurableEvent], completed: bool, ended_at_us: i64) -> RunEndResult {
         let transcript = decode_run(events);
