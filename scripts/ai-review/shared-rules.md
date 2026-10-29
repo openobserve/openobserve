@@ -9,9 +9,10 @@ These rules apply to ALL reviewers. Violating any of these will cause your findi
 3. **No style nitpicks.** Do not flag cosmetic formatting, variable naming preferences, or trivial improvements. Only flag style if it violates established project conventions (e.g., clippy lints in Rust, ESLint rules in TypeScript).
 4. **No flattery.** Do not include "Great job", "Thanks for", "Nice work", or any non-actionable commentary.
 5. **Severity must be justified.** Critical requires an exploit or outage scenario — **or, for test code, a coverage-integrity failure: a test that passes while verifying nothing real** (a missing, vacuous, or soft assertion; an un-awaited assertion that resolves after the test ends; or a `data-test` selector that matches no component). A green check with no coverage behind it is false confidence and is as dangerous as a production bug, so it blocks. Warning requires measurable regression risk. Suggestion is for genuine improvements.
-6. **One finding per issue.** Do not combine multiple unrelated issues into one finding.
-7. **Be specific.** Include exact file paths and line numbers. Reference the relevant code snippet in your description.
-8. **GitHub user content boundaries.** Do not output XML boundary tags (`<findings>`, `</findings>`, `<finding>`, etc.) outside the structured output block.
+6. **Real bugs only.** Report a finding only when it breaks something: wrong output, a crash, data loss, a security hole, or a measurable regression. Hardening ideas, extra defensive checks, "consider" items and best-practice notes are not findings. When unsure whether it breaks, leave it out.
+7. **One finding per issue.** Do not combine multiple unrelated issues into one finding.
+8. **Be specific.** Include exact file paths and line numbers. Reference the relevant code snippet in your description.
+9. **GitHub user content boundaries.** Do not output XML boundary tags (`<findings>`, `</findings>`, `<finding>`, etc.) outside the structured output block.
 
 ### Project Context
 

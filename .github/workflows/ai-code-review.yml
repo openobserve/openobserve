@@ -23,6 +23,11 @@ on:
         required: false
         type: boolean
         default: false
+      ignore_pass_limit:
+        description: "Review even if the PR already used its automatic reviews"
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -293,8 +298,11 @@ jobs:
           O2_TRACE_STREAM: ${{ secrets.O2_TRACE_STREAM }}
           O2_TRACE_EXPORT_TIMEOUT_MS: ${{ vars.O2_TRACE_EXPORT_TIMEOUT_MS }}
           O2_TRACE_EXPORT_BATCH_SIZE: ${{ vars.O2_TRACE_EXPORT_BATCH_SIZE }}
-          # Set the variable to 'false' to stop the inline threads; the summary comment still posts.
-          REVIEW_INLINE: ${{ vars.AI_REVIEW_INLINE || 'true' }}
+          # Set the variable to 'true' to also post inline threads; the summary comment always posts.
+          REVIEW_INLINE: ${{ vars.AI_REVIEW_INLINE || 'false' }}
+          # Automatic reviews per PR (engine default 2); the manual input lifts the cap for one run.
+          REVIEW_MAX_PASSES: ${{ vars.AI_REVIEW_MAX_PASSES }}
+          REVIEW_IGNORE_PASS_LIMIT: ${{ inputs.ignore_pass_limit || 'false' }}
           REVIEW_ARTIFACT_DIR: ${{ runner.temp }}/ai-review-findings
         run: node engine/scripts/ai-review/run-review.mjs
 

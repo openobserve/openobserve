@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { selectOwnReviewComment } from "../src/comments.mjs";
+import { reviewPassCount, reviewPassTag, selectOwnReviewComment } from "../src/comments.mjs";
 
 const MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
 const comment = (id, login, type, body) => ({ id, user: { login, type }, body });
@@ -21,4 +21,10 @@ test("only the posting bot's own marker comments count, the newest wins", () => 
 
 test("no bot login means no previous review", () => {
   assert.equal(selectOwnReviewComment([comment(1, "", "User", "<!-- ai-code-review -->")], "", MARKER), null);
+});
+
+test("the pass count reads the hidden tag, and a legacy review counts as one", () => {
+  assert.equal(reviewPassCount(`<!-- ai-code-review -->\nbody\n${reviewPassTag(2)}`), 2);
+  assert.equal(reviewPassCount("<!-- ai-code-review -->\nbody"), 1);
+  assert.equal(reviewPassCount(`x\n${reviewPassTag(0)}`), 0);
 });
