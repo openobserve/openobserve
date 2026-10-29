@@ -7,10 +7,10 @@ export function selectOwnReviewComment(comments, botLogin, markerPattern) {
   return own.at(-1) ?? null;
 }
 
-// A review posted before the counter existed carries no tag but is still one pass.
-export function reviewPassCount(body) {
+// untagged is what a comment from before the counter is worth: a review is one pass, a pointer or notice none.
+export function reviewPassCount(body, untagged = 1) {
   const m = (body || "").match(new RegExp(REVIEW_PASS_TAG, "i"));
-  return m ? Number(m[1]) : 1;
+  return m ? Number(m[1]) : untagged;
 }
 
 export function reviewPassTag(count) {

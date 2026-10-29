@@ -57,6 +57,7 @@ import type {
   PromoteSeverity,
   PutTelephonyBody,
   TelephonyView,
+  TelephonyStatus,
   OrgTelephonyView,
   TestPageResult,
   UnroutedSignal,
@@ -843,6 +844,10 @@ const oncall = {
   /// A refusal carries a `TelephonyRefusalBody`; a 403 means the caller may not read Settings.
   getTelephony: ({ org_identifier }: { org_identifier: string }) =>
     http().get<TelephonyView>(`/api/${org_identifier}/telephony`),
+
+  /// Asks Twilio about the account the org would page with; read-only.
+  getTelephonyStatus: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<TelephonyStatus>(`/api/${org_identifier}/telephony/status`),
 
   /// Twilio is asked first; nothing is stored unless it reports the account active.
   putTelephony: ({ org_identifier, data }: { org_identifier: string; data: PutTelephonyBody }) =>
