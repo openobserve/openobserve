@@ -269,7 +269,7 @@ function viewTrace(traceId: string) {
     <button
       v-if="counts.passing"
       type="button"
-      class="text-text-secondary hover:text-text-primary inline-flex items-center"
+      class="text-text-secondary hover:text-text-heading inline-flex items-center"
       data-test="llm-data-health-passing"
       @click="openDrawer(null)"
     >

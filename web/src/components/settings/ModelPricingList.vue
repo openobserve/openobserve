@@ -43,12 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <template #actions-overflow>
-        <OButton
-          variant="outline"
-          size="sm"
-          @click="openGaps"
-          data-test="model-pricing-gaps-btn"
-        >
+        <OButton variant="outline" size="sm" @click="openGaps" data-test="model-pricing-gaps-btn">
           {{ t("modelPricing.unpriced.title") }}
         </OButton>
         <OButton
