@@ -116,7 +116,7 @@ const listsReadStreams = (anyItem: ActionIndex, moduleWide: ActionIndex) => {
     : STREAM_TYPES.some((type) => holds(moduleWide, type, list));
 };
 
-/** Modules a role's grants need to work but lacks: List needs a module-wide grant, Get any item's, All counting for both. */
+/** Modules a role's grants need to work but lacks: List needs an org-wide grant (per read stream type for Streams), Get any item's, All counting for both. */
 export function findCompanionGaps(
   keys: ReadonlySet<string>,
   availableModules: ReadonlySet<string>,

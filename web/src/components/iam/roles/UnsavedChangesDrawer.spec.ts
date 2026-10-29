@@ -163,14 +163,29 @@ describe("UnsavedChangesDrawer - Not Added Yet", () => {
     expect(wrapper.emitted("add")).toEqual([[[`destination:${ALL}:AllowList`]]]);
   });
 
-  // Streams Get is picked per stream (D1), so its row opens Streams and never adds a module-wide read.
-  it("offers Open Streams instead of Add when Streams Get is missing", async () => {
+  // Streams Get is picked per stream (D1), so Open Streams covers it and Add never grants a module-wide read.
+  it("offers Open Streams for Get and Add for List when both Streams grants are missing", async () => {
     const wrapper = mountDrawer({ gaps: [gap("stream", ["AllowList", "AllowGet"], "dfolder")] });
 
-    expect(find(wrapper, "edit-role-companion-add-stream").exists()).toBe(false);
     await find(wrapper, "edit-role-companion-open-stream").trigger("click");
+    await find(wrapper, "edit-role-companion-add-stream").trigger("click");
 
     expect(wrapper.emitted("open-module")).toEqual([["stream"]]);
+    expect(wrapper.emitted("add")).toEqual([[[`stream:${ALL}:AllowList`]]]);
+  });
+
+  it("ignores the second click of a double click on Add and Add All", async () => {
+    const wrapper = mountDrawer({
+      gaps: [gap("destination", ["AllowList"]), gap("template", ["AllowList"])],
+    });
+
+    find(wrapper, "edit-role-companion-add-destination").element.dispatchEvent(
+      new MouseEvent("click", { detail: 2, bubbles: true }),
+    );
+    find(wrapper, "edit-role-companions-add-all").element.dispatchEvent(
+      new MouseEvent("click", { detail: 2, bubbles: true }),
+    );
+
     expect(wrapper.emitted("add")).toBeUndefined();
   });
 
@@ -215,10 +230,10 @@ describe("UnsavedChangesDrawer - Your Changes", () => {
     expect(find(wrapper, "edit-role-unsaved-summary").text()).toBe("· 3 changes in 2 modules");
   });
 
-  it("reads None Yet with only missing modules to show", () => {
+  it("reads none yet with only missing modules to show", () => {
     const wrapper = mountDrawer({ gaps: [gap("destination", ["AllowList"])] });
 
-    expect(find(wrapper, "edit-role-unsaved-summary").text()).toBe("· None Yet");
+    expect(find(wrapper, "edit-role-unsaved-summary").text()).toBe("· none yet");
   });
 
   it("lists each change under its module group, the Other group included", () => {

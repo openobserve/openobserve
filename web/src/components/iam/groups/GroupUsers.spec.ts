@@ -1113,7 +1113,7 @@ describe("GroupUsers and GroupServiceAccounts while a role save is in flight", (
           updateJsonInTable: () => {},
           grants: { payload: () => ({ add: [], remove: [] }), commit: () => {} },
           updateRoleOne: { mutateAsync },
-          moduleKeyOf: (resource: string) => resource,
+          pendingCounts: () => ({ changes: 0, modules: 0 }),
           presetSettled: () => Promise.resolve(),
           t: i18n.global.t as any,
         });

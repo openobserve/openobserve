@@ -22,7 +22,6 @@ import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import { useRoleGrants } from "@/composables/iam/useRoleGrants";
 import { useRolePresets } from "@/composables/iam/useRolePresets";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
-import { DBM_VIEWER_STREAMS } from "@/components/iam/roles/dbmViewerPreset";
 import { K8S_VIEWER_STREAMS } from "@/components/iam/roles/k8sViewerPreset";
 
 const mockToast = vi.fn();
@@ -500,8 +499,11 @@ describe("useRolePresets - stream presets", () => {
     expect(added(ctx)).not.toContain(`metrics:${ALL}:AllowGet`);
     expect(mockToast).toHaveBeenCalledTimes(1);
     expect(mockToast).toHaveBeenCalledWith({
-      variant: "info",
-      message: t("iam.editRole.dbmPresetSeeded", { matched: 3, total: DBM_VIEWER_STREAMS.length }),
+      variant: "success",
+      message: t("iam.editRole.presetApplied", {
+        title: t("iam.editRole.presetDbmTitle"),
+        permissions: t("iam.editRole.presetPermissionCount", { count: 6 }, 6),
+      }),
     });
   });
 

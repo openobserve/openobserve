@@ -221,6 +221,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
+import type { Resource } from "@/ts/interfaces";
 
 export type ScopeRow = {
   key: string;
@@ -372,9 +373,9 @@ const setFilter = (nextQuery: string, nextScope: string) => {
 };
 
 // Module rows carry no group, so it is read from the same map the rail uses.
-const groupLabelOf = (row: any) => t(GROUP_LABEL_KEYS[moduleGroup(row.name, row.parent)]);
+const groupLabelOf = (row: Resource) => t(GROUP_LABEL_KEYS[moduleGroup(row.name, row.parent)]);
 
-const moduleMatch = (row: any) =>
+const moduleMatch = (row: Resource) =>
   matchModule(
     { key: row.name, label: String(row.display_name ?? row.name), groupLabel: groupLabelOf(row) },
     query.value,

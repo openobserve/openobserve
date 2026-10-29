@@ -313,8 +313,8 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     findCompanionGaps(selectedPermissionsHash.value, availableModules.value, getOrgId()),
   );
 
-  const listOf = (items: string[]) =>
-    raw(new Intl.ListFormat(getIntlLocale(), { type: "conjunction" }).format(items));
+  const listFormat = computed(() => new Intl.ListFormat(getIntlLocale(), { type: "conjunction" }));
+  const listOf = (items: string[]) => raw(listFormat.value.format(items));
 
   // All grants only the actions the row shows, so All on logs_cache means delete; an unknown row reads as every action.
   const actionsOfAll = (resource: string, entity: string) => {

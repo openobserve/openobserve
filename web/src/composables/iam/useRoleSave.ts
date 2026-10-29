@@ -36,7 +36,8 @@ type SaveDeps = {
     mutateAsync: (vars: { role_id: string; payload: Record<string, unknown> }) => Promise<unknown>;
   };
   /** The rail module a resource is counted under, so "in 2 modules" matches the rail. */
-  moduleKeyOf: (resource: string) => string;
+  /** Drawer rows and modules, the numbers the Review Changes badge shows. */
+  pendingCounts: () => { changes: number; modules: number };
   /** Resolves once a preset still staging has finished, so the save carries its grants. */
   presetSettled: () => Promise<void>;
   t: TranslateFn;
@@ -55,18 +56,17 @@ export const useRoleSave = (deps: SaveDeps) => {
     removedServiceAccounts,
     roleUsers,
     updateRoleOne,
-    moduleKeyOf,
+    pendingCounts,
     presetSettled,
     t,
   } = deps;
 
-  // Counted before commit() clears the staging: two keys on `logs:app` and one on `dashboard:f1/d1` -> 3 changes in 2 modules.
+  // Counted before commit() clears the staging, from the same rows the badge counts.
   const savedMessage = (changed: Staged[]) => {
-    const count = changed.length;
-    if (!count) return t("iam.editRole.updateSuccess");
-    const modules = new Set(changed.map(({ object }) => moduleKeyOf(object.split(":")[0]))).size;
+    const { changes, modules } = pendingCounts();
+    if (!changed.length || !changes) return t("iam.editRole.updateSuccess");
     return t("iam.editRole.saveSuccessCounts", {
-      changes: t("iam.editRole.permissionChangeCount", { count }, count),
+      changes: t("iam.editRole.changeCount", { count: changes }, changes),
       modules: t("iam.editRole.presetModuleCount", { count: modules }, modules),
     });
   };
@@ -139,7 +139,7 @@ export const useRoleSave = (deps: SaveDeps) => {
         removedServiceAccounts.value = new Set([]);
       })
       .catch((err) => {
-        if (err.response.status != 403) {
+        if (err?.response?.status != 403) {
           toast({
             variant: "error",
             message: t("iam.editRole.updateError"),

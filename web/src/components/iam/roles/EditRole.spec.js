@@ -934,7 +934,7 @@ describe("EditRole - save and cancel", () => {
 
     expect(mockToast).toHaveBeenCalledWith({
       variant: "success",
-      message: "Saved 1 permission change in 1 module.",
+      message: "Saved 1 change in 1 module.",
     });
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
   });
@@ -3823,7 +3823,7 @@ describe("EditRole - save toast", () => {
     return mockToast.mock.calls.map(([arg]) => arg);
   };
 
-  it("names the permission changes and modules a save touched", async () => {
+  it("names the changes and modules a save touched", async () => {
     const vm = await mountEditRoleVm();
     withSaved(vm, ["dfolder:f1:AllowGet"]);
     vm.updatePermissionMappings("logs:app:AllowGet");
@@ -3831,7 +3831,7 @@ describe("EditRole - save toast", () => {
     vm.updatePermissionMappings("dfolder:f1:AllowGet");
 
     expect(await toastAfterSave(vm)).toEqual([
-      { variant: "success", message: "Saved 3 permission changes in 2 modules." },
+      { variant: "success", message: "Saved 3 changes in 2 modules." },
     ]);
   });
 

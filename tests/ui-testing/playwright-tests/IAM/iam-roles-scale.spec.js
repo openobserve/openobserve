@@ -151,10 +151,9 @@ test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, ()
 
         // Looking at the JSON is not editing it — a round trip that stages changes
         // would let an untouched role be rewritten by a stray Save.
-        // Read the change count, not the button: dfolder List without stream Get is a
-        // companion gap, which keeps Review Changes enabled with nothing staged.
-        expect((await pm.rolesPage.unsavedCount.allInnerTexts()).join(''),
-            'the Table -> JSON -> Table round trip staged changes').not.toMatch(/[1-9]/);
+        // Review Changes always renders in table view; List-only grants raise no companion gap, so it stays disabled.
+        await expect(pm.rolesPage.unsavedCount, 'the Table -> JSON -> Table round trip staged changes').toHaveCount(0);
+        await expect(pm.rolesPage.reviewChangesButton).toBeDisabled();
 
         const payload = await pm.rolesPage.saveAndCapture({ expectRequest: false });
         if (payload) {

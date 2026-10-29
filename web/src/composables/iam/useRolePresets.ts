@@ -53,8 +53,8 @@ export type PresetInfo = {
   section: PresetSection;
   titleKey: string;
   descriptionKey: string;
-  icon: string;
-  tone: string;
+  icon: JobPreset["icon"];
+  tone: JobPreset["tone"];
 };
 
 export type PresetPreview = {
@@ -143,13 +143,10 @@ type PresetDeps = {
   heavyResourceEntities: Ref<{ [key: string]: Entity[] }>;
   /** Presets judge "already held" on the live grants, since staging a held key again would revoke it. */
   grants: {
-    has: (key: string) => boolean;
     current: Ref<Set<string>>;
     removed: Ref<Record<string, unknown>>;
   };
   permissionHashFor: (row: Row, permission: string) => string;
-  /** Unused since presets stage in one batch; optional so EditRole can stop passing it. */
-  handlePermissionChange?: (row: Row, permission: string) => void;
   handlePermissionBatchChange: (
     changes: { row: Row; permission: string; newValue: boolean }[],
   ) => void;
@@ -231,11 +228,6 @@ export const useRolePresets = (deps: PresetDeps) => {
           .filter((permission) => row.permission?.[permission]?.show)
           .map((permission) => ({ row, permission }))
       : [];
-
-  const collectVisibleReadGrants = (row: Entity, perms: readonly PermissionType[]) =>
-    visible(row, perms)
-      .filter((grant) => !grants.has(permissionHashFor(grant.row, grant.permission)))
-      .map((grant) => ({ ...grant, newValue: true }));
 
   // `typeNode.entities` holds only rows under the current filter, so curated names are matched on the full list.
   const curatedStreamGrants = (
@@ -331,7 +323,9 @@ export const useRolePresets = (deps: PresetDeps) => {
 
   const isRestore = (key: string) => key in grants.removed.value;
 
-  const stage = (list: Grant[]) => {
+  type Staged = { added: number; restored: number };
+
+  const stage = (list: Grant[]): Staged => {
     const { adds } = pendingGrants(list);
     // Read before staging, since the toggle clears the removal.
     const restored = adds.filter((grant) =>
@@ -395,29 +389,47 @@ export const useRolePresets = (deps: PresetDeps) => {
     const previewed = streamStatus.value[type] === "loaded";
     if (!previewed) await openStreamType(type);
     const resolved = resolvePreset(presetId);
-    stage(resolved?.grants ?? []);
+    const staged = stage(resolved?.grants ?? []);
     if (previewed) await openStreamType(type);
-    return resolved;
+    return { resolved, staged };
   };
 
-  const seedDbmViewerPreset = () =>
+  // An undone removal is no change to the saved role, so it is never counted as added.
+  const announceApplied = (presetId: string, { added, restored }: Staged) => {
+    const preset = [...BUILTIN_PRESETS, ...JOB_PRESETS].find((item) => item.id === presetId);
+    const count = added || restored;
+    if (!count || !preset) return;
+    toast({
+      variant: "success",
+      message: t(added ? "iam.editRole.presetApplied" : "iam.editRole.presetRestored", {
+        title: t(preset.titleKey),
+        permissions: t("iam.editRole.presetPermissionCount", { count }, count),
+      }),
+    });
+  };
+
+  // The panel gets the same applied toast as the job presets; the `?preset=` link keeps the seeding toast.
+  const seedDbmViewerPreset = (opts: { announce?: boolean } = {}) =>
     locked(async () => {
-      const resolved = await stageStreamPreset("dbm", "metrics");
+      const { resolved, staged } = await stageStreamPreset("dbm", "metrics");
+      if (opts.announce && resolved?.matched) return announceApplied("dbm", staged);
       reportDbmViewerSeeding(resolved?.matched ?? 0, DBM_VIEWER_STREAMS.length);
     });
 
-  const seedK8sViewerPreset = () =>
+  const seedK8sViewerPreset = (opts: { announce?: boolean } = {}) =>
     locked(async () => {
-      const resolved = await stageStreamPreset("k8s", "metrics");
+      const { resolved, staged } = await stageStreamPreset("k8s", "metrics");
       // With no metrics node there is no stream list to match, so there is nothing to report.
       if (!streamTypeNode("metrics")) return;
+      if (opts.announce && resolved?.matched) return announceApplied("k8s", staged);
       reportK8sViewerSeeding(resolved?.matched ?? 0, K8S_VIEWER_STREAMS.length);
     });
 
-  const seedRumPreset = (preset: RumPreset) =>
+  const seedRumPreset = (preset: RumPreset, opts: { announce?: boolean } = {}) =>
     locked(async () => {
-      const resolved = await stageStreamPreset(preset, "logs");
+      const { resolved, staged } = await stageStreamPreset(preset, "logs");
       const total = RUM_STREAMS.length;
+      if (opts.announce && resolved?.matched) return announceApplied(preset, staged);
       toast(
         resolved?.matched
           ? {
@@ -429,24 +441,15 @@ export const useRolePresets = (deps: PresetDeps) => {
     });
 
   const applyPreset = (presetId: string, opts: { announce?: boolean } = {}): Promise<void> => {
-    if (presetId === "dbm") return seedDbmViewerPreset();
-    if (presetId === "k8s") return seedK8sViewerPreset();
-    if (presetId === "rum_viewer" || presetId === "rum_editor") return seedRumPreset(presetId);
+    if (presetId === "dbm") return seedDbmViewerPreset(opts);
+    if (presetId === "k8s") return seedK8sViewerPreset(opts);
+    if (presetId === "rum_viewer" || presetId === "rum_editor")
+      return seedRumPreset(presetId, opts);
     return locked(() => {
       const resolved = resolvePreset(presetId);
       if (!resolved) return;
       const { added, restored } = stage(resolved.grants);
-      const preset = [...BUILTIN_PRESETS, ...JOB_PRESETS].find((item) => item.id === presetId);
-      const count = added || restored;
-      if (!opts.announce || !count || !preset) return;
-      // An undone removal is no change to the saved role, so it is never counted as added.
-      toast({
-        variant: "success",
-        message: t(added ? "iam.editRole.presetApplied" : "iam.editRole.presetRestored", {
-          title: t(preset.titleKey),
-          permissions: t("iam.editRole.presetPermissionCount", { count }, count),
-        }),
-      });
+      if (opts.announce) announceApplied(presetId, { added, restored });
     });
   };
 
@@ -524,18 +527,19 @@ export const useRolePresets = (deps: PresetDeps) => {
       adds: addKeys,
       restores: addKeys.filter(isRestore),
       skipped: unique - addKeys.length,
-      stillMissing: findCompanionGaps(
-        new Set([...grants.current.value, ...addKeys]),
-        new Set(Object.keys(resourceMapper.value)),
-        orgId(),
-      ),
+      get stillMissing() {
+        return findCompanionGaps(
+          new Set([...grants.current.value, ...addKeys]),
+          new Set(Object.keys(resourceMapper.value)),
+          orgId(),
+        );
+      },
       ...(streamType ? { noMatchingStreams: !resolved?.matched } : {}),
     };
   };
 
   return {
     seedReadonlyPreset,
-    collectVisibleReadGrants,
     seedDbmViewerPreset,
     reportDbmViewerSeeding,
     seedK8sViewerPreset,

@@ -303,6 +303,23 @@ describe("RolePresetsPanel - detail", () => {
     expect(detail.find('[data-test="edit-role-preset-missing"]').exists()).toBe(false);
   });
 
+  it("ignores the second click of a double click on Add and on the list row", async () => {
+    const w = await mountPanel({
+      alert_viewer: ready({ adds: [`afolder:${ORG_WIDE}:AllowAll`] }),
+    });
+
+    w.find('[data-test="edit-role-preset-alert_viewer"]').element.dispatchEvent(
+      new MouseEvent("click", { detail: 2, bubbles: true }),
+    );
+    expect(w.find('[data-test="edit-role-preset-detail"]').exists()).toBe(false);
+
+    await openDetail(w, "alert_viewer");
+    w.find('[data-test="edit-role-preset-apply"]').element.dispatchEvent(
+      new MouseEvent("click", { detail: 2, bubbles: true }),
+    );
+    expect(w.emitted("apply")).toBeUndefined();
+  });
+
   // Applying only cancels the staged removal, so nothing is counted as added.
   it("says Keep, not Add, when every grant is a removal the admin staged", async () => {
     const w = await mountPanel({
@@ -336,7 +353,7 @@ describe("RolePresetsPanel - detail", () => {
       }),
     });
 
-    expect(status(w, "alert_manager").text()).toBe("+3");
+    expect(status(w, "alert_manager").text()).toBe("+2");
     const detail = await openDetail(w, "alert_manager");
 
     expect(detail.find('[data-test="edit-role-preset-summary"]').text()).toBe(

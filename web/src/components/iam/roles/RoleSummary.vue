@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Stacks when the rails squeeze the overview, which a viewport breakpoint cannot see. -->
     <div class="relative flex min-h-0 flex-1 @max-[38rem]/role-overview:flex-col">
-      <div class="@container/role-cards flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
         <div v-if="loading" class="flex flex-1 items-center justify-center p-6">
           <OSpinner size="md" data-test="edit-role-summary-loading" />
         </div>
@@ -48,26 +48,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <OContent v-else class="flex flex-col gap-3 py-4">
-          <!-- The end gutter keeps the top card clear of the floating Show Presets button. -->
+          <!-- Fixed-width columns keep cards still when the Presets panel opens or closes; the end gutter keeps the top card clear of the floating Show Presets button. -->
           <div
-            class="grid auto-rows-fr grid-cols-1 gap-4 @min-[30rem]/role-cards:grid-cols-2 @min-[46rem]/role-cards:grid-cols-3"
+            class="grid auto-rows-fr grid-cols-[repeat(auto-fill,minmax(min(100%,17rem),17rem))] gap-3"
             :class="{ 'pe-10': !presetsOpen }"
           >
             <button
               v-for="module in modules"
               :key="module.moduleKey"
               type="button"
-              class="group rounded-surface border-border-default bg-surface-panel hover:border-accent focus-visible:ring-accent flex h-full flex-col border p-4 text-left shadow-xs transition outline-none hover:shadow-md focus-visible:ring-2"
+              class="group rounded-surface border-border-default bg-surface-panel hover:border-accent focus-visible:ring-accent flex h-full flex-col border p-3 text-left shadow-xs transition outline-none hover:shadow-md focus-visible:ring-2"
               :data-test="`edit-role-summary-module-${module.moduleKey}`"
               @click="emit('open', module.moduleKey)"
             >
-              <span class="flex w-full items-start gap-3">
+              <span class="flex w-full items-start gap-2.5">
                 <span
-                  class="rounded-default inline-flex size-10 shrink-0 items-center justify-center"
+                  class="rounded-default inline-flex size-8 shrink-0 items-center justify-center"
                   :class="groupTone(module.group)"
                   :data-test="`edit-role-summary-icon-${module.moduleKey}`"
                 >
-                  <OIcon :name="module.icon" size="md" />
+                  <OIcon :name="module.icon" size="sm" />
                 </span>
                 <span class="flex min-w-0 flex-1 flex-col">
                   <span class="flex min-w-0 items-center gap-1.5">
@@ -84,10 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="sr-only">{{ t("iam.editRole.summaryPendingTitle") }}</span>
                     </span>
                   </span>
-                  <OTruncatedText
-                    :lines="2"
-                    class="text-text-secondary mt-0.5 text-xs leading-snug"
-                  >
+                  <OTruncatedText class="text-text-secondary mt-0.5 text-xs leading-snug">
                     {{ module.description }}
                   </OTruncatedText>
                 </span>
@@ -98,18 +95,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </span>
 
-              <span class="mt-auto w-full pt-4">
+              <span class="mt-auto w-full pt-3">
                 <span
-                  class="border-border-default flex items-end justify-between gap-2 border-t pt-3"
+                  class="border-border-default flex items-center justify-between gap-2 border-t pt-2"
                 >
-                  <span class="flex flex-col">
+                  <span class="flex items-baseline gap-1">
                     <span
-                      class="text-text-heading text-2xl leading-none font-semibold tabular-nums"
+                      class="text-text-heading text-sm font-semibold tabular-nums"
                       :data-test="`edit-role-summary-granted-${module.moduleKey}`"
                     >
                       {{ grouped(module.granted) }}
                     </span>
-                    <span class="text-text-secondary mt-1 text-xs">
+                    <span class="text-text-secondary text-xs">
                       {{ t("iam.editRole.summaryGrantsLabel", {}, module.granted) }}
                     </span>
                   </span>

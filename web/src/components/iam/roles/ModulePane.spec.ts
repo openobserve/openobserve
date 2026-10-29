@@ -783,9 +783,7 @@ describe("ModulePane - All Modules filter by group and task word", () => {
   const row = (wrapper: any, name: string) =>
     wrapper.find(`[data-test="edit-role-module-pane-open-${name}"]`);
 
-  const pill = (wrapper: any) => wrapper.find('[data-test^="edit-role-module-match-"]');
-
-  it("keeps module rows matched by group, without a pill", async () => {
+  it("keeps module rows matched by group", async () => {
     const wrapper = await mountModules(modules());
 
     await search(wrapper, "alerting");
@@ -793,10 +791,9 @@ describe("ModulePane - All Modules filter by group and task word", () => {
     expect(row(wrapper, "destination").exists()).toBe(true);
     expect(row(wrapper, "afolder").exists()).toBe(true);
     expect(row(wrapper, "stream").exists()).toBe(false);
-    expect(pill(wrapper).exists()).toBe(false);
   });
 
-  it("keeps module rows matched by task word, without a pill", async () => {
+  it("keeps module rows matched by task word", async () => {
     const wrapper = await mountModules([
       ...modules(),
       moduleRow("rum_analytics", "Product Analytics"),
@@ -806,23 +803,20 @@ describe("ModulePane - All Modules filter by group and task word", () => {
 
     expect(row(wrapper, "destination").exists()).toBe(true);
     expect(row(wrapper, "stream").exists()).toBe(false);
-    expect(pill(wrapper).exists()).toBe(false);
 
     await search(wrapper, "funnel");
 
     expect(row(wrapper, "rum_analytics").exists()).toBe(true);
     expect(row(wrapper, "destination").exists()).toBe(false);
-    expect(pill(wrapper).exists()).toBe(false);
   });
 
-  it("shows a matched module name as plain text, without a pill", async () => {
+  it("shows a matched module name as plain text", async () => {
     const wrapper = await mountModules(modules());
 
     await search(wrapper, "dest");
 
     expect(row(wrapper, "destination").exists()).toBe(true);
     expect(wrapper.find("mark").exists()).toBe(false);
-    expect(pill(wrapper).exists()).toBe(false);
   });
 
   // An unknown resource would read as group "Other", so "other" would keep it if module matching leaked in.

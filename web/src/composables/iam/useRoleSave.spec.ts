@@ -46,8 +46,7 @@ const makeDeps = (
   removedServiceAccounts: ref(new Set<unknown>()),
   roleUsers: ref<string[]>([]),
   updateRoleOne: { mutateAsync: vi.fn(mutateAsync) },
-  moduleKeyOf: (resource: string) =>
-    ({ logs: "stream", metrics: "stream", dashboard: "dfolder" })[resource] ?? resource,
+  pendingCounts: vi.fn(() => ({ changes: 1, modules: 1 })),
   presetSettled: vi.fn(() => Promise.resolve()),
   t: i18n.global.t as any,
 });
@@ -81,8 +80,8 @@ describe("useRoleSave toast", () => {
     return vi.mocked(toast).mock.calls.map(([arg]) => arg);
   };
 
-  // Keys, not drawer rows: two actions on `logs:app` are two permission changes; `logs` and `metrics` are one module.
-  it("names the permission changes and the modules they touch", async () => {
+  // Drawer rows, not payload keys: four keys can be three rows.
+  it("names the changes and the modules the drawer shows", async () => {
     const deps = makeDeps(() => Promise.resolve({}), {
       add: [
         { object: "logs:app", permission: "AllowGet" },
@@ -91,9 +90,10 @@ describe("useRoleSave toast", () => {
       ],
       remove: [{ object: "metrics:cpu", permission: "AllowGet" }],
     });
+    deps.pendingCounts.mockReturnValue({ changes: 3, modules: 2 });
 
     expect(await savedToast(deps)).toEqual([
-      { variant: "success", message: "Saved 4 permission changes in 2 modules." },
+      { variant: "success", message: "Saved 3 changes in 2 modules." },
     ]);
   });
 
@@ -101,7 +101,7 @@ describe("useRoleSave toast", () => {
     const deps = makeDeps(() => Promise.resolve({}));
 
     expect(await savedToast(deps)).toEqual([
-      { variant: "success", message: "Saved 1 permission change in 1 module." },
+      { variant: "success", message: "Saved 1 change in 1 module." },
     ]);
   });
 
@@ -133,7 +133,7 @@ describe("useRoleSave toast", () => {
     });
 
     expect(await savedToast(deps)).toEqual([
-      { variant: "success", message: "Saved 1 permission change in 1 module." },
+      { variant: "success", message: "Saved 1 change in 1 module." },
     ]);
   });
 });
@@ -205,5 +205,21 @@ describe("useRoleSave preset and save interlock", () => {
     await first;
 
     expect(deps.updateRoleOne.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useRoleSave network failure", () => {
+  it("shows the save-failure toast when the request has no response", async () => {
+    vi.mocked(toast).mockClear();
+    const deps = makeDeps(() => Promise.reject(new TypeError("Network Error")));
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await useRoleSave(deps).saveRole();
+    await flushPromises();
+
+    expect(toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: i18n.global.t("iam.editRole.updateError"),
+    });
   });
 });

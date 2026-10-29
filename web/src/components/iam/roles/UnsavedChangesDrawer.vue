@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="saving"
           data-test="edit-role-companions-add-all"
           @click="
-            emit(
-              'add',
+            addKeys(
+              $event,
               gapRows.flatMap((gap) => gap.keys),
             )
           "
@@ -116,14 +116,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </OTooltip>
           <OButton
-            v-else
+            v-if="gap.keys.length"
             variant="outline"
             size="sm"
             icon-left="add"
             :aria-label="t('iam.editRole.companionAddItem', { item: gap.label })"
             :disabled="saving"
             :data-test="`edit-role-companion-add-${gap.module}`"
-            @click="emit('add', gap.keys)"
+            @click="addKeys($event, gap.keys)"
           >
             {{ t("iam.editRole.companionAdd") }}
           </OButton>
@@ -262,6 +262,12 @@ const emit = defineEmits<{
 }>();
 
 const { t, locale } = useI18nTyped();
+
+// A double click's second click lands on the row that slid up under the pointer, so only the first click adds.
+const addKeys = (event: MouseEvent, keys: string[]) => {
+  if (event.detail > 1) return;
+  emit("add", keys);
+};
 
 const listOf = (items: string[], type: Intl.ListFormatType = "conjunction") =>
   raw(new Intl.ListFormat(locale.value, { type }).format(items));

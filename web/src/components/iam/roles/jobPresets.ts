@@ -32,7 +32,7 @@ export type JobPreset = {
 const ALL: readonly PermissionType[] = ["AllowAll"];
 const READ: readonly PermissionType[] = ["AllowList", "AllowGet"];
 
-/** Role starting points named after a job; each one also carries the companion grants it needs, Streams Get included. */
+/** Role starting points named after a job; each one also carries the companion grants it needs. */
 export const JOB_PRESETS: JobPreset[] = [
   {
     id: "alert_manager",

@@ -171,8 +171,6 @@ describe("ModuleRail - filter by group and task word", () => {
   const search = (wrapper: any, value: string) =>
     wrapper.find('[data-test="edit-role-module-rail-search"] input').setValue(value);
 
-  const pill = (wrapper: any) => wrapper.find('[data-test^="edit-role-module-match-"]');
-
   it("asks for modules, groups or tasks in the search box", async () => {
     const wrapper = await mountRail(modules());
 
@@ -189,17 +187,15 @@ describe("ModuleRail - filter by group and task word", () => {
     expect(item(wrapper, "destination").exists()).toBe(true);
     expect(item(wrapper, "template").exists()).toBe(true);
     expect(item(wrapper, "stream").exists()).toBe(false);
-    expect(pill(wrapper).exists()).toBe(false);
   });
 
-  it("keeps a module matched by a task word, without a pill", async () => {
+  it("keeps a module matched by a task word", async () => {
     const wrapper = await mountRail(modules());
 
     await search(wrapper, "slack");
 
     expect(item(wrapper, "destination").exists()).toBe(true);
     expect(item(wrapper, "template").exists()).toBe(false);
-    expect(pill(wrapper).exists()).toBe(false);
   });
 
   it("shows a matched name as plain text, with no highlight", async () => {
@@ -218,7 +214,6 @@ describe("ModuleRail - filter by group and task word", () => {
     await search(wrapper, "k");
 
     expect(item(wrapper, "destination").exists()).toBe(false);
-    expect(pill(wrapper).exists()).toBe(false);
     expect(wrapper.find('[data-test="edit-role-module-rail-no-match"]').text()).toContain(
       t("iam.editRole.noModuleMatchQuery", { query: "k" }),
     );

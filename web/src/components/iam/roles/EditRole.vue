@@ -260,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="edit-role-save-btn"
               variant="primary"
               size="sm-action"
+              :loading="isSaving"
               @click="saveRole"
             >
               {{ t("alerts.save") }}
@@ -665,7 +666,6 @@ const {
   pendingChanges,
   pendingGroups,
   companionGaps,
-  moduleKeyOf,
   entityLabel,
   summaryActions,
   innerGrants,
@@ -917,7 +917,10 @@ const { saveRole, isSaving } = useRoleSave({
   removedServiceAccounts,
   roleUsers,
   updateRoleOne,
-  moduleKeyOf,
+  pendingCounts: () => ({
+    changes: pendingChanges.value.length,
+    modules: pendingGroups.value.length,
+  }),
   presetSettled,
   t,
 });

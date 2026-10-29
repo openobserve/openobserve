@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :sublabel="t(item.preset.descriptionKey)"
               :unavailable="loading"
               :data-test="`edit-role-preset-${item.preset.id}`"
-              @click="openPreset(item.preset.id)"
+              @click="openPreset($event, item.preset.id)"
             >
               <template #label>
                 <span class="flex min-w-0 items-center gap-2">
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="rounded-default inline-flex size-8 shrink-0 items-center justify-center"
           :class="groupTone(detail.tone)"
         >
-          <OIcon :name="detail.icon as IconName" size="sm" />
+          <OIcon :name="detail.icon" size="sm" />
         </span>
         <span class="min-w-0">
           <span class="text-text-heading block text-sm font-semibold">
@@ -297,7 +297,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { splitGrantKey } from "@/composables/iam/useRoleGrants";
 import type { PresetInfo, PresetPreview } from "@/composables/iam/useRolePresets";
 import { moduleIcon } from "@/components/iam/roles/roleModules";
@@ -353,7 +352,8 @@ const badgeOf = (preview: PresetPreview | undefined): Badge => {
   if (props.loading) return "loading";
   if (!preview || preview.status === "failed") return null;
   if (preview.status === "loading") return streamsRequested.value ? "loading" : null;
-  if (preview.adds.length) return "adds";
+  if (preview.adds.length > preview.restores.length) return "adds";
+  if (preview.adds.length) return null;
   return preview.noMatchingStreams ? null : "in-role";
 };
 
@@ -365,7 +365,11 @@ const sections = computed(() =>
       .filter((preset) => preset.section === section.id)
       .map((preset) => {
         const preview = previews.value.get(preset.id);
-        return { preset, badge: badgeOf(preview), adds: preview?.adds.length ?? 0 };
+        return {
+          preset,
+          badge: badgeOf(preview),
+          adds: preview ? preview.adds.length - preview.restores.length : 0,
+        };
       }),
   })).filter((section) => section.items.length),
 );
@@ -475,7 +479,9 @@ const missingLine = computed(() => {
 const focusTest = (dataTest: string) =>
   nextTick(() => root.value?.querySelector<HTMLElement>(`[data-test="${dataTest}"]`)?.focus());
 
-const openPreset = (id: string) => {
+// A double click on Add closes the detail, so its second click would open the preset now under the pointer.
+const openPreset = (event: MouseEvent, id: string) => {
+  if (event.detail > 1) return;
   selected.value = id;
   const preview = previews.value.get(id);
   // A stream preset asks on every open, so streams ingested since its lookup can show; a fresh matched list is reused.
@@ -490,7 +496,8 @@ const closePreset = () => {
   if (id) focusTest(`edit-role-preset-${id}`);
 };
 
-const applyPreset = () => {
+const applyPreset = (event: MouseEvent) => {
+  if (event.detail > 1) return;
   if (!selected.value || !addCount.value || props.applying) return;
   emit("apply", selected.value);
   closePreset();
