@@ -22,6 +22,7 @@
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
+          calendar-presets
           class="flex-none"
           data-test="scorer-detail-runs-window"
         />
