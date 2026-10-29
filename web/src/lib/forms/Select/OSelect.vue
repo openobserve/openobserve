@@ -1482,7 +1482,7 @@ const fieldWidthClass = computed(() => {
             :class="[
               'z-10001 min-w-(--reka-popover-trigger-width)',
               'flex flex-col overflow-hidden',
-              'rounded-default shadow-lg',
+              'rounded-default shadow-overlay border border-transparent',
               'bg-select-content-bg',
             ]"
             :style="[
@@ -1535,7 +1535,7 @@ const fieldWidthClass = computed(() => {
                     'cursor-pointer outline-none select-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
-                    'transition-colors duration-100',
+                    'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                     'border-select-content-border mb-1 border-b pb-1.5',
                   ]"
                   data-test="o-select-all"
@@ -1654,7 +1654,7 @@ const fieldWidthClass = computed(() => {
                         :class="[
                           'flex h-full w-full items-center justify-between gap-2 ps-3 pe-3 text-sm',
                           'text-select-item-text cursor-pointer select-none',
-                          'transition-colors duration-100',
+                          'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                           vRow.index === highlightedIndex
                             ? 'bg-select-item-hover-bg'
                             : 'hover:bg-select-item-hover-bg',
@@ -1700,7 +1700,7 @@ const fieldWidthClass = computed(() => {
                             'pe-3 text-sm',
                             'text-select-item-text',
                             'cursor-pointer outline-none select-none',
-                            'transition-colors duration-100',
+                            'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                             // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
                             (filteredOptions[vRow.index].subLabel &&
                               !filteredOptions[vRow.index].subLabelInline) ||
@@ -2070,8 +2070,8 @@ const fieldWidthClass = computed(() => {
             'z-10001 min-w-(--reka-select-trigger-width) max-lg:max-w-[calc(100vw-1rem)]',
             'overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-            'rounded-default border shadow-md',
-            'bg-select-content-bg border-select-content-border',
+            'rounded-default shadow-overlay border border-transparent',
+            'bg-select-content-bg',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
             // ease-out-expo in (200ms), quick wipe out (140ms).

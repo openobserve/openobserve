@@ -1275,6 +1275,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Dimensione scansione",
     "deltaScanSize": "Dimensione scansione delta",
+    "scannedSoFar": "Scansionati {size}",
+    "resultsProgressLabel": "Avanzamento ricerca",
     "histogramTitleError": "Errore durante la generazione del titolo dell'istogramma.",
     "selectLogStream": "Seleziona lo stream dei log",
     "searchInspect": "Cerca Ispeziona",
