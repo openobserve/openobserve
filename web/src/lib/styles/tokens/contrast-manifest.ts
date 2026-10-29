@@ -1234,7 +1234,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     fg: "--color-flame-frame-text",
     bg: "--color-chart-series-1",
     category: "text",
-    why: "a flame graph frame label is painted on the frame fill (FlameGraphView.vue: chart series 1, 5, 7, 9), never on the page; series 1 is the darkest of the four, so it is the pair that must clear 4.5:1",
+    why: "a flame graph frame label is painted on the frame fill (FlameGraphView.vue: chart series 1, 5, 7, 9, or the grouped fill), never on the page; series 1 is the darkest of the four series, so it is the series pair that must clear 4.5:1",
+  },
+  {
+    fg: "--color-flame-frame-text",
+    bg: "--color-flame-grouped-fill",
+    category: "text",
+    why: "the root, grouped frames and unchanged Compare frames paint the frame label on the grouped fill (FlameGraphView.vue)",
   },
   {
     fg: "--color-icon-chip-error-text",

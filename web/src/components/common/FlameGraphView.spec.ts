@@ -13,14 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
+import { createStore } from "vuex";
 import FlameGraphView from "@/components/common/FlameGraphView.vue";
+import { paletteIndexFor } from "@/components/common/flameGraphPackage";
 import i18n from "@/locales";
 
 const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
+const breakpoint = vi.hoisted(() => ({ lgUp: true }));
+vi.mock("@/composables/useBreakpoint", () => ({
+  default: () => ({
+    lgUp: {
+      get value() {
+        return breakpoint.lgUp;
+      },
+    },
+  }),
+}));
 
 const ChartRendererStub = {
   name: "ChartRenderer",
@@ -42,6 +54,8 @@ const rightClick = async (
     );
   await nextTick();
 };
+
+enableAutoUnmount(afterEach);
 
 describe("FlameGraphView frame menu", () => {
   it("positions the menu from the pointer relative to the root", async () => {
@@ -123,7 +137,6 @@ describe("FlameGraphView frame menu", () => {
     expect(style).toContain("left: 90px");
     expect(style).toContain("top: 0px");
     spy.mockRestore();
-    wrapper.unmount();
     host.remove();
   });
 
@@ -193,7 +206,6 @@ describe("FlameGraphView frame menu", () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     await nextTick();
     expect(wrapper.find('[data-test="flame-graph-frame-menu"]').exists()).toBe(false);
-    wrapper.unmount();
   });
 });
 
@@ -356,7 +368,7 @@ describe("FlameGraphView grouped frames", () => {
       }
     ).options.series[0].data.map((datum) => datum.block);
 
-  it("labels the flip switch Root at Bottom and draws the root last when it is on", async () => {
+  it("labels the flip switch Root at bottom and draws the root last when it is on", async () => {
     const wrapper = mountGraph({
       name: "total",
       total: 10,
@@ -364,7 +376,7 @@ describe("FlameGraphView grouped frames", () => {
     });
     await flushPromises();
     await nextTick();
-    expect(wrapper.text()).toContain("Root at Bottom");
+    expect(wrapper.text()).toContain("Root at bottom");
 
     (wrapper.vm as unknown as { rootAtBottom: boolean }).rootAtBottom = true;
     await nextTick();
@@ -421,10 +433,10 @@ describe("FlameGraphView grouped frames", () => {
       });
 
     const leaf = tooltipFor("main.hashOrder");
-    expect(leaf).toContain("Share of Caller");
+    expect(leaf).toContain("Share of caller");
     expect(leaf).toContain("25.00%"); // 25 of the caller's 100
     expect(leaf).toContain("12.50%"); // 25 of the view's 200
-    expect(tooltipFor("total")).not.toContain("Share of Caller");
+    expect(tooltipFor("total")).not.toContain("Share of caller");
   });
 
   it("draws other as a grouped frame and folds thin frames into one sliver", async () => {
@@ -502,7 +514,7 @@ describe("FlameGraphView grouped frames", () => {
   });
 
   it("colours the first side's own graph by the same change as the diff graph", async () => {
-    // Side by Side: the tree is v1.4.0's, and after_total carries v1.5.0's time for each frame.
+    // Side by side: the tree is v1.4.0's, and after_total carries v1.5.0's time for each frame.
     const wrapper = mount(FlameGraphView, {
       props: {
         root: {
@@ -725,7 +737,7 @@ describe("FlameGraphView grouped frames", () => {
       expect(blocksOf(wrapper).find((block) => !block.ancestor)).toMatchObject({ id: "root/0" });
     });
 
-    it("offers Zoom Out on the zoomed frame, Zoom Out to Here on a caller, and Reset Zoom while zoomed", async () => {
+    it("offers Zoom out on the zoomed frame, Zoom out to here on a caller, and Reset zoom while zoomed", async () => {
       const wrapper = mountGraph(tree);
       await flushPromises();
       await nextTick();
@@ -735,7 +747,7 @@ describe("FlameGraphView grouped frames", () => {
           .findAll('[data-test^="flame-graph-zoom"]')
           .map((item) => item.attributes("data-test"));
 
-      // Not zoomed: the root offers no zoom, a frame offers Zoom In.
+      // Not zoomed: the root offers no zoom, a frame offers Zoom in.
       await rightClick(wrapper, 10, 10);
       expect(menuTests()).toEqual([]);
       await rightClick(wrapper, 10, 1 + 26 * 2 + 5);
@@ -756,7 +768,7 @@ describe("FlameGraphView grouped frames", () => {
       expect(blocksOf(wrapper).some((block) => block.ancestor)).toBe(false);
     });
 
-    it("shows the Cmd + scroll hint until it is closed, and Don't Show Again keeps it closed", async () => {
+    it("shows the Cmd + scroll hint until it is closed, and Don't show again keeps it closed", async () => {
       localStorage.removeItem("o2_flame_zoom_hint_hidden");
       const first = mountGraph(tree);
       await flushPromises();
@@ -790,6 +802,201 @@ describe("FlameGraphView grouped frames", () => {
       };
       expect(options.options.dataZoom[0]).toMatchObject({ start: 0, end: 100 });
     });
+  });
+});
+
+describe("FlameGraphView theme and size", () => {
+  const SERIES_STEPS = [1, 5, 7, 9];
+  const CHILD = "main.handleCheckout";
+  const themeTokens = [
+    "--color-flame-grouped-fill",
+    "--color-border-default",
+    ...SERIES_STEPS.map((step) => `--color-chart-series-${step}`),
+  ];
+  const setThemeTokens = (base: number) => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-flame-grouped-fill", `rgb(${base}, 2, 3)`);
+    html.style.setProperty("--color-border-default", `rgb(${base}, 5, 6)`);
+    SERIES_STEPS.forEach((step, index) =>
+      html.style.setProperty(`--color-chart-series-${step}`, `rgb(${base}, ${index}, ${step})`),
+    );
+  };
+  const childColor = (base: number) => {
+    const index = paletteIndexFor(CHILD, SERIES_STEPS.length);
+    return `rgb(${base}, ${index}, ${SERIES_STEPS[index]})`;
+  };
+  afterEach(() => {
+    themeTokens.forEach((token) => document.documentElement.style.removeProperty(token));
+  });
+  const mountWithStore = (store = createStore({ state: { theme: "light" } })) =>
+    mount(FlameGraphView, {
+      props: {
+        root: {
+          name: "main",
+          self: 1,
+          total: 4,
+          children: [{ name: CHILD, self: 3, total: 3, children: [] }],
+        },
+        unitLabel: "ns",
+        summaryLabel: "total",
+        summaryValue: "4",
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ChartRenderer: ChartRendererStub,
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+        },
+      },
+    });
+  const optionsOf = (wrapper: ReturnType<typeof mountWithStore>) =>
+    (
+      wrapper.findComponent({ name: "ChartRenderer" }).props("data") as {
+        options: {
+          backgroundColor?: string;
+          series: {
+            data: { block: { name: string }; itemStyle: { color: string; borderColor: string } }[];
+          }[];
+        };
+      }
+    ).options;
+  const styleOf = (wrapper: ReturnType<typeof mountWithStore>, name: string) =>
+    optionsOf(wrapper).series[0].data.find((item) => item.block.name === name)?.itemStyle;
+
+  it("re-reads the theme colours and rebuilds the chart when the theme switches", async () => {
+    setThemeTokens(1);
+    const store = createStore({ state: { theme: "light" } });
+    const wrapper = mountWithStore(store);
+    await flushPromises();
+    expect(styleOf(wrapper, "main")).toMatchObject({
+      color: "rgb(1, 2, 3)",
+      borderColor: "rgb(1, 5, 6)",
+    });
+    expect(styleOf(wrapper, CHILD)?.color).toBe(childColor(1));
+
+    setThemeTokens(7);
+    store.state.theme = "dark";
+    await nextTick();
+    expect(styleOf(wrapper, "main")).toMatchObject({
+      color: "rgb(7, 2, 3)",
+      borderColor: "rgb(7, 5, 6)",
+    });
+    expect(styleOf(wrapper, CHILD)?.color).toBe(childColor(7));
+  });
+
+  it("re-reads the theme colours when a theme colour preset is applied", async () => {
+    setThemeTokens(1);
+    const wrapper = mountWithStore();
+    await flushPromises();
+    expect(styleOf(wrapper, "main")).toMatchObject({
+      color: "rgb(1, 2, 3)",
+      borderColor: "rgb(1, 5, 6)",
+    });
+    expect(styleOf(wrapper, CHILD)?.color).toBe(childColor(1));
+
+    setThemeTokens(7);
+    window.dispatchEvent(new CustomEvent("themeColorChanged"));
+    await nextTick();
+    expect(styleOf(wrapper, "main")).toMatchObject({
+      color: "rgb(7, 2, 3)",
+      borderColor: "rgb(7, 5, 6)",
+    });
+    expect(styleOf(wrapper, CHILD)?.color).toBe(childColor(7));
+  });
+
+  it("draws on a transparent background, so the dark chart theme does not box it in", async () => {
+    const wrapper = mountWithStore();
+    await flushPromises();
+    expect(optionsOf(wrapper).backgroundColor).toBe("transparent");
+  });
+
+  it("leaves resizes to ChartRenderer below lg, resizes at lg+ only when the container size differs from the drawn size, and stops watching on unmount", async () => {
+    const observers: {
+      callback: () => void;
+      disconnect: ReturnType<typeof vi.fn>;
+      observe: ReturnType<typeof vi.fn>;
+    }[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        callback: () => void;
+        disconnect = vi.fn();
+        observe = vi.fn();
+        constructor(callback: () => void) {
+          this.callback = callback;
+          observers.push(this);
+        }
+      },
+    );
+    const frames: (() => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: () => void) => frames.push(callback));
+    const notify = () => {
+      observers[0].callback();
+      frames.splice(0).forEach((frame) => frame());
+    };
+    const dom = document.createElement("div");
+    const box = { width: 600, height: 300 };
+    Object.defineProperty(dom, "clientWidth", { get: () => box.width });
+    Object.defineProperty(dom, "clientHeight", { get: () => box.height });
+    const drawn = { width: 600, height: 300 };
+    const chartInstance = {
+      setOption: vi.fn(),
+      dispatchAction: vi.fn(),
+      getDom: () => dom,
+      getWidth: () => drawn.width,
+      getHeight: () => drawn.height,
+      resize: vi.fn(),
+    };
+    try {
+      const wrapper = mount(FlameGraphView, {
+        props: {
+          root: { name: "main", self: 1, total: 4, children: [] },
+          unitLabel: "ns",
+          summaryLabel: "total",
+          summaryValue: "4",
+        },
+        global: {
+          plugins: [i18n],
+          stubs: {
+            ChartRenderer: { ...ChartRendererStub, setup: () => ({ chart: chartInstance }) },
+            OButton: { template: "<button><slot /></button>" },
+            OSwitch: true,
+            OTooltip: true,
+          },
+        },
+      });
+      await flushPromises();
+      expect(observers).toHaveLength(1);
+      expect(observers[0].observe).toHaveBeenCalledTimes(1);
+      expect(observers[0].observe).toHaveBeenCalledWith(wrapper.element);
+
+      breakpoint.lgUp = false;
+      box.width = 400;
+      notify();
+      expect(chartInstance.resize).not.toHaveBeenCalled();
+
+      breakpoint.lgUp = true;
+      box.width = 600;
+      // ChartRenderer already resized for this change, so the chart matches its box.
+      notify();
+      expect(chartInstance.resize).not.toHaveBeenCalled();
+
+      box.width = 400;
+      notify();
+      expect(chartInstance.resize).toHaveBeenCalledTimes(1);
+
+      box.height = 0;
+      notify();
+      expect(chartInstance.resize).toHaveBeenCalledTimes(1);
+
+      wrapper.unmount();
+      expect(observers[0].disconnect).toHaveBeenCalled();
+    } finally {
+      breakpoint.lgUp = true;
+      vi.unstubAllGlobals();
+    }
   });
 });
 
