@@ -506,6 +506,7 @@ mod tests {
             level: Some(AlertLevel::Critical),
             chart_url: None,
             chart_png: None,
+            alert_id: String::new(),
         }
     }
 
