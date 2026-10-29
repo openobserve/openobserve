@@ -188,8 +188,14 @@ pub struct ScorerResponseBody {
 }
 
 impl ScorerResponseBody {
-    /// A remote scorer's auth and header values call the customer's endpoint; the names stay.
+    /// A remote scorer's endpoint, auth and header values call the customer's service; the
+    /// endpoint keeps its origin and the auth and header names stay.
     pub fn redact_credentials(&mut self) {
+        if let Some(endpoint) = self.params.get_mut("endpoint")
+            && let Some(raw) = endpoint.as_str()
+        {
+            *endpoint = Value::String(config::utils::str::url_origin(raw));
+        }
         if let Some(auth) = self.params.get_mut("auth").and_then(Value::as_object_mut) {
             for field in ["token", "password"] {
                 if let Some(value) = auth.get_mut(field) {
@@ -703,10 +709,10 @@ mod tests {
     }
 
     #[test]
-    fn redaction_blanks_remote_auth_and_header_values_only() {
+    fn redaction_keeps_the_endpoint_origin_and_blanks_auth_and_header_values() {
         let mut s = sample_scorer();
         s.params = serde_json::json!({
-            "endpoint": "https://eval.example.com/score",
+            "endpoint": "https://u:p@eval.example.com/score?api_key=k3y",
             "auth": {"type": "api_key", "token": "k3y", "header_name": "X-Api-Key"},
             "custom_headers": [{"key": "X-Tenant", "value": "t3n"}],
         });
@@ -715,7 +721,7 @@ mod tests {
         assert_eq!(
             body.params,
             serde_json::json!({
-                "endpoint": "https://eval.example.com/score",
+                "endpoint": "https://eval.example.com",
                 "auth": {"type": "api_key", "token": "", "header_name": "X-Api-Key"},
                 "custom_headers": [{"key": "X-Tenant", "value": ""}],
             })
