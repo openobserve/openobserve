@@ -242,6 +242,7 @@ mod m20261025_000004_create_slack_alert_messages;
 mod m20261025_000005_add_held_action_to_slack_link_requests;
 mod m20261026_000001_backfill_v1_rca_pointer;
 mod m20261028_000001_add_group_label_set_to_alert_states;
+mod m20261029_000001_widen_alert_dedup_fingerprint;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -730,6 +731,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261025_000004_create_slack_alert_messages::Migration),
             Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
             Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
+            Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
         ]
     }
 }
@@ -822,6 +824,7 @@ mod tests {
             "m20261025_000005_add_held_action_to_slack_link_requests",
         ),
         (127, "m20261028_000001_add_group_label_set_to_alert_states"),
+        (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -943,6 +946,10 @@ mod tests {
             (
                 "m20261007_000001_scope_alert_dedup_state_by_org",
                 "m20261009_000001_create_downtimes",
+            ),
+            (
+                "m20261007_000001_scope_alert_dedup_state_by_org",
+                "m20261029_000001_widen_alert_dedup_fingerprint",
             ),
             (
                 "m20261009_000001_create_downtimes",
