@@ -8708,6 +8708,11 @@
     "rowFields": "Rijvelden",
     "valueFields": "Waardevelden",
     "noData": "Geen gegevens",
+    "previewView": "Voorbeeldweergave",
+    "previewChart": "Grafiek",
+    "previewData": "Gegevens",
+    "dataViewEmpty": "Geen rijen geretourneerd",
+    "dataViewCapped": "De eerste {shown} van {total} rijen worden getoond",
     "logExplorer": {
       "title": "Logverkenner",
       "openInLogs": "Openen in Logs",

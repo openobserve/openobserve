@@ -8703,6 +8703,11 @@
     "rowFields": "列欄位",
     "valueFields": "值欄位",
     "noData": "無資料",
+    "previewView": "預覽檢視",
+    "previewChart": "圖表",
+    "previewData": "資料",
+    "dataViewEmpty": "未傳回任何資料列",
+    "dataViewCapped": "顯示 {total} 列中的前 {shown} 列",
     "logExplorer": {
       "title": "日誌瀏覽器",
       "openInLogs": "在日誌中開啟",

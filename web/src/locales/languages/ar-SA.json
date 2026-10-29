@@ -8708,6 +8708,11 @@
     "rowFields": "حقول الصف",
     "valueFields": "حقول القيمة",
     "noData": "لا توجد بيانات",
+    "previewView": "عرض المعاينة",
+    "previewChart": "مخطط",
+    "previewData": "بيانات",
+    "dataViewEmpty": "لم يتم إرجاع أي صفوف",
+    "dataViewCapped": "عرض أول {shown} من {total} صف",
     "logExplorer": {
       "title": "مستكشف السجلات",
       "openInLogs": "فتح في السجلات",

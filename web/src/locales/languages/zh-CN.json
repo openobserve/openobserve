@@ -8708,6 +8708,11 @@
     "rowFields": "行字段",
     "valueFields": "值字段",
     "noData": "无数据",
+    "previewView": "预览视图",
+    "previewChart": "图表",
+    "previewData": "数据",
+    "dataViewEmpty": "未返回任何行",
+    "dataViewCapped": "显示 {total} 行中的前 {shown} 行",
     "logExplorer": {
       "title": "日志浏览器",
       "openInLogs": "在日志中打开",
