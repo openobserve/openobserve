@@ -52,7 +52,8 @@ export default class DashboardactionPage {
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
-    this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    this.chartRendererSelector = '[data-test="chart-renderer"]';
+    this.chartRendererCanvas = page.locator(this.chartRendererSelector);
     this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
@@ -933,13 +934,7 @@ export default class DashboardactionPage {
     }, scopeSelector);
   }
 
-  /**
-   * Geometry problems of the rendered gauge dials, empty when every dial is well-formed and fits its canvas.
-   * @param {{count?: number, min?: number, max?: number}} expected
-   * @param {string} scopeSelector
-   * @returns {Promise<string[]>}
-   */
-  async getGaugeLayoutProblems(expected = {}, scopeSelector = '[data-test="chart-renderer"]') {
+  async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
     const charts = await this.getChartOptionSnapshots(scopeSelector);
     if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];
     const [chart] = charts;
@@ -991,13 +986,7 @@ export default class DashboardactionPage {
     return problems;
   }
 
-  /**
-   * Polls until the rendered gauge has no layout problems, failing with the last list seen.
-   * @param {Function} expect - Playwright expect function
-   * @param {{count?: number, min?: number, max?: number}} expected
-   * @param {string} scopeSelector
-   */
-  async expectGaugeWellFormed(expect, expected = {}, scopeSelector = '[data-test="chart-renderer"]') {
+  async expectGaugeWellFormed(expect, expected = {}, scopeSelector = this.chartRendererSelector) {
     await expect
       .poll(() => this.getGaugeLayoutProblems(expected, scopeSelector), {
         timeout: 20000,
@@ -1006,12 +995,7 @@ export default class DashboardactionPage {
       .toEqual([]);
   }
 
-  /**
-   * Labels of the dials the rendered gauge draws, one per dial.
-   * @param {string} scopeSelector
-   * @returns {Promise<string[]>}
-   */
-  async getGaugeDialNames(scopeSelector = '[data-test="chart-renderer"]') {
+  async getGaugeDialNames(scopeSelector = this.chartRendererSelector) {
     const [chart] = await this.getChartOptionSnapshots(scopeSelector);
     return chart ? chart.series.filter((s) => s.type === "gauge").map((s) => s.pointNames[0] ?? "") : [];
   }

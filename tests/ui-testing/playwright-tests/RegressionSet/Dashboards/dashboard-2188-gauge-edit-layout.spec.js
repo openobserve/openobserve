@@ -9,6 +9,7 @@ import {
 const testLogger = require("../../utils/test-logger.js");
 
 const NAMESPACE = "ziox";
+const GAUGE_RANGE_PANEL_ERROR = "Gauge min value must be lower than max value";
 
 test.describe("Gauge keeps its layout when an existing panel is edited (#2188)", () => {
   test.describe.configure({ mode: "parallel" });
@@ -19,7 +20,11 @@ test.describe("Gauge keeps its layout when an existing panel is edited (#2188)",
     await ingestion(page);
   });
 
-  test("editing min and max of a saved gauge keeps the dial inside its canvas", {
+  test.afterEach(async ({}, testInfo) => {
+    testLogger.testEnd(testInfo.title, testInfo.status);
+  });
+
+  test("editing min and max of a saved gauge keeps the dial inside its canvas after a panel error is shown and cleared", {
     tag: ["@bug-2188", "@P2", "@regression", "@dashboards", "@dashboardRegression"],
   }, async ({ page }) => {
     const pm = new PageManager(page);
@@ -35,10 +40,17 @@ test.describe("Gauge keeps its layout when an existing panel is edited (#2188)",
       // Opening the editor and its config sidebar resizes the chart, which is where the dial used to distort.
       await pm.dashboardPanelActions.expectGaugeWellFormed(expect);
 
+      // The issue's repro is a message under the chart, which resizes it; an inverted range is the gauge message still reachable.
+      await pm.dashboardPanelConfigs.selectGuageMin("500");
+      await pm.dashboardPanelConfigs.selectGuageMax("10");
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await expect(pm.dashboardPanelActions.dashboardErrorItems).toContainText([GAUGE_RANGE_PANEL_ERROR]);
+
       await pm.dashboardPanelConfigs.selectGuageMin("10");
       await pm.dashboardPanelConfigs.selectGuageMax("500");
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
+      await expect(pm.dashboardPanelActions.dashboardErrorItems).toHaveCount(0);
       await pm.dashboardPanelActions.expectGaugeWellFormed(expect, { min: 10, max: 500 });
 
       await pm.dashboardPanelActions.savePanel();
@@ -67,13 +79,13 @@ test.describe("Gauge keeps its layout when an existing panel is edited (#2188)",
       await pm.dashboardPanelActions.waitForChartToRender();
       // The editor keeps drawing the old grouping until the regrouped query lands.
       await expect.poll(() => pm.dashboardPanelActions.getGaugeDialNames(), { timeout: 20000 }).toContain(NAMESPACE);
-      const dials = (await pm.dashboardPanelActions.getGaugeDialNames()).length;
-      testLogger.info(`Gauge dials after regrouping: ${dials}`);
-      await pm.dashboardPanelActions.expectGaugeWellFormed(expect, { count: dials });
+      testLogger.info("Gauge dials after regrouping", { dials: await pm.dashboardPanelActions.getGaugeDialNames() });
+      await pm.dashboardPanelActions.expectGaugeWellFormed(expect);
 
       await pm.dashboardPanelActions.savePanel();
+      // The saved panel re-queries a shared stream, so its dial count can move; only the namespace is stable.
       await expect.poll(() => pm.dashboardPanelActions.getGaugeDialNames(), { timeout: 20000 }).toContain(NAMESPACE);
-      await pm.dashboardPanelActions.expectGaugeWellFormed(expect, { count: dials });
+      await pm.dashboardPanelActions.expectGaugeWellFormed(expect);
     } finally {
       await discardAndCleanupTestDashboard(page, dashboardName);
     }

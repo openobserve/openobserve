@@ -51,6 +51,7 @@ export class TracesPage {
 
     // Main Components
     this.searchBar = '[data-test="logs-search-bar"]';
+    this.queryPlaceholderTypewriter = '.query-editor-placeholder-typewriter';
     this.indexList = '[data-test="traces-search-index-list"]';
     this.fieldListCollapseButton = '[data-test="traces-search-field-list-collapse-btn"]';
     this.searchResult = '[data-test="logs-search-search-result"]';
@@ -68,6 +69,7 @@ export class TracesPage {
 
     // Trace Details
     this.traceDetailsHeader = '[data-test="trace-details-header"]';
+    this.traceDetailsSpanIdLabel = '[data-test="trace-details-sidebar-header-toolbar-span-id"]';
     this.traceDetailsBackButton = '[data-test="trace-details-back-btn"]';
     this.traceDetailsCloseButton = '[data-test="trace-details-close-btn"]';
     this.traceDetailsCopyTraceIdButton = '[data-test="trace-details-copy-trace-id-btn"]';
@@ -1161,8 +1163,8 @@ export class TracesPage {
    * @param {string} text - Text to check for
    */
   async expectQueryEditorContains(text) {
-    const content = await this.getQueryEditorContent();
-    expect(content).toContain(text);
+    // Monaco loads lazily and reads '' until window.monaco exists, so a single read races the editor.
+    await expect.poll(() => this.getQueryEditorContent(), { timeout: 30000 }).toContain(text);
   }
 
   /**
@@ -3265,18 +3267,15 @@ export class TracesPage {
     // Same url-safe base64 alphabet as b64EncodeUnicode in web/src/utils/formatters.ts.
     const query = Buffer.from(filter, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '.');
     await this.page.goto(`${baseUrl}/web/traces?stream=${encodeURIComponent(stream)}&period=${period}&query=${query}&org_identifier=${org}`);
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   }
 
   async navigateToTraceDetailsSpanUrl({ traceId, spanId, fromUs, toUs, stream = 'default', org = process.env['ORGNAME'] || 'default' }) {
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    await this.page.goto(`${baseUrl}/web/traces/trace-details?stream=${stream}&trace_id=${traceId}&span_id=${spanId}&from=${fromUs}&to=${toUs}&org_identifier=${org}`);
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this.page.goto(`${baseUrl}/web/traces/trace-details?stream=${encodeURIComponent(stream)}&trace_id=${traceId}&span_id=${spanId}&from=${fromUs}&to=${toUs}&org_identifier=${org}`);
   }
 
   async hardReload() {
     await this.page.reload({ waitUntil: 'load' });
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   }
 
   async expectTracesListRendered() {
@@ -3291,20 +3290,31 @@ export class TracesPage {
 
   async expectTraceDetailsSelectedSpan(spanId) {
     await expect(this.page.locator(this.traceDetailsHeader)).toBeVisible({ timeout: 30000 });
-    await expect(this.page.locator('[data-test="trace-details-sidebar-header-toolbar-span-id"]').first()).toContainText(spanId, { timeout: 30000 });
+    await expect(this.page.locator(this.traceDetailsSpanIdLabel).first()).toContainText(spanId, { timeout: 30000 });
   }
 
-  /** Samples the animated query placeholder; `examples` are the fully typed strings (no sample extends them). */
-  async sampleQueryPlaceholder(durationMs = 12000, intervalMs = 100) {
-    const typewriter = this.page.locator(`${this.searchBar} .query-editor-placeholder-typewriter`);
+  // An example counts only once the typewriter moves off it, so a half-typed string is never mistaken for one.
+  async sampleQueryPlaceholder({ minExamples = 2, maxMs = 12000, intervalMs = 100 } = {}) {
+    const typewriter = this.page.locator(`${this.searchBar} ${this.queryPlaceholderTypewriter}`);
     await expect(typewriter).toHaveText(/\S/, { timeout: 30000 });
-    const samples = await typewriter.evaluate((el, { durationMs, intervalMs }) => new Promise((resolve) => {
+    return typewriter.evaluate((el, { minExamples, maxMs, intervalMs }) => new Promise((resolve) => {
       const seen = new Set();
-      const timer = setInterval(() => seen.add(el.textContent || ''), intervalMs);
-      setTimeout(() => { clearInterval(timer); resolve([...seen]); }, durationMs);
-    }), { durationMs, intervalMs });
-    const nonEmpty = samples.filter((s) => s.trim());
-    const examples = nonEmpty.filter((s) => !nonEmpty.some((o) => o !== s && o.startsWith(s)));
-    return { samples: nonEmpty, examples };
+      const peaks = new Set();
+      let prev = '';
+      const summarize = () => {
+        const samples = [...seen].filter((s) => s.trim());
+        const examples = [...peaks].filter((p) => p.trim() && !samples.some((o) => o !== p && o.startsWith(p)));
+        return { samples, examples };
+      };
+      const finish = () => { clearInterval(timer); clearTimeout(cap); resolve(summarize()); };
+      const timer = setInterval(() => {
+        const cur = el.textContent || '';
+        seen.add(cur);
+        if (!cur.startsWith(prev)) peaks.add(prev);
+        prev = cur;
+        if (summarize().examples.length >= minExamples) finish();
+      }, intervalMs);
+      const cap = setTimeout(finish, maxMs);
+    }), { minExamples, maxMs, intervalMs });
   }
 }
