@@ -954,6 +954,20 @@ describe("AssociatedRegexPatterns.vue", () => {
       expect(wrapper.find(dropped).exists()).toBe(false);
     });
 
+    it("does not show Field dropped after clearing a non-empty Drop result", async () => {
+      vi.mocked(regexPatternsService.test).mockResolvedValueOnce({
+        data: { results: ["no digits"] },
+      } as any);
+      const vm = await pick("DropField", "no digits");
+      await vm.testStringOutput();
+      await nextTick();
+      expect(vm.testedPolicy).toBe(null);
+      vm.outputString = "";
+      await nextTick();
+      expect(wrapper.find(dropped).exists()).toBe(false);
+      expect(wrapper.text()).toContain(hint);
+    });
+
     it("does not mark a Drop result when the policy changes while the test is running", async () => {
       let resolveTest: (value: unknown) => void = () => {};
       vi.mocked(regexPatternsService.test).mockReturnValueOnce(

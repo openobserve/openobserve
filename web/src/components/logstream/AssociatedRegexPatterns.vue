@@ -534,7 +534,11 @@ export default defineComponent({
         );
         outputString.value = response.data.results[0];
         // An edit during the request already cleared the marker; do not restore it for old inputs.
-        if (policy.value === sentPolicy && testString.value === sentString) {
+        if (
+          outputString.value === "" &&
+          policy.value === sentPolicy &&
+          testString.value === sentString
+        ) {
           testedPolicy.value = sentPolicy;
         }
       } catch (error) {
