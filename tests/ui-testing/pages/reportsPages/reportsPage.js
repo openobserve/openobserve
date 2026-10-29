@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import {
   dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
   Past30SecondsValue, openNavFlyoutChild
@@ -484,6 +485,7 @@ export class ReportsPage {
   async signOut() {
     await this.profileButton.click({ force: true });
     await this.signOutButton.click({ force: true });
+    await confirmDraftSignOut(this.page);
   }
 
   async pauseReport(reportName) {
@@ -573,6 +575,7 @@ export class ReportsPage {
     await this.signOutButton.waitFor({ state: 'visible', timeout: 5000 });
     // Now click the logout item
     await this.signOutButton.click({ force: true });
+    await confirmDraftSignOut(this.page);
   }
 
   async notAvailableReport(reportName) {

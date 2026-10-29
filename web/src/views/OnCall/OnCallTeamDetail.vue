@@ -136,19 +136,24 @@
           icon="format-list-bulleted"
           data-test="oncall-team-tab-overview"
         />
-        <OTab
-          name="schedule"
-          :label="t('oncall.schedule')"
-          icon="calendar-month"
-          data-test="oncall-team-tab-schedule"
-        />
-        <!-- Counts via the default slot, which is the documented seam for badges;
-             `label` and `icon` are ignored once it is provided. The icon is
-             sized the way the `icon` prop sizes it on the two tabs above, so the
-             strip carries one glyph size rather than two. -->
+        <!-- The default slot drops `label` and `icon`, so these tabs size their icon as the `icon` prop would. -->
+        <OTab name="schedule" data-test="oncall-team-tab-schedule">
+          <OIcon name="calendar-month" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.schedule") }}</span>
+          <EditorDraftDot
+            v-if="scheduleDraftAt(teamId) !== null"
+            :saved-at="scheduleDraftAt(teamId)"
+            data-test="oncall-team-tab-schedule-draft-dot"
+          />
+        </OTab>
         <OTab name="policy" data-test="oncall-team-tab-policy">
           <OIcon name="arrow-upward" size="sm" class="shrink-0" />
           <span>{{ t("oncall.escalationTab") }}</span>
+          <EditorDraftDot
+            v-if="policyDrafts.ids.has(teamId)"
+            :saved-at="policyDrafts.savedAt(teamId)"
+            data-test="oncall-team-tab-policy-draft-dot"
+          />
           <!-- Warning whether or not the tab is open: a priority that pages
                nobody is a finding, not a tally of what is on the tab. -->
           <OTag v-if="silentPriorities" type="countChip" value="warning">
@@ -447,6 +452,14 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import {
+  dropRotationDrafts,
+  dropScheduleDrafts,
+  useScheduleDraftTimes,
+} from "@/components/oncall/scheduleDrafts";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
@@ -611,6 +624,16 @@ const editOpen = ref(false);
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const teamId = computed(() => String(route.params.teamId ?? ""));
 
+const scheduleDraftAt = useScheduleDraftTimes();
+const policyDrafts = useEditorDraftIds("oncall_policy");
+
+const scheduleDraftTarget = () => ({ org: orgId.value, teamId: teamId.value });
+
+const dropTeamDrafts = () => {
+  dropScheduleDrafts(scheduleDraftTarget());
+  deleteEditorDraftsFor({ kind: "oncall_policy", org: orgId.value, entityId: teamId.value });
+};
+
 /// The tabs, in the order they render. Also the route's whitelist — a `:tab`
 /// outside this set is ignored rather than left on a panel that does not exist.
 const TEAM_TABS = ["overview", "members", "schedule", "policy", "ownership"] as const;
@@ -746,11 +769,15 @@ async function readForEdit<T>(
   }
 }
 
+/// The fresh read is the one place a rotation deleted elsewhere is known gone, so its orphaned drafts go here.
 const refreshScheduleForEdit = () =>
-  readForEdit<OnCallSchedule | null>(
-    teamScheduleQuery(orgId.value, teamId.value),
-    (value) => (schedule.value = value),
-  );
+  readForEdit<OnCallSchedule | null>(teamScheduleQuery(orgId.value, teamId.value), (value) => {
+    schedule.value = value;
+    dropScheduleDrafts({
+      ...scheduleDraftTarget(),
+      liveRotationIds: new Set((value?.rotations ?? []).map((rotation) => rotation.id)),
+    });
+  });
 
 async function fetchAll(force = false) {
   loadError.value = null;
@@ -785,6 +812,7 @@ async function fetchAll(force = false) {
     // The probe above already confirmed on-call is available, so a 404 on this query alone means the team id was deleted.
     if (err?.response?.status === 404) {
       teamNotFound.value = true;
+      dropTeamDrafts();
       return;
     }
     loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
@@ -1047,6 +1075,7 @@ async function deleteRotation() {
   try {
     await scheduleWrite.mutateAsync({ timezone: current.timezone, rotations });
     toast({ variant: "success", message: t("oncall.laneDeleted", { name: raw(name) }) });
+    dropRotationDrafts({ org: orgId.value, teamId: teamId.value, rotationId: id });
     await onScheduleSaved();
   } catch (err: any) {
     noteConfigurationDenied(err);
