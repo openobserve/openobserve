@@ -787,6 +787,8 @@ const listboxScrollEl = ref<HTMLElement | null>(null);
 //
 // Strategy:
 //   - highlightedIndex tracks which filteredOptions entry is highlighted.
+//   - Up / Down move it through navigable rows with wrap-around.
+//   - Enter commits the selection; Escape closes the dropdown.
 //   - The highlight class is applied reactively — no DOM focus juggling.
 //   - The search <input> retains browser focus the whole time the dropdown is
 //     open, so typing always goes straight to the filter.
