@@ -214,8 +214,20 @@ describe("OnCallEscalationLadder", () => {
       // Two silent priorities, far enough apart not to fold, so the only
       // difference between the chips is which one is selected.
       priorities: [
-        { priority: "P3", rungs: 0, pages_anyone: false, ends_with_whole_team: false, channels: [] },
-        { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false, channels: [] },
+        {
+          priority: "P3",
+          rungs: 0,
+          pages_anyone: false,
+          ends_with_whole_team: false,
+          channels: [],
+        },
+        {
+          priority: "P5",
+          rungs: 0,
+          pages_anyone: false,
+          ends_with_whole_team: false,
+          channels: [],
+        },
       ],
     });
     const variantOf = (priority: string) =>
@@ -234,8 +246,20 @@ describe("OnCallEscalationLadder", () => {
     const wrapper = render({
       selected: "P1",
       priorities: [
-        { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false, channels: [] },
-        { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false, channels: [] },
+        {
+          priority: "P4",
+          rungs: 0,
+          pages_anyone: false,
+          ends_with_whole_team: false,
+          channels: [],
+        },
+        {
+          priority: "P5",
+          rungs: 0,
+          pages_anyone: false,
+          ends_with_whole_team: false,
+          channels: [],
+        },
       ],
     });
 
