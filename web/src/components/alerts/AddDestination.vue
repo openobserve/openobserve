@@ -153,7 +153,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Template selector for prebuilt destinations -->
               <div
-                v-if="dtVal && dtVal !== 'custom' && dtVal !== 'jira' && showPrebuiltAdvancedSettings"
+                v-if="
+                  dtVal && dtVal !== 'custom' && dtVal !== 'jira' && showPrebuiltAdvancedSettings
+                "
                 class="w-1/2 py-1"
               >
                 <OFormSelect
@@ -484,7 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("alerts.cancel") }}</OButton
             >
             <OButton
-              v-if="showPrebuiltAdvancedSettings"
+              v-if="(!isNewSlackDestination && dtVal !== 'jira') || showPrebuiltAdvancedSettings"
               data-test="add-destination-submit-btn"
               variant="primary"
               size="sm-action"
