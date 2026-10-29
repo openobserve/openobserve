@@ -957,7 +957,7 @@ impl IncidentEvent {
 mod tests {
     use super::*;
 
-    /// B2: only a new alert joining counts; the same alert firing again never re-pages.
+    /// Only a new alert joining counts; the same alert firing again never re-pages.
     #[test]
     fn test_only_a_new_alert_joining_names_the_incident() {
         let (id, svc) = (|| "inc_1".to_string(), || "checkout".to_string());

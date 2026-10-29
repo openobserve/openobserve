@@ -443,7 +443,7 @@ describe("OnCallTeamDetail", () => {
       expect(service.listOverrides.mock.calls.length).toBeGreaterThan(before);
     });
 
-    // #3149: swap covers are stored at the handovers the server counts in the team's zone.
+    // Swap covers are stored at the handovers the server counts in the team's zone.
     it("offers swap shifts at the team-zone handovers the server uses", async () => {
       const c = shiftParity[0];
       const now = vi.spyOn(Date, "now").mockReturnValue(c.at_micros / 1000);

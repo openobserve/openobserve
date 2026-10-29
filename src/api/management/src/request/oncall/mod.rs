@@ -1616,6 +1616,28 @@ fn broken_link(status: StatusCode, reason: &str) -> Response {
     html_page(status, ack_page::broken_link_html(reason, &pages))
 }
 
+/// The ack link's refusal for an inactive or unreadable org: the same HTML page, never JSON.
+#[cfg(feature = "enterprise")]
+fn ack_status_refusal(
+    org_id: &str,
+    active: Result<bool, impl std::fmt::Display>,
+) -> Option<Response> {
+    match active {
+        Ok(true) => None,
+        Ok(false) => Some(broken_link(
+            StatusCode::FORBIDDEN,
+            "the organization it belongs to is no longer active",
+        )),
+        Err(e) => {
+            log::error!("cannot read the status of org {org_id}: {e}");
+            Some(broken_link(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "the organization could not be checked; try the link again shortly",
+            ))
+        }
+    }
+}
+
 /// The team a linked record belongs to, for its name and zone; unreadable is only logged.
 #[cfg(feature = "enterprise")]
 async fn team_of(record: &config::meta::oncall::Response) -> Option<config::meta::oncall::Team> {
@@ -1663,7 +1685,7 @@ pub async fn acknowledge(
         };
         // After the signature, so an unsigned caller cannot probe whether the org exists.
         if let Some(refusal) =
-            crate::request::alerts::external_events::inactive_org_response(&org_id).await
+            ack_status_refusal(&org_id, db::org_status::read_active(&org_id).await)
         {
             return refusal;
         }
@@ -1752,7 +1774,7 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
             Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
         if let Some(refusal) =
-            crate::request::alerts::external_events::inactive_org_response(&org_id).await
+            ack_status_refusal(&org_id, db::org_status::read_active(&org_id).await)
         {
             return refusal;
         }
@@ -4915,6 +4937,31 @@ mod tests {
         let unknown = voice_reply(press("oncall-voice-ack-unknown-org").await).await;
         assert_eq!(blocked, unknown);
         assert_ne!(blocked, VOICE_ORG_INACTIVE);
+    }
+
+    /// A signed link whose org is blocked or unreadable gets the HTML page, not a JSON body.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_ack_link_of_an_inactive_org_is_refused_with_html() {
+        for (active, status) in [
+            (Ok(false), StatusCode::FORBIDDEN),
+            (
+                Err("db down".to_string()),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+        ] {
+            let resp = ack_status_refusal("ack-org", active).expect("refused");
+            assert_eq!(resp.status(), status);
+            assert_eq!(
+                resp.headers()[axum::http::header::CONTENT_TYPE],
+                "text/html; charset=utf-8"
+            );
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(String::from_utf8_lossy(&body).contains("This link no longer works"));
+        }
+        assert!(ack_status_refusal("ack-org", Ok::<_, String>(true)).is_none());
     }
 
     #[cfg(feature = "enterprise")]

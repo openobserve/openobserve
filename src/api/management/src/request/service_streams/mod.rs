@@ -159,8 +159,8 @@ pub async fn list_services(
         } else {
             records
         };
-        // The same ids correlation asks with, so the list and on-call routing agree on a row.
-        let tracked = &identity_config.tracked_alias_ids;
+        // The ids ingest names a service from, set `distinguish_by` included.
+        let tracked = &identity_config.naming_alias_ids();
         let rows: Vec<ServiceRow> = records
             .into_iter()
             .map(|record| {
@@ -1032,7 +1032,7 @@ mod tests {
         }
     }
 
-    /// B11: the picker reads the flag beside the row's own fields, not nested under it.
+    /// The picker reads the flag beside the row's own fields, not nested under it.
     #[test]
     fn test_a_service_row_carries_named_after_stream_beside_its_fields() {
         let record = infra::table::service_streams::ServiceRecord {

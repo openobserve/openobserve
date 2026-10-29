@@ -1947,7 +1947,7 @@ mod tests {
         .unwrap()
     }
 
-    /// F2/F3: a re-page wins only against the row it read; an ack or a second join in between wins.
+    /// A re-page wins only against the row it read; an ack or a second join in between wins.
     #[tokio::test]
     async fn test_restarting_an_exhausted_page_is_a_compare_and_swap() {
         let now = 10_000_000_000;

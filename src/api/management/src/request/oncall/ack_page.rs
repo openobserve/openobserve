@@ -265,7 +265,7 @@ mod tests {
         }
     }
 
-    /// B3: a second click shows where the page stands, never an error.
+    /// A second click shows where the page stands, never an error.
     #[test]
     fn test_outcome_follows_the_record_and_the_click() {
         let at = 1_700_000_000_000_000;
@@ -305,7 +305,7 @@ mod tests {
         }
     }
 
-    /// B3 amendment: a failed ack shows the record as it stands, never a success.
+    /// A failed ack shows the record as it stands, never a success.
     #[test]
     fn test_a_failed_ack_never_reads_as_success() {
         let record = page(ResponseState::Triggered, None, None);
@@ -317,7 +317,7 @@ mod tests {
         assert!(!html.contains("Escalation stopped"));
     }
 
-    /// B3: the landing page says when escalation stopped, in the team's hours, and links in.
+    /// The landing page says when escalation stopped, in the team's hours, and links in.
     #[test]
     fn test_an_acknowledged_page_says_when_escalation_stopped() {
         let record = page(ResponseState::Acknowledged, None, None);
@@ -348,7 +348,7 @@ mod tests {
         }
     }
 
-    /// L8: opening a link to a page somebody already has shows its state, not the button.
+    /// Opening a link to a page somebody already has shows its state, not the button.
     #[test]
     fn test_a_get_shows_the_button_only_while_nobody_has_the_page() {
         let at = 1_700_000_000_000_000;
@@ -391,7 +391,7 @@ mod tests {
         }
     }
 
-    /// B3: the button page names the product, the page, its team and priority before a press.
+    /// The button page names the product, the page, its team and priority before a press.
     #[test]
     fn test_the_confirm_page_names_the_page_and_posts_the_token() {
         let record = page(ResponseState::Triggered, None, None);
@@ -407,7 +407,7 @@ mod tests {
         }
     }
 
-    /// B6: an untrusted link gets a sentence and a way in, and no record at all.
+    /// An untrusted link gets a sentence and a way in, and no record at all.
     #[test]
     fn test_a_broken_link_says_why_and_offers_pages() {
         let html = broken_link_html("acknowledgement link has expired", "https://o2/pages");

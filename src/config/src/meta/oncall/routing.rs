@@ -1413,7 +1413,7 @@ mod tests {
         assert!(!defaulted.reason(None).contains("rule_id"));
     }
 
-    /// B15: a person reads the team's name; `insight` still finds the path after the marker.
+    /// A person reads the team's name; `insight` still finds the path after the marker.
     #[test]
     fn test_the_sentence_names_the_team_and_keeps_the_ownership_marker() {
         let named = Some("Platform SRE");

@@ -635,7 +635,7 @@ def test_a_replayed_token_shows_the_state_and_records_nothing(create_session, ba
 
 def test_a_used_link_opened_again_shows_the_state_not_the_button(create_session, base_url,
                                                                  org_id, minted_ack_token):
-    """L8: once the page is acknowledged, opening the link again must not offer the
+    """Once the page is acknowledged, opening the link again must not offer the
     Acknowledge button a second time; it says who has the page, as the POST does."""
     token, _response_id, subject = minted_ack_token
 
