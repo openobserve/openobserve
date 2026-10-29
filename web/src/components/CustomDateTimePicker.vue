@@ -178,6 +178,15 @@ const agoKeys: Record<PeriodKey, I18nKey> = {
   M: "dashboard.utils.monthsAgo",
 };
 
+const pastKeys: Record<PeriodKey, I18nKey> = {
+  s: "common.pastSecond",
+  m: "common.pastMinute",
+  h: "common.pastHour",
+  d: "common.pastDay",
+  w: "common.pastWeek",
+  M: "common.pastMonth",
+};
+
 const relativePeriods = computed(() =>
   props.excludeMonths ? allRelativePeriods.filter((p) => p.value !== "M") : allRelativePeriods,
 );
@@ -235,10 +244,9 @@ const getDisplayValue = () => {
 };
 
 const getTrimmedDisplayValue = () => {
-  return t("common.relativeTimePast", {
-    value: picker.data.selectedDate.relative.value,
-    unit: picker.data.selectedDate.relative.label,
-  });
+  const count = picker.data.selectedDate.relative.value;
+  const key = pastKeys[picker.data.selectedDate.relative.period as PeriodKey] ?? pastKeys.m;
+  return t(key, { count }, count);
 };
 
 // Check if the current selection matches the modelValue

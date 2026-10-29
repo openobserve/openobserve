@@ -1986,6 +1986,25 @@ describe("OTable", () => {
       expect(rowModelSize(wrapper)).toBe(300);
     });
 
+    it("counts every row in the footer while the row model is windowed", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2000),
+          columns: makeColumns(),
+          virtualScroll: true,
+          windowRowModel: true,
+          pagination: "none",
+          sorting: "server",
+        },
+        slots: {
+          "pagination-bar": `<template #pagination-bar="s"><span data-test="total-rows">{{ s.totalRows }}</span></template>`,
+        },
+      });
+      await nextTick();
+      expect(rowModelSize(wrapper)).toBeLessThan(2000);
+      expect(wrapper.find('[data-test="total-rows"]').text()).toBe("2000");
+    });
+
     it("never windows a tree", () => {
       wrapper = mountWindowed({ measureExpandedRows: true, expansion: "tree" });
       expect(rowModelSize(wrapper)).toBe(300);

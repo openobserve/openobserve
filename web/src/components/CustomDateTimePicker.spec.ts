@@ -138,6 +138,13 @@ describe("CustomDateTimePicker.vue", () => {
       expect(vm.getTrimmedDisplayValue()).toBe("Past 5 Minutes");
     });
 
+    it("getTrimmedDisplayValue uses the singular unit for a count of one", () => {
+      wrapper = createWrapper({ modelValue: "1h" });
+      const vm = wrapper.vm as any;
+
+      expect(vm.getTrimmedDisplayValue()).toBe("Past 1 Hour");
+    });
+
     it("getDisplayValue works with hours", () => {
       wrapper = createWrapper({ modelValue: "2h" });
       const vm = wrapper.vm as any;
