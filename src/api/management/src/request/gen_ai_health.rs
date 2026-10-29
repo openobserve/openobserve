@@ -574,6 +574,45 @@ fn follow_up_sql(
     (samples, unpriced)
 }
 
+/// Enrich cached strip checks without repeating the window-wide aggregations.
+async fn populate_samples(
+    org_id: &str,
+    user_id: &str,
+    query: &DataHealthQuery,
+    window: &Window,
+    checks: &mut [HealthCheck],
+) -> Result<(), anyhow::Error> {
+    for check in checks.iter_mut() {
+        check.samples = Some(Vec::new());
+    }
+    let Some(cols) = stream_columns(org_id, &query.stream_name).await else {
+        return Ok(());
+    };
+    let Some(base) = base_where(&cols, query) else {
+        return Ok(());
+    };
+    let pricing_enabled = config::get_config().common.model_pricing_enabled;
+    let jobs = checks
+        .iter()
+        .enumerate()
+        .filter(|(_, check)| check.affected > 0)
+        .map(|(i, check)| {
+            let pred = check_pred(check.id, &cols, pricing_enabled);
+            let sql = samples_sql(&query.stream_name, &base, &pred);
+            async move {
+                (
+                    i,
+                    run_sql(org_id, user_id, sql, window, SAMPLE_SCAN_ROWS).await,
+                )
+            }
+        })
+        .collect::<Vec<_>>();
+    for (i, hits) in futures::future::join_all(jobs).await {
+        checks[i].samples = Some(distinct_trace_ids(&hits?));
+    }
+    Ok(())
+}
+
 async fn compute_checks(
     org_id: &str,
     user_id: &str,
@@ -809,12 +848,25 @@ pub async fn get_data_health(
     {
         return MetaHttpResponse::json(cached);
     }
-    match compute_checks(&org_id, user_id, &query, &window).await {
-        Ok(checks) => {
-            let resp = DataHealthResponse {
-                checked_at: now,
-                checks,
-            };
+    let result = async {
+        if query.include_samples && !query.refresh {
+            let mut aggregate_query = query.clone();
+            aggregate_query.include_samples = false;
+            let aggregate_key = cache_key(&org_id, &aggregate_query, &window);
+            if let Some(mut cached) = cache_get(&CACHE, &aggregate_key, now) {
+                populate_samples(&org_id, user_id, &query, &window, &mut cached.checks).await?;
+                return Ok::<_, anyhow::Error>(cached);
+            }
+        }
+        let checks = compute_checks(&org_id, user_id, &query, &window).await?;
+        Ok(DataHealthResponse {
+            checked_at: now,
+            checks,
+        })
+    }
+    .await;
+    match result {
+        Ok(resp) => {
             cache_put(&CACHE, key, resp.clone());
             MetaHttpResponse::json(resp)
         }

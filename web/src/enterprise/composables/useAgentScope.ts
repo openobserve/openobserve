@@ -84,12 +84,12 @@ export function rememberModeChoice(mode: ScopeMode): void {
 
 /**
  * The mode the user asked for, or null when the agents list should decide: the
- * URL `type` (an `agent` param alone also means Agent), else the remembered
+ * URL `type` (any agent/env/version scope also means Agent), else the remembered
  * toggle choice.
  */
 export function explicitScopeMode(url: UrlScope): ScopeMode | null {
   if (url.type) return url.type;
-  if (url.agent) return "agent";
+  if (url.agent || url.env || url.version) return "agent";
   const remembered = localStorage.getItem(SCOPE_MODE_CHOICE_LS_KEY);
   return remembered === "stream" || remembered === "agent" ? remembered : null;
 }

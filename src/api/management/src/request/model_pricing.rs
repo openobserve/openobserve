@@ -708,7 +708,7 @@ fn resolve_unpriced(
     tag = "LLM",
     operation_id = "ListUnpricedModels",
     summary = "List models seen in traces with no price or an approximate one",
-    description = "Models in the stream's spans that ingest marked unpriced or approximately priced during the window, with spans, tokens and recorded cost. Models that resolve to an exact price today are omitted. Spans with tokens but no model name are listed as one row with a null model.",
+    description = "Models in the stream's spans that ingest marked unpriced or approximately priced during the window, with spans, tokens and recorded cost. Historical gaps remain after adding an exact price and are marked priced_now; old costs are not backfilled. Spans with tokens but no model name are listed as one row with a null model.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
