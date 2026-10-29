@@ -79,6 +79,7 @@ struct PendingMigrations {
     ai_chat_shares: bool,
     fleet: bool,
     public_dashboards: bool,
+    incident_integrations: bool,
     missing_ownership: bool,
     profiles: bool,
 }
@@ -575,6 +576,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.profiles {
         keys.push("profiles");
     }
+    if pending.incident_integrations {
+        keys.push("incident_integrations");
+    }
     keys
 }
 
@@ -766,6 +770,11 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] profiles stream permissions migration needed");
         pending.profiles = true;
     }
+    let v0_0_62 = version_compare::Version::from("0.0.62").unwrap();
+    if meta_version >= v0_0_62 && existing_model_version < v0_0_62 {
+        log::info!("[OFGA:Local] incident integrations permissions migration needed");
+        pending.incident_integrations = true;
+    }
 
     pending
 }
@@ -883,5 +892,17 @@ mod tests {
             vec!["profiles"]
         );
         assert!(OFGA_MODELS.contains_key("profiles"));
+    }
+
+    #[test]
+    fn incident_integrations_back_fill_runs_once_across_0_0_62() {
+        let pending = pending_migrations("0.0.62", "0.0.61");
+        assert!(pending.incident_integrations && !pending.profiles);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["incident_integrations"]
+        );
+        assert!(!pending_migrations("0.0.62", "0.0.62").incident_integrations);
+        assert!(!pending_migrations("0.0.61", "0.0.60").incident_integrations);
     }
 }

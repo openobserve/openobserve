@@ -280,6 +280,28 @@ export async function setupDonutPanelWithConfig(page, pm, dashboardName, panelNa
 }
 
 /**
+ * Pie or donut slicing e2e_automate by kubernetes_namespace_name with the default count measure —
+ * a handful of named slices with known shares. Config sidebar opened and ready.
+ */
+export async function setupNamespacePiePanelWithConfig(page, pm, dashboardName, {
+  chartType = "pie",
+  panelName = "Test Panel",
+} = {}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType(chartType);
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("e2e_automate");
+  await pm.chartTypeSelector.removeField("x_axis_1", "x");
+  await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "x");
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Namespace pie panel with config ready", { chartType, dashboardName, panelName });
+}
+
+/**
  * Gauge chart panel — config sidebar opened and ready.
  */
 export async function setupGaugePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
@@ -461,6 +483,21 @@ export async function setupPromQLPiePanelWithConfig(page, pm, dashboardName, pan
   await buildPromQLPanel(page, pm, dashboardName, { chartType: "pie", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL pie panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL pie with one slice per region of cpu_usage, as a Range query — config sidebar opened and ready.
+ * last_over_time over 1h keeps the Instant variant non-empty however long after ingestion the test runs.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLRegionPiePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, {
+    chartType: "pie",
+    panelName,
+    query: "sum by (region) (last_over_time(cpu_usage[1h]))",
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL region pie panel with config ready", { dashboardName, panelName });
 }
 
 /**
