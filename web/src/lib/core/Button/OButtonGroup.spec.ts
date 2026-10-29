@@ -57,6 +57,33 @@ describe("OButtonGroup", () => {
     expect(wrapper.classes()).toContain("[&>*:not(:first-child)]:border-t-0");
   });
 
+  // --- Focus outline ---
+
+  it("has no overflow-hidden or overflow-clip class", () => {
+    const classes = mount(OButtonGroup).classes();
+    expect(classes).not.toContain("overflow-hidden");
+    expect(classes).not.toContain("overflow-clip");
+  });
+
+  it("gives a focused descendant z-1", () => {
+    const wrapper = mount(OButtonGroup);
+    expect(wrapper.classes()).toContain("[&_:focus-visible]:z-1");
+  });
+
+  it.each([
+    ["horizontal", "rounded-e-none", "rounded-s-none"],
+    ["vertical", "rounded-b-none", "rounded-t-none"],
+  ])(
+    "scopes %s corner removal to children that are not an only child",
+    (orientation, first, last) => {
+      const classes = mount(OButtonGroup, { props: { orientation } }).classes();
+      expect(classes).toContain(`[&>*:first-child:not(:only-child)]:${first}`);
+      expect(classes).toContain(`[&>*:last-child:not(:only-child)]:${last}`);
+      expect(classes).not.toContain(`[&>*:first-child]:${first}`);
+      expect(classes).not.toContain(`[&>*:last-child]:${last}`);
+    },
+  );
+
   // --- Integration: OButton children ---
 
   it("renders OButton children inside the group", () => {

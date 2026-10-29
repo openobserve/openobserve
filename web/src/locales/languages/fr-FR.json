@@ -1275,6 +1275,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Taille de scan",
     "deltaScanSize": "Taille de scan delta",
+    "scannedSoFar": "{size} analysés",
+    "resultsProgressLabel": "Progression de la recherche",
     "histogramTitleError": "Erreur lors de la génération du titre de l'histogramme.",
     "selectLogStream": "Sélectionnez le flux de journaux",
     "searchInspect": "Rechercher Inspect",

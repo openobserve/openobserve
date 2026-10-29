@@ -52,6 +52,7 @@ vi.mock("./calculateGridForSubPlot", () => ({
 }));
 
 vi.mock("./colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   ColorModeWithoutMinMax: { palette: "palette" },
   getMetricMinMaxValue: vi.fn(() => [0, 100]),
   getSeriesColor: vi.fn(() => "#FF0000"),
@@ -2710,7 +2711,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
     });
 
@@ -2744,7 +2745,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
     });
 
@@ -2884,8 +2885,8 @@ describe("Convert PromQL Data Utils", () => {
 
       // Based on the ternary logic: panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true
       // When show_gridlines is null, it's not undefined, so it uses the null value
-      // The splitLine.show gets set to null, not the default true
-      expect(result.options.xAxis.splitLine.show).toBe(null);
+      // The y splitLine.show gets set to null, not the default true; the x axis never draws gridlines
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(null);
     });
   });
@@ -3557,7 +3558,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.legend.show).toBe(false);
       expect(result.extras.isTimeSeries).toBe(true);
     });
@@ -3846,8 +3847,40 @@ describe("Convert PromQL Data Utils", () => {
       // Should show both axis borders and gridlines
       expect(result.options.xAxis.axisLine.show).toBe(true);
       expect(result.options.yAxis.axisLine.show).toBe(true);
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
+    });
+
+    it("draws the x baseline by default and hides it when axis_border_show is false", async () => {
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "baseline_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+      const build = (config: Record<string, unknown>) =>
+        convertPromQLData(
+          { id: "panel1", type: "line", config, queries: [{ config: { promql_legend: "" } }] },
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+      const byDefault = await build({});
+      expect(byDefault.options.xAxis.axisLine.show).toBe(true);
+      expect(byDefault.options.yAxis.axisLine.show).toBe(false);
+      expect(byDefault.options.xAxis.axisLabel.fontSize).toBe(12);
+      expect(byDefault.options.xAxis.axisLabel.color).toBe(byDefault.options.yAxis.axisLabel.color);
+
+      const hidden = await build({ axis_border_show: false });
+      expect(hidden.options.xAxis.axisLine.show).toBe(false);
     });
 
     it("should handle empty result but valid structure", async () => {

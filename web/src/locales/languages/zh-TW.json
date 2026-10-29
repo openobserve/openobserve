@@ -1275,6 +1275,8 @@
     "tookChip": "{took} 毫秒",
     "scanSize": "掃描大小",
     "deltaScanSize": "掃描大小差異",
+    "scannedSoFar": "已掃描 {size}",
+    "resultsProgressLabel": "搜尋進度",
     "histogramTitleError": "產生直方圖標題時發生錯誤。",
     "selectLogStream": "選擇日誌串流",
     "searchInspect": "搜尋檢查",

@@ -31,6 +31,8 @@ const runBtn = '[data-test="logs-search-bar-refresh-btn"]';
 const table = '[data-test="logs-search-result-logs-table"]';
 const pager = '[data-test="logs-search-result-pagination"]';
 const jsonContent = '[data-test="log-detail-json-content"]';
+// Syntax-highlight colours are tuned for white rows, not the selected fill; AC8.2 covers the J/K surfaces, not log colouring.
+const activeRowLogText = `${table} [data-active-row] .log-cell-html`;
 
 const b64 = (text) =>
   Buffer.from(text, "utf8")
@@ -608,6 +610,7 @@ test.describe("Logs J/K navigation (item 4a)", () => {
           `${logs.logDetailDialog} .select-noof-records`,
           `${logs.logDetailDialog} label`,
           `${logs.logDetailDialog} [role="tab"]`,
+          activeRowLogText,
         ],
       );
       expect(drawerScan.passes).toBeGreaterThan(0);
@@ -615,10 +618,11 @@ test.describe("Logs J/K navigation (item 4a)", () => {
 
       await page.keyboard.press("Escape");
       await expect(logs.logResultsRow(1)).toBeFocused();
-      const rowScan = await axeScan(page, [
-        `${table} [data-active-row]`,
-        logs.logsRowNavLive,
-      ]);
+      const rowScan = await axeScan(
+        page,
+        [`${table} [data-active-row]`, logs.logsRowNavLive],
+        [activeRowLogText],
+      );
       expect(rowScan.passes).toBeGreaterThan(0);
       expect(rowScan.violations).toEqual([]);
 

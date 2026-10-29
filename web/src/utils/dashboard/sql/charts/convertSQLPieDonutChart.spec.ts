@@ -23,6 +23,7 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
 }));
 
 vi.mock("@/utils/dashboard/colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   getSeriesColor: vi.fn(() => "#FF5733"),
 }));
 
