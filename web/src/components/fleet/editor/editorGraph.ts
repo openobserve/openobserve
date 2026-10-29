@@ -76,7 +76,8 @@ const p = (
   name: string,
   icon: IconName,
   defaults: Record<string, string>,
-): CatalogItem => ({ key, kind: "processor", type: key, name, icon, defaults });
+  extra: Partial<CatalogItem> = {},
+): CatalogItem => ({ key, kind: "processor", type: key, name, icon, defaults, ...extra });
 const e = (
   key: string,
   name: string,
@@ -175,12 +176,31 @@ export const CATALOG: CatalogItem[] = [
     limit_mib: "400",
     spike_limit_mib: "100",
   }),
+  // Without pod_association only the connection IP is matched, so file-read pod logs get nothing.
   p("k8sattributes", "K8s attributes", "label", {
     auth_type: "serviceAccount",
+    "pod_association[0].sources[0].from": "resource_attribute",
+    "pod_association[0].sources[0].name": "k8s.pod.uid",
+    "pod_association[1].sources[0].from": "resource_attribute",
+    "pod_association[1].sources[0].name": "k8s.pod.ip",
+    "pod_association[2].sources[0].from": "connection",
     "extract.metadata[0]": "k8s.pod.name",
     "extract.metadata[1]": "k8s.namespace.name",
     "extract.metadata[2]": "k8s.deployment.name",
+    "extract.metadata[3]": "k8s.node.name",
+    "extract.metadata[4]": "k8s.pod.ip",
   }),
+  p(
+    "k8s_cluster_name",
+    "K8s cluster name",
+    "hub",
+    {
+      "attributes[0].key": "k8s.cluster.name",
+      "attributes[0].value": "${env:K8S_CLUSTER_NAME}",
+      "attributes[0].action": "upsert",
+    },
+    { type: "resource", idHint: "resource/k8s_cluster" },
+  ),
   p("resource", "Resource", "tune", {
     "attributes[0].key": "deployment.environment",
     "attributes[0].value": "production",

@@ -16,6 +16,9 @@
 import { describe, it, expect } from "vitest";
 import { load } from "js-yaml";
 import {
+  CATALOG,
+  addFromCatalog,
+  catalogFor,
   graphToYaml,
   isSettingPath,
   seedGraph,
@@ -376,5 +379,52 @@ describe("graphToYaml", () => {
     expect(yaml).toContain("  pprof: {}");
     expect(yaml).toContain("    logs: {}");
     expect(load(yaml)).toEqual({ extensions: { pprof: {} }, service: { pipelines: { logs: {} } } });
+  });
+});
+
+describe("Kubernetes palette items", () => {
+  const added = (key: string) => {
+    const graph = seedGraph();
+    const item = CATALOG.find((i) => i.key === key)!;
+    const compKey = addFromCatalog(graph, item);
+    graph.pipelines[0].processors.push(graph.components[compKey].id);
+    return { graph, yaml: load(graphToYaml(graph)) as Record<string, any> };
+  };
+
+  it("adds K8s attributes matched by pod uid first, so pod logs read from files get metadata", () => {
+    const { yaml } = added("k8sattributes");
+    expect(yaml.processors.k8sattributes).toEqual({
+      auth_type: "serviceAccount",
+      pod_association: [
+        { sources: [{ from: "resource_attribute", name: "k8s.pod.uid" }] },
+        { sources: [{ from: "resource_attribute", name: "k8s.pod.ip" }] },
+        { sources: [{ from: "connection" }] },
+      ],
+      extract: {
+        metadata: [
+          "k8s.pod.name",
+          "k8s.namespace.name",
+          "k8s.deployment.name",
+          "k8s.node.name",
+          "k8s.pod.ip",
+        ],
+      },
+    });
+  });
+
+  it("adds the cluster name as a resource processor reading the chart's K8S_CLUSTER_NAME", () => {
+    const { graph, yaml } = added("k8s_cluster_name");
+    expect(yaml.processors["resource/k8s_cluster"]).toEqual({
+      attributes: [{ key: "k8s.cluster.name", value: "${env:K8S_CLUSTER_NAME}", action: "upsert" }],
+    });
+    expect(yaml.service.pipelines.logs.processors).toEqual(["resource/k8s_cluster"]);
+    expect(catalogFor(graph.components["processor:resource/k8s_cluster"])?.key).toBe(
+      "k8s_cluster_name",
+    );
+  });
+
+  it("keeps a plain resource processor on the generic Resource item", () => {
+    const { graph } = added("resource");
+    expect(catalogFor(graph.components["processor:resource"])?.key).toBe("resource");
   });
 });
