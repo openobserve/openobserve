@@ -185,6 +185,12 @@
                   class="me-2 flex shrink-0 items-center justify-end"
                   data-test="view-panel-last-refreshed-at"
                 >
+                  <PanelViewToggle
+                    v-if="showDataViewToggle"
+                    v-model="previewView"
+                    class="ms-2 me-auto"
+                    data-test-prefix="dashboard-viewpanel"
+                  />
                   <!-- Error/Warning tooltips -->
                   <PanelErrorButtons
                     :error="errorMessage"
@@ -203,44 +209,54 @@
                     :viewOnly="false"
                   />
                 </div>
-                <PanelSchemaRenderer
-                  class="min-h-0 flex-1"
-                  v-if="chartData"
-                  :key="dashboardPanelData.data.type"
-                  :panelSchema="chartData"
-                  :dashboard-id="dashboardId"
-                  :folder-id="folderId"
-                  :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                  :variablesData="currentVariablesDataRef"
-                  :currentVariablesData="liveVariablesData"
-                  :tabId="currentTabId"
-                  :panelId="currentPanelId"
-                  :width="6"
-                  :searchType="searchType"
-                  :showLegendsButton="true"
-                  :exemplars-override="viewExemplarOverride"
-                  @error="handleChartApiError"
-                  @updated:data-zoom="onDataZoom"
-                  @update:initialVariableValues="onUpdateInitialVariableValues"
-                  @last-triggered-at-update="handleLastTriggeredAtUpdate"
-                  @result-metadata-update="handleResultMetadataUpdate"
-                  @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
-                  @series-limit-update="handleSeriesLimitUpdate"
-                  @region-join-update="handleRegionJoinUpdate"
-                  @sankey-notice-update="handleSankeyNoticeUpdate"
-                  @limit-number-of-series-warning-message-update="
-                    handleLimitNumberOfSeriesWarningMessage
-                  "
-                  @sparkline-warning-update="handleSparklineWarningUpdate"
-                  @is-partial-data-update="handleIsPartialDataUpdate"
-                  @loading-state-change="handleLoadingStateChange"
-                  @is-cached-data-differ-with-current-time-range-update="
-                    handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-                  "
-                  @show-legends="showLegendsDialog = true"
-                  data-test="dashboard-viewpanel-panel-schema-renderer"
-                  ref="panelSchemaRendererRef"
-                />
+                <div class="relative flex min-h-0 flex-1 flex-col">
+                  <PanelSchemaRenderer
+                    class="min-h-0 flex-1"
+                    v-if="chartData"
+                    :key="dashboardPanelData.data.type"
+                    :panelSchema="chartData"
+                    :dashboard-id="dashboardId"
+                    :folder-id="folderId"
+                    :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                    :variablesData="currentVariablesDataRef"
+                    :currentVariablesData="liveVariablesData"
+                    :tabId="currentTabId"
+                    :panelId="currentPanelId"
+                    :width="6"
+                    :searchType="searchType"
+                    :showLegendsButton="true"
+                    :exemplars-override="viewExemplarOverride"
+                    @error="handleChartApiError"
+                    @updated:data-zoom="onDataZoom"
+                    @update:initialVariableValues="onUpdateInitialVariableValues"
+                    @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                    @result-metadata-update="handleResultMetadataUpdate"
+                    @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
+                    @series-limit-update="handleSeriesLimitUpdate"
+                    @region-join-update="handleRegionJoinUpdate"
+                    @sankey-notice-update="handleSankeyNoticeUpdate"
+                    @limit-number-of-series-warning-message-update="
+                      handleLimitNumberOfSeriesWarningMessage
+                    "
+                    @sparkline-warning-update="handleSparklineWarningUpdate"
+                    @is-partial-data-update="handleIsPartialDataUpdate"
+                    @loading-state-change="handleLoadingStateChange"
+                    @is-cached-data-differ-with-current-time-range-update="
+                      handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                    "
+                    @show-legends="showLegendsDialog = true"
+                    data-test="dashboard-viewpanel-panel-schema-renderer"
+                    ref="panelSchemaRendererRef"
+                  />
+                  <PanelDataView
+                    v-if="showDataOverlay && chartData"
+                    class="absolute inset-0 z-10"
+                    :data="previewRawData"
+                    :query-type="dashboardPanelData.data.queryType"
+                    :loading="isPanelLoading"
+                    data-test-prefix="dashboard-viewpanel"
+                  />
+                </div>
               </div>
               <DashboardErrorsComponent
                 :errors="errorData"
@@ -283,6 +299,9 @@ import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
+import PanelDataView from "@/components/dashboards/addPanel/PanelDataView.vue";
+import PanelViewToggle from "@/components/dashboards/PanelViewToggle.vue";
+import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { parseDuration } from "@/utils/date";
@@ -338,6 +357,8 @@ export default defineComponent({
     DashboardErrorsComponent,
     VariablesValueSelector,
     PanelSchemaRenderer,
+    PanelDataView,
+    PanelViewToggle,
     AutoRefreshInterval,
     HistogramIntervalDropDown,
     ShowLegendsPopup,
@@ -408,6 +429,15 @@ export default defineComponent({
       dashboardPanelDataPageKey,
       t,
     );
+    const {
+      previewView,
+      showDataViewToggle,
+      showDataOverlay,
+      rawData: previewRawData,
+    } = usePanelDataView({
+      panelType: () => dashboardPanelData.data.type,
+      renderer: panelSchemaRendererRef,
+    });
     // The applied range the chart loads with; the picker's own value is `timeGate.picked`.
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
@@ -1086,6 +1116,10 @@ export default defineComponent({
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,
+      previewView,
+      showDataViewToggle,
+      showDataOverlay,
+      previewRawData,
       isPartialData,
       isPanelLoading,
       isCachedDataDifferWithCurrentTimeRange,
