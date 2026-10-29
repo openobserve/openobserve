@@ -444,9 +444,16 @@ export function useConfigPanel(
       },
     },
     stateTimeline: {
+      display: {
+        label: t("dashboard.stateTimelineDisplay"),
+        visible: isStateTimeline.value,
+      },
       "merge-gaps": {
         label: t("dashboard.stateTimelineMergeGaps"),
-        visible: isStateTimeline.value,
+        // Cells keep one block per time bucket, so there is nothing to merge.
+        visible:
+          isStateTimeline.value &&
+          dashboardPanelData.data.config?.state_timeline_display !== "cells",
       },
       "row-size": {
         label: [t("dashboard.stateTimelineRowHeight"), t("dashboard.stateTimelineRowGap")],

@@ -288,6 +288,75 @@ describe("ConfigPanel chart type settings", { timeout: 30_000 }, () => {
     await flushPromises();
     expect(has("dashboard-config-distribution_bucket_count")).toBe(false);
   });
+  it("state timeline: Display starts on Default (Bands) and Default stores nothing", async () => {
+    const panel = mountPanel("state-timeline");
+    const before = JSON.stringify(panel.data.config);
+    await flushPromises();
+    expect(JSON.stringify(panel.data.config)).toBe(before);
+    const select = wrapper!
+      .findAllComponents({ name: "OSelect" })
+      .find(
+        (component: any) =>
+          component.attributes("data-test") === "dashboard-config-state_timeline_display",
+      )!;
+    expect(select).toBeTruthy();
+    expect(select.props("options").map((option: any) => option.label)).toEqual([
+      "Default (Bands)",
+      "Bands",
+      "Cells",
+    ]);
+    select.vm.$emit("update:modelValue", "cells");
+    await flushPromises();
+    expect(panel.data.config.state_timeline_display).toBe("cells");
+    select.vm.$emit("update:modelValue", select.props("options")[0].value);
+    await flushPromises();
+    expect("state_timeline_display" in panel.data.config).toBe(false);
+  });
+
+  it("state timeline cells: hides merge gaps and keeps the state text switch", async () => {
+    mountPanel("state-timeline", { state_timeline_display: "cells" });
+    await flushPromises();
+    expect(isShown("dashboard-config-state-timeline-merge-gaps")).toBe(false);
+    expect(isShown("dashboard-config-state-timeline-show-state-text")).toBe(true);
+    expect(isShown("dashboard-config-state-timeline-row-height")).toBe(true);
+  });
+
+  it("state timeline: row sort and tooltip mode are dropdowns with Default first, and Default stores nothing", async () => {
+    const panel = mountPanel("state-timeline");
+    await flushPromises();
+    for (const [test, key, value, fallback] of [
+      ["dashboard-config-state-timeline-row-sort", "row_sort", "non_ok_time", "name"],
+      ["dashboard-config-state-timeline-tooltip-mode", "tooltip_mode", "all_rows", "segment"],
+    ]) {
+      const select = wrapper!
+        .findAllComponents({ name: "OSelect" })
+        .find((component: any) => component.attributes("data-test") === test)!;
+      expect(select, test).toBeTruthy();
+      const options = select.props("options");
+      const fallbackLabel = options.find((option: any) => option.value === fallback).label;
+      expect(options[0].label, test).toBe(`Default (${fallbackLabel})`);
+      select.vm.$emit("update:modelValue", value);
+      await flushPromises();
+      expect(panel.data.config[key], test).toBe(value);
+      select.vm.$emit("update:modelValue", select.props("options")[0].value);
+      await flushPromises();
+      expect(key in panel.data.config, test).toBe(false);
+    }
+  });
+
+  it("names each display's own value alignment in its Default choice", async () => {
+    const defaultAlign = () =>
+      wrapper!
+        .find('[data-test="dashboard-config-state_value_align-option"]')
+        .attributes("data-test-label");
+    mountPanel("state-timeline", { state_timeline_display: "cells" });
+    await flushPromises();
+    expect(defaultAlign()).toBe("Default (Center)");
+    wrapper!.unmount();
+    mountPanel("state-timeline");
+    await flushPromises();
+    expect(defaultAlign()).toBe("Default (Left)");
+  });
 
   it("state timeline: keeps its own controls and writes the value alignment", async () => {
     const panel = mountPanel("state-timeline");

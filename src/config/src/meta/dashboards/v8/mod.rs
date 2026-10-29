@@ -781,6 +781,8 @@ pub struct PanelConfig {
     #[schema(value_type = Option<f64>)]
     distribution_bucket_offset: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    state_timeline_display: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_group_by: Option<Vec<String>>,
@@ -2977,7 +2979,8 @@ mod tests {
         let rest3 = serde_json::json!({
             "distribution_bucket_count": 30.0,
             "distribution_bucket_size": 0.25,
-            "distribution_bucket_offset": -1.0
+            "distribution_bucket_offset": -1.0,
+            "state_timeline_display": "cells"
         });
         for part in [rest, rest2, rest3] {
             fields

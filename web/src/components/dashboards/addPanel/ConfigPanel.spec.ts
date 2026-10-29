@@ -41,6 +41,9 @@ import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 
+// Value the component gives its "Default" choice.
+const TOGGLE_AUTO = "__auto__";
+
 const mockDashboardPanelData = {
   data: {
     id: "panel-1",
@@ -249,7 +252,7 @@ describe("ConfigPanel", () => {
 
       const sort = wrapper.find('[data-test="dashboard-config-state-timeline-row-sort"]');
       expect(sort.exists()).toBe(true);
-      expect(sort.attributes("data-test-selected-value")).toBe("name");
+      expect(sort.attributes("data-test-selected-value")).toBe(TOGGLE_AUTO);
       expect(wrapper.vm.showStateTextModel).toBe(true);
       expect("show_state_text" in panelData.data.config).toBe(false);
 
@@ -257,9 +260,11 @@ describe("ConfigPanel", () => {
       wrapper.vm.rowSortModel = "non_ok_time";
       expect(panelData.data.config.show_state_text).toBe(false);
       expect(panelData.data.config.row_sort).toBe("non_ok_time");
+      wrapper.vm.rowSortModel = TOGGLE_AUTO;
+      expect("row_sort" in panelData.data.config).toBe(false);
     });
 
-    it("offers the tooltip mode, defaulting to this segment", async () => {
+    it("offers the tooltip mode with Default first, which stores nothing", async () => {
       const panelData = {
         ...mockDashboardPanelData,
         data: {
@@ -273,11 +278,13 @@ describe("ConfigPanel", () => {
 
       const mode = wrapper.find('[data-test="dashboard-config-state-timeline-tooltip-mode"]');
       expect(mode.exists()).toBe(true);
-      expect(mode.attributes("data-test-selected-value")).toBe("segment");
+      expect(mode.attributes("data-test-selected-value")).toBe(TOGGLE_AUTO);
       expect("tooltip_mode" in panelData.data.config).toBe(false);
 
       wrapper.vm.tooltipModeModel = "all_rows";
       expect(panelData.data.config.tooltip_mode).toBe("all_rows");
+      wrapper.vm.tooltipModeModel = TOGGLE_AUTO;
+      expect("tooltip_mode" in panelData.data.config).toBe(false);
     });
   });
 
