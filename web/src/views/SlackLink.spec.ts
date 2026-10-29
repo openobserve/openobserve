@@ -22,12 +22,14 @@ import organizations from "@/services/organizations";
 import slack from "@/services/slack";
 import { leaveFor, recallLinkRequest } from "@/utils/slackLink";
 import { axiosError, makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 import SlackLink from "./SlackLink.vue";
 
 vi.mock("@/services/slack", () => ({
   default: { startLinkRequest: vi.fn(), resendLinkRequest: vi.fn() },
 }));
 vi.mock("@/services/organizations", () => ({ default: { list: vi.fn() } }));
+vi.mock("@/utils/rum/ensureBrowserRum", () => ({ ensureBrowserRum: vi.fn() }));
 vi.mock("@/utils/slackLink", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/slackLink")>()),
   leaveFor: vi.fn(),
@@ -77,6 +79,11 @@ afterEach(() => {
 });
 
 describe("SlackLink (N7 pass-through)", () => {
+  it("starts RUM from the full config of the org this page resolved", async () => {
+    await mountLink();
+    expect(ensureBrowserRum).toHaveBeenCalledWith("acme");
+  });
+
   it("starts the request with the signature from ?r and hands off to Sign in with Slack", async () => {
     const w = await mountLink();
 

@@ -113,7 +113,7 @@ module.exports = defineConfig({
     navigationTimeout: process.env.CI ? 90000 : 30000,
     actionTimeout: process.env.CI ? 45000 : 15000,
     screenshot: process.env.CI ? 'only-on-failure' : 'off',
-    video: process.env.CI ? 'retain-on-failure' : 'off',
+    video: 'off',
   },
 
   // beforeEach pays navigateToBase plus the one-per-worker fixture ingestion against the
