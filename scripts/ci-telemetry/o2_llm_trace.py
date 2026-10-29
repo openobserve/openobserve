@@ -10,7 +10,6 @@ import hashlib
 import json
 import os
 import re
-import sys
 import threading
 import time
 import urllib.parse
@@ -640,76 +639,6 @@ def build_payload(resource_attrs, spans):
     }
 
 
-def claude_code_env(service_name, env):
-    """Claude Code's OTel env vars pointing at OpenObserve, or {} when the O2_TRACE_* config is incomplete."""
-    traces_url = trace_endpoint(env)
-    auth = auth_header(env)
-    if not traces_url or not auth:
-        return {}
-    base = traces_url[: -len("/v1/traces")]
-    trace_id = trace_id_from_env(env)
-    headers = ",".join(
-        f"{key}={urllib.parse.quote(value, safe='')}" for key, value in (("Authorization", auth), ("stream-name", stream_name(env)))
-    )
-    # Claude Code reports its own SDK and version, so ours would overwrite the real ones.
-    skip = ("telemetry.sdk.language", "telemetry.sdk.name", "service.version")
-    resource = ",".join(
-        f"{key}={urllib.parse.quote(str(value), safe='-_.~/:')}"
-        for key, value in resource_attributes(service_name, env, trace_id).items()
-        if value not in (None, "") and key not in skip
-    )
-    out = {
-        "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-        # Spans are only emitted behind this beta flag; OTEL_TRACES_EXPORTER alone does nothing.
-        "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
-        "OTEL_SERVICE_NAME": service_name,
-        "OTEL_RESOURCE_ATTRIBUTES": resource,
-        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
-        "OTEL_EXPORTER_OTLP_ENDPOINT": base,
-        "OTEL_EXPORTER_OTLP_HEADERS": headers,
-        "OTEL_TRACES_EXPORT_INTERVAL": "1000",
-        "OTEL_LOGS_EXPORT_INTERVAL": "5000",
-        "OTEL_METRIC_EXPORT_INTERVAL": "10000",
-        # Claude Code joins an inbound W3C trace in SDK/-p mode, so its spans land under workflow.trace_id.
-        "TRACEPARENT": f"00-{trace_id}-{_random_hex(8)}-01",
-    }
-    for signal in ("traces", "logs", "metrics"):
-        out[f"OTEL_{signal.upper()}_EXPORTER"] = "otlp"
-        out[f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT"] = f"{base}/v1/{signal}"
-    return out
-
-
-def write_claude_env(service_name, env):
-    """Append claude_code_env() to $GITHUB_ENV, masking every form of the auth header first."""
-    values = claude_code_env(service_name, env)
-    target = env.get("GITHUB_ENV")
-    if not values or not target:
-        print("::notice::Claude Code telemetry disabled: O2_TRACE_* secrets are not configured.")
-        return 0
-    auth = auth_header(env)
-    for part in (auth, auth.split(" ", 1)[-1], urllib.parse.quote(auth, safe=""), values["OTEL_EXPORTER_OTLP_HEADERS"]):
-        print(f"::add-mask::{part}")
-    if any("\n" in v for v in values.values()):
-        print("::warning::Claude Code telemetry disabled: a trace setting contains a newline.")
-        return 0
-    with open(target, "a", encoding="utf-8") as fh:
-        fh.writelines(f"{key}={value}\n" for key, value in values.items())
-    print(f"Claude Code telemetry enabled for {service_name}, trace_id={values['TRACEPARENT'].split('-')[1]}.")
-    return 0
-
-
-def main(argv):
-    """`o2_llm_trace.py claude-env [service.name]` enables Claude Code OTel export for later steps."""
-    if len(argv) < 2 or argv[1] != "claude-env":
-        print("usage: o2_llm_trace.py claude-env [service.name]", file=sys.stderr)
-        return 2
-    try:
-        return write_claude_env(argv[2] if len(argv) > 2 else "github-actions.claude-code-action", os.environ)
-    except Exception as exc:
-        print(f"::warning::Claude Code telemetry disabled: {type(exc).__name__}")
-        return 0
-
-
 def _clean(attributes):
     return {k: v for k, v in (attributes or {}).items() if v is not None and v != ""}
 
@@ -717,6 +646,3 @@ def _clean(attributes):
 def _random_hex(n_bytes):
     return os.urandom(n_bytes).hex()
 
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv))

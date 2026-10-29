@@ -404,47 +404,5 @@ class ProgressiveExportTest(unittest.TestCase):
             server.server_close()
 
 
-class ClaudeEnvTest(unittest.TestCase):
-    def test_incomplete_config_disables(self):
-        self.assertEqual(t.claude_code_env("svc", {"O2_TRACE_INGEST_URL": "https://o2.example"}), {})
-
-    def test_env_values(self):
-        env = github_env(O2_TRACE_INGEST_URL="https://o2.example/api/acme", O2_TRACE_AUTH="dTpw==", O2_TRACE_STREAM="ai", GITHUB_WORKFLOW="Claude Code")
-        out = t.claude_code_env("github-actions.claude-code", env)
-        self.assertEqual(out["CLAUDE_CODE_ENABLE_TELEMETRY"], "1")
-        self.assertEqual(out["CLAUDE_CODE_ENHANCED_TELEMETRY_BETA"], "1")
-        self.assertEqual(out["OTEL_SERVICE_NAME"], "github-actions.claude-code")
-        self.assertEqual(out["OTEL_EXPORTER_OTLP_ENDPOINT"], "https://o2.example/api/acme")
-        self.assertEqual(out["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"], "https://o2.example/api/acme/v1/traces")
-        self.assertEqual(out["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"], "https://o2.example/api/acme/v1/logs")
-        self.assertEqual(out["OTEL_TRACES_EXPORTER"], "otlp")
-        self.assertEqual(out["OTEL_EXPORTER_OTLP_PROTOCOL"], "http/json")
-        self.assertEqual(out["OTEL_EXPORTER_OTLP_HEADERS"], "Authorization=Basic%20dTpw%3D%3D,stream-name=ai")
-        self.assertTrue(out["TRACEPARENT"].startswith(f"00-{TRACE_ID}-"))
-        resource = dict(pair.split("=", 1) for pair in out["OTEL_RESOURCE_ATTRIBUTES"].split(","))
-        self.assertEqual(resource["service.name"], "github-actions.claude-code")
-        self.assertEqual(resource["workflow.trace_id"], TRACE_ID)
-        self.assertEqual(resource["github.workflow"], "Claude%20Code")
-        self.assertEqual(set(resource), RESOURCE_KEYS - {"service.version", "telemetry.sdk.language", "telemetry.sdk.name"})
-
-    def test_cli_writes_github_env_and_masks_auth(self):
-        with tempfile.NamedTemporaryFile("r", delete=False) as fh:
-            target = fh.name
-        try:
-            env = github_env(GITHUB_ENV=target)
-            with mock.patch.dict(os.environ, env, clear=True), mock.patch("builtins.print") as printed:
-                self.assertEqual(t.main(["o2_llm_trace.py", "claude-env", "github-actions.bug-checker"]), 0)
-            with open(target) as fh:
-                written = fh.read()
-            self.assertIn("OTEL_SERVICE_NAME=github-actions.bug-checker\n", written)
-            self.assertIn("::add-mask::Basic abc", [c.args[0] for c in printed.call_args_list])
-        finally:
-            os.unlink(target)
-        with mock.patch.dict(os.environ, {}, clear=True), mock.patch("builtins.print"):
-            self.assertEqual(t.main(["o2_llm_trace.py", "claude-env"]), 0)
-        with mock.patch("builtins.print"):
-            self.assertEqual(t.main(["o2_llm_trace.py"]), 2)
-
-
 if __name__ == "__main__":
     unittest.main()
