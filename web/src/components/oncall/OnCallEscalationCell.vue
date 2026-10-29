@@ -162,7 +162,8 @@ const headline = computed<I18nText>(() => {
 /// Distinct people the fired rungs reached, deduplicated across rungs.
 const peopleRung = computed(() => {
   const fired = props.progress?.fired ?? [];
-  return new Set(fired.flatMap((rung) => rung.targets)).size;
+  // Targets are role labels; only a server without the ledger field leaves `reached` absent.
+  return new Set(fired.flatMap((rung) => rung.reached ?? rung.targets)).size;
 });
 
 /// Relative, because "in 4m 12s" is the number being decided against.

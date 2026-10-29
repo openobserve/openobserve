@@ -20,7 +20,7 @@ import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import type { EscalationProgress, OnCallResponse } from "@/ts/interfaces/oncall";
+import type { EscalationProgress, FiredRung, OnCallResponse } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
@@ -127,8 +127,13 @@ describe("OnCallEscalationCell", () => {
       { exhausted_at: null },
       {
         fired: [
-          { after_micros: 0, at: 1, targets: ["ana@o2.ai"] },
-          { after_micros: 60_000_000, at: 2, targets: ["ana@o2.ai", "liam@o2.ai"] },
+          { after_micros: 0, at: 1, targets: ["the on-call"], reached: ["ana@o2.ai"] },
+          {
+            after_micros: 60_000_000,
+            at: 2,
+            targets: ["the next on-call"],
+            reached: ["ana@o2.ai", "liam@o2.ai"],
+          },
         ],
         exhausted: true,
       },
@@ -140,6 +145,31 @@ describe("OnCallEscalationCell", () => {
     );
     expect(wrapper.text()).not.toContain("Ladder finished");
     expect(tooltipText(wrapper)).toContain("rung 2 people over 6 levels, no ack");
+  });
+
+  /// Targets are role labels; the people are who the ledger reached, and an empty ledger is nobody.
+  it.each<[string, FiredRung[], string]>([
+    [
+      "one person behind two role labels",
+      [
+        { after_micros: 0, at: 1, targets: ["the on-call"], reached: ["ana@o2.ai"] },
+        { after_micros: 60_000_000, at: 2, targets: ["the next on-call"], reached: ["ana@o2.ai"] },
+      ],
+      "rung 1 person over 6 levels",
+    ],
+    [
+      "a ledger that reached nobody",
+      [{ after_micros: 0, at: 1, targets: ["the on-call"], reached: [] }],
+      "The ladder is finished. Nobody acknowledged, and there is nobody left to escalate to.",
+    ],
+    [
+      "an older server with no ledger",
+      [{ after_micros: 0, at: 1, targets: ["ana@o2.ai", "liam@o2.ai"] }],
+      "rung 2 people over 6 levels",
+    ],
+  ])("counts the people reached: %s", (_, fired, expected) => {
+    const wrapper = render({ exhausted_at: null }, { fired, exhausted: true }, { totalRungs: 6 });
+    expect(tooltipText(wrapper)).toContain(expected);
   });
 
   it("counts down to the next rung and names who it wakes", () => {

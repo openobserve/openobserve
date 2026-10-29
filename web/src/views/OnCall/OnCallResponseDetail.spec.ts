@@ -1742,6 +1742,22 @@ describe("OnCallResponseDetail — responding", () => {
       expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
     });
 
+    it("drops the previous page's ladder and team while a linked page loads", async () => {
+      const { reactive } = await import("vue");
+      const wrapper = await renderWith({ id: "resp_1", title: "First page" });
+      (wrapper.vm as any).escalation = { fired: [], next_targets: [], exhausted: true };
+      (wrapper.vm as any).teamName = "Platform";
+      service.getResponse.mockImplementationOnce(() => new Promise(() => {}));
+
+      reactive(routeState).params.responseId = "resp_next";
+      await flushPromises();
+
+      expect((wrapper.vm as any).escalation).toBe(null);
+      expect((wrapper.vm as any).teamName).toBe("");
+      reactive(routeState).params.responseId = "resp_1";
+      await flushPromises();
+    });
+
     it("says a linked page is gone instead of keeping the page it came from", async () => {
       const { reactive } = await import("vue");
       const wrapper = await renderWith({ id: "resp_1", title: "First page" });

@@ -610,6 +610,11 @@ describe("OnCallResponses", () => {
       expect(cell("resp_0")).toBe("Not paged yet");
       expect(cell("resp_29")).toBe("Paging step 2 of 3");
       expect(cell("resp_28")).toBe("");
+
+      const table = wrapper.findComponent({ name: "OTable" });
+      const escalation = (table.props("columns") as any[]).find((c) => c.id === "escalation");
+      const rowFor = (id: string) => (table.props("data") as any[]).find((r) => r.latest.id === id);
+      expect(escalation.accessorFn(rowFor("resp_29"))).toBe(2);
     });
 
     /// An empty 200 body is not an answer: the row makes no claim rather than "Not paged yet".

@@ -1253,7 +1253,8 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     id: "escalation",
     header: t("oncall.escalation"),
     size: 240,
-    accessorFn: (row: PageRow) => progressById.value[row.latest.id]?.fired.length ?? 0,
+    accessorFn: (row: PageRow) =>
+      progressById.value[row.latest.id]?.fired.length ?? reachedStepFor(row.latest) ?? 0,
     sortable: true,
   },
   {

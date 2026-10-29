@@ -1795,6 +1795,16 @@ watch(
   responseId,
   () => {
     response.value = null;
+    events.value = [];
+    escalation.value = null;
+    escalationLoaded.value = false;
+    policy.value = null;
+    onCallPositions.value = [];
+    deliveries.value = [];
+    teamName.value = "";
+    subjectAlert.value = null;
+    priorCauses.value = [];
+    report.value = null;
     fetchResponse();
   },
   { immediate: true },
