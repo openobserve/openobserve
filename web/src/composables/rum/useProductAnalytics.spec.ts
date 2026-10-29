@@ -146,6 +146,22 @@ describe("useProductAnalytics", () => {
     expect(pa.toQuery().exact).toBe("1");
   });
 
+  it("reads page_url and device from the link and writes them only for the heatmaps route", () => {
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web", page_url: "https://x.test/home", device: "phone" });
+
+    expect(pa.heatmap).toEqual({ pageUrl: "https://x.test/home", device: "phone" });
+    expect(pa.toQuery("productAnalyticsHeatmaps")).toMatchObject({
+      page_url: "https://x.test/home",
+      device: "phone",
+    });
+    expect(pa.toQuery("productAnalyticsPaths").page_url).toBeUndefined();
+
+    pa.initFromRoute({ app: "web", device: "watch" });
+    expect(pa.heatmap).toEqual({ pageUrl: "", device: "all" });
+    expect(pa.toQuery("productAnalyticsHeatmaps").device).toBeUndefined();
+  });
+
   it("runs env and version options only for fields in the schema", async () => {
     respond([
       [/AS app, COUNT/, [{ app: "web", sessions: 10 }]],

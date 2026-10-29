@@ -19,7 +19,7 @@ import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
-import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+import { PA_ROUTES, redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
 import { endSignedInSession } from "@/utils/drafts/signOutFlow";
 import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
@@ -1291,14 +1291,7 @@ const useRoutes = () => {
         },
         {
           path: "heatmaps",
-          name: "RumClickHeatmap",
-          component: ClickHeatmap,
-          meta: {
-            keepAlive: false,
-          },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          redirect: (to: any) => redirectHeatmaps(to),
         },
         {
           path: "source-maps",
@@ -1409,6 +1402,14 @@ const useRoutes = () => {
           path: "paths",
           name: PA_ROUTES.paths,
           component: AnalyticsPaths,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "heatmaps",
+          name: PA_ROUTES.heatmaps,
+          component: ClickHeatmap,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

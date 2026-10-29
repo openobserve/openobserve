@@ -98,6 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-if="!sessionNotFound" #actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="local-fire-department"
+        :disabled="heatmapOpening"
+        data-test="session-viewer-view-heatmap-btn"
+        @click="openSessionHeatmap(String(getSessionId), viewerStartUs)"
+        >{{ t("rum.heatmap.viewHeatmap") }}</OButton
+      >
       <ShareButton
         data-test="session-viewer-share-link-btn"
         :url="shareUrl"
@@ -307,6 +316,7 @@ import { sessionEventsProbeSql, type StepKind } from "@/utils/rum/productAnalyti
 import { MAX_KEY_LENGTH } from "@/utils/rum/productAnalyticsModel";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
+import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import analytics from "@/services/product_analytics";
 
 import { formatDate } from "@/utils/date";
@@ -550,6 +560,10 @@ const markedTimestamps = computed<number[]>(() => {
 });
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
+const { openSessionHeatmap, opening: heatmapOpening } = useSessionHeatmap();
+const viewerStartUs = computed(
+  () => Number(router.currentRoute.value.query.start_time) || Date.now() * 1000,
+);
 
 // Read event_time query parameter
 const eventTime = computed(() => {

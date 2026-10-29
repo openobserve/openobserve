@@ -1088,6 +1088,42 @@ describe("AppSessions.vue", () => {
       await nextTick();
     };
 
+    it("offers a View heatmap action on each session row that opens the heatmap, not the viewer", async () => {
+      wrapper.unmount();
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper = mount(AppSessions, {
+        props: { isSessionReplayEnabled: true },
+        global: {
+          plugins: [store, router, i18n],
+          stubs: {
+            ...buildPlatformStubs(),
+            OTable: {
+              template:
+                '<div data-test="rum-sessions-table" @click="$emit(\'row-click\', data[0])"><div v-for="row in data" :key="row.session_id"><slot name="cell-session" :row="row" /></div></div>',
+              props: [
+                "data",
+                "columns",
+                "loading",
+                "rowKey",
+                "columnVisibility",
+                "getRowStatusColor",
+              ],
+              emits: ["row-click"],
+            },
+          },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.rows = [
+        { session_id: "session-1", start_time: 1000, events: 2, time_spent: 5000 },
+      ];
+      await nextTick();
+
+      const button = wrapper.find('[data-test="rum-app-sessions-view-heatmap-btn"]');
+      expect(button.exists()).toBe(true);
+      expect(button.attributes("aria-label")).toBe("View heatmap");
+    });
+
     it("renders React Native as the platform label when source is react-native", async () => {
       // Act
       await setSessionRow("react-native");

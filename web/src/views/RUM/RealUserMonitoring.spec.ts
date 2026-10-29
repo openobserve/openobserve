@@ -32,6 +32,7 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 import RealUserMonitoring from "./RealUserMonitoring.vue";
+import { redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
 
 const Stub = { template: "<div />" };
 
@@ -48,7 +49,7 @@ const makeRouter = () =>
           { path: "sessions/view/:id", name: "SessionViewer", component: Stub },
           { path: "errors", name: "ErrorTracking", component: Stub },
           { path: "source-maps", name: "SourceMaps", component: Stub },
-          { path: "heatmaps", name: "RumClickHeatmap", component: Stub },
+          { path: "heatmaps", redirect: (to) => redirectHeatmaps(to) },
           {
             path: "performance",
             name: "RumPerformance",
@@ -58,6 +59,7 @@ const makeRouter = () =>
         ],
       },
       { path: "/product-analytics/paths", name: "productAnalyticsPaths", component: Stub },
+      { path: "/product-analytics/heatmaps", name: "productAnalyticsHeatmaps", component: Stub },
     ],
   });
 
@@ -95,37 +97,24 @@ describe("RealUserMonitoring tabs", () => {
   it("no longer carries a Product Analytics tab: it has its own menu", async () => {
     await mountAt("/rum/sessions");
     const tabs = wrapper!.findAll('[role="tab"]').map((t) => t.text());
-    expect(tabs).toEqual([
-      "Performance",
-      "Sessions",
-      "Heatmaps Beta",
-      "Error Tracking",
-      "Source Maps",
-    ]);
+    expect(tabs).toEqual(["Performance", "Sessions", "Error Tracking", "Source Maps"]);
     expect(wrapper!.find('[data-test="rum-tab-product-analytics"]').exists()).toBe(false);
   });
 
-  it("shows the Beta badge on the Heatmaps tab only", async () => {
+  it("has no Beta badge or Heatmaps tab: heatmaps moved to Product Analytics", async () => {
     await mountAt("/rum/sessions");
-    expect(wrapper!.findAll('[data-test="beta-badge"]')).toHaveLength(1);
-    expect(wrapper!.find('[data-test="rum-tab-heatmaps"] [data-test="beta-badge"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper!.findAll('[data-test="beta-badge"]')).toHaveLength(0);
+    expect(wrapper!.find('[data-test="rum-tab-heatmaps"]').exists()).toBe(false);
   });
 
-  it("clicking the Heatmaps tab opens the heatmaps route", async () => {
-    await mountAt("/rum/sessions");
-    await wrapper!.find('[data-test="rum-tab-heatmaps"]').trigger("mousedown", { button: 0 });
-    await flushPromises();
-    expect(router.currentRoute.value.name).toBe("RumClickHeatmap");
-    expect(router.currentRoute.value.query.org_identifier).toBe("org1");
-  });
-
-  it("highlights the Heatmaps tab on the heatmaps route", async () => {
-    await mountAt("/rum/heatmaps");
-    expect(router.currentRoute.value.name).toBe("RumClickHeatmap");
-    const tab = wrapper!.find('[data-test="rum-tab-heatmaps"]');
-    expect(tab.attributes("aria-selected")).toBe("true");
+  it("sends the old heatmaps path to the Product Analytics heatmaps route, keeping the query", async () => {
+    await mountAt("/rum/heatmaps?page_url=%2Fhome&device=phone&app=web");
+    expect(router.currentRoute.value.name).toBe("productAnalyticsHeatmaps");
+    expect(router.currentRoute.value.query).toMatchObject({
+      page_url: "/home",
+      device: "phone",
+      app: "web",
+    });
   });
 
   it("keeps Performance as the default landing tab", async () => {

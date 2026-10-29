@@ -113,6 +113,7 @@ type UsRange = { startUs: number; endUs: number };
 const DEFAULT_PERIOD = "7d";
 export const PICKER_LIMIT = 200;
 const SEARCH_STREAM_NOT_FOUND = 20002;
+const HEATMAP_DEVICES = ["all", "desktop", "tablet", "phone"];
 const PATH_KEYS = ["anchor", "dir", "depth", "inc", "cohort"] as const;
 const RETENTION_KEYS = ["rs", "rr", "per", "rmode"] as const;
 
@@ -156,6 +157,7 @@ const lastSubTab = ref<AnalyticsSubTab>("overview");
 const funnel = ref<FunnelDef>(defaultFunnel());
 const paths = ref<PathsDef>(defaultPaths());
 const retention = ref<RetentionDef>(defaultRetention());
+const heatmap = reactive({ pageUrl: "", device: "all" });
 const trendSeries = ref<StepRef[]>([]);
 const refreshTick = ref(0);
 const syncedSignature = ref("");
@@ -238,6 +240,7 @@ export function resetProductAnalytics(): void {
   funnel.value = defaultFunnel();
   paths.value = defaultPaths();
   retention.value = defaultRetention();
+  Object.assign(heatmap, { pageUrl: "", device: "all" });
   trendSeries.value = [];
   refreshTick.value = 0;
   syncedSignature.value = "";
@@ -413,6 +416,11 @@ export default function useProductAnalytics() {
     range.value = null;
     paths.value = defaultPaths();
     retention.value = defaultRetention();
+    const device = firstString(q.device);
+    Object.assign(heatmap, {
+      pageUrl: firstString(q.page_url) ?? "",
+      device: device && HEATMAP_DEVICES.includes(device) ? device : "all",
+    });
     if (!keepFunnel) {
       funnel.value = defaultFunnel();
       if (q.funnel !== undefined) {
@@ -478,6 +486,10 @@ export default function useProductAnalytics() {
     if (r.ret) q.rr = encodeDef(stepRefParam(r.ret));
     if (r.per !== "auto") q.per = r.per;
     if (r.mode !== "on") q.rmode = r.mode;
+    if (routeName === PA_ROUTES.heatmaps) {
+      if (heatmap.pageUrl) q.page_url = heatmap.pageUrl;
+      if (heatmap.device !== "all") q.device = heatmap.device;
+    }
     return q;
   };
 
@@ -1087,6 +1099,7 @@ export default function useProductAnalytics() {
     funnel,
     paths,
     retention,
+    heatmap,
     trendSeries,
     initFromRoute,
     toQuery,

@@ -10,6 +10,18 @@ const h = vi.hoisted(() => ({
   real: false,
   events: [] as unknown[],
   dom: "",
+  pageWidth: 0,
+  pageHeight: 0,
+  rectFor: undefined as undefined | ((el: Element) => Record<string, number> | undefined),
+  gotos: [] as number[],
+  added: [] as unknown[],
+  pa: undefined as any,
+  makePa: undefined as any,
+  range: { startUs: 1_000_000_000_000, endUs: 1_000_000_000_000 + 24 * 3_600_000_000 },
+  route: { name: "productAnalyticsHeatmaps", query: {} } as {
+    name: string;
+    query: Record<string, string>;
+  },
 }));
 
 vi.mock("@/utils/rum/sessionReplayViews", () => ({
@@ -25,15 +37,24 @@ vi.mock("@openobserve/rrweb-player", () => ({
       opts.target.appendChild(this.iframe);
       this.iframe.contentDocument!.body.innerHTML = h.dom;
       const win = this.iframe.contentWindow as unknown as { Element: typeof Element };
-      win.Element.prototype.getBoundingClientRect = () =>
-        ({ left: 0, top: 0, width: 50, height: 20 }) as DOMRect;
+      if (h.pageWidth) this.iframe.setAttribute("width", String(h.pageWidth));
+      if (h.pageHeight) this.iframe.setAttribute("height", String(h.pageHeight));
+      win.Element.prototype.getBoundingClientRect = function (this: Element) {
+        return (h.rectFor?.(this) ?? { left: 0, top: 0, width: 50, height: 20 }) as DOMRect;
+      };
       this.wrapper = document.createElement("div");
       opts.target.appendChild(this.wrapper);
     }
     getReplayer() {
-      return { iframe: this.iframe, wrapper: this.wrapper };
+      return {
+        iframe: this.iframe,
+        wrapper: this.wrapper,
+        addEvent: (e: unknown) => h.added.push(e),
+      };
     }
-    goto() {}
+    goto(ms: number) {
+      h.gotos.push(ms);
+    }
   },
 }));
 
@@ -44,8 +65,42 @@ vi.mock("@/composables/rum/useAnalyticsSearch", async (importOriginal) => {
   };
 });
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStream: h.getStream }) }));
-vi.mock("@/services/rumProductAnalytics", () => ({
-  default: { getAppSettings: vi.fn().mockResolvedValue({ data: undefined }) },
+vi.mock("@/composables/rum/useProductAnalytics", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/rum/useProductAnalytics")>();
+  const { ref, reactive } = await import("vue");
+  h.makePa = () => {
+    const state = reactive({ app: "web" });
+    const heatmap = reactive({ pageUrl: "", device: "all" });
+    const scopeStatus = ref("ok");
+    const scopeKey = ref("k1");
+    const refreshTick = ref(0);
+    const rulesReady = ref(true);
+    const scope = ref({ app: "web", env: [], version: [], schema: {} });
+    const pa = {
+      state,
+      heatmap,
+      scope,
+      scopeStatus,
+      scopeKey,
+      refreshTick,
+      rulesReady,
+      resolveRange: () => ({ startUs: h.range.startUs, endUs: h.range.endUs }),
+      toQuery: () => ({
+        org_identifier: "default",
+        app: state.app,
+        ...(heatmap.pageUrl ? { page_url: heatmap.pageUrl } : {}),
+        ...(heatmap.device !== "all" ? { device: heatmap.device } : {}),
+      }),
+      syncUrl: vi.fn().mockResolvedValue(undefined),
+    };
+    return pa;
+  };
+  h.pa = h.makePa();
+  return { ...actual, default: () => h.pa };
+});
+vi.mock("vue-router", () => ({
+  useRoute: () => h.route,
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
 vi.mock("@/utils/rum/clickHeatmapQueries", async (importOriginal) => {
@@ -63,19 +118,11 @@ vi.mock("@/utils/rum/clickHeatmapQueries", async (importOriginal) => {
       h.real || a[1] ? actual.pageListSql(...a) : "SELECT pages",
   };
 });
-vi.mock("@/utils/rum/productAnalyticsQueries", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/utils/rum/productAnalyticsQueries")>();
-  return {
-    ...actual,
-    appProbeSql: (...a: Parameters<typeof actual.appProbeSql>) =>
-      h.real ? actual.appProbeSql(...a) : "SELECT apps",
-  };
-});
-
 import ClickHeatmap from "./ClickHeatmap.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSlider from "@/lib/forms/Slider/OSlider.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import rumProductAnalytics from "@/services/rumProductAnalytics";
 import searchService from "@/services/search";
 import { PAGE_LIST_LIMIT, RANKING_LIMIT } from "@/utils/rum/clickHeatmapQueries";
 
@@ -92,7 +139,6 @@ const answer = (overrides: Record<string, () => unknown> = {}) =>
   h.run.mockImplementation(async (id: string) => {
     if (overrides[id]) return overrides[id]();
     const byId: Record<string, unknown[]> = {
-      apps: [{ app: "web" }],
       pages: [{ view_url: "https://x.test/home" }],
       devices: [{ cls: "desktop", clicks: 4 }],
       totals: [{ clicks: 4, sessions: 2, frustrated: 0 }],
@@ -121,13 +167,18 @@ describe("ClickHeatmap", () => {
         disconnect() {}
       },
     );
+    h.pa = h.makePa();
+    h.gotos = [];
+    h.added = [];
+    h.range = { startUs: 1_000_000_000_000, endUs: 1_000_000_000_000 + 24 * 3_600_000_000 };
+    h.route = { name: "productAnalyticsHeatmaps", query: {} };
     h.getStream.mockImplementation(async (name: string) => ({
       schema: name === "_sessionreplay" ? [{ name: "has_full_snapshot" }] : [],
     }));
   });
 
-  it("shows the load error banner and not the empty state when the app list fails", async () => {
-    answer({ apps: () => ({ status: "error", error: { message: "boom" } }) });
+  it("shows the load error banner and not the empty state when the page list fails", async () => {
+    answer({ pages: () => ({ status: "error", error: { message: "boom" } }) });
     vi.spyOn(console, "error").mockImplementation(() => {});
     const wrapper = await mountPage();
 
@@ -139,11 +190,14 @@ describe("ClickHeatmap", () => {
   });
 
   it("shows the empty state when there are no pages", async () => {
-    answer({ apps: () => ok([]) });
+    answer({ pages: () => ok([]) });
     const wrapper = await mountPage();
 
     expect(wrapper.find('[data-test="rum-heatmap-empty"]').text()).toContain(
       "No clicks recorded in this period",
+    );
+    expect(wrapper.find('[data-test="rum-heatmap-empty"]').text()).toContain(
+      "session replay and click tracking",
     );
     expect(wrapper.find('[data-test="rum-heatmap-load-error"]').exists()).toBe(false);
   });
@@ -162,7 +216,7 @@ describe("ClickHeatmap", () => {
     answer();
     const wrapper = await mountPage();
     expect(ids()).toEqual(
-      expect.arrayContaining(["apps", "pages", "devices", "totals", "ranking", "replay-views"]),
+      expect.arrayContaining(["pages", "devices", "totals", "ranking", "replay-views"]),
     );
     h.run.mockClear();
 
@@ -170,7 +224,7 @@ describe("ClickHeatmap", () => {
     device?.vm.$emit("update:modelValue", "phone");
     await flushPromises();
 
-    expect(ids().sort()).toEqual(["ranking", "replay-views", "totals"]);
+    expect(ids().sort()).toEqual(["ranking", "replay-views", "replay-views", "totals"]);
   });
 
   it("says the element is missing, not the clicks, when clicks exist without targets", async () => {
@@ -218,16 +272,25 @@ describe("ClickHeatmap", () => {
     expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).not.toContain("99");
   });
 
-  it("shows the settings notice and still loads when the app settings fail", async () => {
+  it("waits for the shell scope before querying, then loads once it is ready", async () => {
     answer();
-    vi.mocked(rumProductAnalytics.getAppSettings).mockRejectedValueOnce(new Error("nope"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    h.pa.scopeStatus.value = "loading";
     const wrapper = await mountPage();
+    expect(h.run).not.toHaveBeenCalled();
 
-    expect(wrapper.find('[data-test="rum-heatmap-settings-failed"]').text()).toContain(
-      "counts may include bot sessions",
-    );
+    h.pa.scopeStatus.value = "ok";
+    await flushPromises();
+
+    expect(ids()).toContain("pages");
     expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("4");
+  });
+
+  it("waits for the app's bot rules before querying", async () => {
+    answer();
+    h.pa.rulesReady.value = false;
+    await mountPage();
+
+    expect(h.run).not.toHaveBeenCalled();
   });
 
   it("clears the ranking note when the next page load fails", async () => {
@@ -391,7 +454,7 @@ describe("ClickHeatmap", () => {
     expect(wrapper.find('[data-test="rum-heatmap-load-error"]').exists()).toBe(false);
   });
 
-  it("drops the not-clicked tile from the stats and shows the top element with its share", async () => {
+  it("shows clicks, sessions and frustrated clicks in one row with the overlay controls and no top element", async () => {
     answer({
       totals: () => ok([{ clicks: 10, sessions: 5, frustrated: 0 }]),
       ranking: () => ok([{ selector: "#buy", name: "Buy now", clicks: 4, sessions: 2 }]),
@@ -402,9 +465,12 @@ describe("ClickHeatmap", () => {
     expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("10");
     expect(wrapper.find('[data-test="rum-heatmap-stat-sessions"]').text()).toContain("5");
     expect(wrapper.find('[data-test="rum-heatmap-stat-frustrated"]').text()).toContain("0");
-    expect(wrapper.find('[data-test="rum-heatmap-stat-top"]').text()).toBe(
-      "Top elementBuy now · 40% of clicks",
-    );
+    expect(wrapper.find('[data-test="rum-heatmap-stat-top"]').exists()).toBe(false);
+    const row = wrapper.find('[data-test="rum-heatmap-stage-toolbar"]');
+    expect(row.find('[data-test="rum-heatmap-stats"]').exists()).toBe(true);
+    expect(row.find('[data-test="rum-heatmap-mode"]').exists()).toBe(true);
+    expect(row.find('[data-test="rum-heatmap-panel-toggle"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="rum-heatmap-stage-toolbar"]')).toHaveLength(1);
   });
 
   it("filters the element list by text and by the frustrated chip, with a count", async () => {
@@ -565,6 +631,717 @@ describe("ClickHeatmap", () => {
     });
   });
 
+  describe("toolbar and shell scope", () => {
+    const mountToolbar = async () => {
+      const wrapper = mount(ClickHeatmap, {
+        global: { plugins: [store], stubs: { OTable: true } },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("has no app select, probe or date picker of its own, only page and device", async () => {
+      answer();
+      const wrapper = await mountToolbar();
+      const html = wrapper.find('[data-test="rum-heatmap-toolbar"]').html();
+      const at = (id: string) => html.indexOf(`data-test="${id}"`);
+
+      expect(at("rum-heatmap-app-select")).toBe(-1);
+      expect(at("rum-heatmap-date-picker")).toBe(-1);
+      expect(at("rum-heatmap-page-select")).toBeGreaterThan(-1);
+      expect(at("rum-heatmap-device-select")).toBeGreaterThan(at("rum-heatmap-page-select"));
+      expect(ids()).not.toContain("apps");
+    });
+
+    it("queries the shell's date range and app scope", async () => {
+      answer();
+      await mountToolbar();
+      const spec = h.run.mock.calls.find((c) => c[0] === "pages")![1];
+
+      expect([spec.startUs, spec.endUs]).toEqual([h.range.startUs, h.range.endUs]);
+    });
+
+    it("reloads with the new window when the shell scope changes", async () => {
+      answer();
+      await mountToolbar();
+      h.run.mockClear();
+      h.range = { startUs: 5, endUs: 9 };
+
+      h.pa.scopeKey.value = "k2";
+      await flushPromises();
+      const spec = h.run.mock.calls.find((c) => c[0] === "totals")![1];
+
+      expect([spec.startUs, spec.endUs]).toEqual([5, 9]);
+    });
+
+    it("reloads when the shell refresh button ticks", async () => {
+      answer();
+      await mountToolbar();
+      h.run.mockClear();
+
+      h.pa.refreshTick.value++;
+      await flushPromises();
+
+      expect(ids()).toContain("pages");
+    });
+
+    it("opens the page and device named in the link", async () => {
+      h.pa.heatmap.pageUrl = "https://x.test/pricing";
+      h.pa.heatmap.device = "phone";
+      answer();
+      const wrapper = await mountToolbar();
+
+      expect(wrapper.find('[data-test="rum-heatmap-page-current"]').text()).toBe(
+        "https://x.test/pricing",
+      );
+      expect(wrapper.findComponent(OToggleGroup).props("modelValue")).toBe("phone");
+    });
+
+    it("starts the clicks and snapshot for a linked page while the page list is still loading", async () => {
+      h.pa.heatmap.pageUrl = "https://x.test/home";
+      let release: (v: unknown) => void = () => {};
+      answer({ pages: () => new Promise((r) => (release = r)) });
+      const wrapper = mount(ClickHeatmap, {
+        global: { plugins: [store], stubs: { OTable: true } },
+      });
+      await flushPromises();
+
+      expect(ids()).toEqual(expect.arrayContaining(["pages", "totals", "ranking"]));
+      expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("4");
+
+      release(ok([{ view_url: "https://x.test/home", clicks: 4, sessions: 2 }]));
+      await flushPromises();
+      expect(ids().filter((id) => id === "totals")).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("writes the picked page and device into the shared URL state", async () => {
+      answer({
+        pages: () =>
+          ok([
+            { view_url: "https://x.test/home", clicks: 5, sessions: 2 },
+            { view_url: "https://x.test/pricing", clicks: 3, sessions: 1 },
+          ]),
+      });
+      const wrapper = await mountToolbar();
+      h.pa.syncUrl.mockClear();
+
+      wrapper.findComponent(OToggleGroup).vm.$emit("update:modelValue", "tablet");
+      await flushPromises();
+
+      expect(h.pa.heatmap.device).toBe("tablet");
+      expect(h.pa.heatmap.pageUrl).toBe("https://x.test/home");
+      expect(h.pa.syncUrl).toHaveBeenCalled();
+    });
+  });
+
+  describe("phased snapshot load", () => {
+    const hookRest = (impl: () => unknown) => {
+      const base = h.run.getMockImplementation()!;
+      h.run.mockImplementation(async (id: string, ...rest: unknown[]) =>
+        id === "replay-rest" ? impl() : base(id, ...rest),
+      );
+    };
+    const mountPhased = async () => {
+      const wrapper = mount(ClickHeatmap, {
+        global: { plugins: [store], stubs: { OTable: true } },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      for (let i = 0; i < 40 && !ids().includes("replay-rest"); i++) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      await flushPromises();
+      return wrapper;
+    };
+    const stageVisible = (w: { find: (s: string) => any }) =>
+      w.find('[data-test="rum-heatmap-stage"]').isVisible();
+
+    beforeEach(() => {
+      h.events = [
+        { type: 4, timestamp: 1, data: { width: 100, height: 100 } },
+        { type: 2, timestamp: 2, data: { node: {} } },
+      ];
+      h.dom = '<button id="buy">Buy now</button>';
+      h.pageWidth = 100;
+      h.pageHeight = 100;
+    });
+
+    afterEach(() => {
+      h.pageWidth = 0;
+      h.pageHeight = 0;
+    });
+
+    it("shows the first frame before the remaining segments arrive, then advances to the last click", async () => {
+      snapshotAnswer();
+      let release: (v: unknown) => void = () => {};
+      hookRest(() => new Promise((r) => (release = r)));
+      const wrapper = await mountPhased();
+
+      expect(stageVisible(wrapper)).toBe(true);
+      expect(wrapper.find('[data-test="rum-heatmap-snapshot-loading"]').exists()).toBe(false);
+      expect(h.gotos).toEqual([0]);
+      expect(ids()).toContain("replay-rest");
+
+      release(ok([{ start: 1, segment: "{}" }]));
+      await new Promise((r) => setTimeout(r, 50));
+      await flushPromises();
+      expect(h.gotos[h.gotos.length - 1]).toBe(1);
+      wrapper.unmount();
+    });
+
+    it("asks for only the earliest segments first", async () => {
+      snapshotAnswer();
+      hookRest(() => ok([]));
+      const wrapper = await mountPhased();
+      const first = h.run.mock.calls.find((c) => c[0] === "replay-segments")![1];
+
+      expect(first.sql).toContain("ORDER BY start ASC LIMIT 3");
+      wrapper.unmount();
+    });
+
+    it("keeps the first frame and shows no error when the refinement fails", async () => {
+      snapshotAnswer();
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      hookRest(() => ({ status: "error", error: { message: "boom" } }));
+      const wrapper = await mountPhased();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(stageVisible(wrapper)).toBe(true);
+      expect(wrapper.find('[data-test="rum-heatmap-snapshot-error"]').exists()).toBe(false);
+      expect(h.gotos).toEqual([0]);
+      wrapper.unmount();
+    });
+
+    it("looks for a view in the active range first and widens to 720 hours only when it finds none", async () => {
+      snapshotAnswer();
+      const base = h.run.getMockImplementation()!;
+      let views = 0;
+      h.run.mockImplementation(async (id: string, ...rest: unknown[]) =>
+        id === "replay-views" && ++views === 1 ? ok([]) : base(id, ...rest),
+      );
+      const wrapper = await mountPhased();
+      const calls = h.run.mock.calls.filter((c) => c[0] === "replay-views").map((c) => c[1]);
+
+      expect(calls).toHaveLength(2);
+      expect(calls[0].endUs - calls[0].startUs).toBe(h.range.endUs - h.range.startUs);
+      expect(calls[1].endUs - calls[1].startUs).toBe(720 * 3_600_000_000);
+      wrapper.unmount();
+    });
+
+    it("does not widen the view lookup when the active range already has a view", async () => {
+      snapshotAnswer();
+      const wrapper = await mountPhased();
+
+      expect(ids().filter((id) => id === "replay-views")).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("keeps the mounted snapshot when only the shell range changes", async () => {
+      snapshotAnswer();
+      const wrapper = await mountPhased();
+      const stage = wrapper.find('[data-test="rum-heatmap-stage"]').element;
+      h.run.mockClear();
+      h.gotos = [];
+
+      h.range = { startUs: 5, endUs: 9_000_000_000_000 };
+      h.pa.scopeKey.value = "k2";
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(ids()).toContain("totals");
+      expect(ids()).not.toContain("replay-views");
+      expect(ids()).not.toContain("replay-segments");
+      expect(h.gotos).toEqual([]);
+      expect(wrapper.find('[data-test="rum-heatmap-stage"]').element).toBe(stage);
+      expect(wrapper.find('[data-test="rum-heatmap-snapshot-loading"]').exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("remounts the snapshot when the device changes", async () => {
+      snapshotAnswer();
+      const wrapper = await mountPhased();
+      h.run.mockClear();
+
+      wrapper.findComponent(OToggleGroup).vm.$emit("update:modelValue", "phone");
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(ids()).toContain("replay-views");
+      wrapper.unmount();
+    });
+
+    it("draws heat when the clicks land after the first frame, and when they land before it", async () => {
+      snapshotAnswer();
+      const base = h.run.getMockImplementation()!;
+      let releaseRank: (v: unknown) => void = () => {};
+      h.run.mockImplementation(async (id: string, ...rest: unknown[]) =>
+        id === "ranking" ? new Promise((r) => (releaseRank = r)) : base(id, ...rest),
+      );
+      const wrapper = mount(ClickHeatmap, {
+        global: { plugins: [store], stubs: { OTable: true } },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 400));
+      expect(wrapper.find('[data-test="rum-heatmap-stage"]').isVisible()).toBe(true);
+      expect(wrapper.find('[data-test="rum-heatmap-canvas"]').exists()).toBe(false);
+
+      releaseRank(ok([{ selector: "#buy", name: "Buy now", clicks: 9, sessions: 3 }]));
+      await new Promise((r) => setTimeout(r, 100));
+      await flushPromises();
+      expect(wrapper.find('[data-test="rum-heatmap-canvas"]').exists()).toBe(true);
+      wrapper.unmount();
+
+      snapshotAnswer();
+      h.run.mockClear();
+      const early = await mountPhased();
+      expect(early.find('[data-test="rum-heatmap-canvas"]').exists()).toBe(true);
+      early.unmount();
+    });
+
+    it("drops the second phase when a newer load supersedes it", async () => {
+      snapshotAnswer();
+      let calls = 0;
+      let release: (v: unknown) => void = () => {};
+      hookRest(() =>
+        ++calls === 1 ? new Promise((r) => (release = r)) : new Promise(() => undefined),
+      );
+      const wrapper = await mountPhased();
+
+      wrapper.findComponent(OToggleGroup).vm.$emit("update:modelValue", "phone");
+      await flushPromises();
+      release(ok([{ start: 1, segment: "{}" }]));
+      await new Promise((r) => setTimeout(r, 100));
+      await flushPromises();
+
+      expect(h.gotos).not.toContain(1);
+      wrapper.unmount();
+    });
+  });
+
+  describe("stage fit and hover auto-scroll with real-ish geometry", () => {
+    const rows = {
+      props: ["data", "rowClass", "rowRailTone"],
+      emits: ["row-mouseenter", "row-mouseleave", "row-click"],
+      template:
+        '<div v-for="r in data" :key="r.selector" class="row" :data-row="r.selector" @mouseenter="$emit(\'row-mouseenter\', r)" @mouseleave="$emit(\'row-mouseleave\', r)"><slot name="cell-feature" :row="r" /></div>',
+    };
+    const origWidth = Object.getOwnPropertyDescriptor(Element.prototype, "clientWidth");
+    const origHeight = Object.getOwnPropertyDescriptor(Element.prototype, "clientHeight");
+    let paneWidth = 1200;
+    const mountGeo = async () => {
+      h.events = [
+        { type: 4, timestamp: 1, data: { width: 1440, height: 800 } },
+        { type: 2, timestamp: 2, data: { node: {} } },
+      ];
+      h.dom = '<button id="buy">Buy now</button><button id="other">Other</button>';
+      h.pageWidth = 1440;
+      h.pageHeight = 6000;
+      h.rectFor = (el) =>
+        el.id === "buy"
+          ? { left: 100, top: 3000, width: 200, height: 40 }
+          : el.id === "other"
+            ? { left: 100, top: 700, width: 200, height: 40 }
+            : undefined;
+      document.documentElement.style.fontSize = "16px";
+      Object.defineProperty(Element.prototype, "clientWidth", {
+        configurable: true,
+        get() {
+          return (this as Element).querySelector('[data-test="rum-heatmap-stage"]') ? paneWidth : 0;
+        },
+      });
+      Object.defineProperty(Element.prototype, "clientHeight", {
+        configurable: true,
+        get() {
+          return (this as Element).querySelector('[data-test="rum-heatmap-stage"]') ? 600 : 0;
+        },
+      });
+      snapshotAnswer([
+        { selector: "#buy", name: "Buy now", clicks: 9, sessions: 3 },
+        { selector: "#other", name: "Other", clicks: 5, sessions: 2 },
+      ]);
+      const wrapper = mount(ClickHeatmap, {
+        global: {
+          plugins: [store],
+          stubs: { OTable: rows as unknown as boolean, DateTimePickerDashboard: true },
+        },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      await settle();
+      const stage = wrapper.find('[data-test="rum-heatmap-stage"]').element as HTMLElement;
+      const scroller = stage.closest(".overflow-auto") as HTMLElement;
+      scroller.getBoundingClientRect = () => ({ top: 100, left: 0 }) as DOMRect;
+      stage.getBoundingClientRect = () => ({ top: 100 - 500 + 16, left: 0 }) as DOMRect;
+      let top = 500;
+      Object.defineProperty(scroller, "scrollTop", {
+        get: () => top,
+        set: (v: number) => (top = v),
+        configurable: true,
+      });
+      const scrollTo = vi.fn();
+      scroller.scrollTo = scrollTo as unknown as typeof scroller.scrollTo;
+      return { wrapper, scroller, scrollTo };
+    };
+    const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
+    const scale = (1200 - 32) / 1440;
+
+    beforeEach(() => {
+      // jsdom has no CSS.escape; browsers do.
+      vi.stubGlobal("CSS", { escape: (v: string) => v.replace(/[^\w-]/g, (c) => `\\${c}`) });
+    });
+
+    afterEach(() => {
+      if (origWidth) Object.defineProperty(Element.prototype, "clientWidth", origWidth);
+      if (origHeight) Object.defineProperty(Element.prototype, "clientHeight", origHeight);
+      h.pageWidth = 0;
+      h.pageHeight = 0;
+      h.rectFor = undefined;
+      paneWidth = 1200;
+      delete (Element.prototype as any).scrollIntoView;
+    });
+
+    it("fits the pane width, not the page height, and sizes the wrapper to page height times scale", async () => {
+      const { wrapper } = await mountGeo();
+      const fit = wrapper.find('[data-test="rum-heatmap-stage"]').element.parentElement!;
+
+      expect(fit.style.width).toBe(`${1440 * scale}px`);
+      expect(fit.style.height).toBe(`${6000 * scale}px`);
+      expect(
+        (wrapper.find('[data-test="rum-heatmap-stage"]').element as HTMLElement).style.transform,
+      ).toBe(`scale(${scale})`);
+      wrapper.unmount();
+    });
+
+    it("ignores a zero-width measurement and refits once the pane has width", async () => {
+      paneWidth = 0;
+      const { wrapper } = await mountGeo();
+      const stage = wrapper.find('[data-test="rum-heatmap-stage"]').element as HTMLElement;
+      expect(stage.style.transform).not.toContain("scale(0");
+      expect(stage.style.transform).not.toContain("-");
+
+      paneWidth = 1200;
+      window.dispatchEvent(new Event("resize"));
+      await wait(300);
+
+      expect(stage.style.transform).toBe(`scale(${scale})`);
+      wrapper.unmount();
+    });
+
+    it("refits and redraws after entering and leaving full screen", async () => {
+      (HTMLElement.prototype as any).requestFullscreen = vi.fn().mockResolvedValue(undefined);
+      vi.resetModules();
+      const { wrapper } = await mountGeo();
+      const stage = wrapper.find('[data-test="rum-heatmap-stage"]').element as HTMLElement;
+      const root = wrapper.find('[data-test="rum-heatmap-page"]').element;
+
+      const fit = stage.parentElement as HTMLElement;
+      const scroller = stage.closest(".overflow-auto") as HTMLElement;
+      scroller.scrollTop = 900;
+
+      paneWidth = 1900;
+      Object.defineProperty(document, "fullscreenElement", { value: root, configurable: true });
+      document.dispatchEvent(new Event("fullscreenchange"));
+      await wait(300);
+      expect(stage.style.transform).toBe("scale(1)");
+      expect(fit.style.height).toBe("6000px");
+      expect(scroller.scrollTop).toBe(0);
+
+      paneWidth = 1200;
+      scroller.scrollTop = 900;
+      Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
+      document.dispatchEvent(new Event("fullscreenchange"));
+      await wait(300);
+      expect(stage.style.transform).toBe(`scale(${scale})`);
+      expect(fit.style.width).toBe(`${1440 * scale}px`);
+      expect(fit.style.height).toBe(`${6000 * scale}px`);
+      expect(scroller.scrollTop).toBe(0);
+      expect(wrapper.find('[data-test="rum-heatmap-canvas"]').exists()).toBe(true);
+      delete (HTMLElement.prototype as any).requestFullscreen;
+      wrapper.unmount();
+    });
+
+    const hitMove = async (w: any, x: number, y: number) => {
+      const layer = w.find('[data-test="rum-heatmap-hit-layer"]');
+      layer.element.getBoundingClientRect = () => ({ left: 0, top: 0, bottom: 0 }) as DOMRect;
+      await layer.trigger("mousemove", { clientX: x * scale, clientY: y * scale });
+      return layer;
+    };
+    const tip = (w: any) => w.find('[data-test="rum-heatmap-element-tip"]');
+
+    it("shows the details card over a hit-tested element in Heatmap mode with the panel closed", async () => {
+      const { wrapper } = await mountGeo();
+      expect(tip(wrapper).exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-heatmap-panel"]').isVisible()).toBe(false);
+
+      const layer = await hitMove(wrapper, 150, 3010);
+
+      expect(tip(wrapper).exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-heatmap-tip-name"]').text()).toBe("Buy now");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-selector"]').text()).toBe("#buy");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-clicks"]').text()).toBe("9 clicks");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-share"]').text()).toBe("90%");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-sessions"]').text()).toBe("3 sessions");
+      expect(tip(wrapper).classes()).toContain("pointer-events-none");
+
+      await layer.trigger("mouseleave");
+      expect(tip(wrapper).exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("shows no card when nothing is under the pointer", async () => {
+      const { wrapper } = await mountGeo();
+
+      await hitMove(wrapper, 1000, 10);
+
+      expect(tip(wrapper).exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("hides the card when the stage starts scrolling and brings it back on the next move", async () => {
+      const { wrapper, scroller } = await mountGeo();
+      await hitMove(wrapper, 150, 3010);
+      expect(tip(wrapper).exists()).toBe(true);
+
+      await scroller.dispatchEvent(new Event("scroll"));
+      await flushPromises();
+      expect(tip(wrapper).exists()).toBe(false);
+
+      await hitMove(wrapper, 152, 3012);
+      expect(tip(wrapper).exists()).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("opens below the element, and flips above it when it would leave the pane", async () => {
+      const { wrapper, scroller } = await mountGeo();
+      const wrapperEl = wrapper.find('[data-test="rum-heatmap-stage"]').element.parentElement!
+        .parentElement as HTMLElement;
+      wrapperEl.getBoundingClientRect = () => ({ top: 100, bottom: 5000, left: 0 }) as DOMRect;
+      scroller.getBoundingClientRect = () => ({ top: 100, bottom: 700, left: 0 }) as DOMRect;
+      Object.defineProperty(window, "innerHeight", { value: 5000, configurable: true });
+      const top = () => parseFloat((tip(wrapper).element as HTMLElement).style.top);
+
+      await hitMove(wrapper, 150, 3010);
+      const elementTop = 3000 * scale;
+      const elementBottom = 3040 * scale;
+      expect(top()).toBeCloseTo(elementTop - 8 - 128, 0);
+      expect(top()).toBeLessThan(elementTop);
+
+      Object.defineProperty(window, "innerHeight", { value: 5000, configurable: true });
+      scroller.getBoundingClientRect = () => ({ top: 100, bottom: 4900, left: 0 }) as DOMRect;
+      await wrapper.find('[data-test="rum-heatmap-hit-layer"]').trigger("mouseleave");
+      await hitMove(wrapper, 150, 3010);
+      expect(top()).toBeCloseTo(elementBottom + 8, 0);
+      wrapper.unmount();
+    });
+
+    it("shows the card for a hovered marker in Markers mode too", async () => {
+      const { wrapper } = await mountGeo();
+      await wrapper.find('[data-test="rum-heatmap-mode-markers"]').trigger("click");
+
+      await wrapper.find('[data-test="rum-heatmap-marker-#buy"]').trigger("mouseenter");
+
+      expect(tip(wrapper).exists()).toBe(true);
+      expect(wrapper.findAll('[data-test="rum-heatmap-element-tip"]')).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("scrolls the picture to the centre of a far element when its row is hovered, and not when off", async () => {
+      const { wrapper, scrollTo } = await mountGeo();
+      const row = wrapper.find('[data-row="#buy"]');
+
+      await row.trigger("mouseenter");
+      await wait();
+      const top = 16 + 3000 * scale;
+      expect(scrollTo).toHaveBeenCalledWith({
+        top: (top + (top + 40 * scale)) / 2 - 300,
+        behavior: "smooth",
+      });
+      await row.trigger("mouseleave");
+
+      scrollTo.mockClear();
+      wrapper.findComponent(OSwitch).vm.$emit("update:modelValue", false);
+      await flushPromises();
+      await row.trigger("mouseenter");
+      await wait();
+      expect(scrollTo).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("does not scroll for an element already in view", async () => {
+      const { wrapper, scrollTo } = await mountGeo();
+
+      await wrapper.find('[data-row="#other"]').trigger("mouseenter");
+      await wait();
+
+      expect(scrollTo).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("scrolls the list row into view when the heat area under the pointer is hovered, panel open", async () => {
+      const scrollIntoView = vi.fn();
+      (Element.prototype as any).scrollIntoView = scrollIntoView;
+      const { wrapper } = await mountGeo();
+      await wrapper.find('[data-test="rum-heatmap-panel-toggle"]').trigger("click");
+      const layer = wrapper.find('[data-test="rum-heatmap-hit-layer"]');
+      layer.element.getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect;
+
+      await layer.trigger("mousemove", { clientX: 150 * scale, clientY: (3000 + 10) * scale });
+      expect(wrapper.find('[data-test="rum-heatmap-hover-box"]').exists(), "hover").toBe(true);
+      expect(wrapper.find('[data-test="rum-heatmap-feature-#buy"]').exists(), "cell").toBe(true);
+      await wait();
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+      expect(scrollIntoView.mock.contexts[0]).toBe(
+        wrapper.find('[data-test="rum-heatmap-feature-#buy"]').element,
+      );
+
+      scrollIntoView.mockClear();
+      await layer.trigger("mouseleave");
+      wrapper.findComponent(OSwitch).vm.$emit("update:modelValue", false);
+      await flushPromises();
+      await layer.trigger("mousemove", { clientX: 150 * scale, clientY: (3000 + 10) * scale });
+      await wait();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rum-heatmap-hover-box"]').exists()).toBe(true);
+      wrapper.unmount();
+    });
+  });
+
+  describe("toolbar groups and full screen", () => {
+    it("keeps tooltip copy out of the page until hover or focus", async () => {
+      const wrapper = await mountGroups();
+
+      expect(wrapper.text()).not.toContain("Highlighting stays on either way");
+      expect(document.body.textContent).not.toContain("Highlighting stays on either way");
+      expect(wrapper.find('[data-test="rum-heatmap-auto-scroll"]').text()).toContain(
+        "Auto-scroll to hotspot",
+      );
+      wrapper.unmount();
+    });
+
+    it("renders the stat chips and every toolbar control while the first load is pending", async () => {
+      h.run.mockImplementation(() => new Promise(() => {}));
+      const wrapper = mount(ClickHeatmap, {
+        global: { plugins: [store], stubs: { OTable: true, DateTimePickerDashboard: picker } },
+      });
+      await flushPromises();
+
+      for (const id of [
+        "stat-clicks",
+        "stat-sessions",
+        "stat-frustrated",
+        "mode",
+        "opacity",
+        "auto-scroll",
+        "panel-toggle",
+        "page-select",
+        "device-select",
+      ]) {
+        expect(wrapper.find(`[data-test="rum-heatmap-${id}"]`).exists(), id).toBe(true);
+      }
+      expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("—");
+      wrapper.unmount();
+    });
+
+    const picker = { template: "<div />", props: ["modelValue"] };
+    const mountGroups = async (rows = [{ selector: "#buy", clicks: 4, sessions: 2 }]) => {
+      answer({
+        totals: () => ok([{ clicks: 4, sessions: 2, frustrated: 3 }]),
+        ranking: () => ok(rows),
+      });
+      const wrapper = mount(ClickHeatmap, {
+        global: { plugins: [store], stubs: { OTable: true, DateTimePickerDashboard: picker } },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      return wrapper;
+    };
+    const fullscreenToggle = (w: { find: (s: string) => any }) =>
+      w.find('[data-test="rum-heatmap-fullscreen-toggle"]');
+
+    afterEach(() => {
+      delete (HTMLElement.prototype as any).requestFullscreen;
+      Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
+    });
+
+    it("groups stats, view controls and actions with dividers and colours frustrated clicks", async () => {
+      const wrapper = await mountGroups();
+      const row = wrapper.find('[data-test="rum-heatmap-stage-toolbar"]');
+
+      expect(row.find('[data-test="rum-heatmap-stats"]').exists()).toBe(true);
+      expect(row.find('[data-test="rum-heatmap-divider-stats"]').exists()).toBe(true);
+      expect(
+        row
+          .find('[data-test="rum-heatmap-view-group"]')
+          .find('[data-test="rum-heatmap-opacity"]')
+          .exists(),
+      ).toBe(true);
+      expect(row.find('[data-test="rum-heatmap-actions"]').classes()).toContain("ms-auto");
+      expect(
+        wrapper.find('[data-test="rum-heatmap-stat-frustrated"] span:last-child').classes(),
+      ).toContain("text-status-negative");
+      expect(wrapper.find('[data-test="rum-heatmap-panel-toggle-text"]').text()).toBe(
+        "Show elements",
+      );
+      wrapper.unmount();
+    });
+
+    it("hides the full screen button when the browser has no Fullscreen API", async () => {
+      const wrapper = await mountGroups();
+
+      expect(fullscreenToggle(wrapper).exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("enters full screen on the page root and follows fullscreenchange back out", async () => {
+      const request = vi.fn().mockResolvedValue(undefined);
+      (HTMLElement.prototype as any).requestFullscreen = request;
+      vi.resetModules();
+      const { default: Fresh } = await import("./ClickHeatmap.vue");
+      answer();
+      const wrapper = mount(Fresh, {
+        global: { plugins: [store], stubs: { OTable: true, DateTimePickerDashboard: picker } },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      const root = wrapper.find('[data-test="rum-heatmap-page"]').element;
+      expect(fullscreenToggle(wrapper).attributes("aria-label")).toBe("Full screen");
+
+      await fullscreenToggle(wrapper).trigger("click");
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(request.mock.contexts[0]).toBe(root);
+
+      Object.defineProperty(document, "fullscreenElement", { value: root, configurable: true });
+      document.dispatchEvent(new Event("fullscreenchange"));
+      await flushPromises();
+      expect(fullscreenToggle(wrapper).attributes("aria-label")).toBe("Exit full screen");
+      expect(wrapper.find('[data-test="rum-heatmap-page"]').classes()).toContain("bg-surface-base");
+
+      Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
+      document.dispatchEvent(new Event("fullscreenchange"));
+      await flushPromises();
+      expect(fullscreenToggle(wrapper).attributes("aria-label")).toBe("Full screen");
+      wrapper.unmount();
+    });
+
+    it("does not crash when the browser rejects full screen", async () => {
+      (HTMLElement.prototype as any).requestFullscreen = vi.fn().mockRejectedValue(new Error("no"));
+      vi.resetModules();
+      const { default: Fresh } = await import("./ClickHeatmap.vue");
+      answer();
+      const wrapper = mount(Fresh, {
+        global: { plugins: [store], stubs: { OTable: true, DateTimePickerDashboard: picker } },
+      });
+      await flushPromises();
+
+      await fullscreenToggle(wrapper).trigger("click");
+      await flushPromises();
+
+      expect(fullscreenToggle(wrapper).attributes("aria-label")).toBe("Full screen");
+    });
+  });
+
   describe("overlay modes and markers", () => {
     const other = { selector: "#other", name: "Other", clicks: 5, sessions: 2 };
     const marker = (w: { find: (s: string) => any }, sel: string) =>
@@ -691,7 +1468,7 @@ describe("ClickHeatmap", () => {
     it("shows the tooltip with name, selector, clicks, share and sessions on hover and focus", async () => {
       const wrapper = await mountModes();
       await pickMode(wrapper, "markers");
-      expect(wrapper.find('[data-test="rum-heatmap-marker-tip"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-heatmap-element-tip"]').exists()).toBe(false);
 
       await marker(wrapper, "#buy").trigger("mouseenter");
 
@@ -702,26 +1479,186 @@ describe("ClickHeatmap", () => {
       expect(wrapper.find('[data-test="rum-heatmap-tip-sessions"]').text()).toBe("3 sessions");
 
       await marker(wrapper, "#buy").trigger("mouseleave");
-      expect(wrapper.find('[data-test="rum-heatmap-marker-tip"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-heatmap-element-tip"]').exists()).toBe(false);
       await marker(wrapper, "#other").trigger("focus");
       expect(wrapper.find('[data-test="rum-heatmap-tip-name"]').text()).toBe("Other");
       wrapper.unmount();
     });
 
-    it("hides and restores the element panel and flips the button label", async () => {
+    it("starts with the element panel closed, then shows and hides it with the button label", async () => {
       const wrapper = await mountModes();
       const button = () => wrapper.find('[data-test="rum-heatmap-panel-toggle"]');
       const panel = () => wrapper.find('[data-test="rum-heatmap-panel"]');
-      expect(button().text()).toBe("Hide elements");
-      expect(panel().isVisible()).toBe(true);
-
-      await button().trigger("click");
-      expect(button().text()).toBe("Show elements");
+      expect(button().attributes("aria-label")).toBe("Show elements");
+      expect(button().attributes("aria-expanded")).toBe("false");
       expect(panel().isVisible()).toBe(false);
 
       await button().trigger("click");
-      expect(button().text()).toBe("Hide elements");
+      expect(button().attributes("aria-label")).toBe("Hide elements");
+      expect(button().attributes("aria-expanded")).toBe("true");
       expect(panel().isVisible()).toBe(true);
+
+      await button().trigger("click");
+      expect(button().attributes("aria-label")).toBe("Show elements");
+      expect(panel().isVisible()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("scrolls the stage to a hovered row's element only when it is off-screen", async () => {
+      const wrapper = await mountModes();
+      const scroller = wrapper
+        .find('[data-test="rum-heatmap-stage"]')
+        .element.closest(".overflow-auto") as HTMLElement;
+      const scrollTo = vi.fn();
+      scroller.scrollTo = scrollTo as unknown as typeof scroller.scrollTo;
+      const hover = async (sel: string) => {
+        wrapper.findComponent(OTable).vm.$emit("row-mouseenter", { selector: sel });
+        await new Promise((r) => setTimeout(r, 150));
+      };
+
+      await hover("#buy");
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(scrollTo).toHaveBeenCalledWith({ top: 10, behavior: "smooth" });
+
+      wrapper.findComponent(OTable).vm.$emit("row-mouseleave", { selector: "#buy" });
+      Object.defineProperty(scroller, "clientHeight", { value: 500, configurable: true });
+      scrollTo.mockClear();
+      await hover("#other");
+      expect(scrollTo).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("outlines the element and lights its row when the pointer is over its heat area", async () => {
+      const wrapper = await mountModes();
+      const rowClass = (sel: string) =>
+        (wrapper.findComponent(OTable).props("rowClass") as (r: { selector: string }) => string)({
+          selector: sel,
+        });
+      expect(wrapper.find('[data-test="rum-heatmap-hover-box"]').exists()).toBe(false);
+
+      await wrapper
+        .find('[data-test="rum-heatmap-hit-layer"]')
+        .trigger("mousemove", { clientX: 10, clientY: 10 });
+      expect(wrapper.find('[data-test="rum-heatmap-hover-box"]').exists()).toBe(true);
+      expect(rowClass("#buy")).toBe("bg-surface-tint-accent");
+
+      await wrapper.find('[data-test="rum-heatmap-hit-layer"]').trigger("mouseleave");
+      expect(wrapper.find('[data-test="rum-heatmap-hover-box"]').exists()).toBe(false);
+      expect(rowClass("#buy")).toBe("");
+      wrapper.unmount();
+    });
+
+    it("selects the hovered element when the heat area is clicked", async () => {
+      const wrapper = await mountModes();
+      const layer = wrapper.find('[data-test="rum-heatmap-hit-layer"]');
+
+      await layer.trigger("mousemove", { clientX: 10, clientY: 10 });
+      await layer.trigger("click");
+      await layer.trigger("mouseleave");
+
+      const rowClass = wrapper.findComponent(OTable).props("rowClass") as (r: {
+        selector: string;
+      }) => string;
+      expect(rowClass({ selector: "#buy" })).toBe("bg-surface-tint-accent");
+      wrapper.unmount();
+    });
+
+    it("lights the row for a hovered marker and keeps marker clicks working", async () => {
+      const wrapper = await mountModes();
+      await pickMode(wrapper, "markers");
+      expect(wrapper.find('[data-test="rum-heatmap-hit-layer"]').exists()).toBe(false);
+
+      await marker(wrapper, "#other").trigger("mouseenter");
+      const rowClass = wrapper.findComponent(OTable).props("rowClass") as (r: {
+        selector: string;
+      }) => string;
+      expect(rowClass({ selector: "#other" })).toBe("bg-surface-tint-accent");
+      await marker(wrapper, "#other").trigger("click");
+      expect(marker(wrapper, "#other").attributes("aria-pressed")).toBe("true");
+      wrapper.unmount();
+    });
+
+    it("fades the heat canvas with the opacity slider and hides the slider in Markers mode", async () => {
+      const wrapper = await mountModes();
+      const canvas = () => wrapper.find('[data-test="rum-heatmap-canvas"]');
+      const slider = () => wrapper.findComponent(OSlider);
+      expect(slider().props("modelValue")).toBe(100);
+      expect(slider().attributes("aria-label")).toBe("Heat opacity");
+      expect(canvas().attributes("style")).toContain("opacity: 1");
+
+      slider().vm.$emit("update:modelValue", 40);
+      await flushPromises();
+      expect(canvas().attributes("style")).toContain("opacity: 0.4");
+      expect(wrapper.find('[data-test="rum-heatmap-opacity-value"]').text()).toBe("40%");
+
+      await pickMode(wrapper, "markers");
+      expect(wrapper.find('[data-test="rum-heatmap-opacity"]').classes()).toContain("invisible");
+      expect(wrapper.find('[data-test="rum-heatmap-auto-scroll"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="rum-heatmap-opacity"] [data-test="rum-heatmap-auto-scroll"]')
+          .exists(),
+      ).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("highlights but does not scroll on hover when auto scroll is off, and scrolls when on", async () => {
+      const wrapper = await mountModes();
+      const scroller = wrapper
+        .find('[data-test="rum-heatmap-stage"]')
+        .element.closest(".overflow-auto") as HTMLElement;
+      const scrollTo = vi.fn();
+      scroller.scrollTo = scrollTo as unknown as typeof scroller.scrollTo;
+      const hoverRow = async (sel: string) => {
+        wrapper.findComponent(OTable).vm.$emit("row-mouseenter", { selector: sel });
+        await new Promise((r) => setTimeout(r, 150));
+        wrapper.findComponent(OTable).vm.$emit("row-mouseleave", { selector: sel });
+      };
+      const rowClass = wrapper.findComponent(OTable).props("rowClass") as (r: {
+        selector: string;
+      }) => string;
+      const toggle = wrapper.findComponent(OSwitch);
+      expect(toggle.props("modelValue")).toBe(true);
+
+      toggle.vm.$emit("update:modelValue", false);
+      await flushPromises();
+      wrapper.findComponent(OTable).vm.$emit("row-mouseenter", { selector: "#buy" });
+      await new Promise((r) => setTimeout(r, 150));
+      expect(rowClass({ selector: "#buy" })).toBe("bg-surface-tint-accent");
+      expect(scrollTo).not.toHaveBeenCalled();
+      wrapper.findComponent(OTable).vm.$emit("row-mouseleave", { selector: "#buy" });
+
+      toggle.vm.$emit("update:modelValue", true);
+      await flushPromises();
+      await hoverRow("#buy");
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+
+    it("does not scroll the element list for a hovered marker when auto scroll is off", async () => {
+      const scrollIntoView = vi.fn();
+      (Element.prototype as any).scrollIntoView = scrollIntoView;
+      const wrapper = await mountModes();
+      await pickMode(wrapper, "markers");
+      wrapper.findComponent(OSwitch).vm.$emit("update:modelValue", false);
+      await wrapper.find('[data-test="rum-heatmap-panel-toggle"]').trigger("click");
+
+      await marker(wrapper, "#other").trigger("mouseenter");
+      await new Promise((r) => setTimeout(r, 150));
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      delete (Element.prototype as any).scrollIntoView;
+      wrapper.unmount();
+    });
+
+    it("draws markers as outlines with no translucent fill unless active", async () => {
+      const wrapper = await mountModes();
+      await pickMode(wrapper, "markers");
+
+      const classes = marker(wrapper, "#buy").classes();
+      expect(classes.some((c: string) => c.startsWith("bg-"))).toBe(false);
+      await marker(wrapper, "#buy").trigger("mouseenter");
+      expect(marker(wrapper, "#buy").classes()).toContain("bg-accent/10");
       wrapper.unmount();
     });
   });
@@ -955,21 +1892,87 @@ describe("ClickHeatmap", () => {
     wrapper.unmount();
   });
 
-  it("sorts ascending and back to descending when the Clicks header toggles", async () => {
+  it("sorts ascending and back to descending from the sort control", async () => {
     answer(rankedRows([buy, gone], 10));
     const wrapper = await mountPage({ OTable: true });
     const table = () => wrapper.findComponent(OTable);
     const order = () => (table().props("data") as { selector: string }[]).map((r) => r.selector);
+    const sort = () => wrapper.findComponent('[data-test="rum-heatmap-sort-select"]');
     expect(order()).toEqual(["#buy", "#gone"]);
 
-    table().vm.$emit("sort-change");
+    sort().vm.$emit("update:modelValue", "asc");
     await flushPromises();
     expect(order()).toEqual(["#gone", "#buy"]);
-    expect(table().props("sortOrder")).toBe("asc");
 
-    table().vm.$emit("sort-change");
+    sort().vm.$emit("update:modelValue", "desc");
     await flushPromises();
     expect(order()).toEqual(["#buy", "#gone"]);
+  });
+
+  it("keeps the summary strip mounted while a filter change refetches", async () => {
+    answer(rankedRows([buy, gone], 10));
+    const wrapper = await mountPage({ OTable: true });
+    const strip = () => wrapper.find('[data-test="rum-heatmap-stats"]');
+    expect(strip().exists()).toBe(true);
+
+    let release: (v: unknown) => void = () => {};
+    const gate = new Promise((res) => (release = res));
+    h.run.mockImplementation(async (id: string) => {
+      if (id === "totals") {
+        await gate;
+        return ok([{ clicks: 20, sessions: 8, frustrated: 1 }]);
+      }
+      return ok(id === "ranking" ? [buy, gone] : []);
+    });
+    wrapper.findComponent(OToggleGroup).vm.$emit("update:modelValue", "phone");
+    await flushPromises();
+
+    expect(strip().exists()).toBe(true);
+    expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("10");
+
+    release(null);
+    await flushPromises();
+    expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("20");
+  });
+
+  it("lays each element out as rank, name with share bar and badges, then clicks over share", async () => {
+    snapshotAnswer([buy, gone]);
+    const rows = {
+      props: ["data"],
+      template:
+        '<div v-for="r in data" :key="r.selector"><slot name="cell-feature" :row="r" /></div>',
+    };
+    const wrapper = await mountPage({ OTable: rows as unknown as boolean });
+
+    const cell = wrapper.find('[data-test="rum-heatmap-feature-#buy"]');
+    expect(cell.find('[data-test="rum-heatmap-row-rank"]').text()).toBe("1");
+    expect(cell.find('[data-test="rum-heatmap-row-clicks"]').text()).toBe("9");
+    expect(cell.find('[data-test="rum-heatmap-row-share"]').text()).toBe("90%");
+    expect(cell.find('[data-test="rum-heatmap-row-sessions"]').text()).toBe("3 sessions");
+    expect(cell.find('[data-test="rum-heatmap-row-bar"]').exists()).toBe(true);
+    expect(cell.find('[data-test="rum-heatmap-frustrated-#buy"]').text()).toBe("2 frustrated");
+    expect(cell.attributes("title")).toContain("#buy");
+    expect(wrapper.find('[data-test="rum-heatmap-not-on-snapshot-#buy"]').exists()).toBe(false);
+  });
+
+  it("badges rows whose element is missing from the snapshot as Off snapshot", async () => {
+    snapshotAnswer([buy, gone]);
+    const rows = {
+      props: ["data"],
+      template:
+        '<div v-for="r in data" :key="r.selector"><slot name="cell-feature" :row="r" /></div>',
+    };
+    const wrapper = mount(ClickHeatmap, {
+      global: { plugins: [store], stubs: { OTable: rows as unknown as boolean } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await settle();
+
+    expect(wrapper.find('[data-test="rum-heatmap-not-on-snapshot-#gone"]').text()).toBe(
+      "Off snapshot",
+    );
+    wrapper.unmount();
   });
 
   it("labels the device group 'Device type', keeps 'All', and reloads when returning to All", async () => {
@@ -987,7 +1990,7 @@ describe("ClickHeatmap", () => {
     device.vm.$emit("update:modelValue", "all");
     await flushPromises();
 
-    expect(ids().sort()).toEqual(["ranking", "replay-views", "totals"]);
+    expect(ids().sort()).toEqual(["ranking", "replay-views", "replay-views", "totals"]);
   });
 
   it("separates every footer note with the same separator", async () => {
@@ -1008,7 +2011,7 @@ describe("ClickHeatmap", () => {
     expect(footer.findAll('[aria-hidden="true"]').map((el) => el.text())).toEqual(["·"]);
   });
 
-  it("pluralizes the frustration split", async () => {
+  it("keeps the full frustration split in the row tooltip", async () => {
     answer(
       rankedRows(
         [
@@ -1032,8 +2035,8 @@ describe("ClickHeatmap", () => {
     };
     const wrapper = await mountPage({ OTable: rows as unknown as boolean });
 
-    expect(wrapper.find('[data-test="rum-heatmap-frustrated-#buy"]').text()).toBe(
-      "· 1 rage click · 2 dead clicks",
+    expect(wrapper.find('[data-test="rum-heatmap-feature-#buy"]').attributes("title")).toContain(
+      "Rage 1, dead 2, error 0",
     );
   });
 });

@@ -30,7 +30,6 @@ export interface ClickSummary {
   clicks: number;
   sessions: number;
   frustrated: number;
-  top: ElementGroup | null;
 }
 
 export interface OutlineRect {

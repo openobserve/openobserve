@@ -37,24 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #tabs>
           <OTabs v-model="activeTab" align="left" @change="changeTab">
-            <template v-for="tab in tabs" :key="tab.value">
-              <OTab
-                v-if="tab.beta"
-                :name="tab.value"
-                :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
-              >
-                <span class="inline-flex items-center gap-2">
-                  {{ tab.label }}
-                  <BetaBadge />
-                </span>
-              </OTab>
-              <OTab
-                v-else
-                :name="tab.value"
-                :label="tab.label"
-                :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
-              />
-            </template>
+            <OTab
+              v-for="tab in tabs"
+              :key="tab.value"
+              :name="tab.value"
+              :label="tab.label"
+              :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
+            />
           </OTabs>
         </template>
       </OPageHeader>
@@ -98,7 +87,6 @@ import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
 
@@ -133,7 +121,6 @@ const showTabs = computed(() => {
     "rumPerformanceErrors",
     "rumPerformanceApis",
     "SourceMaps",
-    "RumClickHeatmap",
   ];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
@@ -154,11 +141,6 @@ const tabs = [
   {
     label: t("rum.sessions"),
     value: "sessions",
-  },
-  {
-    label: t("rum.heatmap.tab"),
-    value: "heatmaps",
-    beta: true,
   },
   {
     label: t("rum.errorTracking"),
@@ -197,7 +179,6 @@ onMounted(async () => {
     Sessions: "sessions",
     rumPerformanceSummary: "performance",
     SourceMaps: "source_maps",
-    RumClickHeatmap: "heatmaps",
   };
 
   if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
@@ -208,7 +189,7 @@ onMounted(async () => {
 
   // This is temporary fix, as we have kept sessionViewer keep-alive as false.
   // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps", "RumClickHeatmap"];
+  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
   if (ignoreRoutes.includes(routeName.value as string)) return;
   if (keepsOwnTimeRange()) return;
@@ -225,7 +206,6 @@ onUpdated(async () => {
       Sessions: "sessions",
       rumPerformanceSummary: "performance",
       SourceMaps: "source_maps",
-      RumClickHeatmap: "heatmaps",
     };
 
     if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
@@ -237,7 +217,7 @@ onUpdated(async () => {
 
     // This is temporary fix, as we have kept sessionViewer keep-alive as false.
     // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps", "RumClickHeatmap"];
+    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
     if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
   }
@@ -263,7 +243,6 @@ const updateTabOnRouteChange = () => {
     rumPerformanceErrors: "performance",
     rumPerformanceApis: "performance",
     SourceMaps: "source_maps",
-    RumClickHeatmap: "heatmaps",
   };
   const tab = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
   if (tab !== activeTab.value && tab !== undefined) {
@@ -347,14 +326,6 @@ const changeTab = (tab: string | number) => {
     router.push({
       name: "Sessions",
       query: getQueryParams(performanceState.data.datetime, sessionState.data.editorValue),
-    });
-    return;
-  }
-
-  if (tab === "heatmaps") {
-    router.push({
-      name: "RumClickHeatmap",
-      query: { org_identifier: store.state.selectedOrganization.identifier },
     });
     return;
   }
