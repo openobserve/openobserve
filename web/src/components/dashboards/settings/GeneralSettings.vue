@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
+            :key="dateTimePickerKey"
             class="h-7.5"
             size="sm"
             :initialTimezone="initialTimezone"
@@ -131,7 +132,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, nextTick, type Ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  nextTick,
+  watch,
+  type Ref,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getDashboard, updateDashboard } from "@/utils/commons";
@@ -157,6 +167,12 @@ import {
   generalSettingsDefaults,
   type GeneralSettingsForm,
 } from "./GeneralSettings.schema";
+import {
+  comparableDateTime,
+  useDashboardSettingsDraft,
+  type GeneralSettingsDraft,
+} from "./dashboardSettingsDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 
 export default defineComponent({
   name: "GeneralSettings",
@@ -211,7 +227,57 @@ export default defineComponent({
     // initial timezone, which will come from the route query
     const initialTimezone: any = ref(store.state.timezone ?? null);
 
+    const draftContext = useDashboardSettingsDraft();
+    // The picker reads its v-model only on mount, so a restored range remounts it.
+    const dateTimePickerKey = ref(0);
+    // What the server holds; null until loaded.
+    let loadedSection: GeneralSettingsDraft | null = null;
+    // The picker re-emits the range it is given, normalised, so until the user's first input its emits are the loaded range.
+    let rangeFollowsPicker = false;
+    const stopFollowingPicker = () => {
+      rangeFollowsPicker = false;
+    };
+    // Off from a load until its pending edits are back, so the picker's mount emit cannot clear them first.
+    let draftSyncOn = false;
+    let lastSaveSucceeded = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const formValues = form.useStore((s) => s.values);
+    const generalSnapshot = (): GeneralSettingsDraft =>
+      JSON.parse(
+        JSON.stringify({ values: formValues.value, dateTime: dateTimeValue.value ?? null }),
+      );
+    const sectionKey = (draft: GeneralSettingsDraft) =>
+      stableStringify({ values: draft.values, dateTime: comparableDateTime(draft.dateTime) });
+
+    const syncDraftSection = () => {
+      if (!draftContext || loadedSection === null) return;
+      const current = generalSnapshot();
+      if (rangeFollowsPicker) loadedSection = { ...loadedSection, dateTime: current.dateTime };
+      if (!draftSyncOn) return;
+      draftContext.pending.general =
+        sectionKey(current) === sectionKey(loadedSection) ? null : current;
+    };
+
+    const applyPendingDraft = async () => {
+      const pending = draftContext?.pending.general;
+      if (!pending) return;
+      stopFollowingPicker();
+      form.reset(pending.values);
+      dateTimeValue.value = pending.dateTime;
+      dateTimePickerKey.value++;
+      await nextTick();
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      lastSaveSucceeded = false;
+      await form.handleSubmit();
+      return lastSaveSucceeded;
+    };
+
     const getDashboardData = async () => {
+      draftSyncOn = false;
+      loadedSection = null;
       const data = await getDashboard(
         store,
         route.query.dashboard,
@@ -238,9 +304,45 @@ export default defineComponent({
         relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod,
         valueType: data?.defaultDatetimeDuration?.type,
       };
+      if (draftContext) {
+        loadedSection = generalSnapshot();
+        rangeFollowsPicker = true;
+      }
     };
-    onMounted(async () => {
+    const reloadAfterConflict = async () => {
       await getDashboardData();
+      draftSyncOn = true;
+      syncDraftSection();
+    };
+
+    onMounted(async () => {
+      if (draftContext) {
+        window.addEventListener("pointerdown", stopFollowingPicker, true);
+        window.addEventListener("keydown", stopFollowingPicker, true);
+      }
+      await getDashboardData();
+      if (!draftContext) return;
+      await applyPendingDraft();
+      draftSyncOn = true;
+      syncDraftSection();
+      unregisterDraftSection = draftContext.register("general", saveForDraft);
+    });
+
+    watch([formValues, dateTimeValue], syncDraftSection, { deep: true });
+    watch(
+      () => draftContext?.restoreRevision,
+      async () => {
+        if (!draftSyncOn) return;
+        draftSyncOn = false;
+        await applyPendingDraft();
+        draftSyncOn = true;
+        syncDraftSection();
+      },
+    );
+    onBeforeUnmount(() => {
+      unregisterDraftSection?.();
+      window.removeEventListener("pointerdown", stopFollowingPicker, true);
+      window.removeEventListener("keydown", stopFollowingPicker, true);
     });
 
     const saveDashboard = async (value: GeneralSettingsForm) => {
@@ -291,6 +393,11 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.generalSettingsPage.updatedSuccessfully"));
 
+        lastSaveSucceeded = true;
+        if (loadedSection !== null) {
+          loadedSection = generalSnapshot();
+          syncDraftSection();
+        }
         emit("save");
       } catch (error: any) {
         if (saveConflict.isConflict(error)) {
@@ -299,7 +406,7 @@ export default defineComponent({
             folderId: (route?.query?.folder as string) ?? "default",
             mine: data,
             change: t("dashboard.saveConflict.change.changedSettings"),
-            onResolved: getDashboardData,
+            onResolved: reloadAfterConflict,
           });
         } else {
           showErrorNotification(
@@ -332,6 +439,7 @@ export default defineComponent({
       closeBtn,
       initialTimezone,
       dateTimeValue,
+      dateTimePickerKey,
       formRef,
     };
   },

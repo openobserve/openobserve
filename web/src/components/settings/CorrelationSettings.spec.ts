@@ -21,6 +21,9 @@ import CorrelationSettings from "./CorrelationSettings.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import serviceStreamsService from "@/services/service_streams";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { onBeforeRouteLeave } from "vue-router";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
@@ -284,6 +287,28 @@ describe("CorrelationSettings", () => {
 
       expect(spy).not.toHaveBeenCalledWith(scope);
       spy.mockRestore();
+    });
+  });
+
+  describe("leaving with unsaved field aliases", () => {
+    it("a forced sign-out offers only Discard, which cannot be dismissed", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as unknown as { draftSemanticGroups: unknown[] }).draftSemanticGroups = [
+        { display: "Host", group: "", fields: ["host"] },
+      ];
+      const guard = vi.mocked(onBeforeRouteLeave).mock.calls[0][0] as () => Promise<boolean>;
+      const { currentDialog, handleConfirm } = useConfirmDialog();
+      beginDraftSignOut({ forced: true });
+      try {
+        const leave = guard();
+        await flushPromises();
+        expect(currentDialog.value).toMatchObject({ confirmOnly: true });
+        handleConfirm();
+        expect(await leave).toBe(true);
+      } finally {
+        cancelDraftSignOut();
+      }
     });
   });
 });

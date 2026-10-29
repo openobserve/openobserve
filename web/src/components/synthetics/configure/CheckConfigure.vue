@@ -143,6 +143,7 @@ function handleUpdate(value: BrowserCheck) {
             <CheckAuthNetwork
               v-if="showAuthNetwork"
               :check="check"
+              :validation-errors="props.validationErrors ?? {}"
               data-test="synthetics-check-configure-auth-network"
               @update:check="handleUpdate"
             />

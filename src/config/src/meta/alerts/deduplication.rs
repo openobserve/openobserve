@@ -133,90 +133,12 @@ pub struct DeduplicationConfig {
         deserialize_with = "deserialize_optional_i32"
     )]
     pub time_window_minutes: Option<i32>,
-
-    /// Optional alert grouping configuration
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub grouping: Option<GroupingConfig>,
 }
 
 impl MemorySize for DeduplicationConfig {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<DeduplicationConfig>() + self.fingerprint_fields.mem_size()
     }
-}
-
-/// Configuration for alert grouping
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
-pub struct GroupingConfig {
-    /// Enable alert grouping
-    #[serde(default)]
-    pub enabled: bool,
-
-    /// Maximum number of alerts in a single group
-    #[serde(default = "default_max_group_size")]
-    pub max_group_size: usize,
-
-    /// How to send grouped notifications
-    #[serde(default)]
-    pub send_strategy: SendStrategy,
-
-    /// Initial wait time before sending first notification (seconds)
-    #[serde(default = "default_group_wait")]
-    pub group_wait_seconds: i64,
-}
-
-impl MemorySize for GroupingConfig {
-    fn mem_size(&self) -> usize {
-        std::mem::size_of::<GroupingConfig>()
-    }
-}
-
-impl Default for GroupingConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            max_group_size: default_max_group_size(),
-            send_strategy: SendStrategy::default(),
-            group_wait_seconds: default_group_wait(),
-        }
-    }
-}
-
-/// Strategy for sending grouped alert notifications
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum SendStrategy {
-    /// Send only the first alert with a count of others
-    #[default]
-    #[serde(rename = "first_with_count")]
-    FirstWithCount,
-
-    /// Send an aggregated summary of all alerts
-    Summary,
-
-    /// Send all alerts in one notification
-    All,
-}
-
-impl std::str::FromStr for SendStrategy {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "first_with_count" => Ok(Self::FirstWithCount),
-            "summary" => Ok(Self::Summary),
-            "all" => Ok(Self::All),
-            _ => Ok(Self::default()),
-        }
-    }
-}
-
-fn default_max_group_size() -> usize {
-    100
-}
-
-fn default_group_wait() -> i64 {
-    30
 }
 
 impl GlobalDeduplicationConfig {
@@ -267,18 +189,6 @@ impl DeduplicationConfig {
             return Err("Time window must be positive".to_string());
         }
 
-        // Validate grouping config if present
-        if let Some(grouping) = &self.grouping
-            && grouping.enabled
-        {
-            if grouping.max_group_size == 0 {
-                return Err("Max group size must be at least 1".to_string());
-            }
-            if grouping.group_wait_seconds < 0 {
-                return Err("Group wait seconds must be non-negative".to_string());
-            }
-        }
-
         Ok(())
     }
 }
@@ -309,7 +219,6 @@ mod tests {
         assert!(!config.enabled);
         assert!(config.fingerprint_fields.is_empty());
         assert_eq!(config.time_window_minutes, None);
-        assert_eq!(config.grouping, None);
     }
 
     #[test]
@@ -339,7 +248,6 @@ mod tests {
             enabled: true,
             fingerprint_fields: vec!["hostname".to_string(), "service".to_string()],
             time_window_minutes: Some(10),
-            grouping: None,
         };
 
         assert!(config.validate().is_ok());
@@ -375,12 +283,6 @@ mod tests {
             enabled: true,
             fingerprint_fields: vec!["service".to_string(), "hostname".to_string()],
             time_window_minutes: Some(10),
-            grouping: Some(GroupingConfig {
-                enabled: true,
-                max_group_size: 50,
-                send_strategy: SendStrategy::Summary,
-                group_wait_seconds: 60,
-            }),
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();
@@ -401,8 +303,6 @@ mod tests {
         assert!(json.get("fingerprint_fields").is_none());
         // time_window_minutes should be omitted when None
         assert!(json.get("time_window_minutes").is_none());
-        // grouping should be omitted when None
-        assert!(json.get("grouping").is_none());
     }
 
     #[test]
@@ -423,26 +323,6 @@ mod tests {
             json.get("alert_dedup_enabled").and_then(|v| v.as_bool()),
             Some(false)
         );
-    }
-
-    #[test]
-    fn test_send_strategy_from_str() {
-        use std::str::FromStr;
-        assert_eq!(
-            SendStrategy::from_str("first_with_count").unwrap(),
-            SendStrategy::FirstWithCount
-        );
-        assert_eq!(
-            SendStrategy::from_str("summary").unwrap(),
-            SendStrategy::Summary
-        );
-        assert_eq!(SendStrategy::from_str("all").unwrap(), SendStrategy::All);
-        // unknown → default (FirstWithCount)
-        assert_eq!(
-            SendStrategy::from_str("UNKNOWN").unwrap(),
-            SendStrategy::default()
-        );
-        assert_eq!(SendStrategy::from_str("").unwrap(), SendStrategy::default());
     }
 
     #[test]
@@ -503,75 +383,14 @@ mod tests {
     }
 
     #[test]
-    fn test_per_alert_dedup_config_validate_grouping_zero_size_err() {
-        let config = DeduplicationConfig {
-            enabled: true,
-            fingerprint_fields: vec![],
-            time_window_minutes: None,
-            grouping: Some(GroupingConfig {
-                enabled: true,
-                max_group_size: 0,
-                send_strategy: SendStrategy::All,
-                group_wait_seconds: 10,
-            }),
-        };
-        let result = config.validate();
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Max group size"));
-    }
-
-    #[test]
-    fn test_per_alert_dedup_config_validate_grouping_negative_wait_err() {
-        let config = DeduplicationConfig {
-            enabled: true,
-            fingerprint_fields: vec![],
-            time_window_minutes: None,
-            grouping: Some(GroupingConfig {
-                enabled: true,
-                max_group_size: 5,
-                send_strategy: SendStrategy::Summary,
-                group_wait_seconds: -1,
-            }),
-        };
-        let result = config.validate();
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Group wait seconds"));
-    }
-
-    #[test]
-    fn test_per_alert_dedup_config_validate_grouping_disabled_skip() {
-        // grouping present but enabled=false → skip grouping validation
-        let config = DeduplicationConfig {
-            enabled: true,
-            fingerprint_fields: vec![],
-            time_window_minutes: None,
-            grouping: Some(GroupingConfig {
-                enabled: false,
-                max_group_size: 0, // would fail if checked
-                send_strategy: SendStrategy::All,
-                group_wait_seconds: -1, // would fail if checked
-            }),
-        };
-        assert!(config.validate().is_ok());
-    }
-
-    #[test]
     fn test_deduplication_config_mem_size() {
         let config = DeduplicationConfig {
             enabled: true,
             fingerprint_fields: vec!["host".to_string(), "service".to_string()],
             time_window_minutes: Some(5),
-            grouping: None,
         };
         let size = config.mem_size();
         assert!(size >= std::mem::size_of::<DeduplicationConfig>());
-    }
-
-    #[test]
-    fn test_grouping_config_mem_size() {
-        let config = GroupingConfig::default();
-        let size = config.mem_size();
-        assert_eq!(size, std::mem::size_of::<GroupingConfig>());
     }
 
     #[test]
@@ -623,7 +442,6 @@ mod tests {
         assert!(!obj.contains_key("fingerprint_fields"));
         // Option::is_none → absent
         assert!(!obj.contains_key("time_window_minutes"));
-        assert!(!obj.contains_key("grouping"));
     }
 
     #[test]
@@ -632,18 +450,28 @@ mod tests {
             enabled: true,
             fingerprint_fields: vec!["host".to_string()],
             time_window_minutes: Some(30),
-            grouping: Some(GroupingConfig {
-                enabled: true,
-                max_group_size: 10,
-                send_strategy: SendStrategy::Summary,
-                group_wait_seconds: 30,
-            }),
         };
         let json = serde_json::to_value(&config).unwrap();
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("fingerprint_fields"));
         assert!(obj.contains_key("time_window_minutes"));
-        assert!(obj.contains_key("grouping"));
+    }
+
+    #[test]
+    fn test_stored_grouping_object_still_deserializes_and_is_dropped_on_save() {
+        let stored = serde_json::json!({
+            "fingerprint_fields": ["host"],
+            "grouping": {
+                "enabled": true,
+                "max_group_size": 50,
+                "send_strategy": "summary",
+                "group_wait_seconds": 60
+            }
+        });
+        let config: DeduplicationConfig = serde_json::from_value(stored).unwrap();
+        assert_eq!(config.fingerprint_fields, vec!["host".to_string()]);
+        let saved = serde_json::to_value(&config).unwrap();
+        assert!(saved.get("grouping").is_none());
     }
 
     #[test]
@@ -675,16 +503,6 @@ mod tests {
     #[test]
     fn test_default_upgrade_window() {
         assert_eq!(default_upgrade_window(), 30);
-    }
-
-    #[test]
-    fn test_default_max_group_size() {
-        assert_eq!(default_max_group_size(), 100);
-    }
-
-    #[test]
-    fn test_default_group_wait() {
-        assert_eq!(default_group_wait(), 30);
     }
 
     // ── §5.5 MN-6: reserve, then confirm on successful delivery ─────────────

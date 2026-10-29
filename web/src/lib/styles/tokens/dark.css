@@ -48,7 +48,7 @@
        well    = recessed / segmented track
        overlay = menus, dropdowns, tooltips */
   --d-chrome: #0e0f11; /* title bar + left activity-bar strip             */
-  --d-base: #0d1117; /* MAIN: content card + table canvas               */
+  --d-base: #111111; /* MAIN: content card + table canvas               */
   --d-well: #2d2d2d; /* recessed wells, segmented-control track         */
   --d-panel: #181818; /* folder sidebar, sub rails, cards, dialogs (DM)  */
   --d-overlay: #202020; /* menus, dropdowns, tooltips, table-header (top tier,
@@ -66,12 +66,9 @@
        label==muted==disabled==placeholder all landed on one value). */
 
   /* Row / item states on the content surface */
-  --d-hover: var(
-    --color-primary-900
-  ); /* row & list-item hover — MATCHES
-                             the dashboard-folder hover (theme-tinted, not grey) */
-  --d-selected: color-mix(in srgb, var(--color-primary-500) 30%, var(--d-panel));
-  /* selected row — teal-tinted (brand signal)       */
+  /* Both mix into the panel so selected stays >=1.2:1 above hover and severity spines keep 3:1 even on bright custom-theme palettes. */
+  --d-hover: color-mix(in srgb, var(--color-primary-900) 50%, var(--d-panel));
+  --d-selected: color-mix(in srgb, var(--color-primary-500) 24%, var(--d-panel));
   --d-zebra: #252526; /* striped-row bg — VS Code list alternating row    */
 
   /* --- Text — grey palette steps, one per tier (light half of the ramp) --- */
@@ -82,9 +79,8 @@
   --color-text-label: var(--color-grey-500); /* form labels, metadata */
   --color-text-muted: var(--color-grey-500); /* de-emphasized */
   --color-text-disabled: var(--color-grey-600); /* dimmer than labels so disabled reads disabled */
-  --color-text-placeholder: var(
-    --color-grey-500
-  ); /* input placeholders — dim but legible, above disabled */
+  /* Between grey-500 and grey-400: the lowest grey that clears 4.5:1 on the dark canvas without matching secondary text. */
+  --color-text-placeholder: #7c7c7c;
   --color-text-link: var(--color-primary-400); /* clickable links (teal) */
   --color-text-link-hover: var(--color-primary-300); /* link hover state (teal) */
   --color-text-code: var(--color-grey-300); /* inline code, monospace */
@@ -147,7 +143,7 @@
   --color-surface-panel: var(--d-panel); /* folder rails, cards, table-header base */
   --color-surface-overlay: var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
   --color-surface-subtle: var(--d-well); /* recessed fills, segmented track */
-  --color-surface-subtle-hover: var(--d-panel); /* hover on a recessed fill (one step up) */
+  --color-surface-subtle-hover: #383838;
   /* Floating chip on a dark panel — a lighter grey so it lifts off the surface. */
   --color-surface-chip: var(--color-grey-700);
   --color-surface-chip-hover: var(--color-grey-600);
@@ -610,6 +606,11 @@
   --shadow-md-c2: rgb(0 0 0 / 0.35);
   --shadow-lg-c1: rgb(0 0 0 / 0.55);
   --shadow-lg-c2: rgb(0 0 0 / 0.4);
+  /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-overlay:
+    inset 0 1px 0 #ffffff0f, 0 0 0 1px var(--d-border), 0 6px 12px -3px #01040966,
+    0 6px 18px 0 #01040966;
+  /* eslint-enable local/no-hardcoded-px */
 }
 
 /* Dashboard classic series palette — dark overrides (light values in base.css) */
@@ -664,8 +665,7 @@
   --color-chart-table-23: rgba(255, 180, 180, 0.15);
   --color-chart-table-24: rgba(180, 225, 245, 0.15);
 
-  /* Chart grid line — dark override, raised for perceptibility (see base.css) */
-  --color-chart-gridline: rgba(255, 255, 255, 0.25);
+  --color-chart-gridline: rgba(240, 250, 255, 0.18);
 
   /* Chart expected-range band fill — dark override (see base.css) */
   --color-chart-band: rgba(255, 255, 255, 0.18);
@@ -806,6 +806,12 @@
   --color-table-header-bg: var(--d-overlay); /* header band lifts off rows */
   --color-table-row-hover-bg: var(--d-hover); /* neutral hover (not teal-washed) */
   --color-table-row-selected-bg: var(--d-selected); /* teal-tinted selection */
+  /* grey-400 drops to ~4.3:1 on the selected fill of brighter custom themes. */
+  --color-table-row-text-secondary-tinted: color-mix(
+    in srgb,
+    var(--color-grey-300) 50%,
+    var(--color-grey-400)
+  );
   --color-table-row-striped-bg: var(--d-zebra); /* panel +1 step zebra */
   --color-table-row-divider: var(--d-divider); /* solid, visible row separators */
   --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-700) 40%, transparent);
@@ -874,6 +880,9 @@
   --color-log-severity-debug-indicator: #3daab8;
   --color-log-severity-trace-indicator: #7a9baa;
   --color-log-severity-ok-indicator: #4dad55;
+  --color-log-severity-error-text: #eb938d;
+  --color-log-severity-warning-text: #e3a15a;
+  --color-log-severity-debug-text: #a8abb2;
   --color-log-table-header-bg: var(--color-table-header-bg);
   --color-log-table-row-bg: #21242c;
   --color-log-table-row-border: rgba(255, 255, 255, 0.14);

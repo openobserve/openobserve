@@ -1,5 +1,6 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from './draftSignOut.js';
 import { openNavFlyoutChild, gotoMetricsEditor, clickNavUntilRoute } from '../commonActions.js';
 
 export class HomePage {
@@ -378,6 +379,7 @@ export class HomePage {
     async logout() {
         await this.openProfileMenu();
         await this.logoutButton.click();
+        await confirmDraftSignOut(this.page);
     }
 
     async openThemeManager() {
