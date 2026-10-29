@@ -1629,10 +1629,7 @@ struct RungReached {
     rung: i64,
 }
 
-/// The deepest rung each record reached in its current run, in one grouped query. The
-/// pages list has to say how far a firing climbed, and asking the timeline once
-/// per row is the N+1 this avoids — the same reason [`runbook_urls`] takes a
-/// page of ids.
+/// The deepest rung each record reached in its current run, in one grouped query (no N+1).
 pub async fn deepest_rungs(
     records: &[(String, i32)],
 ) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
