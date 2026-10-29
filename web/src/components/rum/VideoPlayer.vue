@@ -636,6 +636,10 @@ async function handleFullscreenToggle() {
   fullscreenRequestPending = true;
   try {
     await document.documentElement.requestFullscreen();
+    // Unmount or deactivation during the request cleared ownership, so no player would ever exit it.
+    if (!startedFullscreen && document.fullscreenElement === document.documentElement) {
+      void document.exitFullscreen().catch(() => {});
+    }
   } catch {
     // A denied request changes nothing, so this player must not claim a later full screen.
     startedFullscreen = false;
