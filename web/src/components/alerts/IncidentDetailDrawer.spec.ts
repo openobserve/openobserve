@@ -502,14 +502,17 @@ describe("IncidentDetailDrawer.vue", () => {
     it.each([
       ["resolved", "Resolve incident?"],
       ["open", "Reopen incident?"],
-    ])("the Manage chip for %s asks first and changes nothing when cancelled", async (status, title) => {
-      mockConfirm.mockResolvedValueOnce(false);
+    ])(
+      "the Manage chip for %s asks first and changes nothing when cancelled",
+      async (status, title) => {
+        mockConfirm.mockResolvedValueOnce(false);
 
-      await wrapper.vm.handleStatusChange(status);
+        await wrapper.vm.handleStatusChange(status);
 
-      expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
-      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
-    });
+        expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
+        expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+      },
+    );
 
     it("a reopen from the Manage chip drops the cleared acknowledgement", async () => {
       wrapper.vm.incidentDetails.status = "resolved";
