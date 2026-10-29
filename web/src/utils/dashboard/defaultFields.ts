@@ -151,6 +151,7 @@ export const keepRawValueFields = (
 export const SKIP_SEED_TYPES = [
   "geomap",
   "sankey",
+  "node-graph",
   "maps",
   "custom_chart",
   "html",

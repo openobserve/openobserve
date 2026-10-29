@@ -322,7 +322,9 @@ export default defineComponent({
 
       // These series are not lines to single out, and unnamed heatmaps share ECharts' default name.
       if (
-        ["sankey", "heatmap", "treemap", "sunburst", "funnel"].includes(params?.componentSubType)
+        ["sankey", "heatmap", "treemap", "sunburst", "funnel", "graph"].includes(
+          params?.componentSubType,
+        )
       ) {
         params.seriesName = "";
         params.seriesIndex = -1;

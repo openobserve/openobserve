@@ -322,6 +322,7 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("state-timeline");
         expect(ALL_CHART_TYPES).toContain("sunburst");
         expect(ALL_CHART_TYPES).toContain("funnel");
+        expect(ALL_CHART_TYPES).toContain("node-graph");
         expect(ALL_CHART_TYPES).toContain("hostmap");
         expect(ALL_CHART_TYPES).toContain("treemap");
       });

@@ -7458,6 +7458,10 @@
     "funnelSortNone": "Ordem da consulta",
     "funnelShowPercent": "Mostrar percentagem da primeira etapa",
     "funnelShowPercentTooltip": "Cada etapa como percentagem da maior etapa. Um funil ordenado começa ou termina com ela; na ordem da consulta pode ser qualquer etapa.",
+    "nodeGraphLayout": "Disposição",
+    "nodeGraphLayoutForce": "Força",
+    "nodeGraphLayoutCircular": "Circular",
+    "nodeGraphShowEdgeLabels": "Mostrar valores das ligações",
     "stateValueAlign": "Alinhamento do texto do estado",
     "mapCluster": "Agrupar pontos",
     "mapClusterRadius": "Tamanho do grupo (px)",
@@ -7734,6 +7738,7 @@
       "treemap": "Mapa em árvore",
       "sunburst": "Sunburst",
       "funnel": "Funil",
+      "nodeGraph": "Grafo de nós",
       "sankey": "Sankey",
       "customChart": "Gráfico Personalizado"
     },

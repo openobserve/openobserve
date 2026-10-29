@@ -20,7 +20,7 @@ export const isRowTimeline = (type: unknown): boolean =>
   typeof type === "string" && ROW_TIMELINE_TYPES.includes(type);
 
 /** Panel types built from source, target and value fields instead of x/y/breakdown. */
-export const FLOW_TYPES: readonly string[] = ["sankey"];
+export const FLOW_TYPES: readonly string[] = ["sankey", "node-graph"];
 
 export const isFlowChart = (type: unknown): boolean =>
   typeof type === "string" && FLOW_TYPES.includes(type);

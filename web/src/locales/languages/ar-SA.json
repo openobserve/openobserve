@@ -7458,6 +7458,10 @@
     "funnelSortNone": "ترتيب الاستعلام",
     "funnelShowPercent": "إظهار النسبة من المرحلة الأولى",
     "funnelShowPercentTooltip": "كل مرحلة كنسبة مئوية من أكبر مرحلة. يبدأ القمع المرتب بها أو ينتهي بها؛ وبترتيب الاستعلام قد تكون أي مرحلة.",
+    "nodeGraphLayout": "التخطيط",
+    "nodeGraphLayoutForce": "قوة",
+    "nodeGraphLayoutCircular": "دائري",
+    "nodeGraphShowEdgeLabels": "إظهار قيم الحواف",
     "stateValueAlign": "محاذاة نص الحالة",
     "mapCluster": "تجميع النقاط",
     "mapClusterRadius": "حجم المجموعة (px)",
@@ -7734,6 +7738,7 @@
       "treemap": "مخطط شجري",
       "sunburst": "مخطط شمسي",
       "funnel": "قمع",
+      "nodeGraph": "مخطط العقد",
       "sankey": "سانكي",
       "customChart": "المخطط المخصص"
     },

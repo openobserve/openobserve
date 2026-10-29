@@ -201,6 +201,11 @@ export default defineComponent({
         id: "sankey",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/node-graph.svg"),
+        title: t("dashboard.chartSelection.nodeGraph"),
+        id: "node-graph",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/chart.svg"),
         title: t("dashboard.chartSelection.customChart"),
         id: "custom_chart",

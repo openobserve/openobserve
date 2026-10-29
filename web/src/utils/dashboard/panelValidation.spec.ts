@@ -1284,3 +1284,73 @@ describe("validatePanel on funnel", () => {
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+describe("validatePanel on node graph", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "node-graph",
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const edges = { source: field("source"), target: field("target"), value: field("value") };
+
+  it("accepts source, target and value fields", () => {
+    expect(run(edges)).toEqual([]);
+  });
+
+  it("asks for the target and value when only the source is set", () => {
+    expect(run({ source: field("source") })).toHaveLength(2);
+  });
+
+  it("is not allowed on PromQL", () => {
+    expect(run({}, {}, "promql")).toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("checks the layout value", () => {
+    expect(run(edges, { node_graph_layout: "circular" })).toEqual([]);
+    expect(run(edges, { node_graph_layout: "tree" })).toHaveLength(1);
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "node-graph", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});

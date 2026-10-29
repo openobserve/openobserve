@@ -550,6 +550,8 @@ mod tests {
             "funnel_sort": "none",
             "funnel_orient": "vertical",
             "funnel_show_percent": false,
+            "node_graph_layout": "force",
+            "node_graph_show_edge_labels": false,
             "override_config": [{
                 "field": {"matchBy": "series", "value": "errors"},
                 "config": [

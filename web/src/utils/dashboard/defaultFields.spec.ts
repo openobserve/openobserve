@@ -171,6 +171,13 @@ describe("defaultFields", () => {
       expect(y[0].functionName).toBe("count");
     });
 
+    it("node graph: seeds nothing, since its builder takes source, target and value", () => {
+      expect(buildDefaultBuilderFields("node-graph", "logs", logsSchema, "logs")).toEqual({
+        x: [],
+        y: [],
+      });
+    });
+
     it.each(SKIP_SEED_TYPES)("%s: seeds nothing (self-driven builder)", (type) => {
       const { x, y } = buildDefaultBuilderFields(type, "logs", logsSchema, "logs");
       expect(x).toHaveLength(0);

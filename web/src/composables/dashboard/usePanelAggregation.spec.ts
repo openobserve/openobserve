@@ -507,6 +507,16 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].fields.x).toHaveLength(0);
         expect(panelData.data.queries[0].fields.filter.conditions).toHaveLength(0);
       });
+
+      it("node graph clears the x/y slots like a sankey", () => {
+        const panelData = makePanelData("node-graph");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x1" }];
+        fields.y = [{ alias: "y1", functionName: "count" }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toEqual([]);
+        expect(fields.y).toEqual([]);
+      });
     });
 
     describe("bar gauge chart type", () => {

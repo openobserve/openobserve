@@ -1670,6 +1670,27 @@ describe("configUtils", () => {
       expect(shouldShowAxisConfig(panel)).toBe(false);
     });
   });
+  describe("node graph", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("node-graph"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("node-graph"))).toBe(false);
+      expect(shouldShowLegendPosition(panel("node-graph"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("node-graph"))).toBe(false);
+    });
+  });
 });
 
 describe("pruneDependentOptions", () => {
