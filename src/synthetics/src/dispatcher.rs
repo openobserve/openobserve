@@ -35,7 +35,22 @@ use infra::{
 };
 
 const TICK: Duration = Duration::from_secs(2);
-const LEASE_BATCH_SIZE: i64 = 10;
+
+/// Jobs per pool per lease call (`ZO_SYNTHETICS_LEASE_BATCH_SIZE`), read per tick.
+fn lease_batch_size() -> i64 {
+    config::get_config().synthetics.lease_batch_size.max(1)
+}
+
+/// Most jobs leased across all pools in one tick (`ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK`).
+fn max_inflight_per_tick() -> i64 {
+    config::get_config().synthetics.max_inflight_per_tick.max(1)
+}
+
+/// Size of the next lease call: a full batch, trimmed so the tick never leases
+/// past its cap. Zero means the tick is out of budget.
+fn next_batch_limit(batch: i64, leased_this_tick: i64, cap: i64) -> i64 {
+    batch.min(cap - leased_this_tick).max(0)
+}
 /// How long a leased job may run before the reaper requeues it
 /// (`reaper::requeue_expired`).
 ///
@@ -109,32 +124,56 @@ pub async fn run(stop: crate::StopToken) {
 
         let now_us = config::utils::time::now_micros();
 
-        for pool in dispatcher_pools().await {
-            // Ownership lost mid-tick: lease nothing more.
-            if stop.is_cancelled() {
-                return;
-            }
-            let rows = match synthetics_jobs::lease_batch(
-                db,
-                &pool,
-                instance_id,
-                LEASE_BATCH_SIZE,
-                now_us,
-                lease_secs(),
-                None, // public pools are already type-segmented (net-* vs aws-browser)
-            )
-            .await
-            {
-                Ok(r) => r,
-                Err(e) => {
-                    tracing::error!(pool = %pool, "[synthetics dispatcher] lease_batch: {e}");
-                    continue;
+        // Round-robin across pools, one batch each per round. A pool whose batch
+        // came back full may have more due, so it stays in for another round;
+        // the per-tick cap bounds the total, and no pool gets a second batch
+        // before every other active pool has had its turn.
+        let batch = lease_batch_size();
+        let cap = max_inflight_per_tick();
+        let mut leased_this_tick: i64 = 0;
+        let mut active = dispatcher_pools().await;
+        while !active.is_empty() {
+            let mut still_active = Vec::with_capacity(active.len());
+            for pool in active {
+                // Ownership lost mid-tick: lease nothing more.
+                if stop.is_cancelled() {
+                    return;
                 }
-            };
+                let limit = next_batch_limit(batch, leased_this_tick, cap);
+                if limit == 0 {
+                    break;
+                }
+                let rows = match synthetics_jobs::lease_batch(
+                    db,
+                    &pool,
+                    instance_id,
+                    limit,
+                    now_us,
+                    lease_secs(),
+                    None, // public pools are already type-segmented (net-* vs aws-browser)
+                )
+                .await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!(pool = %pool, "[synthetics dispatcher] lease_batch: {e}");
+                        continue;
+                    }
+                };
 
-            for row in rows {
-                tokio::spawn(invoke_probe(row, stop.clone()));
+                let full = rows.len() as i64 >= limit;
+                leased_this_tick += rows.len() as i64;
+                for row in rows {
+                    tokio::spawn(invoke_probe(row, stop.clone()));
+                }
+                if full {
+                    still_active.push(pool);
+                }
             }
+            if leased_this_tick >= cap {
+                break;
+            }
+            active = still_active;
         }
     }
 }
@@ -315,7 +354,9 @@ async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) ->
         db,
         &row.synthetics_id,
         config::meta::status_pages::CHECK_STATUS_ERROR,
-    ).await {
+    )
+    .await
+    {
         Ok(true) => {
             #[cfg(feature = "enterprise")]
             if o2_enterprise::enterprise::common::config::get_config()
@@ -706,5 +747,18 @@ async fn handle_dispatch_failure(
             // customer's website being down. Do NOT send to customer alert
             // destinations.
         }
+    }
+}
+
+#[cfg(test)]
+mod lease_batch_tests {
+    use super::next_batch_limit;
+
+    #[test]
+    fn batch_limit_is_trimmed_to_the_tick_cap() {
+        assert_eq!(next_batch_limit(10, 0, 100), 10);
+        assert_eq!(next_batch_limit(10, 95, 100), 5);
+        assert_eq!(next_batch_limit(10, 100, 100), 0);
+        assert_eq!(next_batch_limit(10, 120, 100), 0);
     }
 }
