@@ -739,7 +739,7 @@ describe("useAgentScope — cascade with the All option (Quality)", () => {
 });
 
 describe("useAgentScope — stream options", () => {
-  it("streamSelectOptions + selectedStreamCount reflect availableStreams and agent counts", async () => {
+  it("counts each stream's distinct agent names, as the Agent picker lists them", async () => {
     const activeStream = ref("stream_a");
     const availableStreams = ref<string[]>(["stream_a", "stream_b"]);
     const scope = useAgentScope({
@@ -751,7 +751,10 @@ describe("useAgentScope — stream options", () => {
       allAgents: true,
       t,
     });
-    listAgents.mockResolvedValue({ agents: [agentA, agentA] });
+    // The same agent seen with and without an id, plus a second agent.
+    listAgents.mockResolvedValue({
+      agents: [agentA, { ...agentA, id: null }, { ...agentA, name: "gamma", id: "g1" }],
+    });
     await scope.loadAgents();
     const streamA = scope.streamSelectOptions.value.find((o: any) => o.value === "stream_a");
     expect(streamA?.agentCount).toBe(2);

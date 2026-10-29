@@ -56,28 +56,26 @@ export function buildAgentSelectOptions(
 }
 
 /**
- * Stream-picker options, each annotated with how many discovered agents the
- * stream contains — e.g. `sre_agent_traces_production (2 agents)`. The count is
- * shared across every AI page's Stream picker so they read identically. `value`
- * stays the bare stream name; the label carries the count.
- */
-/**
  * Stream-picker options. The label is the bare stream name (so it truncates
  * cleanly with a tooltip in a fixed-width trigger — stream names are arbitrary
  * length), and the agent count rides along as `agentCount` so callers render it
  * as a separate badge rather than cramming it into the truncated label text.
+ * The count is of distinct agent names, as the Agent picker lists them: one
+ * agent seen with and without an id, or in two envs, is still one agent.
  */
 export function buildStreamSelectOptions(
   streams: string[],
   agents: GenAiAgentListItem[],
 ): (SelectOption & { agentCount: number })[] {
-  const counts = new Map<string, number>();
+  const names = new Map<string, Set<string>>();
   for (const a of agents) {
-    counts.set(a.source_stream, (counts.get(a.source_stream) ?? 0) + 1);
+    const set = names.get(a.source_stream) ?? new Set<string>();
+    set.add(a.name);
+    names.set(a.source_stream, set);
   }
   return streams.map((s) => ({
     label: raw(s),
     value: s,
-    agentCount: counts.get(s) ?? 0,
+    agentCount: names.get(s)?.size ?? 0,
   }));
 }
