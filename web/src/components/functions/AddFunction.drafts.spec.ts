@@ -48,6 +48,7 @@ interface FunctionVm {
   handleFunctionUpdate: (code: string) => void;
   cancelAddFunction: () => Promise<void>;
   functionDraft: { hasUnsavedChanges: () => boolean };
+  confirmDialogMeta: { show: boolean };
 }
 
 const newScope: EditorDraftScope = {
@@ -248,6 +249,44 @@ describe("AddFunction drafts", () => {
     clickLeave("o-dialog-close-btn");
     await cancel;
     expect(readEditorDraft(editScope)?.data).toMatchObject({ function: ". = {}" });
+  });
+
+  it("a language change alone is drafted and asks before closing", async () => {
+    await mountEditor({ modelValue: { ...savedFunction }, isUpdated: true });
+    window.dispatchEvent(new Event("pointerdown"));
+    form().setFieldValue("transType", "1");
+    await nextTick();
+
+    expect(vm().functionDraft.hasUnsavedChanges()).toBe(true);
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft(editScope)?.data).toMatchObject({ transType: "1", function: ". = ." });
+
+    const pending = vm().cancelAddFunction();
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    clickLeave("o-dialog-neutral-btn");
+    await pending;
+    expect(emitted.cancel).toBe(1);
+    expect(readEditorDraft(editScope)).toBeNull();
+  });
+
+  it("a host's forced language is not an edit, but changing it asks", async () => {
+    await mountEditor({ forcedLanguage: "javascript", hideTestPanel: true });
+
+    await vm().cancelAddFunction();
+    expect(vm().confirmDialogMeta.show).toBe(false);
+    expect(emitted.cancel).toBe(1);
+
+    // The embedded editor renders no form, so the language is set on the form it owns.
+    (
+      editor().vm as unknown as {
+        addFunctionForm: { setFieldValue: (k: string, v: string) => void };
+      }
+    ).addFunctionForm.setFieldValue("transType", "0");
+    await nextTick();
+    await vm().cancelAddFunction();
+    expect(vm().confirmDialogMeta.show).toBe(true);
+    expect(emitted.cancel).toBe(1);
   });
 
   it("cancel with unsaved changes asks, and discard closes and drops the draft", async () => {

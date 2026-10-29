@@ -63,6 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="t('common.editorDraft.signOutDiscardsOthers', { count: 0 }, 0)"
         data-test="dashboard-panel-leave-sign-out"
       />
+      <EditorDraftInfoHint
+        v-else-if="canKeepDraft"
+        :content="retention"
+        data-test="dashboard-panel-leave-retention"
+      />
     </div>
   </ODialog>
 </template>
@@ -73,6 +78,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import EditorDraftInfoHint from "@/components/common/drafts/EditorDraftInfoHint.vue";
 import type { PanelLeaveChoice } from "./panelDraft.types";
+import { PANEL_DRAFT_MAX, PANEL_DRAFT_TTL_MS } from "@/composables/dashboard/usePanelDraft";
 
 const props = withDefaults(
   defineProps<{
@@ -92,6 +98,13 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+const retention = computed(() =>
+  t("common.editorDraft.retention", {
+    days: PANEL_DRAFT_TTL_MS / 86_400_000,
+    max: PANEL_DRAFT_MAX,
+  }),
+);
 
 // The discard-only copy offers to stay, so it carries a button for it.
 const secondaryLabel = computed<I18nText | undefined>(() => {

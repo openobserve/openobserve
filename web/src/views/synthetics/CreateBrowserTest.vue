@@ -101,12 +101,14 @@ import {
   deleteEditorDraft,
   deleteEditorDraftsFor,
   readEditorDraft,
+  stableStringify,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import {
   describeCheckRedacted,
   redactCheckDraftSecrets,
   reentryValidationKey,
+  refillTypedStepWires,
 } from "@/utils/synthetics/checkDraftSecrets";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -835,7 +837,7 @@ const browserDraft = useEditorDraft<BrowserTestDraft>({
   apply: (data) => {
     // A restored journey opens still: nothing records or replays until the author asks.
     autoRecord.value = false;
-    check.value = data.check;
+    check.value = refillTypedStepWires(data.check);
     checkName.value = data.check.name;
     startUrl.value = data.check.url;
     journeyStepDone.value = data.journeyStepDone;
@@ -880,7 +882,7 @@ onBeforeRouteUpdate((to, from) => {
   return true;
 });
 
-/** The setup checklist's reload carries the gate fields in the query, so a draft of only those is redundant. */
+/** The setup checklist's reload carries the gate fields in the query, so a draft holding nothing else is redundant. */
 function dropDraftCarriedByQuery() {
   if (typeof route.query.url !== "string" || !route.query.url) return;
   const scope: EditorDraftScope = {
@@ -890,14 +892,16 @@ function dropDraftCarriedByQuery() {
     userEmail: String(store.state.userInfo?.email ?? ""),
   };
   const stored = readEditorDraft<BrowserTestDraft>(scope)?.data.check;
-  if (
-    stored &&
-    stored.journey.length === 0 &&
-    stored.url.trim() === startUrl.value.trim() &&
-    stored.name.trim() === checkName.value.trim()
-  ) {
-    deleteEditorDraft(scope);
-  }
+  if (!stored) return;
+  const comparable = (value: BrowserCheck) =>
+    stableStringify({ ...value, url: (value.url ?? "").trim(), name: (value.name ?? "").trim() });
+  // The draft is stored redacted, so the reloaded check is compared in the same form.
+  const reloaded = redactCheckDraftSecrets({
+    ...check.value,
+    url: startUrl.value,
+    name: checkName.value,
+  }).data;
+  if (comparable(stored) === comparable(reloaded)) deleteEditorDraft(scope);
 }
 
 /** A check missing from this org takes its drafts there with it. */
@@ -971,8 +975,21 @@ function startUrlHostMismatch(): { host: string; other: string } | null {
 async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean> {
   // ── Pre-save validation ───────────────────────────────────────────
   validationErrors.value = {};
-  if (browserDraft.pendingReentries().length) {
-    currentStep.value = 2;
+  const pending = browserDraft.pendingReentries();
+  if (pending.length) {
+    const journeyIssues = pending.flatMap((path) => {
+      const step = /^\/check\/journey\/(\d+)\/value$/.exec(path);
+      return step
+        ? [
+            {
+              path: ["journey", Number(step[1]), "value"],
+              message: t("common.editorDraft.reenterField"),
+            },
+          ]
+        : [];
+    });
+    journeyFieldIssues.value = journeyIssues;
+    currentStep.value = journeyIssues.length === pending.length ? 1 : 2;
     toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
     return false;
   }

@@ -83,6 +83,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 
 import passwordPolicyService from "@/services/passwordPolicy";
 import {
+  cancelDraftSignOut,
   draftSignOutDiscardOnly,
   draftSignOutForced,
   resumeDraftSession,
@@ -144,7 +145,10 @@ describe("UpdatePasswordDialog", () => {
     wrappers = [];
     close();
     vi.stubGlobal("location", realLocation);
+    // A sign-out that reached the reload leaves its flags and the signed-out user behind, as the reload would clear them.
+    cancelDraftSignOut();
     resumeDraftSession();
+    localStorage.clear();
   });
 
   it("renders nothing until the user is flagged", async () => {
@@ -330,6 +334,42 @@ describe("UpdatePasswordDialog", () => {
     expect(stopSessionServices).not.toHaveBeenCalled();
     expect(assign).not.toHaveBeenCalled();
     expect(isOpen.value).toBe(true);
+  });
+
+  it("confirms discarding the user's drafts before its Sign out, as the menu's Sign out does", async () => {
+    const scope = { kind: "slo" as const, org: "acme", entityId: null, userEmail: "maya@acme.io" };
+    writeEditorDraft(scope, { data: { name: "unsaved" } });
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+
+    await wrapper.find('[data-test="o-dialog-neutral-btn"]').trigger("click");
+    await flushPromises();
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="editor-draft-signout-message"]').text()).toBe(
+      "You have 1 unsaved draft in this browser. Signing out discards it.",
+    );
+    expect(readEditorDraft(scope)).not.toBeNull();
+
+    await wrapper.find('[data-test="editor-draft-signout-confirm"]').trigger("click");
+    await flushPromises();
+    expect(pushMock).toHaveBeenCalledWith("/logout");
+    expect(assign).toHaveBeenCalledTimes(1);
+    resumeDraftSession();
+    expect(readEditorDraft(scope)).toBeNull();
+    localStorage.clear();
+  });
+
+  it("signs out at once from its Sign out when the user has no drafts", async () => {
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+
+    await wrapper.find('[data-test="o-dialog-neutral-btn"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="editor-draft-signout-dialog"]').exists()).toBe(false);
+    expect(pushMock).toHaveBeenCalledWith("/logout");
+    expect(assign).toHaveBeenCalledTimes(1);
   });
 
   it("signs the user out on success, because the cookie is the old password", async () => {

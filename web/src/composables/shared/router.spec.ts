@@ -383,7 +383,7 @@ describe("useRoutes (router.ts)", () => {
       });
     });
 
-    it("ends the session as the sign-out flow does, for an editor that retries /logout after cancelling it", async () => {
+    it("ends the session but keeps the drafts, since only the menu's sign-out confirms discarding them", async () => {
       const { readEditorDraft, writeEditorDraft } = await import("@/utils/drafts/editorDraftStore");
       const { resumeDraftSession } = await import("@/utils/drafts/draftSession");
       const draftScope = {
@@ -413,9 +413,9 @@ describe("useRoutes (router.ts)", () => {
       enter.call(undefined, {} as never, {} as never, vi.fn());
       window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
 
-      expect(dispatch).toHaveBeenCalledWith("logout", { draftsOf: "me@x.io" });
-      expect(readEditorDraft(draftScope)).toBeNull();
-      expect(writeEditorDraft(draftScope, { data: {} })).toBe(false);
+      expect(dispatch).toHaveBeenCalledWith("logout");
+      expect(dispatch).not.toHaveBeenCalledWith("logout", expect.anything());
+      expect(readEditorDraft(draftScope)).not.toBeNull();
       expect(aborted).toHaveBeenCalledTimes(1);
       expect(prompt).not.toHaveBeenCalled();
       expect(window.location.href).toBe("/login");

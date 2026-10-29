@@ -982,7 +982,6 @@
       "credentialFileField": "credential file {name}",
       "stay": "Stay",
       "discard": "Discard",
-      "leaveMessageForced": "Your session has ended, so this {entity} cannot be saved. Discard your changes to sign out.",
       "signOutDiscardsOthers": "Drafts are not kept when you sign out. | Signing out also discards {count} other unsaved draft in this browser. | Signing out also discards {count} other unsaved drafts in this browser.",
       "changedOnServerInBrowser": "This {entity} was changed after your changes were kept in this browser. Saving them will replace those changes.",
       "credentialsNotSavedInBrowser": "Passwords, tokens and other secrets are not kept in this browser. Re-enter them before saving.",
@@ -999,7 +998,6 @@
       "startFresh": "重新开始",
       "itemDeleted": "此{entity}已不存在，因此其未保存的草稿已被丢弃。",
       "leaveTitle": "带着未保存的更改离开？",
-      "leaveMessage": "保存{entity}，将更改作为草稿保留在此浏览器中直到您退出，或丢弃它们。",
       "keepDraft": "保留草稿",
       "keepFailed": "由于此浏览器的存储已满或不可用，无法保留草稿。请保存{entity}或丢弃您的更改。",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
@@ -1041,7 +1039,6 @@
       "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
-      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
     }
   },
@@ -6286,7 +6283,6 @@
       "panelDeleted": "此面板已不存在，因此其未保存的草稿已被丢弃。",
       "variablesSkipped": "草稿中的 {count} 个变量因名称已被使用而未添加 | 草稿中的 {count} 个变量因名称已被使用而未添加",
       "leaveTitle": "有未保存的更改，确定离开？",
-      "leaveMessage": "保存面板，将更改作为草稿保留在此浏览器中直至退出，或丢弃更改。",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "保留草稿",

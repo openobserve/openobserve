@@ -89,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="flex min-w-0 items-center gap-2">
           <OTruncatedText>{{ row.name }}</OTruncatedText>
           <EditorDraftDot
-            v-if="teamDraftSavedAt(row.id) !== null"
-            :saved-at="teamDraftSavedAt(row.id)"
+            v-if="teamDraftTimes.has(row.id)"
+            :saved-at="teamDraftTimes.get(row.id) ?? null"
             :data-test="`oncall-teams-${row.id}-draft-dot`"
           />
           <OTag
@@ -381,12 +381,14 @@ const scheduleDraftAt = useScheduleDraftTimes();
 const policyDrafts = useEditorDraftIds("oncall_policy");
 
 /// A team's schedule and its policy are both edited from the team, so one dot carries the newer draft.
-function teamDraftSavedAt(teamId: string): number | null {
-  const times = [scheduleDraftAt(teamId), policyDrafts.savedAt(teamId)].filter(
-    (at): at is number => at !== null,
-  );
-  return times.length ? Math.max(...times) : null;
-}
+const teamDraftTimes = computed(() => {
+  const times = new Map<string, number>();
+  for (const team of teams.value) {
+    const newest = Math.max(scheduleDraftAt(team.id) ?? 0, policyDrafts.savedAt(team.id) ?? 0);
+    if (newest > 0) times.set(team.id, newest);
+  }
+  return times;
+});
 const setRoutingConfigWrite = useMutation(() => setRoutingConfigMutation(orgId.value));
 
 // Named handler: `@click="fetchTeams"` would hand the MouseEvent to `force`.

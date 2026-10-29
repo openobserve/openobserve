@@ -613,6 +613,44 @@ describe("OnlineEvals editor drafts", () => {
       expect(onlineEvalsService.scorers.create).toHaveBeenCalledTimes(1);
     });
 
+    it("an edited remote scorer's base hash leaves out its endpoint token and header values", async () => {
+      const remoteScorer = (endpoint: string, header: string) =>
+        ({
+          ...scorer,
+          scorerType: "remote",
+          template: "",
+          params: {
+            endpoint,
+            http_method: "POST",
+            custom_headers: [{ key: "X-Api-Key", value: header }],
+          },
+        }) as Scorer;
+      const draftHashFor = async (row: Scorer) => {
+        localStorage.clear();
+        queryClient.clear();
+        vi.mocked(onlineEvalsService.scorers.list).mockResolvedValue([row]);
+        await remount("tab=scorers&action=update&id=s1");
+        await edit("description", "sharper");
+        window.dispatchEvent(new Event("pagehide"));
+        return readEditorDraft(scope("eval_scorer", "s1"))?.baseHash;
+      };
+
+      const first = await draftHashFor(
+        remoteScorer("https://judge.example.com/score?token=s3cr3t", "hdr-a"),
+      );
+      const rotated = await draftHashFor(
+        remoteScorer("https://judge.example.com/score?token=r0tated", "hdr-b"),
+      );
+      const renamed = await draftHashFor({
+        ...remoteScorer("https://judge.example.com/score?token=s3cr3t", "hdr-a"),
+        name: "Renamed",
+      });
+
+      expect(first).toBeTruthy();
+      expect(rotated).toBe(first);
+      expect(renamed).not.toBe(first);
+    });
+
     it("start fresh drops a scorer's draft; escape keeps it", async () => {
       writeEditorDraft(scope("eval_scorer", null, "llm_judge"), {
         data: { values: { name: "old judge" } },

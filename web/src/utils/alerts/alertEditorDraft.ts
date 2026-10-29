@@ -25,6 +25,9 @@ export const ALERT_DRAFT_KIND: EditorDraftKind = "alert";
 /** New anomaly detections keep their own new-item slot, apart from new alerts. */
 export const ANOMALY_DRAFT_VARIANT = "anomaly";
 
+/** How many alerts a bulk delete's by-id check asks the server for at once. */
+export const ALERT_LOOKUP_CONCURRENCY = 4;
+
 /** How the editor tells its host about a save; `navigate: false` is the leave dialog's Save. */
 export interface AlertSavedOptions {
   navigate: boolean;
@@ -71,6 +74,29 @@ const omitFields = (
 
 export const isNotFoundError = (error: unknown): boolean =>
   (error as { response?: { status?: unknown } } | null)?.response?.status === 404;
+
+/** The ids the server answers 404 for, asked at most `concurrency` at a time; any other answer keeps the id. */
+export const findDeletedAlertIds = async (
+  ids: string[],
+  getAlert: (id: string) => Promise<unknown>,
+  concurrency: number = ALERT_LOOKUP_CONCURRENCY,
+): Promise<string[]> => {
+  const queue = [...ids];
+  const gone = new Set<string>();
+  const worker = async () => {
+    for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+      try {
+        await getAlert(id);
+      } catch (error) {
+        if (isNotFoundError(error)) gone.add(id);
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(Math.max(1, concurrency), queue.length) }, worker),
+  );
+  return ids.filter((id) => gone.has(id));
+};
 
 /** The saved alert as the draft's base: the server copy without its evaluation bookkeeping. */
 export const alertDraftBase = (alert: Record<string, unknown> | null | undefined) =>

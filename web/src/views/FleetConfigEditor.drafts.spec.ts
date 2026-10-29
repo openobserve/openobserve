@@ -261,13 +261,13 @@ describe("FleetConfigEditor drafts", () => {
   });
 
   describe("restore", () => {
-    it("offers the draft in the standard wording, and Escape keeps it for later", async () => {
+    it("offers the browser copy apart from the server draft, and Escape keeps it for later", async () => {
       writeEditorDraft(scope("edge"), { data: draftOf(SECRET_YAML) });
       await mountEditor("edge");
 
       const dialog = byTest("editor-draft-restore-dialog");
-      expect(dialog?.textContent).toContain("Unsaved draft");
-      expect(dialog?.textContent).not.toContain("local changes");
+      expect(dialog?.textContent).toContain("Unsaved local changes");
+      expect(dialog?.textContent).not.toContain("Unsaved draft");
       expect(byTest("editor-draft-restore-message")?.textContent).toContain(
         "unsaved changes to this collector configuration",
       );
@@ -353,7 +353,11 @@ describe("FleetConfigEditor drafts", () => {
       expect(storedDraft("edge")).not.toBeNull();
 
       const { navigation } = await goToOtherConfig();
-      expect(leaveButton("o-dialog-secondary-btn")).not.toBeNull();
+      expect(leaveButton("editor-draft-leave-save")?.textContent?.trim()).toBe("Save draft");
+      expect(leaveButton("o-dialog-secondary-btn")?.textContent?.trim()).toBe(
+        "Keep in this browser",
+      );
+      expect(byTest("editor-draft-leave-message")?.textContent).not.toContain("as a draft");
       clickLeave("editor-draft-leave-save");
       await navigation;
       await flushPromises();
@@ -382,7 +386,7 @@ describe("FleetConfigEditor drafts", () => {
       expect(storedDraft("edge")?.data.yamlText).toBe(SECRET_YAML);
     });
 
-    it("Keep draft leaves with the YAML kept and offers it on return", async () => {
+    it("Keep in this browser leaves with the YAML kept and offers it on return", async () => {
       await mountEditor("edge");
       await editYaml(SECRET_YAML);
       const { navigation } = await goToOtherConfig();
@@ -412,6 +416,40 @@ describe("FleetConfigEditor drafts", () => {
       expect(router.currentRoute.value.name).toBe("fleet");
       expect(storedDraft("edge")).toBeNull();
       expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
+    });
+
+    it("a new configuration offers no Save, so leaving never opens the create dialog", async () => {
+      await mountEditor("new");
+      await editYaml("receivers:\n  otlp: {}\n");
+      const navigation = router.push({ name: "fleet" });
+      await flushPromises();
+
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      expect(leaveButton("editor-draft-leave-save")).toBeNull();
+      expect(byTest("editor-draft-leave-message")?.textContent).toContain("not created yet");
+      clickLeave("o-dialog-secondary-btn");
+      await navigation;
+      await flushPromises();
+
+      expect(router.currentRoute.value.name).toBe("fleet");
+      expect(byTest("fleet-create-config-dialog")).toBeNull();
+      expect(fleet.createConfig).not.toHaveBeenCalled();
+      expect(storedDraft(null)?.data.yamlText).toBe("receivers:\n  otlp: {}\n");
+    });
+
+    it("Discard on a new configuration leaves and drops its draft", async () => {
+      await mountEditor("new");
+      await editYaml("receivers:\n  otlp: {}\n");
+      window.dispatchEvent(new Event("pagehide"));
+      const navigation = router.push({ name: "fleet" });
+      await flushPromises();
+      clickLeave("o-dialog-neutral-btn");
+      await navigation;
+      await flushPromises();
+
+      expect(router.currentRoute.value.name).toBe("fleet");
+      expect(storedDraft(null)).toBeNull();
+      expect(fleet.createConfig).not.toHaveBeenCalled();
     });
 
     it("Escape stays on the editor with the edits", async () => {

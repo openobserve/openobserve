@@ -58,6 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="t('common.editorDraft.signOutDiscardsOthers', { count: 0 }, 0)"
         data-test="editor-draft-leave-sign-out"
       />
+      <EditorDraftInfoHint
+        v-else-if="canKeepDraft"
+        :content="retention"
+        data-test="editor-draft-leave-retention"
+      />
     </div>
   </ODialog>
 </template>
@@ -68,6 +73,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import EditorDraftInfoHint from "./EditorDraftInfoHint.vue";
 import type { EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
+import { EDITOR_DRAFT_MAX_PER_KIND, EDITOR_DRAFT_TTL_MS } from "@/utils/drafts/editorDraftStore";
 
 const props = withDefaults(
   defineProps<{
@@ -77,7 +83,7 @@ const props = withDefaults(
     canKeepDraft?: boolean;
     signingOut?: boolean;
     canSave?: boolean;
-    /** The sign-out cannot be cancelled, so the dialog cannot be closed and offers no Stay. */
+    /** The sign-out cannot be cancelled (the password changed), so the dialog offers only Discard and cannot be closed. */
     forced?: boolean;
     /** While signing out, how many of the user's other drafts the sign-out discards. */
     otherDraftCount?: number;
@@ -105,6 +111,13 @@ const leaveMessage = computed(() => {
   return props.serverDraftItem
     ? t("common.editorDraft.leaveMessageInBrowser", { entity })
     : t("common.editorDraft.leaveMessage", { entity });
+});
+
+const retention = computed(() => {
+  const params = { days: EDITOR_DRAFT_TTL_MS / 86_400_000, max: EDITOR_DRAFT_MAX_PER_KIND };
+  return props.serverDraftItem
+    ? t("common.editorDraft.retentionInBrowser", params)
+    : t("common.editorDraft.retention", params);
 });
 
 // Deleting the user's other drafts is destructive, so it is said in the dialog, not only behind the info icon.

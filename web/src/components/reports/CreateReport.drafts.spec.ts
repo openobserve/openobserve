@@ -260,6 +260,22 @@ describe("CreateReport drafts", () => {
       expect(router.currentRoute.value.fullPath).toBe("/reports/create?folder=default");
     });
 
+    it("a folder-only change is unsaved, so Cancel asks", async () => {
+      await mountEditor("/reports/create?folder=default", { realFolderPicker: true });
+      expect(vm().reportDraft.hasUnsavedChanges()).toBe(false);
+
+      window.dispatchEvent(new Event("pointerdown"));
+      folderPicker().selectedFolder = "folder-b";
+      await flushPromises();
+
+      expect(vm().selectedReportFolderId).toBe("folder-b");
+      expect(vm().reportDraft.hasUnsavedChanges()).toBe(true);
+      click("add-report-cancel-btn");
+      await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      expect(router.currentRoute.value.name).toBe("createReport");
+    });
+
     it("continuing a draft shows the draft's folder in the picker", async () => {
       writeEditorDraft(newScope, {
         data: { values: validValues(), step: 2, folderId: "folder-b", showCustomDimensions: false },

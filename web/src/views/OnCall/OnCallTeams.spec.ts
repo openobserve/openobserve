@@ -668,6 +668,32 @@ describe("OnCallTeams - editor drafts", () => {
     expect(wrapper.find('[data-test="oncall-teams-team_2-draft-dot"]').exists()).toBe(true);
   });
 
+  it("dots a team by its own rotation drafts, new and duplicated ones included, never by a team whose id it prefixes", async () => {
+    service.listTeams.mockResolvedValue({
+      data: [team("team_1", "Platform"), team("team_10", "Search"), team("team_2", "Payments")],
+    } as never);
+    writeEditorDraft(scopeOf("oncall_schedule", "team_10/rot_a"), { data: {} });
+    writeEditorDraft(
+      { ...scopeOf("oncall_schedule", "team_2"), entityId: null, variant: "team_2/clone:rot_b" },
+      { data: {} },
+    );
+    const wrapper = mount(OnCallTeams, {
+      global: {
+        plugins: [i18n, store],
+        stubs: { ...stubs, OTooltip: { name: "OTooltip", template: "<span><slot /></span>" } },
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-teams-team_1-draft-dot"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-teams-team_10-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-teams-team_2-draft-dot"]').exists()).toBe(true);
+
+    writeEditorDraft(scopeOf("oncall_policy", "team_1"), { data: {} });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-team_1-draft-dot"]').exists()).toBe(true);
+  });
+
   it("drops a deleted team's policy and rotation drafts, and keeps another team's", async () => {
     const newRotation: EditorDraftScope = {
       ...scopeOf("oncall_schedule", "team_1"),

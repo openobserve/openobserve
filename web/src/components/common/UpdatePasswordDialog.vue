@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="dismissible ? t('common.cancel') : undefined"
     :primary-button-label="t('passwordReset.submit')"
     form-id="update-password-form"
-    @click:neutral="signOut()"
+    @click:neutral="requestSignOut"
     @click:secondary="close"
     @update:open="(open: boolean) => !open && close()"
   >
@@ -83,10 +83,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OForm>
     </div>
   </ODialog>
+  <EditorDraftSignOutDialog
+    v-model:open="signOutDraftsOpen"
+    :count="signOutDraftCount"
+    @confirm="signOut()"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -101,7 +106,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import userService from "@/services/users";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { reuseRejection } from "@/utils/passwordComplexity";
-import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
+import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
+import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
 
 import PasswordRequirementList from "./PasswordRequirementList.vue";
 import {
@@ -160,6 +166,20 @@ watch(
 const signOut = async ({ passwordChanged = false } = {}) => {
   const options = passwordChanged ? { forced: true } : { discardOnly: true };
   if (await signOutThroughLeaveGuards(router, store, options)) close();
+};
+
+const signOutDraftsOpen = ref(false);
+const signOutDraftCount = ref(0);
+
+// The user's own Sign out discards every draft of theirs in this browser, so it is confirmed first, as the menu's Sign out does.
+const requestSignOut = () => {
+  const count = signOutDraftsToConfirm(store);
+  if (count > 0) {
+    signOutDraftCount.value = count;
+    signOutDraftsOpen.value = true;
+    return;
+  }
+  void signOut();
 };
 
 const submit = async (values: UpdatePasswordForm) => {

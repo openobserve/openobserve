@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { discardEditorDraftIfAsked, dismissEditorDraftRestoreIfShown } from '../alertsPages/editorDraftHelpers.js';
+import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
 
 export class RegexPatternsFormValidationPage {
     /**
@@ -68,9 +68,9 @@ export class RegexPatternsFormValidationPage {
     // ── Drawer helpers ────────────────────────────────────────────────────────
 
     async openAddPatternDrawer() {
+        await clearEditorDrafts(this.page);
         await this.page.locator(this.addPatternButton).click();
         await this.page.locator(this.drawer).waitFor({ state: 'visible', timeout: 8000 });
-        await dismissEditorDraftRestoreIfShown(this.page);
     }
 
     async fillName(name) {

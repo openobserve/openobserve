@@ -242,6 +242,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @undo="(keys) => keys.forEach(updatePermissionMappings)"
   />
   <EditorDraftDialogs :draft="roleDraft" />
+  <EditorDraftLeaveDialog
+    :open="unstartedLeave.open"
+    :entity-label="roleDraft.state.entityLabel"
+    :saving="unstartedLeave.saving"
+    :can-keep-draft="false"
+    :signing-out="roleDraft.state.signingOut"
+    :can-save="roleDraft.state.canSave"
+    :forced="roleDraft.state.signOutForced"
+    @choose="chooseUnstartedLeave"
+  />
 </template>
 
 <script setup lang="ts">
@@ -250,7 +260,15 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { resourcesQuery } from "@/services/iam.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  reactive,
+  ref,
+  type Ref,
+} from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -270,10 +288,11 @@ import {
   buildRoleModules,
   GROUP_LABEL_KEYS,
 } from "@/components/iam/roles/roleModules";
-import { useRouter } from "vue-router";
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import { onBeforeMount } from "vue";
-import { useEditorDraft } from "@/composables/useEditorDraft";
+import { useEditorDraft, type EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import EditorDraftLeaveDialog from "@/components/common/drafts/EditorDraftLeaveDialog.vue";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { getAllRolePermissions, getRoleUsers } from "@/services/iam";
 import { useRoleEntityLoaders } from "@/composables/iam/useRoleEntityLoaders";
@@ -545,6 +564,7 @@ const getRoleDetails = () => {
     .catch((error) => {
       isFetchingInitialRoles.value = false;
       if (error?.response?.status === 404) {
+        roleGone = true;
         deleteEditorDraftsFor({
           kind: "iam_role",
           org: store.state.selectedOrganization.identifier,
@@ -882,10 +902,57 @@ const roleDraft = useEditorDraft<RoleDraftData>({
 const startRoleDraft = async (): Promise<boolean> => {
   draftRestored = false;
   await roleDraft.start();
+  roleDraftStarted = true;
   // Baselined now rather than on first input, so preset grants staged next count as unsaved.
   if (!draftRestored && !roleDraft.hasUnsavedChanges()) roleDraft.discard();
   return draftRestored;
 };
+
+// A load that fails never starts the draft, whose guard then lets staged edits go, so this one asks instead.
+let roleDraftStarted = false;
+// A deleted role's staged edits can go nowhere, so leaving it never asks.
+let roleGone = false;
+const unstartedLeave = reactive({ open: false, saving: false });
+let resolveUnstartedLeave: ((allowed: boolean) => void) | null = null;
+
+const settleUnstartedLeave = (allowed: boolean) => {
+  const resolve = resolveUnstartedLeave;
+  resolveUnstartedLeave = null;
+  resolve?.(allowed);
+};
+
+const askUnstartedLeave = (): boolean | Promise<boolean> => {
+  if (roleDraftStarted || roleGone || !isAnyDirty.value) {
+    return true;
+  }
+  // A second leave while the dialog's Save runs must not stack another dialog.
+  if (unstartedLeave.saving) return false;
+  // A newer navigation has already cancelled the earlier one, so the open dialog now answers for it.
+  settleUnstartedLeave(false);
+  unstartedLeave.open = true;
+  return new Promise<boolean>((resolve) => {
+    resolveUnstartedLeave = resolve;
+  });
+};
+
+const chooseUnstartedLeave = async (choice: EditorDraftLeaveChoice) => {
+  const resolve = resolveUnstartedLeave;
+  if (!resolve || unstartedLeave.saving) return;
+  if (choice === "save" && !roleDraft.state.canSave) return;
+  let allowed = choice === "discard";
+  if (choice === "save") {
+    unstartedLeave.saving = true;
+    allowed = await saveRole().catch(() => false);
+    unstartedLeave.saving = false;
+  }
+  unstartedLeave.open = false;
+  if (resolveUnstartedLeave === resolve) resolveUnstartedLeave = null;
+  resolve(allowed);
+};
+
+onBeforeRouteLeave(askUnstartedLeave);
+onBeforeRouteUpdate((to, from) => (to.path !== from.path ? askUnstartedLeave() : true));
+onBeforeUnmount(() => settleUnstartedLeave(false));
 
 const saveRoleAndMark = (): Promise<boolean> =>
   saveRole().then((saved) => {

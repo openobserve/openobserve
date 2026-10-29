@@ -130,9 +130,9 @@ describe("FleetConfigurations", () => {
     };
     writeEditorDraft(scope, { data: { yamlText: "x: 1\n" } });
     wrapper = await mountList();
-    const dot = () => wrapper.find('[data-test="fleet-configurations-draft-dot-org-baseline"]');
+    const dot = () => wrapper.find('[data-test="fleet-configurations-org-baseline-draft-dot"]');
     expect(dot().exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-configurations-draft-dot-edge-minimal"]').exists()).toBe(
+    expect(wrapper.find('[data-test="fleet-configurations-edge-minimal-draft-dot"]').exists()).toBe(
       false,
     );
 

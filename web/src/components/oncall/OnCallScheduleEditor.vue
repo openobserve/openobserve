@@ -398,7 +398,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
-import { newRotationVariant, rotationDraftId } from "./scheduleDrafts";
+import { dropRotationDrafts, newRotationVariant, rotationDraftId } from "./scheduleDrafts";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1069,8 +1069,11 @@ watch(editing, (isOpen) => {
 async function deleteActive() {
   const target = active.value;
   if (!target) return;
+  const stored = !isNew.value;
   draft.value = draft.value.filter((r) => r !== target);
-  await save();
+  if ((await save()) && stored) {
+    dropRotationDrafts({ org: String(orgId.value), teamId: props.teamId, rotationId: target.id });
+  }
 }
 
 async function save(): Promise<boolean> {

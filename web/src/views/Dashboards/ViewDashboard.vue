@@ -617,35 +617,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :open="discardDialog.open"
           size="sm"
           :title="t('dashboard.layoutEdit.discardTitle')"
+          :persistent="discardForced"
+          :show-close="!discardForced"
           :secondary-button-label="
-            discardDialog.reason === 'leave'
-              ? t('dashboard.layoutEdit.stay')
-              : t('dashboard.layoutEdit.keepEditing')
+            discardForced
+              ? undefined
+              : discardDialog.reason === 'leave'
+                ? t('dashboard.layoutEdit.stay')
+                : t('dashboard.layoutEdit.keepEditing')
           "
           :primary-button-label="
-            discardDialog.reason === 'leave'
-              ? t('dashboard.layoutEdit.discardAndLeave')
-              : t('dashboard.layoutEdit.discard')
+            discardForced
+              ? t('dashboard.layoutEdit.discardAndSignOut')
+              : discardDialog.reason === 'leave'
+                ? t('dashboard.layoutEdit.discardAndLeave')
+                : t('dashboard.layoutEdit.discard')
           "
           primary-button-variant="destructive"
-          initial-focus="secondary"
+          :initial-focus="discardForced ? 'primary' : 'secondary'"
           data-test="dashboard-edit-discard-dialog"
           @update:open="(open) => !open && settleDiscard(false)"
           @click:secondary="settleDiscard(false)"
           @click:primary="settleDiscard(true)"
         >
           {{
-            discardDialog.reason === "leave"
+            discardForced
               ? t(
-                  "dashboard.layoutEdit.leaveMessage",
+                  "dashboard.layoutEdit.leaveMessageForced",
                   { count: layoutChangeCount },
                   layoutChangeCount,
                 )
-              : t(
-                  "dashboard.layoutEdit.discardMessage",
-                  { count: layoutChangeCount },
-                  layoutChangeCount,
-                )
+              : discardDialog.reason === "leave"
+                ? t(
+                    "dashboard.layoutEdit.leaveMessage",
+                    { count: layoutChangeCount },
+                    layoutChangeCount,
+                  )
+                : t(
+                    "dashboard.layoutEdit.discardMessage",
+                    { count: layoutChangeCount },
+                    layoutChangeCount,
+                  )
           }}
         </ODialog>
       </OPageLayout>
@@ -728,6 +740,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { draftSignOutForced } from "@/utils/drafts/draftSession";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useLoading } from "@/composables/useLoading";
@@ -1464,6 +1477,10 @@ export default defineComponent({
     };
 
     const discardDialog = reactive({ open: false, reason: "exit" as "exit" | "leave" });
+    // The password changed and the sign-out goes on whatever is answered, so Stay would only pretend to keep the edits.
+    const discardForced = computed(
+      () => discardDialog.reason === "leave" && draftSignOutForced.value,
+    );
     let resolveDiscard: ((confirmed: boolean) => void) | null = null;
 
     const confirmDiscard = (reason: "exit" | "leave") =>
@@ -2964,6 +2981,7 @@ export default defineComponent({
       saveLayout,
       requestExitLayoutEdit,
       discardDialog,
+      discardForced,
       settleDiscard,
       folderNameFromFolderId,
       showJsonEditorDialog,

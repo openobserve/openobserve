@@ -42,6 +42,7 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "./editorDraftStore";
+import { DRAFT_SIGNED_OUT_KEY } from "./draftSession";
 
 const scope: EditorDraftScope = {
   kind: "function",
@@ -343,6 +344,23 @@ describe("editorDraftStore", () => {
 
       window.dispatchEvent(new StorageEvent("storage", { key: null }));
       expect(editorDraftRevision.value).toBe(start + 4);
+    });
+
+    it("bumps when another tab signs a user out, so open editors stop offering Keep draft", () => {
+      const start = editorDraftRevision.value;
+      window.dispatchEvent(new StorageEvent("storage", { key: DRAFT_SIGNED_OUT_KEY }));
+      expect(editorDraftRevision.value).toBe(start + 1);
+    });
+
+    it("probes storage under a key outside the draft prefix, so other tabs keep their index", () => {
+      const setItem = vi.spyOn(Storage.prototype, "setItem");
+      expect(isEditorDraftStorageAvailable()).toBe(true);
+      const keys = setItem.mock.calls.map(([key]) => key);
+      setItem.mockRestore();
+      expect(keys).toHaveLength(1);
+      expect(keys[0].startsWith(EDITOR_DRAFT_PREFIX)).toBe(false);
+      expect(keys[0]).not.toBe(EDITOR_DRAFT_INDEX_KEY);
+      expect(localStorage.length).toBe(0);
     });
 
     it("does not bump when deleting a draft that is not stored", () => {

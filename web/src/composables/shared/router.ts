@@ -254,8 +254,8 @@ const useRoutes = () => {
         // must run even if a clear throws, and must respect the app base —
         // a bare "/login" 404s when the app is served under /web/.
         try {
-          // An editor's own leave dialog may retry this route after a cancelled sign-out flow, so it ends the session the same way.
-          endSignedInSession(store);
+          // Only the menu's sign-out confirms discarding drafts, so a direct link or a retried navigation keeps them, as an expired session does.
+          endSignedInSession(store, { keepDrafts: true });
         } finally {
           silenceUnloadPrompts();
           window.location.href = `${getPath()}login`;

@@ -311,6 +311,7 @@ describe("AddDestination drafts", () => {
     ["a Zapier hook", "https://hooks.zapier.com/hooks/catch/123456/abcdef/"],
     ["a Mattermost hook key", "https://chat.example.com/hooks/xr3j5x9n7f8gbh6tu1qzw2a4yd"],
     ["a scheme-less Slack webhook", "hooks.slack.com/services/T000/B000/XXXX"],
+    ["a GovSlack webhook", "https://hooks.slack-gov.com/services/T000/B000/XXXX"],
   ])("blanks %s", async (_name, url) => {
     await mountEditor();
     await fillCustomWebhook();

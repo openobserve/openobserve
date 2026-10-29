@@ -1,7 +1,7 @@
 // cipher keys.js
 import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from './draftSignOut.js';
-import { discardEditorDraftIfAsked, dismissEditorDraftRestoreIfShown } from '../alertsPages/editorDraftHelpers.js';
+import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
 
 
 export class CipherKeys {
@@ -63,8 +63,8 @@ export class CipherKeys {
 
       async addCipherKey() {
         await this.addCipherKeyButton.waitFor({ state: 'visible', timeout: 10000 });
+        await clearEditorDrafts(this.page);
         await this.addCipherKeyButton.click();
-        await dismissEditorDraftRestoreIfShown(this.page);
       }
 
       async addCipherKeyName(name) {

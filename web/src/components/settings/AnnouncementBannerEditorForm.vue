@@ -537,6 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :can-keep-draft="false"
     :signing-out="bannerDraft.state.signingOut"
     :can-save="bannerDraft.state.canSave"
+    :forced="bannerDraft.state.signOutForced"
     @choose="chooseUnkeptLeave"
   />
 </template>
@@ -1190,7 +1191,7 @@ const bannerDraft = useEditorDraft<BannerDraftData>({
   leaveOnRouteUpdate: leavesEditor,
 });
 
-// Without a draft the shared leave dialog still asks, offering only Save or Discard.
+// Without a draft the shared leave dialog still asks, offering only Save or Discard, or only Discard once the password changed.
 const unkeptLeave = reactive({ open: false, saving: false });
 let resolveUnkeptLeave: ((allowed: boolean) => void) | null = null;
 

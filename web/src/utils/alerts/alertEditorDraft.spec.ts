@@ -19,6 +19,7 @@ import {
   alertDraftBase,
   anomalyDraftConfig,
   dropDraftOfMissingAlert,
+  findDeletedAlertIds,
   isNotFoundError,
 } from "./alertEditorDraft";
 
@@ -66,5 +67,50 @@ describe("alertEditorDraft", () => {
     expect(readEditorDraft({ ...scope, kind: "alert" })).toBeNull();
     expect(readEditorDraft({ ...teammate, kind: "alert" })).not.toBeNull();
     expect(dropDraftOfMissingAlert(scope)).toBe(false);
+  });
+
+  describe("findDeletedAlertIds", () => {
+    const notFound = { response: { status: 404 } };
+
+    it("returns only the ids answered with a 404, in the order asked", async () => {
+      const answers: Record<string, () => Promise<unknown>> = {
+        a1: () => Promise.reject(notFound),
+        a2: () => Promise.resolve({ data: { id: "a2" } }),
+        a3: () => Promise.reject({ response: { status: 500 } }),
+        a4: () => Promise.reject(notFound),
+      };
+
+      const gone = await findDeletedAlertIds(["a1", "a2", "a3", "a4"], (id) => answers[id]());
+
+      expect(gone).toEqual(["a1", "a4"]);
+    });
+
+    it("never has more lookups in flight than the concurrency allows", async () => {
+      let inFlight = 0;
+      let peak = 0;
+      const ids = Array.from({ length: 25 }, (_, i) => `alert_${i}`);
+      const getAlert = async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        inFlight -= 1;
+        throw notFound;
+      };
+
+      const gone = await findDeletedAlertIds(ids, getAlert, 3);
+
+      expect(peak).toBe(3);
+      expect(gone).toEqual(ids);
+    });
+
+    it("asks nothing for an empty list", async () => {
+      let calls = 0;
+      expect(
+        await findDeletedAlertIds([], async () => {
+          calls += 1;
+        }),
+      ).toEqual([]);
+      expect(calls).toBe(0);
+    });
   });
 });

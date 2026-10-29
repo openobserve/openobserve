@@ -1412,8 +1412,11 @@ const scorerDraft = useEditorDraft<ScorerDraft>({
     form.reset({ ...initForm(null, props.scorerType), ...data.values });
     if (data.values.producesScoreConfigId) void prepareSelectedScoreConfigVersion(true);
   },
+  // Shaped like the snapshot, so the secret pointers blank the endpoint and header values before hashing.
   base: () =>
-    props.mode === "edit" && props.row ? initForm(props.row, props.scorerType) : undefined,
+    props.mode === "edit" && props.row
+      ? { values: initForm(props.row, props.scorerType) }
+      : undefined,
   save: async () => {
     const run = { saved: false };
     leaveSave = run;

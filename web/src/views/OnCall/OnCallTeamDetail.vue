@@ -456,9 +456,8 @@ import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import {
+  dropRotationDrafts,
   dropScheduleDrafts,
-  newRotationVariant,
-  rotationDraftId,
   useScheduleDraftTimes,
 } from "@/components/oncall/scheduleDrafts";
 import { useMutation } from "@tanstack/vue-query";
@@ -1076,13 +1075,7 @@ async function deleteRotation() {
   try {
     await scheduleWrite.mutateAsync({ timezone: current.timezone, rotations });
     toast({ variant: "success", message: t("oncall.laneDeleted", { name: raw(name) }) });
-    // Every user's edit of the rotation and every duplicate of it go with it.
-    deleteEditorDraftsFor({
-      kind: "oncall_schedule",
-      org: orgId.value,
-      entityId: rotationDraftId(teamId.value, id),
-      variant: newRotationVariant(teamId.value, id),
-    });
+    dropRotationDrafts({ org: orgId.value, teamId: teamId.value, rotationId: id });
     await onScheduleSaved();
   } catch (err: any) {
     noteConfigurationDenied(err);

@@ -278,6 +278,109 @@ describe("CreateBrowserTest drafts", () => {
     expect(restored.url).toBe("https://shop.test/?token=t0k-secret");
   });
 
+  describe("a journey step that types a password", () => {
+    const passwordStep = (value: string): BrowserStep =>
+      ({
+        id: "s2",
+        action: "type",
+        name: "Fill in",
+        selector: 'input[type="password"]',
+        value,
+        wire: { id: "s2", action: "fill", selector: 'input[type="password"]', value },
+      }) as BrowserStep;
+
+    const editor = () =>
+      wrapper!.findComponent(CreateBrowserTest).vm as unknown as {
+        check: BrowserCheck;
+        journeyFieldIssues: { path: PropertyKey[] }[];
+        persist: (after: "stay") => Promise<boolean>;
+      };
+
+    it("is never stored, and an unchanged one comes back from the saved check by its step", async () => {
+      vi.mocked(syntheticsService.get).mockImplementation(() =>
+        Promise.resolve({
+          data: { ...savedCheck(), journey: [...steps, passwordStep("saved-pass")] },
+        } as never),
+      );
+      await mountEdit();
+      await recordSteps([
+        ...steps,
+        passwordStep("saved-pass"),
+        { ...steps[0], id: "s3", name: "Open again" },
+      ]);
+      window.dispatchEvent(new Event("pagehide"));
+      expect(JSON.stringify(localStorage)).not.toContain("saved-pass");
+      expect(readEditorDraft(editScope)?.redactedPaths).toContain("/check/journey/1/value");
+      wrapper!.unmount();
+
+      await mountEdit();
+      clickRestore("editor-draft-continue");
+      await flushPromises();
+
+      expect(editor().check.journey[1].value).toBe("saved-pass");
+      expect(editor().check.journey[1].wire?.value).toBe("saved-pass");
+    });
+
+    it("a typed one comes back blank and flagged on its step, and blocks Save until re-entered", async () => {
+      await mountEditor();
+      await openJourney();
+      await recordSteps([...steps, passwordStep("hunter2")]);
+      window.dispatchEvent(new Event("pagehide"));
+      expect(JSON.stringify(localStorage)).not.toContain("hunter2");
+
+      await remount();
+      expect(byTest("editor-draft-restore-notices")?.textContent).toContain(
+        "Your change to the value typed in step Fill in was not kept.",
+      );
+      clickRestore("editor-draft-continue");
+      await flushPromises();
+      expect(editor().check.journey[1].value).toBe("");
+
+      expect(await editor().persist("stay")).toBe(false);
+      expect(syntheticsService.create).not.toHaveBeenCalled();
+      expect(editor().journeyFieldIssues.map((issue) => issue.path)).toEqual([
+        ["journey", 1, "value"],
+      ]);
+    });
+  });
+
+  describe("the setup checklist's reload", () => {
+    /** Record with no extension installed: the gate fields go into the query and the setup checklist opens. */
+    const leaveForSetup = async () => {
+      await mountEditor();
+      await fillField("synthetics-create-url-input", "https://shop.test");
+      await fillField("synthetics-create-name-input", "Checkout journey");
+      click("synthetics-create-record-btn");
+      await flushPromises();
+      window.dispatchEvent(new Event("pagehide"));
+      expect(router.currentRoute.value.query.setup).toBe("1");
+      return router.currentRoute.value.fullPath;
+    };
+
+    it("drops a draft holding only the gate fields the query carries", async () => {
+      const setupPath = await leaveForSetup();
+      expect(readEditorDraft(newScope)).not.toBeNull();
+
+      await remount(setupPath);
+
+      expect(byTest("editor-draft-restore-dialog")).toBeNull();
+      expect(readEditorDraft(newScope)).toBeNull();
+    });
+
+    it("keeps and offers a draft that holds more than the gate fields", async () => {
+      const setupPath = await leaveForSetup();
+      const draft = readEditorDraft<BrowserDraft>(newScope)!;
+      writeEditorDraft(newScope, {
+        data: { ...draft.data, check: { ...draft.data.check, tags: ["checkout"] } },
+      });
+
+      await remount(setupPath);
+
+      expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
+      expect(readEditorDraft<BrowserDraft>(newScope)?.data.check.tags).toEqual(["checkout"]);
+    });
+  });
+
   it("Continue reopens the journey a new draft was left on", async () => {
     await mountEditor();
     await openJourney();

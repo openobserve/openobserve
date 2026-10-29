@@ -840,6 +840,8 @@ const snapshot = () =>
   JSON.stringify({
     // `variables` are now form-owned, so form.state.values already covers them.
     values: form.state.values ?? {},
+    // The report's folder lives outside the form, so moving it is an edit of its own.
+    folderId: selectedReportFolderId.value,
   });
 
 onBeforeMount(async () => {

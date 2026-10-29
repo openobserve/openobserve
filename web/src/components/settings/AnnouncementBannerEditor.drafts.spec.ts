@@ -28,6 +28,7 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import { byTest, leaveButton, click, clickLeave, clickRestore } from "@/test/unit/helpers/draftDom";
 import AnnouncementBannerList from "./AnnouncementBannerList.vue";
 import AnnouncementBannerEditor from "./AnnouncementBannerEditor.vue";
@@ -316,6 +317,28 @@ describe("AnnouncementBannerEditor drafts", () => {
       await flushPromises();
       expect(router.currentRoute.value.name).toBe("announcementBanners");
       expect(localStorage.length).toBe(0);
+    });
+
+    it("a forced sign-out offers only Discard, saying the changes will be lost", async () => {
+      await mountAt("announcementBannerEditor", { index: "1" });
+      await fillField("announcement-editor-message", "Old banner, edited");
+      beginDraftSignOut({ forced: true });
+      try {
+        const navigation = router.push("/logs");
+        await flushPromises();
+        expect(byTest("editor-draft-leave-message")?.textContent?.trim()).toBe(
+          "Your password changed, so you are being signed out and this announcement banner cannot be saved. Your changes to it will be discarded.",
+        );
+        expect(leaveButton("o-dialog-secondary-btn")).toBeNull();
+        expect(leaveButton("o-dialog-close-btn")).toBeNull();
+        expect(leaveButton("editor-draft-leave-save")).toBeNull();
+
+        clickLeave("o-dialog-neutral-btn");
+        await navigation;
+        expect(router.currentRoute.value.name).toBe("logs");
+      } finally {
+        cancelDraftSignOut();
+      }
     });
 
     it("a newer navigation takes over the open dialog, and Discard follows it", async () => {

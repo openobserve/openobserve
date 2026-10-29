@@ -21,8 +21,12 @@ import {
   invalidateLoginData,
 } from "@/utils/zincutils";
 import { forgetLinkRequest } from "@/utils/slackLink";
-import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
-import { endEditorDraftSession } from "@/utils/drafts/editorDraftStore";
+import {
+  beginDraftSignOut,
+  cancelDraftSignOut,
+  signOutLeaveWillAsk,
+} from "@/utils/drafts/draftSession";
+import { countAllDraftsFor, endEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import {
   silenceUnloadPrompts,
   stopSessionServices,
@@ -64,6 +68,12 @@ export const endSignedInSession = (
   useLocalCurrentUser("", true);
   useLocalUserInfo("", true);
   forgetLinkRequest();
+};
+
+/** How many of the user's drafts a sign-out must confirm before it runs: 0 when there are none, or when an open editor's leave dialog tells about them itself. */
+export const signOutDraftsToConfirm = (store: SignOutStore): number => {
+  const count = countAllDraftsFor(String(store.state.userInfo?.email ?? ""));
+  return count > 0 && !signOutLeaveWillAsk() ? count : 0;
 };
 
 /** Signs out through the open editors' leave guards, so their Save still has a session, then reloads to login; resolves false when one of them keeps the user. */

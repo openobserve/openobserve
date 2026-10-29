@@ -230,8 +230,13 @@ export default defineComponent({
     const draftContext = useDashboardSettingsDraft();
     // The picker reads its v-model only on mount, so a restored range remounts it.
     const dateTimePickerKey = ref(0);
-    // What the server holds, taken once the picker settled its own copy of the range; null until loaded.
-    const loadedKey = ref<string | null>(null);
+    // What the server holds; null until loaded.
+    let loadedSection: GeneralSettingsDraft | null = null;
+    // The picker re-emits the range it is given, normalised, so until the user's first input its emits are the loaded range.
+    let rangeFollowsPicker = false;
+    const stopFollowingPicker = () => {
+      rangeFollowsPicker = false;
+    };
     // Off from a load until its pending edits are back, so the picker's mount emit cannot clear them first.
     let draftSyncOn = false;
     let lastSaveSucceeded = false;
@@ -246,14 +251,18 @@ export default defineComponent({
       stableStringify({ values: draft.values, dateTime: comparableDateTime(draft.dateTime) });
 
     const syncDraftSection = () => {
-      if (!draftContext || !draftSyncOn || loadedKey.value === null) return;
+      if (!draftContext || loadedSection === null) return;
       const current = generalSnapshot();
-      draftContext.pending.general = sectionKey(current) === loadedKey.value ? null : current;
+      if (rangeFollowsPicker) loadedSection = { ...loadedSection, dateTime: current.dateTime };
+      if (!draftSyncOn) return;
+      draftContext.pending.general =
+        sectionKey(current) === sectionKey(loadedSection) ? null : current;
     };
 
     const applyPendingDraft = async () => {
       const pending = draftContext?.pending.general;
       if (!pending) return;
+      stopFollowingPicker();
       form.reset(pending.values);
       dateTimeValue.value = pending.dateTime;
       dateTimePickerKey.value++;
@@ -266,16 +275,9 @@ export default defineComponent({
       return lastSaveSucceeded;
     };
 
-    const markLoaded = async () => {
-      // Two ticks: the picker emits its range on mount, then once more for an absolute range.
-      await nextTick();
-      await nextTick();
-      loadedKey.value = sectionKey(generalSnapshot());
-    };
-
     const getDashboardData = async () => {
       draftSyncOn = false;
-      loadedKey.value = null;
+      loadedSection = null;
       const data = await getDashboard(
         store,
         route.query.dashboard,
@@ -302,7 +304,10 @@ export default defineComponent({
         relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod,
         valueType: data?.defaultDatetimeDuration?.type,
       };
-      if (draftContext) await markLoaded();
+      if (draftContext) {
+        loadedSection = generalSnapshot();
+        rangeFollowsPicker = true;
+      }
     };
     const reloadAfterConflict = async () => {
       await getDashboardData();
@@ -311,6 +316,10 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      if (draftContext) {
+        window.addEventListener("pointerdown", stopFollowingPicker, true);
+        window.addEventListener("keydown", stopFollowingPicker, true);
+      }
       await getDashboardData();
       if (!draftContext) return;
       await applyPendingDraft();
@@ -330,7 +339,11 @@ export default defineComponent({
         syncDraftSection();
       },
     );
-    onBeforeUnmount(() => unregisterDraftSection?.());
+    onBeforeUnmount(() => {
+      unregisterDraftSection?.();
+      window.removeEventListener("pointerdown", stopFollowingPicker, true);
+      window.removeEventListener("keydown", stopFollowingPicker, true);
+    });
 
     const saveDashboard = async (value: GeneralSettingsForm) => {
       let data: any;
@@ -381,8 +394,8 @@ export default defineComponent({
         showPositiveNotification(t("dashboard.generalSettingsPage.updatedSuccessfully"));
 
         lastSaveSucceeded = true;
-        if (loadedKey.value !== null) {
-          loadedKey.value = sectionKey(generalSnapshot());
+        if (loadedSection !== null) {
+          loadedSection = generalSnapshot();
           syncDraftSection();
         }
         emit("save");

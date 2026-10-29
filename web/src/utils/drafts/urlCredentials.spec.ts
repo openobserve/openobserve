@@ -23,6 +23,11 @@ describe("urlCarriesCredential", () => {
     "https://mcp.example.com/sse?api_key=abc",
     "mcp.example.com/sse?token=abc",
     "https://hooks.slack.com/services/T000/B000/XXXX",
+    "https://hooks.slack-gov.com/services/T000/B000/XXXX",
+    "https://outlook.office.com/webhook/abc@def/IncomingWebhook/ghi/jkl",
+    "https://maker.ifttt.com/trigger/alert/with/key/abcdefg",
+    "https://eoabcdefgh.m.pipedream.net",
+    "https://hook.eu1.make.com/abcdefghijklmnop",
     "https://chat.example.com/hooks/abcdefghij1234567890xyz",
     "https://api.telegram.org/bot123:abc/sendMessage",
     "not a url @ all",
@@ -37,6 +42,7 @@ describe("urlCarriesCredential", () => {
     "https://api.example.com/mcp/",
     "http://localhost:5080/api/default/mcp",
     "mcp.example.com/v1/tools",
+    "https://slack-gov.com/help",
   ])("does not flag %j", (url) => {
     expect(urlCarriesCredential(url)).toBe(false);
   });

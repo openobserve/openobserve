@@ -982,7 +982,6 @@
       "credentialFileField": "credential file {name}",
       "stay": "Stay",
       "discard": "Discard",
-      "leaveMessageForced": "Your session has ended, so this {entity} cannot be saved. Discard your changes to sign out.",
       "signOutDiscardsOthers": "Drafts are not kept when you sign out. | Signing out also discards {count} other unsaved draft in this browser. | Signing out also discards {count} other unsaved drafts in this browser.",
       "changedOnServerInBrowser": "This {entity} was changed after your changes were kept in this browser. Saving them will replace those changes.",
       "credentialsNotSavedInBrowser": "Passwords, tokens and other secrets are not kept in this browser. Re-enter them before saving.",
@@ -999,7 +998,6 @@
       "startFresh": "처음부터 시작",
       "itemDeleted": "더 이상 존재하지 않는 {entity}의 저장되지 않은 초안이 삭제되었습니다.",
       "leaveTitle": "저장되지 않은 변경 사항이 있는데 나갈까요?",
-      "leaveMessage": "{entity}을(를) 저장하거나, 로그아웃할 때까지 이 브라우저에 변경 사항을 초안으로 보관하거나, 변경 사항을 버리세요.",
       "keepDraft": "초안 보관",
       "keepFailed": "이 브라우저의 저장 공간이 가득 찼거나 사용할 수 없어 초안을 보관할 수 없습니다. {entity}을(를) 저장하거나 변경 사항을 버리세요.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
@@ -1041,7 +1039,6 @@
       "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
-      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
     }
   },
@@ -6286,7 +6283,6 @@
       "panelDeleted": "이 패널이 더 이상 존재하지 않아 저장되지 않은 초안이 삭제되었습니다.",
       "variablesSkipped": "이름이 이미 사용 중이어서 초안의 변수 {count}개가 추가되지 않았습니다 | 이름이 이미 사용 중이어서 초안의 변수 {count}개가 추가되지 않았습니다",
       "leaveTitle": "저장되지 않은 변경 사항이 있습니다. 나가시겠습니까?",
-      "leaveMessage": "패널을 저장하거나, 로그아웃할 때까지 이 브라우저에 변경 사항을 초안으로 보관하거나, 삭제하세요.",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "초안 보관",

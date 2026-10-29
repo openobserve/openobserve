@@ -651,6 +651,43 @@ describe("AddAlert drafts", () => {
     expect(readEditorDraft(newScope)).toBeNull();
   });
 
+  it("leaves no new-alert draft behind when the reset form changes after a save, before the editor closes", async () => {
+    await mountEditor();
+    window.dispatchEvent(new Event("pointerdown"));
+    seedValidScheduled(vm().form);
+    await flushPromises();
+
+    await vm().handleSave();
+    await flushPromises();
+    vm().form.setFieldValue("stream_type", "metrics");
+    vm().activeFolderId = "7400179149878333440";
+    await flushPromises();
+    window.dispatchEvent(new Event("pagehide"));
+    wrapper!.unmount();
+    wrapper = null;
+
+    expect(readEditorDraft(newScope)).toBeNull();
+    await mountEditor();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+  });
+
+  it("leaves no draft of a saved alert behind once the save reset its form", async () => {
+    await mountEditor("/alerts?action=update&alert_id=3HGifdlCfgrm1thif69NRJig9E5", {
+      modelValue: { ...savedAlert },
+      isUpdated: true,
+    });
+    await edit("description", "pages on-call");
+
+    await vm().handleSave();
+    await flushPromises();
+    vm().form.setFieldValue("stream_type", "metrics");
+    await flushPromises();
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(emitted.list).toEqual([["default", { navigate: true }]]);
+    expect(readEditorDraft(editScope)).toBeNull();
+  });
+
   describe("new anomaly detection", () => {
     const anomalyNewScope: EditorDraftScope = { ...newScope, variant: "anomaly" };
 

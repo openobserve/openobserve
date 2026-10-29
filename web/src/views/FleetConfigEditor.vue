@@ -372,7 +372,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
-    <EditorDraftDialogs :draft="configDraft" />
+    <EditorDraftRestoreDialog
+      :open="configDraft.state.restoreOpen"
+      :saved-at="configDraft.state.restoreSavedAt"
+      :entity-label="configDraft.state.entityLabel"
+      :title="configDraft.state.restoreTitle"
+      :changed-on-server="configDraft.state.changedOnServer"
+      :credentials-not-saved="configDraft.state.credentialsNotSaved"
+      :not-kept-fields="configDraft.state.notKeptFields"
+      :note="configDraft.state.restoreNote"
+      :server-draft-item="configDraft.state.serverDraftItem"
+      @continue="configDraft.chooseRestore('continue')"
+      @fresh="configDraft.chooseRestore('fresh')"
+      @dismiss="configDraft.chooseRestore('dismiss')"
+    />
+    <EditorDraftLeaveDialog
+      :open="configDraft.state.leaveOpen"
+      :entity-label="configDraft.state.entityLabel"
+      :saving="configDraft.state.leaveSaving"
+      :can-keep-draft="configDraft.state.canKeepDraft"
+      :signing-out="configDraft.state.signingOut"
+      :other-draft-count="configDraft.state.signOutOtherDrafts"
+      :can-save="configDraft.state.canSave && !isNew"
+      :server-draft-item="configDraft.state.serverDraftItem"
+      :save-label="configDraft.state.saveLabel"
+      :message="newLeaveMessage"
+      @choose="configDraft.chooseLeave"
+    />
   </OPageLayout>
 </template>
 
@@ -406,7 +432,8 @@ import FleetComponentProperties from "@/components/fleet/editor/FleetComponentPr
 import FleetConfigHistory from "@/components/fleet/editor/FleetConfigHistory.vue";
 import FleetConfigVariables from "@/components/fleet/editor/FleetConfigVariables.vue";
 import FleetAddPipelineDialog from "@/components/fleet/editor/FleetAddPipelineDialog.vue";
-import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import EditorDraftLeaveDialog from "@/components/common/drafts/EditorDraftLeaveDialog.vue";
+import EditorDraftRestoreDialog from "@/components/common/drafts/EditorDraftRestoreDialog.vue";
 import type { GroupIssue } from "@/components/fleet/editor/FleetEditorGroupNode.vue";
 import FleetCodeEditor from "@/components/fleet/FleetCodeEditor.vue";
 import FleetCreateConfigDialog from "@/components/fleet/FleetCreateConfigDialog.vue";
@@ -1079,6 +1106,9 @@ function applyDraft(data: FleetConfigDraft) {
 const configDraft = useEditorDraft<FleetConfigDraft>({
   kind: "fleet_config",
   entityLabel: () => t("common.editorDraft.entities.fleet_config"),
+  // "Draft" already names the config's unpublished server version, which the leave dialog's Save writes.
+  serverDraftItem: true,
+  saveLabel: () => t("fleet.editor.saveDraft"),
   entityId: () => (isNew.value ? null : id.value),
   snapshot: () => ({
     yamlText: yamlText.value,
@@ -1092,6 +1122,15 @@ const configDraft = useEditorDraft<FleetConfigDraft>({
   save,
   // Another config's page reuses this view, so only an id change leaves the draft.
   leaveOnRouteUpdate: (to, from) => to.params.id !== from.params.id,
+});
+
+// A new config is created through a dialog that cannot finish a navigation, so its leave offers no Save.
+const newLeaveMessage = computed(() => {
+  if (!isNew.value || !configDraft.state.canSave) return null;
+  const entity = configDraft.state.entityLabel;
+  return configDraft.state.canKeepDraft
+    ? t("fleet.editor.leaveNotCreated", { entity })
+    : t("fleet.editor.leaveNotCreatedNoKeep", { entity });
 });
 
 /** Drops every draft of this config once it no longer exists. */

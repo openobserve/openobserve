@@ -31,12 +31,13 @@ import {
   draftSignOutDiscardOnly,
   draftSignOutForced,
   draftUserSignedOut,
+  registerSignOutLeaveAsker,
   resumeDraftSession,
 } from "@/utils/drafts/draftSession";
 import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 import { stopSessionServices } from "@/utils/sessionServices";
 import { invalidateLoginData } from "@/utils/zincutils";
-import { signOutThroughLeaveGuards } from "./signOutFlow";
+import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "./signOutFlow";
 
 vi.mock("@/utils/sessionServices", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/sessionServices")>()),
@@ -247,5 +248,31 @@ describe("signOutThroughLeaveGuards", () => {
     removeGuard();
     expect(store.dispatch).toHaveBeenCalledWith("logout");
     expect(assign).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("signOutDraftsToConfirm", () => {
+  const scope = { kind: "slo" as const, org: "o", entityId: null, userEmail: email };
+
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  it("counts the user's drafts, and nothing when there are none", () => {
+    const store = makeStore();
+    expect(signOutDraftsToConfirm(store)).toBe(0);
+    writeEditorDraft(scope, { data: {} });
+    writeEditorDraft({ ...scope, userEmail: "other@x.io" }, { data: {} });
+    expect(signOutDraftsToConfirm(store)).toBe(1);
+  });
+
+  it("leaves the count to an open editor whose leave dialog will ask anyway", () => {
+    writeEditorDraft(scope, { data: {} });
+    const unregister = registerSignOutLeaveAsker(() => true);
+    try {
+      expect(signOutDraftsToConfirm(makeStore())).toBe(0);
+    } finally {
+      unregister();
+    }
+    expect(signOutDraftsToConfirm(makeStore())).toBe(1);
   });
 });

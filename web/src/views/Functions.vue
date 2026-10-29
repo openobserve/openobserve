@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        and uses the same breadcrumb section-switcher for fast lateral nav:
          Stream Pipelines ▾            (› Edit Pipeline on a detail page)
        Page actions (and the detail-view teleport target) live in the bar. -->
-  <OPageLayout v-else bleed>
+  <!-- OPageLayout reads which slots it got once, and an empty header slot falls back to a blank header, so it remounts when the header comes or goes. -->
+  <OPageLayout v-else :key="showPipelineActions || isDetailView ? 'header' : 'bare'" bleed>
     <template #header v-if="showPipelineActions || isDetailView">
       <!-- This row hosts page actions: the pipelines-list buttons or the detail
          teleport target. Section pages (functions/enrichment/eval) render

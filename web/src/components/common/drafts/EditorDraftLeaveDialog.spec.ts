@@ -62,13 +62,28 @@ describe("EditorDraftLeaveDialog", () => {
     const root = document.body.querySelector('[data-test="editor-draft-leave-dialog"]');
     expect(root?.textContent).toContain("Leave with unsaved changes?");
     expect(messageText()).toContain("Save the report");
-    expect(messageText()).toContain("in this browser until you sign out");
+    expect(messageText()).toBe(
+      "Save the report, keep your changes as a draft in this browser, or discard them.",
+    );
 
     click("editor-draft-leave-save");
     click("o-dialog-secondary-btn");
     click("o-dialog-neutral-btn");
     expect(dialog.emitted("choose")).toEqual([["save"], ["keep"], ["discard"]]);
     expect(button("o-dialog-neutral-btn")?.textContent?.trim()).toBe("Discard");
+  });
+
+  it("states how long a kept draft lasts behind the info icon, only when Keep is offered", async () => {
+    await mountDialog();
+    const hint = document.body.querySelector('[data-test="editor-draft-leave-retention"]');
+    expect(hint?.tagName).toBe("BUTTON");
+    expect(hint?.getAttribute("aria-label")).toBe(
+      "Drafts are kept in this browser for 7 days, or until you sign out. Only the 20 newest of each kind are kept.",
+    );
+    wrapper?.unmount();
+
+    await mountDialog({ canKeepDraft: false });
+    expect(document.body.querySelector('[data-test="editor-draft-leave-retention"]')).toBeNull();
   });
 
   it("says in the dialog text that signing out discards the other drafts, and explains it behind the info icon", async () => {
@@ -123,7 +138,7 @@ describe("EditorDraftLeaveDialog", () => {
       otherDraftCount: 2,
     });
     expect(messageText()).toBe(
-      "Your session has ended, so this report cannot be saved. Discard your changes to sign out.",
+      "Your password changed, so you are being signed out and this report cannot be saved. Your changes to it will be discarded.",
     );
     expect(button("o-dialog-close-btn")).toBeNull();
     expect(button("o-dialog-secondary-btn")).toBeNull();

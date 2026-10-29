@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Webhook hosts whose path carries the token.
+// Webhook hosts whose path or subdomain carries the token.
 const SECRET_WEBHOOK_HOST =
-  /(^|\.)(hooks\.slack\.com|discord(app)?\.com|webhook\.office\.com|logic\.azure\.com|api\.telegram\.org|hooks\.zapier\.com)$/i;
+  /(^|\.)(hooks\.slack(-gov)?\.com|discord(app)?\.com|webhook\.office\.com|outlook\.office\.com|logic\.azure\.com|api\.telegram\.org|hooks\.zapier\.com|maker\.ifttt\.com|m\.pipedream\.net|make\.com)$/i;
 
 // A long path segment with a digit (Mattermost or Rocket.Chat hook keys), or a Telegram `bot<id>:` token.
 const TOKEN_SEGMENT = /^(?=.*\d)[\w:-]{20,}$|^bot\d/i;

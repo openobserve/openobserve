@@ -33,12 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emit('fresh')"
   >
     <div class="flex flex-col gap-3">
-      <div class="flex items-start gap-1">
-        <p class="text-text-body min-w-0 flex-1 text-sm" data-test="editor-draft-restore-message">
-          {{ t("common.editorDraft.restoreMessage", { entity: entityLabel, date: savedAtText }) }}
-        </p>
-        <EditorDraftInfoHint v-if="note" :content="note" data-test="editor-draft-restore-note" />
-      </div>
+      <p class="text-text-body text-sm" data-test="editor-draft-restore-message">
+        {{ t("common.editorDraft.restoreMessage", { entity: entityLabel, date: savedAtText }) }}
+      </p>
       <OBanner
         v-if="notices.length"
         :variant="changedOnServer ? 'warning' : 'info'"
@@ -61,7 +58,6 @@ import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import EditorDraftInfoHint from "./EditorDraftInfoHint.vue";
 import { formatEditorDraftTime } from "@/utils/drafts/editorDraftStore";
 
 const props = defineProps<{
@@ -115,6 +111,8 @@ const notices = computed(() => {
   if (props.credentialsNotSaved) {
     list.push({ id: "editor-draft-credentials-not-saved", text: credentialsNote.value });
   }
+  // The note says what Continue will do, so it is a consequence shown with the others, not a hint.
+  if (props.note) list.push({ id: "editor-draft-restore-note", text: props.note });
   return list;
 });
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { createStore } from "vuex";
@@ -28,29 +28,39 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   invalidateLoginData: vi.fn(),
 }));
-vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
+const awsExports = vi.hoisted(() => ({ isEnterprise: "true", isCloud: "false" }));
+vi.mock("@/aws-exports", () => ({ default: awsExports }));
 
 describe("MainLayoutCloudMixin", () => {
-  it("ends a session whose organizations are refused as an expired one, so the drafts stay", async () => {
-    vi.mocked(organizationService.list).mockRejectedValueOnce({ status: 403 });
-    const store = createStore({ state: { userInfo: { email: "me@x.io" } } });
-    const dispatch = vi.spyOn(store, "dispatch");
-    let getDefaultOrganization!: (store: unknown) => Promise<void>;
-    mount(
-      defineComponent({
-        setup() {
-          getDefaultOrganization = MainLayoutCloudMixin.setup().getDefaultOrganization;
-          return () => h("div");
-        },
-      }),
-      { global: { plugins: [store] } },
-    );
-
-    await getDefaultOrganization(store);
-    await flushPromises();
-
-    expect(invalidateLoginData).toHaveBeenCalledTimes(1);
-    expect(expireSession).toHaveBeenCalledWith(store);
-    expect(dispatch).not.toHaveBeenCalledWith("logout", expect.anything());
+  afterEach(() => {
+    awsExports.isEnterprise = "true";
+    vi.mocked(invalidateLoginData).mockClear();
   });
+
+  it.each(["true", "false"])(
+    "ends a session whose organizations are refused as an expired one, so the drafts stay, and clears the auth cookie (enterprise %s)",
+    async (isEnterprise) => {
+      awsExports.isEnterprise = isEnterprise;
+      vi.mocked(organizationService.list).mockRejectedValueOnce({ status: 403 });
+      const store = createStore({ state: { userInfo: { email: "me@x.io" } } });
+      const dispatch = vi.spyOn(store, "dispatch");
+      let getDefaultOrganization!: (store: unknown) => Promise<void>;
+      mount(
+        defineComponent({
+          setup() {
+            getDefaultOrganization = MainLayoutCloudMixin.setup().getDefaultOrganization;
+            return () => h("div");
+          },
+        }),
+        { global: { plugins: [store] } },
+      );
+
+      await getDefaultOrganization(store);
+      await flushPromises();
+
+      expect(invalidateLoginData).toHaveBeenCalledTimes(1);
+      expect(expireSession).toHaveBeenCalledWith(store);
+      expect(dispatch).not.toHaveBeenCalledWith("logout", expect.anything());
+    },
+  );
 });

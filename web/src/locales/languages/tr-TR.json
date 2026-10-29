@@ -982,7 +982,6 @@
       "credentialFileField": "credential file {name}",
       "stay": "Stay",
       "discard": "Discard",
-      "leaveMessageForced": "Your session has ended, so this {entity} cannot be saved. Discard your changes to sign out.",
       "signOutDiscardsOthers": "Drafts are not kept when you sign out. | Signing out also discards {count} other unsaved draft in this browser. | Signing out also discards {count} other unsaved drafts in this browser.",
       "changedOnServerInBrowser": "This {entity} was changed after your changes were kept in this browser. Saving them will replace those changes.",
       "credentialsNotSavedInBrowser": "Passwords, tokens and other secrets are not kept in this browser. Re-enter them before saving.",
@@ -999,7 +998,6 @@
       "startFresh": "Sıfırdan başla",
       "itemDeleted": "Bu {entity} artık mevcut değil; bu nedenle kaydedilmemiş taslağı atıldı.",
       "leaveTitle": "Kaydedilmemiş değişikliklerle ayrılmak istiyor musunuz?",
-      "leaveMessage": "{entity} öğesini kaydedin, oturumu kapatana kadar değişikliklerinizi bu tarayıcıda taslak olarak tutun veya bunları atın.",
       "keepDraft": "Taslağı tut",
       "keepFailed": "Bu tarayıcının depolama alanı dolu veya kullanılamıyor olduğundan taslak tutulamadı. {entity} öğesini kaydedin veya değişikliklerinizi atın.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
@@ -1041,7 +1039,6 @@
       "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
-      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
     }
   },
@@ -6286,7 +6283,6 @@
       "panelDeleted": "Bu panel artık mevcut değil, bu nedenle kaydedilmemiş taslağı silindi.",
       "variablesSkipped": "Adı zaten kullanıldığı için taslaktaki {count} değişken eklenmedi | Adları zaten kullanıldığı için taslaktaki {count} değişken eklenmedi",
       "leaveTitle": "Kaydedilmemiş değişikliklerle çıkılsın mı?",
-      "leaveMessage": "Paneli kaydedin, değişikliklerinizi oturumu kapatana kadar bu tarayıcıda taslak olarak saklayın veya atın.",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Taslağı sakla",

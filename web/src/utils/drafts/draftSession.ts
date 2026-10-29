@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import type { ConfirmDialogOptions } from "@/composables/useConfirmDialog";
+import type { TranslateFn } from "@/types/i18n";
 
 /** True from an explicit sign-out until the next login: editor and panel draft writes are all refused. */
 export const draftSessionEnded = ref(false);
@@ -51,6 +53,19 @@ const clearSignOutFlags = () => {
 export const cancelDraftSignOut = (): void => {
   clearSignOutFlags();
 };
+
+/** A leave guard with no draft to keep, during a forced sign-out: it offers only Discard, as staying cannot stop the sign-out. */
+export const confirmForcedSignOutDiscard = (
+  confirm: (options: ConfirmDialogOptions) => Promise<boolean>,
+  t: TranslateFn,
+): Promise<boolean> =>
+  confirm({
+    title: t("common.editorDraft.leaveTitle"),
+    message: t("common.editorDraft.leaveMessageForcedUnnamed"),
+    confirmLabel: t("common.editorDraft.discard"),
+    confirmVariant: "destructive",
+    confirmOnly: true,
+  });
 
 const readSignedOut = (): string[] => {
   try {

@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
@@ -232,6 +232,18 @@ describe("Functions.vue", () => {
       wrapper = await createWrapper({}, "functionList");
       const header = wrapper.find('[data-test="app-page-header"]');
       expect(header.exists()).toBe(false);
+    });
+
+    it("shows the header and New pipeline once the route moves from a headerless page to the list", async () => {
+      wrapper = await createWrapper({}, "evalTemplates");
+      expect(wrapper.find('[data-test="app-page-header"]').exists()).toBe(false);
+      await router.push({ name: "pipelines", query: { org_identifier: "test-org-id" } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="app-page-header"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-list-add-pipeline-btn"]').exists()).toBe(true);
+      await router.push({ name: "evalTemplates", query: { org_identifier: "test-org-id" } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="app-page-header"]').exists()).toBe(false);
     });
 
     it("should show header on detail view routes like pipelineEditor", async () => {

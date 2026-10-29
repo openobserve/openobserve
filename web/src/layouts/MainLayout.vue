@@ -304,9 +304,7 @@ import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
-import { countAllDraftsFor } from "@/utils/drafts/editorDraftStore";
-import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
-import { signOutLeaveWillAsk } from "@/utils/drafts/draftSession";
+import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -390,8 +388,8 @@ export default defineComponent({
     },
     signout() {
       // Signing out clears this user's drafts in this browser, so the user is told first, by the open editor's leave dialog when it asks anyway.
-      const count = countAllDraftsFor(String(this.store.state.userInfo?.email ?? ""));
-      if (count > 0 && !signOutLeaveWillAsk()) {
+      const count = signOutDraftsToConfirm(this.store);
+      if (count > 0) {
         this.signOutDraftCount = count;
         this.signOutDraftsOpen = true;
         return;

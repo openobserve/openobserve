@@ -14,9 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import type { BrowserCheck, HttpCheckConfig } from "@/types/synthetics";
+import type { BrowserCheck, BrowserStep, HttpCheckConfig } from "@/types/synthetics";
 import { raw, type TranslateFn } from "@/types/i18n";
-import { describeCheckRedacted, redactCheckDraftSecrets } from "./checkDraftSecrets";
+import {
+  describeCheckRedacted,
+  redactCheckDraftSecrets,
+  refillTypedStepWires,
+  stepTypesCredential,
+} from "./checkDraftSecrets";
 
 const check = (over: Partial<BrowserCheck> = {}): BrowserCheck => ({
   name: "Shop",
@@ -106,6 +111,72 @@ describe("redactCheckDraftSecrets", () => {
   });
 });
 
+describe("journey steps that type a credential", () => {
+  const typed = (over: Partial<BrowserStep>): BrowserStep => ({
+    id: "s1",
+    action: "type",
+    value: "hunter2",
+    ...over,
+  });
+
+  it.each([
+    ["a password input", { selector: 'input[type="password"]' }],
+    [
+      "a field named by its role locator",
+      { locator: { candidates: [{ kind: "role", value: 'textbox[name="Password"]' }] } },
+    ],
+    ["a one-time code field", { selector: "#otp" }],
+    ["an API key field", { selector: "[name=api_key]" }],
+    ["a recorded selector on the wire", { wire: { id: "s1", action: "fill", selector: "#pwd" } }],
+    ["a secret-named step", { name: "Enter token" }],
+  ] as [string, Partial<BrowserStep>][])("flags typing into %s", (_name, over) => {
+    expect(stepTypesCredential(typed(over))).toBe(true);
+  });
+
+  it.each([
+    ["an email field", typed({ selector: "#email" })],
+    ["a click on a password field", typed({ action: "click", selector: "#password" })],
+    ["a stored secret reference", typed({ selector: "#password", value: "{{ SHOP_PASSWORD }}" })],
+    ["an empty value", typed({ selector: "#password", value: "" })],
+  ])("does not flag %s", (_name, step) => {
+    expect(stepTypesCredential(step)).toBe(false);
+  });
+
+  it("blanks the typed value and its wire, reports the step's path, and keeps every other step", () => {
+    const journey = [
+      typed({ id: "s1", selector: "#email", value: "ana@shop.test" }),
+      typed({
+        id: "s2",
+        selector: "#password",
+        wire: { id: "s2", action: "fill", selector: "#password", value: "hunter2" },
+      }),
+    ];
+    const { data, paths } = redactCheckDraftSecrets(check({ journey }), "/check");
+
+    expect(data.journey[0].value).toBe("ana@shop.test");
+    expect(data.journey[1].value).toBe("");
+    expect(data.journey[1].wire?.value).toBe("");
+    expect(paths).toEqual(["/check/journey/1/value"]);
+    expect(JSON.stringify(data)).not.toContain("hunter2");
+    expect(journey[1].value).toBe("hunter2");
+  });
+
+  it("writes a restored typed value back into its blanked wire", () => {
+    const restored = refillTypedStepWires(
+      check({
+        journey: [
+          typed({
+            selector: "#password",
+            value: "hunter2",
+            wire: { id: "s1", action: "fill", selector: "#password", value: "" },
+          }),
+        ],
+      }),
+    );
+    expect(restored.journey[0].wire?.value).toBe("hunter2");
+  });
+});
+
 describe("describeCheckRedacted", () => {
   const t = ((key: string, named?: Record<string, unknown>) =>
     raw(`${key}${named ? `:${JSON.stringify(named)}` : ""}`)) as TranslateFn;
@@ -136,6 +207,23 @@ describe("describeCheckRedacted", () => {
       'common.editorDraft.cookieField:{"name":"sid"}',
       'common.editorDraft.secretField:{"name":"PIN"}',
       'common.editorDraft.variableField:{"name":"PASS"}',
+    ]);
+  });
+
+  it("names a typed journey value by its step's name, or by its number when it has none", () => {
+    const data = check({
+      journey: [
+        { id: "a", action: "type", name: "Type password", value: "" },
+        { id: "b", action: "type", value: "" },
+      ],
+    });
+    expect(
+      describeCheckRedacted(["/journey/0/value", "/journey/1/value"], data, t, {
+        urlLabel: raw("URL"),
+      }),
+    ).toEqual([
+      'common.editorDraft.stepValueField:{"name":"Type password"}',
+      'common.editorDraft.stepValueField:{"name":"2"}',
     ]);
   });
 

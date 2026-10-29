@@ -27,7 +27,8 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { getAllRolePermissions, updateRole } from "@/services/iam";
-import { byTest, click, clickLeave, clickRestore } from "@/test/unit/helpers/draftDom";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
+import { byTest, click, clickLeave, clickRestore, leaveButton } from "@/test/unit/helpers/draftDom";
 import EditRole from "./EditRole.vue";
 
 vi.setConfig({ testTimeout: 20000 });
@@ -299,6 +300,63 @@ describe("EditRole drafts", () => {
 
     expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
     expect(readEditorDraft(scope)).toBeNull();
+  });
+
+  it("a load that fails still asks before staged changes are left, though no draft started", async () => {
+    let failLoad: (reason: unknown) => void = () => undefined;
+    vi.mocked(getAllRolePermissions).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failLoad = reject;
+        }) as never,
+    );
+    await mountEditor();
+    await stageGrant();
+
+    failLoad({ response: { status: 500 }, message: "Internal error" });
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    await leaveChoice("o-dialog-close-btn");
+    expect(router.currentRoute.value.name).toBe("editRole");
+
+    void router.push("/iam/roles");
+    await flushPromises();
+    await leaveChoice("o-dialog-neutral-btn");
+
+    expect(router.currentRoute.value.name).toBe("roles");
+    expect(vi.mocked(updateRole)).not.toHaveBeenCalled();
+    expect(readEditorDraft(scope)).toBeNull();
+  });
+
+  it("a failed load during a forced sign-out offers only Discard", async () => {
+    let failLoad: (reason: unknown) => void = () => undefined;
+    vi.mocked(getAllRolePermissions).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failLoad = reject;
+        }) as never,
+    );
+    await mountEditor();
+    await stageGrant();
+    failLoad({ response: { status: 500 }, message: "Internal error" });
+    await flushPromises();
+    beginDraftSignOut({ forced: true });
+    try {
+      const navigation = router.push("/iam/roles");
+      await flushPromises();
+      expect(byTest("editor-draft-leave-message")?.textContent?.trim()).toBe(
+        "Your password changed, so you are being signed out and this role cannot be saved. Your changes to it will be discarded.",
+      );
+      expect(leaveButton("o-dialog-secondary-btn")).toBeNull();
+      expect(leaveButton("o-dialog-close-btn")).toBeNull();
+      expect(leaveButton("editor-draft-leave-save")).toBeNull();
+
+      await leaveChoice("o-dialog-neutral-btn");
+      await navigation;
+      expect(router.currentRoute.value.name).toBe("roles");
+    } finally {
+      cancelDraftSignOut();
+    }
   });
 
   it("a role that no longer exists drops its drafts", async () => {

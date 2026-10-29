@@ -982,7 +982,6 @@
       "credentialFileField": "credential file {name}",
       "stay": "Stay",
       "discard": "Discard",
-      "leaveMessageForced": "Your session has ended, so this {entity} cannot be saved. Discard your changes to sign out.",
       "signOutDiscardsOthers": "Drafts are not kept when you sign out. | Signing out also discards {count} other unsaved draft in this browser. | Signing out also discards {count} other unsaved drafts in this browser.",
       "changedOnServerInBrowser": "This {entity} was changed after your changes were kept in this browser. Saving them will replace those changes.",
       "credentialsNotSavedInBrowser": "Passwords, tokens and other secrets are not kept in this browser. Re-enter them before saving.",
@@ -999,7 +998,6 @@
       "startFresh": "Bắt đầu mới",
       "itemDeleted": "{entity} này không còn tồn tại nên bản nháp chưa lưu của nó đã bị hủy.",
       "leaveTitle": "Rời đi khi có thay đổi chưa lưu?",
-      "leaveMessage": "Lưu {entity}, giữ các thay đổi của bạn làm bản nháp trong trình duyệt này cho đến khi bạn đăng xuất, hoặc hủy chúng.",
       "keepDraft": "Giữ bản nháp",
       "keepFailed": "Không thể giữ bản nháp vì bộ nhớ trình duyệt này đã đầy hoặc không khả dụng. Hãy lưu {entity} hoặc hủy các thay đổi của bạn.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
@@ -1041,7 +1039,6 @@
       "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
-      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
     }
   },
@@ -6286,7 +6283,6 @@
       "panelDeleted": "Panel này không còn tồn tại nên bản nháp chưa lưu của nó đã bị hủy.",
       "variablesSkipped": "{count} biến từ bản nháp không được thêm vì tên đã được sử dụng | {count} biến từ bản nháp không được thêm vì tên đã được sử dụng",
       "leaveTitle": "Rời đi khi còn thay đổi chưa lưu?",
-      "leaveMessage": "Lưu panel, giữ thay đổi của bạn làm bản nháp trong trình duyệt này cho đến khi đăng xuất, hoặc hủy chúng.",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Giữ bản nháp",

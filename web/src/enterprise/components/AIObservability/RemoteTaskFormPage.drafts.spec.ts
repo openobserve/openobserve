@@ -253,7 +253,7 @@ describe("RemoteTaskFormPage drafts", () => {
 
     await mountAt("/ai/remote-tasks/new");
     expect(byTest("editor-draft-credentials-not-saved")).toBeNull();
-    expect(byTest("editor-draft-restore-note")?.getAttribute("aria-label")).toContain(
+    expect(byTest("editor-draft-restore-note")?.textContent).toContain(
       "Signing keys are not kept in this browser",
     );
     expect(byTest("editor-draft-continue")?.textContent).toContain("Continue editing");

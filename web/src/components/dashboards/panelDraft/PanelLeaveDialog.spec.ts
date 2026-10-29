@@ -42,11 +42,21 @@ describe("PanelLeaveDialog", () => {
   it("matches the editor's leave copy and buttons", async () => {
     const dialog = await mountDialog();
     expect(inDialog("dashboard-panel-leave-message")?.textContent?.trim()).toBe(
-      "Save the panel, keep your changes as a draft in this browser until you sign out, or discard them.",
+      "Save the panel, keep your changes as a draft in this browser, or discard them.",
     );
     expect(inDialog("o-dialog-neutral-btn")?.textContent?.trim()).toBe("Discard");
     inDialog("o-dialog-secondary-btn")!.click();
     expect(dialog.emitted("choose")).toEqual([["keep"]]);
+  });
+
+  it("tells how long a kept draft lasts behind the info icon, only when Keep is offered", async () => {
+    await mountDialog();
+    expect(inDialog("dashboard-panel-leave-retention")?.getAttribute("aria-label")).toBe(
+      "Drafts are kept in this browser for 7 days, or until you sign out. Only the 20 newest of each kind are kept.",
+    );
+    wrapper?.unmount();
+    await mountDialog({ canKeepDraft: false });
+    expect(inDialog("dashboard-panel-leave-retention")).toBeNull();
   });
 
   it("says in the dialog text that signing out discards the other drafts, and explains it behind the info icon", async () => {

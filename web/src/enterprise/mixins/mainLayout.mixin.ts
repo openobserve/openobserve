@@ -1,5 +1,4 @@
 import { ref, Ref } from "vue";
-import config from "@/aws-exports";
 import { useStore } from "vuex";
 
 import {
@@ -129,9 +128,8 @@ const MainLayoutCloudMixin = {
 
     // The server refused this user's organizations: the session ends as an expired one does, with no leave dialog offering a Save that cannot work.
     const signout = () => {
-      if (config.isEnterprise == "true") {
-        invalidateLoginData();
-      }
+      // In every build, since expireSession leaves the backend auth cookie in place.
+      invalidateLoginData();
       expireSession(store);
     };
 

@@ -982,7 +982,6 @@
       "credentialFileField": "credential file {name}",
       "stay": "Stay",
       "discard": "Discard",
-      "leaveMessageForced": "Your session has ended, so this {entity} cannot be saved. Discard your changes to sign out.",
       "signOutDiscardsOthers": "Drafts are not kept when you sign out. | Signing out also discards {count} other unsaved draft in this browser. | Signing out also discards {count} other unsaved drafts in this browser.",
       "changedOnServerInBrowser": "This {entity} was changed after your changes were kept in this browser. Saving them will replace those changes.",
       "credentialsNotSavedInBrowser": "Passwords, tokens and other secrets are not kept in this browser. Re-enter them before saving.",
@@ -999,7 +998,6 @@
       "startFresh": "Inizia da zero",
       "itemDeleted": "Questo {entity} non esiste più, quindi la relativa bozza non salvata è stata scartata.",
       "leaveTitle": "Uscire con modifiche non salvate?",
-      "leaveMessage": "Salva {entity}, conserva le modifiche come bozza in questo browser fino all'uscita, oppure scartale.",
       "keepDraft": "Mantieni bozza",
       "keepFailed": "Impossibile conservare la bozza: lo spazio di archiviazione di questo browser è pieno o non disponibile. Salva {entity} o scarta le modifiche.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
@@ -1041,7 +1039,6 @@
       "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
-      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
     }
   },
@@ -6286,7 +6283,6 @@
       "panelDeleted": "Questo pannello non esiste più, quindi la sua bozza non salvata è stata eliminata.",
       "variablesSkipped": "{count} variabile della bozza non è stata aggiunta perché il nome è già in uso | {count} variabili della bozza non sono state aggiunte perché i nomi sono già in uso",
       "leaveTitle": "Uscire con modifiche non salvate?",
-      "leaveMessage": "Salva il pannello, mantieni le modifiche come bozza in questo browser finché non esci oppure scartale.",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Conserva la bozza",

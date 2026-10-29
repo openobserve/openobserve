@@ -39,27 +39,40 @@ const rotationOf = (entry: EditorDraftKeyParts, prefix: string): string | null =
   return rest.startsWith(CLONE_PREFIX) ? rest.slice(CLONE_PREFIX.length) : null;
 };
 
-const teamEntries = (org: string, userEmail: string, teamId: string) => {
-  const prefix = `${teamId}/`;
-  return listEditorDrafts(KIND, org, userEmail)
-    .filter((entry) => (entry.entityId ?? entry.variant ?? "").startsWith(prefix))
-    .map((entry) => ({ entry, rotationId: rotationOf(entry, prefix) }));
+// Every rotation draft's key starts with its team id, which holds no slash.
+const teamOf = (entry: EditorDraftKeyParts): string | null => {
+  const key = entry.entityId ?? entry.variant ?? "";
+  const slash = key.indexOf("/");
+  return slash > 0 ? key.slice(0, slash) : null;
 };
 
-/** Reactive: when the newest of a team's rotation drafts was written, for the team's dots. */
+/** Reactive: when the newest of a team's rotation drafts was written, for the team's dots; storage is read once per draft revision. */
 export const useScheduleDraftTimes = () => {
   const store = useStore();
-  const scope = computed(() => ({
-    org: String(store.state.selectedOrganization?.identifier ?? ""),
-    userEmail: String(store.state.userInfo?.email ?? ""),
-  }));
-  return (teamId: string): number | null => {
-    const times = teamEntries(scope.value.org, scope.value.userEmail, teamId).map(
-      ({ entry }) => entry.savedAt,
+  const newestByTeam = computed(() => {
+    const newest = new Map<string, number>();
+    const entries = listEditorDrafts(
+      KIND,
+      String(store.state.selectedOrganization?.identifier ?? ""),
+      String(store.state.userInfo?.email ?? ""),
     );
-    return times.length ? Math.max(...times) : null;
-  };
+    for (const entry of entries) {
+      const teamId = teamOf(entry);
+      if (teamId !== null) newest.set(teamId, Math.max(newest.get(teamId) ?? 0, entry.savedAt));
+    }
+    return newest;
+  });
+  return (teamId: string): number | null => newestByTeam.value.get(teamId) ?? null;
 };
+
+/** Drops every user's edit of a deleted rotation and every duplicate of it. */
+export const dropRotationDrafts = (target: { org: string; teamId: string; rotationId: string }) =>
+  deleteEditorDraftsFor({
+    kind: KIND,
+    org: target.org,
+    entityId: rotationDraftId(target.teamId, target.rotationId),
+    variant: newRotationVariant(target.teamId, target.rotationId),
+  });
 
 /** Drops every user's drafts of a team's rotations, or with `liveRotationIds` only those whose rotation is gone. */
 export const dropScheduleDrafts = (target: {

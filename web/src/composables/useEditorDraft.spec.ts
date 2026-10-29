@@ -23,7 +23,11 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
+import {
+  DRAFT_SIGNED_OUT_KEY,
+  beginDraftSignOut,
+  cancelDraftSignOut,
+} from "@/utils/drafts/draftSession";
 import {
   deleteEditorDraft,
   editorDraftKey,
@@ -586,9 +590,12 @@ describe("useEditorDraft", () => {
       );
       expect(leaveDialogButton("editor-draft-leave-save")?.textContent).toContain("Publish");
       expect(byTest("editor-draft-leave-message")?.textContent).toContain(
-        "keep your changes in this browser until you sign out",
+        "keep your changes in this browser, or discard them",
       );
       expect(byTest("editor-draft-leave-message")?.textContent).not.toContain("draft");
+      expect(byTest("editor-draft-leave-retention")?.getAttribute("aria-label")).toBe(
+        "Changes are kept in this browser for 7 days, or until you sign out. Only the 20 newest of each kind are kept.",
+      );
       draft.chooseLeave("stay");
       expect(await result).toBe(false);
     });
@@ -1663,6 +1670,96 @@ describe("useEditorDraft", () => {
       draft.discard();
       expect(readEditorDraft(editScope)).toBeNull();
       expect(draft.hasUnsavedChanges()).toBe(false);
+    });
+  });
+
+  describe("a sign-out in another tab", () => {
+    const signOutElsewhere = () => {
+      localStorage.setItem(DRAFT_SIGNED_OUT_KEY, JSON.stringify(["me@x.io"]));
+      window.dispatchEvent(new StorageEvent("storage", { key: DRAFT_SIGNED_OUT_KEY }));
+    };
+
+    it("stops offering Keep draft, whose write would be refused", async () => {
+      const draft = await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      expect(draft.state.canKeepDraft).toBe(true);
+      signOutElsewhere();
+      await nextTick();
+      expect(draft.state.canKeepDraft).toBe(false);
+
+      const result = leave();
+      await flushPromises();
+      expect(leaveDialogButton("o-dialog-secondary-btn")).toBeNull();
+      expect(byTest("editor-draft-leave-message")?.textContent).toContain(
+        "Save the function or discard your changes.",
+      );
+      draft.chooseLeave("stay");
+      expect(await result).toBe(false);
+    });
+
+    it("says why a draft could not be kept, not that storage is full", async () => {
+      const draft = await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      signOutElsewhere();
+
+      expect(draft.keepAndRelease()).toBe(false);
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: expect.stringContaining("you signed out in another tab"),
+        }),
+      );
+    });
+  });
+
+  describe("a kept draft that cannot be put back", () => {
+    it("leaves this session's draft in place instead of deleting both", async () => {
+      seed(editScope, { name: "kept" });
+      const draft = await mountHost();
+      const started = draft.start();
+      await flushPromises();
+      draft.chooseRestore("dismiss");
+      await started;
+      userInput();
+      await edit({ name: "new work" });
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("new work");
+
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new DOMException("denied", "SecurityError");
+      });
+      try {
+        await edit({ name: "saved" });
+        flushAutosave();
+      } finally {
+        vi.restoreAllMocks();
+      }
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("new work");
+    });
+  });
+
+  describe("Keep from the editor's own Cancel", () => {
+    it("asks once: the navigation that follows sees nothing unsaved, even after the editor's reset", async () => {
+      const reset = vi.fn(() => {
+        form.name = "saved";
+      });
+      overrides = { onLeaveWithoutSave: reset };
+      const draft = await startHost();
+      userInput();
+      await edit({ name: "typed" });
+
+      const cancel = draft.confirmLeave();
+      await flushPromises();
+      expect(draft.state.leaveOpen).toBe(true);
+      leaveDialogButton("o-dialog-secondary-btn")?.click();
+      expect(await cancel).toBe(true);
+      expect(reset).toHaveBeenCalledTimes(1);
+
+      expect(await leave()).toBe(true);
+      expect(draft.state.leaveOpen).toBe(false);
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("typed");
     });
   });
 });

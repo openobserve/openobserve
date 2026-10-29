@@ -256,6 +256,55 @@ describe("OnCallScheduleEditor drafts", () => {
     expect(readEditorDraft<{ rotation: Rotation }>(newScope)?.data.rotation.name).toBe("Fresh");
   });
 
+  it("removing a rotation from its drawer drops every user's draft of it and of its duplicates", async () => {
+    const teammate = { ...scope, userEmail: "teammate@o2.ai" };
+    const teammateClone = { ...cloneScope, userEmail: "teammate@o2.ai" };
+    const secondaryScope = { ...scope, entityId: "team_1/rot_secondary" };
+    for (const draftScope of [teammate, cloneScope, teammateClone, secondaryScope, newScope]) {
+      writeEditorDraft(draftScope, {
+        data: { rotation: { ...primary, name: "Edited" }, isNew: false, ruleTab: "0" },
+      });
+    }
+    await mountEditor();
+    await openRotation();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+
+    byTest("oncall-rotation-delete")!.click();
+    await flushPromises();
+    const confirm = wrapper!
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((dialog) => dialog.vm.$attrs["data-test"] === "oncall-rotation-remove-confirm")!;
+    confirm.vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.setSchedule).toHaveBeenCalledTimes(1);
+    expect(readEditorDraft(teammate)).toBeNull();
+    expect(readEditorDraft(cloneScope)).toBeNull();
+    expect(readEditorDraft(teammateClone)).toBeNull();
+    expect(readEditorDraft(secondaryScope)).not.toBeNull();
+    expect(readEditorDraft(newScope)).not.toBeNull();
+  });
+
+  it("a rotation whose removal fails keeps its drafts", async () => {
+    service.setSchedule.mockRejectedValue({ response: { data: { message: "nope" } } } as never);
+    const teammate = { ...scope, userEmail: "teammate@o2.ai" };
+    writeEditorDraft(teammate, {
+      data: { rotation: { ...primary, name: "Edited" }, isNew: false, ruleTab: "0" },
+    });
+    await mountEditor();
+    await openRotation();
+
+    byTest("oncall-rotation-delete")!.click();
+    await flushPromises();
+    wrapper!
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((dialog) => dialog.vm.$attrs["data-test"] === "oncall-rotation-remove-confirm")!
+      .vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(readEditorDraft(teammate)).not.toBeNull();
+  });
+
   it("Start fresh drops the draft and shows the stored rotation", async () => {
     seedDraft("Platform");
     await mountEditor();

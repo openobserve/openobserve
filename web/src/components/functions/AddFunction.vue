@@ -440,6 +440,20 @@ export default defineComponent({
       },
     );
 
+    // The forced language is written to the form after setup, so it is part of the starting state, not an edit.
+    const initialTransType = props.forcedLanguage
+      ? props.forcedLanguage === "javascript"
+        ? "1"
+        : "0"
+      : String(props.modelValue?.transType ?? "0");
+    const initialParams = String(props.modelValue?.params ?? "row");
+    const hasUnsavedEdits = computed(
+      () =>
+        isFunctionDataChanged.value ||
+        transType.value !== initialTransType ||
+        String(formData.value.params ?? "row") !== initialParams,
+    );
+
     // Drafts belong to the Functions page; hosts that embed this editor keep their own flow.
     const draftsActive = router.currentRoute.value.name === "functionList" && !props.hideTestPanel;
     let serverFunction: FunctionDraftData | null = null;
@@ -463,7 +477,7 @@ export default defineComponent({
         isFunctionDataChanged.value = true;
       },
       base: () => serverFunction,
-      hasChanges: () => isFunctionDataChanged.value,
+      hasChanges: () => hasUnsavedEdits.value,
       save: async () => {
         const run = { saved: false };
         leaveSave = run;
@@ -497,7 +511,7 @@ export default defineComponent({
 
     const beforeUnloadHandler = (e: any) => {
       //check is data updated or not
-      if (isFunctionDataChanged.value) {
+      if (hasUnsavedEdits.value) {
         // Display a confirmation message
         const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
         e.returnValue = confirmMessage;
@@ -603,7 +617,7 @@ export default defineComponent({
         if (await functionDraft.confirmLeave()) emit("cancel:hideform");
         return;
       }
-      if (isFunctionDataChanged.value) {
+      if (hasUnsavedEdits.value) {
         confirmDialogMeta.value.show = true;
         confirmDialogMeta.value.title = t("common.unsavedTitle");
         confirmDialogMeta.value.message = t("common.unsavedMessage");
@@ -625,7 +639,7 @@ export default defineComponent({
         if (await functionDraft.confirmLeave()) emit("cancel:hideform");
         return;
       }
-      if (isFunctionDataChanged.value) {
+      if (hasUnsavedEdits.value) {
         confirmDialogMeta.value.show = true;
         confirmDialogMeta.value.title = t("common.cancelTitle");
         confirmDialogMeta.value.message = t("common.cancelMessage");

@@ -70,6 +70,8 @@ export const useAlertEditorDraft = ({
   let serverAnomaly: Record<string, unknown> | null = null;
   // Set while the leave dialog's Save runs, so a successful save does not navigate.
   let leaveSave: { saved: boolean } | null = null;
+  // Set by a save that closes the editor: the form it resets to defaults, and what its watchers change after, is not a new alert.
+  let closedBySave = false;
 
   const anomalyId = (): string | null => {
     const id = form.router.currentRoute.value.params.anomaly_id;
@@ -146,6 +148,7 @@ export const useAlertEditorDraft = ({
     snapshot: () => ({ ...content(), tab: form.activeTab.value }),
     // The open tab alone is not an unsaved change.
     contentOf: ({ tab: _tab, ...rest }) => rest,
+    hasChanges: () => !closedBySave,
     // A load landing after Discard must not count as an edit, or autosave writes the discarded draft back.
     rebaselineOnInputAfterDiscard: true,
     apply,
@@ -155,6 +158,7 @@ export const useAlertEditorDraft = ({
   });
 
   const start = async () => {
+    closedBySave = false;
     await form.formReady;
     // A failed fetch is not a deleted item: the draft stays for when the anomaly loads again.
     if (anomalyId() && form.anomalyLoadStatus.value === "failed") return;
@@ -167,6 +171,7 @@ export const useAlertEditorDraft = ({
   };
 
   const handleSaved = (folderId?: string) => {
+    closedBySave = true;
     if (leaveSave) {
       leaveSave.saved = true;
       onSaved(folderId, { navigate: false });

@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <EditorDraftDot
               v-if="configDrafts.ids.has(row.id)"
               :saved-at="configDrafts.savedAt(row.id)"
-              :data-test="`fleet-configurations-draft-dot-${row.id}`"
+              :data-test="`fleet-configurations-${row.id}-draft-dot`"
             />
           </span>
           <span class="text-text-secondary truncate text-xs">{{ row.description }}</span>

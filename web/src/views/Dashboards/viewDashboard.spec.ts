@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import { shallowMount, flushPromises } from "@vue/test-utils";
 import { inject, nextTick, reactive, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
@@ -2476,6 +2477,27 @@ describe("ViewDashboard", () => {
       await expect(leave).resolves.toBe(true);
       land();
       expect(panelLayout().x).toBe(0);
+    });
+
+    it("offers no Stay on a forced sign-out, which goes on whatever is answered", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      beginDraftSignOut({ forced: true });
+      onTestFinished(() => cancelDraftSignOut());
+
+      const leave = routeLeaveGuards.at(-1)!() as Promise<boolean>;
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("secondaryButtonLabel")).toBeUndefined();
+      expect(dialog.props("persistent")).toBe(true);
+      expect(dialog.props("showClose")).toBe(false);
+      expect(dialog.props("primaryButtonLabel")).toBe("dashboard.layoutEdit.discardAndSignOut");
+      expect(wrapper.vm.discardForced).toBe(true);
+
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
     });
 
     it("keeps the layout edits when a later leave guard keeps the user on the page", async () => {

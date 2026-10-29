@@ -33,11 +33,12 @@ import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { usePanelDraftAutosave } from "@/composables/dashboard/usePanelDraft";
-import { registerSignOutLeaveAsker } from "@/utils/drafts/draftSession";
+import { draftUserSignedOut, registerSignOutLeaveAsker } from "@/utils/drafts/draftSession";
 import {
   cleanupEditorDraftsOnce,
   countAllDraftsFor,
   deleteEditorDraft,
+  editorDraftRevision,
   editorDraftSessionEnded,
   editorDraftSigningOut,
   editorDraftSignOutDiscardOnly,
@@ -137,6 +138,8 @@ export interface EditorDraftDialogState {
   readonly canSave: boolean;
   /** Set while signing out, when no draft can be kept. */
   readonly signingOut: boolean;
+  /** Set while a sign-out that cannot be cancelled runs (the user's own password changed). */
+  readonly signOutForced: boolean;
   /** While signing out, how many of the user's other drafts the sign-out discards. */
   readonly signOutOtherDrafts: number;
   /** Set for an item with a server-side draft state: the dialogs avoid the word "draft". */
@@ -260,6 +263,12 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   let leaving = false;
   const instance = getCurrentInstance();
 
+  // A sign-out in another tab refuses every write of this user's drafts, so Keep draft is not offered.
+  const signedOutElsewhere = (): boolean => {
+    void editorDraftRevision.value;
+    return draftUserSignedOut(scopeParts.userEmail);
+  };
+
   const isInEditor = (target: HTMLElement): boolean =>
     [...rootElements(instance), ...(options.inputRoots?.() ?? [])].some(
       (root) => !!root && root.contains(target),
@@ -301,9 +310,10 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     restoreNote: null as I18nText | null,
     leaveOpen: false,
     leaveSaving: false,
-    canKeepDraft: computed(() => storageAvailable && !signingOutNow()),
+    canKeepDraft: computed(() => storageAvailable && !signingOutNow() && !signedOutElsewhere()),
     canSave: computed(() => !editorDraftSignOutDiscardOnly.value),
     signingOut: computed(() => signingOutNow()),
+    signOutForced: computed(() => editorDraftSignOutForced.value),
     // This editor's own draft goes with the dialog's answer, so only the rest is counted.
     signOutOtherDrafts: computed(() =>
       signingOutNow()
@@ -435,10 +445,10 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     remove: () => removeSessionDraft(),
   });
 
-  // This session's draft goes; a kept one it wrote over comes back as it was.
+  // This session's draft goes and a kept one it wrote over comes back; if that write is refused, this one stays.
   const removeSessionDraft = () => {
-    if (keptDraft && keptReplaced && writeEditorDraft(scope(), keptDraft)) {
-      keptReplaced = false;
+    if (keptDraft && keptReplaced) {
+      if (writeEditorDraft(scope(), keptDraft)) keptReplaced = false;
       return;
     }
     deleteEditorDraft(scope());
@@ -658,9 +668,11 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   };
 
   const keepAndRelease = (): boolean => {
-    const kept = keepWork();
-    if (kept) markLeaving();
-    return kept;
+    const written = hasUnsavedChanges();
+    if (!keepWork()) return false;
+    if (written) rebaseline();
+    markLeaving();
+    return true;
   };
 
   const keepWork = (): boolean => {
@@ -670,14 +682,16 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     }
     // An explicit Keep draft replaces a kept older draft; a refused write must not lose the edits silently.
     if (!writeSessionDraft()) {
+      const entity = state.entityLabel;
       toast({
         variant: "error",
-        message: t("common.editorDraft.keepFailed", { entity: state.entityLabel }),
+        message: draftUserSignedOut(scopeParts.userEmail)
+          ? t("common.editorDraft.keepFailedSignedOut", { entity })
+          : t("common.editorDraft.keepFailed", { entity }),
       });
       return false;
     }
     releaseAutosave();
-    rebaseline();
     return true;
   };
 
@@ -688,6 +702,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     if (choice === "keep") {
       if (!keepWork()) return false;
       options.onLeaveWithoutSave?.();
+      // Taken once, after the editor's own reset, so the navigation that follows sees nothing unsaved.
       rebaseline();
       return true;
     }

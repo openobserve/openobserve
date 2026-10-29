@@ -1147,6 +1147,7 @@ import {
   ALERT_DRAFT_KIND,
   ANOMALY_DRAFT_VARIANT,
   dropDraftOfMissingAlert,
+  findDeletedAlertIds,
   isNotFoundError,
   type AlertSavedOptions,
 } from "@/utils/alerts/alertEditorDraft";
@@ -4057,13 +4058,9 @@ export default defineComponent({
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
           if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
           // The list may now show another folder, so each alert is asked for by id and only a 404 proves it gone.
-          const checks = await Promise.allSettled(
-            requested.map((id: string) => alertsService.get_by_alert_id(org, id)),
+          dropAlertDrafts(
+            await findDeletedAlertIds(requested, (id) => alertsService.get_by_alert_id(org, id)),
           );
-          const gone = checks.map(
-            (check) => check.status === "rejected" && isNotFoundError(check.reason),
-          );
-          dropAlertDrafts(requested.filter((_id: string, i: number) => gone[i]));
         }
       } catch (error: any) {
         dismiss();

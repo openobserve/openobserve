@@ -16,6 +16,7 @@
 import { ref } from "vue";
 import { countPanelDraftsFor, formatPanelDraftTime } from "@/composables/dashboard/usePanelDraft";
 import {
+  DRAFT_SIGNED_OUT_KEY,
   draftSessionEnded,
   draftUserSignedOut,
   markDraftSessionEnded,
@@ -139,10 +140,11 @@ const getStorage = (): Storage | null => {
 };
 
 const onStorageEvent = (event: StorageEvent) => {
-  // A null key means another tab cleared the whole storage.
+  // A null key means another tab cleared the whole storage; a sign-out there changes which writes are refused here.
   if (
     event.key === null ||
     event.key === EDITOR_DRAFT_INDEX_KEY ||
+    event.key === DRAFT_SIGNED_OUT_KEY ||
     event.key.startsWith(EDITOR_DRAFT_PREFIX)
   ) {
     indexCache = null;
@@ -323,7 +325,8 @@ export const isEditorDraftStorageAvailable = (): boolean => {
   const storage = getStorage();
   if (!storage) return false;
   try {
-    const probe = `${EDITOR_DRAFT_PREFIX}probe`;
+    // Outside the draft prefix, so the probe's storage events never make other tabs rebuild their index.
+    const probe = "o2_storage_probe";
     storage.setItem(probe, "1");
     storage.removeItem(probe);
     return true;

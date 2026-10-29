@@ -103,15 +103,13 @@ describe("EditorDraftRestoreDialog", () => {
     expect(byTest("editor-draft-restore-notices")?.querySelectorAll("li")).toHaveLength(1);
   });
 
-  it("puts the editor's note behind an info icon beside the message", async () => {
+  it("shows the editor's note in the notices, since it is what Continue will do", async () => {
     await mountDialog({ note: raw("Continuing generates a new key.") });
-    const hint = byTest("editor-draft-restore-note");
-    expect(hint?.tagName).toBe("BUTTON");
-    expect(hint?.getAttribute("aria-label")).toBe("Continuing generates a new key.");
-    expect(byTest("editor-draft-restore-notices")).toBeNull();
-    expect(byTest("editor-draft-restore-dialog")?.textContent).not.toContain(
-      "Continuing generates a new key.",
-    );
+    const note = byTest("editor-draft-restore-note");
+    expect(note?.tagName).toBe("LI");
+    expect(note?.textContent?.trim()).toBe("Continuing generates a new key.");
+    expect(byTest("editor-draft-restore-notices")?.querySelectorAll("li")).toHaveLength(1);
+    expect(byTest("editor-draft-restore-notices")?.getAttribute("role")).toBe("status");
   });
 
   it("avoids the word draft in its notices for an item with a server-side draft", async () => {
