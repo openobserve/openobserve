@@ -24,10 +24,13 @@ use crate::{db::get_orm_client_ddl, dist_lock};
 pub mod ai_chat_sessions;
 pub mod ai_chat_shares;
 pub mod ai_chat_turns;
+pub mod alert_acks;
 pub mod alert_calibration;
 pub mod alert_composites;
 pub mod alert_eval_intervals;
 pub mod alert_incidents;
+#[cfg(test)]
+mod alert_slack_postgres_tests;
 pub mod alert_states;
 pub mod alerts;
 pub mod anomaly_detection;
@@ -103,6 +106,7 @@ pub mod sessions;
 pub mod short_urls;
 #[cfg(any(test, feature = "test-utils"))]
 pub mod slack;
+pub mod slack_alert_messages;
 pub mod slack_channel_defaults;
 pub mod slack_installations;
 pub mod slack_link_requests;

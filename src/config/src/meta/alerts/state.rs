@@ -125,6 +125,9 @@ pub struct AlertState {
     /// episode open. `None` = not in the hold.
     #[serde(default)]
     pub recovering_since: Option<i64>,
+    /// Start of the current firing cycle, the key of acks and Slack messages; `None` = not firing.
+    #[serde(default)]
+    pub firing_started_at: Option<i64>,
 }
 
 impl AlertState {
@@ -151,6 +154,7 @@ impl AlertState {
             episode_opened_at: None,
             episode_incident_id: None,
             recovering_since: None,
+            firing_started_at: None,
         }
     }
 
@@ -378,6 +382,7 @@ pub fn apply_outcome(
     };
 
     // ── Level axis (independent of the above) ───────────────────────────────
+    let level_computed = level.is_some();
     let previous_level = prev.and_then(|p| p.level);
     let (level, level_since, level_at, level_changed) = match level {
         // No level computed this run — e.g. a query error. Carry the whole
@@ -425,6 +430,7 @@ pub fn apply_outcome(
         episode_opened_at: prev.and_then(|p| p.episode_opened_at),
         episode_incident_id: prev.and_then(|p| p.episode_incident_id.clone()),
         recovering_since: prev.and_then(|p| p.recovering_since),
+        firing_started_at: firing_started_at_after(prev, &outcome, level_computed, at),
     };
 
     // A change on EITHER axis is a transition — an escalation while still
@@ -448,6 +454,24 @@ pub fn apply_outcome(
         state: Some(state),
         transition,
     }
+}
+
+/// The firing cycle (§5.1): a firing outcome opens it once, a classified `Normal` closes it.
+fn firing_started_at_after(
+    prev: Option<&AlertState>,
+    outcome: &RunOutcome,
+    level_computed: bool,
+    at: i64,
+) -> Option<i64> {
+    let prev_start = prev.and_then(|p| p.firing_started_at);
+    if outcome.is_firing() {
+        return prev_start.or(Some(at));
+    }
+    // A run that classified nothing (a frozen SLO evaluation) is no recovery, so it keeps it.
+    if *outcome == RunOutcome::Normal && level_computed {
+        return None;
+    }
+    prev_start
 }
 
 #[cfg(test)]
@@ -476,6 +500,7 @@ mod tests {
             episode_opened_at: None,
             episode_incident_id: None,
             recovering_since: None,
+            firing_started_at: None,
         }
     }
 
@@ -740,6 +765,7 @@ mod tests {
             episode_opened_at: None,
             episode_incident_id: None,
             recovering_since: None,
+            firing_started_at: None,
         };
         let update = apply_outcome(
             "alert-1",
@@ -787,6 +813,7 @@ mod tests {
                 episode_opened_at: None,
                 episode_incident_id: None,
                 recovering_since: None,
+                firing_started_at: None,
             }),
             transition: Some(StateTransition {
                 alert_id: "alert-1".to_string(),
@@ -1100,5 +1127,103 @@ mod tests {
         let bytes = crate::utils::json::to_vec(&none).unwrap();
         let back: Option<EvalLedgerWrite> = crate::utils::json::from_slice(&bytes).unwrap();
         assert_eq!(back, None);
+    }
+
+    // ── firing cycle (§5.1) ─────────────────────────────────────────────────
+
+    fn run_outcomes(steps: &[(RunOutcome, Option<AlertLevel>, i64)]) -> Vec<AlertState> {
+        let mut prev: Option<AlertState> = None;
+        let mut seen = Vec::new();
+        for (outcome, level, at) in steps {
+            let update = apply_outcome(
+                "alert-1",
+                ROLLUP_GROUP_KEY,
+                prev.as_ref(),
+                outcome.clone(),
+                *level,
+                *at,
+            );
+            prev = update.state.or(prev);
+            seen.push(prev.clone().unwrap());
+        }
+        seen
+    }
+
+    /// AC-P2.1.1
+    #[test]
+    fn a_firing_cycle_starts_once_and_survives_error_and_notify_failed() {
+        let crit = Some(AlertLevel::Critical);
+        let seen = run_outcomes(&[
+            (RunOutcome::Normal, Some(AlertLevel::Ok), 100),
+            (RunOutcome::Firing, crit, 200),
+            (RunOutcome::Error, None, 300),
+            (RunOutcome::NotifyFailed, crit, 400),
+            (RunOutcome::Firing, crit, 500),
+        ]);
+        assert_eq!(seen[0].firing_started_at, None, "never fired yet");
+        for (i, s) in seen.iter().enumerate().skip(1) {
+            assert_eq!(
+                s.firing_started_at,
+                Some(200),
+                "step {i} must keep the start"
+            );
+        }
+        let since: Vec<_> = seen.iter().map(|s| s.since).collect();
+        assert_eq!(
+            since,
+            vec![Some(100), Some(200), Some(300), Some(400), Some(500)],
+            "`since` moves on every outcome change, which is why it cannot key an ack"
+        );
+    }
+
+    /// AC-P2.1.2
+    #[test]
+    fn normal_closes_the_cycle_and_the_next_firing_opens_a_new_one() {
+        let crit = Some(AlertLevel::Critical);
+        let seen = run_outcomes(&[
+            (RunOutcome::Firing, crit, 100),
+            (RunOutcome::Firing, crit, 200),
+            (RunOutcome::Normal, Some(AlertLevel::Ok), 300),
+            (RunOutcome::Firing, crit, 400),
+        ]);
+        assert_eq!(seen[1].firing_started_at, Some(100));
+        assert_eq!(seen[2].firing_started_at, None);
+        assert_eq!(seen[3].firing_started_at, Some(400));
+    }
+
+    #[test]
+    fn pending_and_an_unclassified_normal_keep_the_cycle_open() {
+        let crit = Some(AlertLevel::Critical);
+        let seen = run_outcomes(&[
+            (RunOutcome::Firing, crit, 100),
+            (RunOutcome::Pending, crit, 200),
+            // A frozen evaluation records no level, and must not read as a recovery.
+            (RunOutcome::Normal, None, 300),
+        ]);
+        assert_eq!(seen[1].firing_started_at, Some(100));
+        assert_eq!(seen[2].firing_started_at, Some(100));
+    }
+
+    #[test]
+    fn a_pending_first_run_opens_no_cycle() {
+        let seen = run_outcomes(&[(RunOutcome::Pending, Some(AlertLevel::Critical), 100)]);
+        assert_eq!(seen[0].firing_started_at, None);
+    }
+
+    #[test]
+    fn a_state_from_an_older_region_decodes_with_no_cycle() {
+        let mut value = crate::utils::json::to_value(replicable_update()).unwrap();
+        value["state"]
+            .as_object_mut()
+            .unwrap()
+            .remove("firing_started_at");
+        let update: StateUpdate = crate::utils::json::from_value(value).unwrap();
+        assert_eq!(update.state.unwrap().firing_started_at, None);
+
+        let mut with = replicable_update();
+        with.state.as_mut().unwrap().firing_started_at = Some(42);
+        let bytes = crate::utils::json::to_vec(&with).unwrap();
+        let back: StateUpdate = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back.state.unwrap().firing_started_at, Some(42));
     }
 }

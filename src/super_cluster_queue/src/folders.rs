@@ -141,6 +141,9 @@ mod tests {
 
     fn downtime(id: &str) -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: id.to_string(),
             org: "acme".to_string(),
             folder_id: "ops".to_string(),

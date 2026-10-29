@@ -192,6 +192,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       condition: { variant: "primary-soft", icon: "tune" },
+      group: { variant: "primary-soft", icon: "bar-chart" },
       alerts: { variant: "default-soft", icon: "shield-alert-outline" },
       anomalydetections: { variant: "default-soft", icon: "query-stats" },
       synthetics: { variant: "default-soft", icon: "radar" },
@@ -1606,6 +1607,19 @@ export const BADGE_GROUPS = {
         variant: "blue-soft",
         icon: "schedule",
         labelKey: "components.badge.alertState.pending",
+      },
+
+      // ── acknowledged: someone owns a firing; blue keeps it apart from firing red and muted amber ──
+      acknowledged: {
+        variant: "blue-soft",
+        icon: "person",
+        labelKey: "components.badge.alertState.acknowledged",
+      },
+      // An ack, unack or take-over recorded as its own history row, not a run.
+      ackevent: {
+        variant: "default-soft",
+        icon: "person",
+        labelKey: "components.badge.alertState.ackevent",
       },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },

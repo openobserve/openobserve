@@ -171,9 +171,27 @@ pub struct ListAlertsResponseBodyItem {
     /// The downtime muting this row now, for the Muted chip. Enterprise only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_downtime: Option<config::meta::downtimes::ActiveDowntime>,
+    /// Start of the alert's current firing (µs); absent when not firing or for a multi-alert.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub firing_started_at: Option<i64>,
+    /// The acks in force on the alert's current firings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ack: Option<config::meta::alerts::ack::AlertAckSummary>,
+    /// The open incident the current firing belongs to. Enterprise only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub incident: Option<AlertIncidentLink>,
     /// Anomaly rows only: the identity the anomaly scheduler matches downtimes on.
     #[serde(skip)]
     pub downtime_dimensions: HashMap<String, String>,
+}
+
+/// The incident a list row links to.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+pub struct AlertIncidentLink {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub status: config::meta::alerts::incidents::IncidentStatus,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -363,6 +381,12 @@ pub struct AlertGroupResponseItem {
     /// measured against. Absent when it has never paged.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_notified_level: Option<String>,
+    /// Start of the current firing cycle (µs), the key an ack names; absent when not firing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firing_started_at: Option<i64>,
+    /// Present only while an ack is in force on the current firing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ack: Option<config::meta::alerts::ack::AckView>,
 }
 
 /// One `key=value` pair of a group's label set.
@@ -523,6 +547,9 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             referenced_by_composite_count: None,
             expression_summary: None,
             active_downtime: None,
+            firing_started_at: None,
+            ack: None,
+            incident: None,
             downtime_dimensions: HashMap::new(),
         })
     }
@@ -658,6 +685,9 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         referenced_by_composite_count: None,
         expression_summary: None,
         active_downtime: None,
+        firing_started_at: None,
+        ack: None,
+        incident: None,
         downtime_dimensions: HashMap::new(),
     })
 }
@@ -728,13 +758,13 @@ fn list_item_downtime(
     item: &ListAlertsResponseBodyItem,
     now: i64,
 ) -> Option<config::meta::downtimes::ActiveDowntime> {
-    use openobserve_core::alerts::downtimes::{active_for_alert, active_for_anomaly};
+    use openobserve_core::alerts::downtimes::{active_for_anomaly, chip_for_alert};
 
     let id = item.alert_id.to_string();
     let dims = list_item_dimensions(item);
     match item.alert_type.as_str() {
         "anomaly_detection" => active_for_anomaly(org, &id, &item.folder_id, &dims, now),
-        _ => active_for_alert(org, &id, &item.folder_id, &dims, now),
+        _ => chip_for_alert(org, &id, &item.folder_id, &dims, now),
     }
 }
 
@@ -786,6 +816,7 @@ fn still_active(
         name: row.name.clone(),
         ends_at: window.end,
         incident_mode: Default::default(),
+        ..Default::default()
     })
 }
 
@@ -879,6 +910,9 @@ mod tests {
             referenced_by_composite_count: None,
             expression_summary: None,
             active_downtime: None,
+            firing_started_at: None,
+            ack: None,
+            incident: None,
             downtime_dimensions: HashMap::new(),
         };
         let json = serde_json::to_value(&item).unwrap();
