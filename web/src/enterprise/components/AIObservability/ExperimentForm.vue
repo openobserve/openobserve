@@ -1231,17 +1231,20 @@ async function providersAnswer(values: ExperimentForm): Promise<boolean> {
   });
   if (!ids.length || !orgId.value) return true;
   let known: Provider[];
+  let listLoaded = true;
   try {
     // Unfiltered and fresh: a judge provider need not be in the chat list.
     known = await onlineEvalsService.providers.list(orgId.value);
   } catch {
     known = providers.value;
+    listLoaded = false;
   }
   providerFailure.value = await checkRunProviders(
     ids,
     known,
     (payload, id) => onlineEvalsService.providers.testConfig(orgId.value, payload, id),
     values.taskType === "remote" ? null : values.providerId,
+    listLoaded,
   );
   return providerFailure.value === null;
 }

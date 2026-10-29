@@ -278,7 +278,7 @@ and prints each check with the page that fixes it. Show its output to the user a
     ✓ Spans without session id  0 of 14 spans
     ✓ Zero-duration spans       0 of 14 spans
     ✗ Unpriced models           acme-internal-llm · 3,420 tokens counted as $0
-                                Fix in LLM Model Pricing: https://<openobserve>/web/settings/model_pricing?tab=unpriced&stream=default&org_identifier=default
+                                Fix in LLM Model Pricing: https://<openobserve>/web/settings/model_pricing/gaps?stream=default&org_identifier=default
 
   3 of 4 checks pass. Fix the items above, then run the checks again.
   Exit code: 1 (data-health checks found an error).

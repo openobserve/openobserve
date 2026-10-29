@@ -284,7 +284,7 @@ impl OtelIngestionProcessor {
         let mut cost = extracted.cost.clone();
         let mut input_includes_cache = extracted.input_includes_cache;
         let mut cost_status = None;
-        let mut exactly_priced = false;
+        let mut zero_priced = false;
 
         if is_generation_or_embedding(extracted.op_name) {
             // Zero means the payload carried no start time; treat it as unknown rather
@@ -360,7 +360,12 @@ impl OtelIngestionProcessor {
                     if priced && resolved.match_kind == MatchKind::Approximate {
                         cost_status = Some(CostStatus::Approximate);
                     }
-                    exactly_priced = priced && resolved.match_kind == MatchKind::Exact;
+                    // Free means the exact match's selected tier prices every unit at $0, not
+                    // that this span happened to cost $0 (a priced model's zero-token span).
+                    zero_priced = priced
+                        && resolved.match_kind == MatchKind::Exact
+                        && !result.prices.is_empty()
+                        && result.prices.values().all(|&price| price == 0.0);
                     if !result.cost.is_empty() {
                         log::debug!(
                             "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
@@ -405,9 +410,10 @@ impl OtelIngestionProcessor {
             let total = actual_cost_total(&cost);
             cost.insert("total".to_string(), total);
         }
-        // An exact price that costs nothing (a free or muted model) is still a price; mark it so
-        // readers do not take the zero for a legacy unpriced span.
-        if exactly_priced && cost.get("total").copied() == Some(0.0) {
+        // An exact all-zero price (a free or muted model) is still a price; mark it so readers
+        // do not take the zero for a legacy unpriced span. A priced model's zero-token span
+        // stays unmarked.
+        if zero_priced && cost.get("total").copied() == Some(0.0) {
             cost_status = Some(CostStatus::Free);
         }
 
@@ -1846,6 +1852,33 @@ mod tests {
             0,
         );
         assert_eq!(cost_status(&no_tokens), Some("free"));
+    }
+
+    #[test]
+    fn test_zero_token_span_of_priced_model_is_not_free() {
+        let processor = OtelIngestionProcessor::new();
+        let mut entry = zero_price_entry("acme-paid-llm");
+        entry.definition.tiers[0].prices = HashMap::from([
+            ("input".to_string(), 0.000001),
+            ("output".to_string(), 0.000002),
+        ]);
+        let entries = vec![entry];
+
+        let mut no_tokens = HashMap::new();
+        no_tokens.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        no_tokens.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("acme-paid-llm"),
+        );
+        processor.process_span_with_pricing(
+            &mut no_tokens,
+            &HashMap::new(),
+            None,
+            &[],
+            &entries,
+            0,
+        );
+        assert_eq!(cost_status(&no_tokens), None);
     }
 
     #[test]
