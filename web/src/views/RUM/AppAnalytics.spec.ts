@@ -45,6 +45,12 @@ import useNamedEvents, { resetNamedEvents } from "@/composables/rum/useNamedEven
 import useSavedFunnels, { resetSavedFunnels } from "@/composables/rum/useSavedFunnels";
 import { encodeDef, MAX_EVENTS_PER_APP, stepRefParam } from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+import {
+  deleteEditorDraft,
+  readEditorDraft,
+  writeEditorDraft,
+} from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 const Child = { name: "AnalyticsOverview", template: "<div data-test='child-view' />" };
 
@@ -610,6 +616,38 @@ describe("AppAnalytics shell", () => {
     await flushPromises();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.eventNew);
     expect(router.currentRoute.value.query).toMatchObject({ app: "web", period: "7d" });
+  });
+
+  it("marks New event while this app has a new event draft", async () => {
+    const scope = {
+      kind: "rum_named_event" as const,
+      org: "org1",
+      entityId: null,
+      userEmail: String(store.state.userInfo?.email ?? ""),
+    };
+    writeEditorDraft({ ...scope, variant: "mobile" }, { data: {} });
+    writeEditorDraft({ ...scope, variant: "web" }, { data: {} });
+    const savedAt = readEditorDraft({ ...scope, variant: "web" })!.savedAt;
+    await mountAt("/product-analytics/events?app=web&period=7d");
+    await new Promise((r) => setTimeout(r, 30));
+    for (let i = 0; i < 3; i++) await flushPromises();
+    const cta = () => wrapper!.find('[data-test="rum-analytics-named-events-new-btn"]');
+    expect(cta().find('[data-test="rum-analytics-named-events-new-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(cta().attributes("aria-label")).toBe("New event · unsaved draft");
+    // The dot's tooltip dates this app's draft.
+    const dot = wrapper!
+      .findAllComponents(EditorDraftDot)
+      .find((c) => c.props("dataTest") === "rum-analytics-named-events-new-draft-dot")!;
+    expect(dot.props("savedAt")).toBe(savedAt);
+
+    deleteEditorDraft({ ...scope, variant: "web" });
+    await flushPromises();
+    expect(cta().find('[data-test="rum-analytics-named-events-new-draft-dot"]').exists()).toBe(
+      false,
+    );
+    localStorage.clear();
   });
 
   it("hides New event for a read-only role and disables it at the cap", async () => {

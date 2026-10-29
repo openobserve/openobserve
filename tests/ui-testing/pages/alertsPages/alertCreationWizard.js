@@ -13,6 +13,7 @@ import testLogger from '../../playwright-tests/utils/test-logger.js';
 import MonacoEditorHelper from '../../playwright-tests/utils/MonacoEditorHelper.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
 import { FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
+import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
 
 export class AlertCreationWizard {
     constructor(page, commonActions, locators) {
@@ -76,6 +77,7 @@ export class AlertCreationWizard {
         const maxRetries = 2;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             await this.page.locator(this.locators.addAlertBackButton || '[data-test="add-alert-back-btn"]').first().click();
+            await discardEditorDraftIfAsked(this.page);
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(1500);
 
@@ -897,6 +899,7 @@ export class AlertCreationWizard {
 
         // Cancel alert creation
         await this.page.locator(this.locators.alertBackButton).click();
+        await discardEditorDraftIfAsked(this.page);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         return { toggleSuccessful, message };

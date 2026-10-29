@@ -69,7 +69,8 @@ export class SyntheticsCreatePage {
       privateLocationsEmpty: '[data-test="synthetics-check-locations-private-empty"]',
       saveButton: '[data-test="synthetics-create-save-btn"]',
       cancelButton: '[data-test="synthetics-create-cancel-btn"]',
-      unsavedDialog: '[data-test="synthetics-create-unsaved-dialog"]',
+      unsavedDialog: '[data-test="editor-draft-leave-dialog"]',
+      leaveDiscardButton: '[data-test="o-dialog-neutral-btn"]',
       dialogPrimary: '[data-test="o-dialog-primary-btn"]',
       gateUrlField: '[data-test="synthetics-create-url-input-field"]',
       gateUrlError: '[data-test="synthetics-create-url-input-error"]',
@@ -257,10 +258,11 @@ export class SyntheticsCreatePage {
 
   async cancel() { await this.page.locator(this.locators.cancelButton).click(); }
 
+  // Leaves through the shared leave dialog's Discard, so no draft is left behind.
   async confirmLeave() {
     const dialog = this.page.locator(this.locators.unsavedDialog);
     await expect(dialog).toBeVisible({ timeout: 15000 });
-    await dialog.locator(this.locators.dialogPrimary).click();
+    await dialog.locator(this.locators.leaveDiscardButton).click();
   }
 
   async fillGate(url, name) {

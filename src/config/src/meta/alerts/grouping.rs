@@ -91,11 +91,6 @@ pub enum MultiAlertError {
     /// A PromQL alert opted in without a `promql_condition`: there is no
     /// threshold to classify a series against, so no group can have a level.
     PromqlConditionMissing,
-    /// Alert-level notification grouping batches every group under one
-    /// fingerprint with enqueue-time delivery accounting, collapsing the
-    /// per-group pages this feature exists to split apart. Rejected until
-    /// per-group batching (§5.5 MN-4) exists.
-    NotificationGroupingUnsupported,
 }
 
 impl std::fmt::Display for MultiAlertError {
@@ -128,10 +123,6 @@ impl std::fmt::Display for MultiAlertError {
             ),
             Self::PromqlConditionMissing => f.write_str(
                 "per-series alerting needs a PromQL condition to classify each series against",
-            ),
-            Self::NotificationGroupingUnsupported => f.write_str(
-                "per-group alerting cannot yet be combined with notification grouping; turn off \
-                 notification grouping or per-group alerting",
             ),
         }
     }

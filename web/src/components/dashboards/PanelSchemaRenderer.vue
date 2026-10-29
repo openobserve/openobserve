@@ -2280,6 +2280,7 @@ export default defineComponent({
       showErrorNotification,
       t,
       onExemplarClick: exemplarInteraction.onExemplarClick,
+      hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction?.({ type: "hideTip" }),
     });
 
     // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.

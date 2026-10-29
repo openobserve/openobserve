@@ -29,7 +29,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import type { FilterField } from "@/utils/query/filterBar";
 
-const props = defineProps<{ check: ProtocolCheck }>();
+const props = defineProps<{ check: ProtocolCheck; validationErrors?: Record<string, string> }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
 
 const { t } = useI18nTyped();
@@ -142,6 +142,8 @@ function removeHeader(index: number) {
             <OInput
               :model-value="h.value"
               :placeholder="t('synthetics.protocolConfig.http.headerValue')"
+              :error="!!validationErrors?.[`http.headers.${i}.value`]"
+              :error-message="raw(validationErrors?.[`http.headers.${i}.value`])"
               :data-test="`synthetics-check-http-header-value-${i}`"
               @update:model-value="
                 (v: string | number) =>

@@ -310,6 +310,16 @@ impl Error {
         }
     }
 
+    /// True for a PostgreSQL data exception (SQLSTATE class 22), which a retry cannot fix.
+    pub fn is_data_exception(&self) -> bool {
+        match self {
+            Error::SqlxError(sqlx::Error::Database(e)) => e
+                .code()
+                .is_some_and(|code| code.len() == 5 && code.starts_with("22")),
+            _ => false,
+        }
+    }
+
     /// The HTTP status code this error maps to. This is the single source of
     /// truth shared by the HTTP response mapping and audit logging.
     pub fn http_status(&self) -> u16 {
@@ -745,5 +755,64 @@ mod tests {
         let e = Error::from(IngestionError::OrgBlocked("t1".into()));
         assert_eq!(e.http_status(), 403);
         assert_eq!(e.to_string(), "Organization [t1] is deleted");
+    }
+
+    #[derive(Debug)]
+    struct CodedDbError(&'static str);
+
+    impl std::fmt::Display for CodedDbError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.0)
+        }
+    }
+
+    impl std::error::Error for CodedDbError {}
+
+    impl sqlx::error::DatabaseError for CodedDbError {
+        fn message(&self) -> &str {
+            self.0
+        }
+
+        fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+            Some(self.0.into())
+        }
+
+        fn as_error(&self) -> &(dyn std::error::Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn as_error_mut(&mut self) -> &mut (dyn std::error::Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn into_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync + 'static> {
+            self
+        }
+
+        fn kind(&self) -> sqlx::error::ErrorKind {
+            sqlx::error::ErrorKind::Other
+        }
+    }
+
+    fn db_error(code: &'static str) -> Error {
+        Error::SqlxError(sqlx::Error::Database(Box::new(CodedDbError(code))))
+    }
+
+    #[test]
+    fn test_is_data_exception() {
+        // 22001: string_data_right_truncation, e.g. a stream key longer than VARCHAR(256)
+        assert!(db_error("22001").is_data_exception());
+        assert!(db_error("22P02").is_data_exception());
+        // 40001 serialization_failure is transient; "22" alone is SQLite's SQLITE_NOLFS
+        assert!(!db_error("40001").is_data_exception());
+        assert!(!db_error("22").is_data_exception());
+        assert!(!Error::Message("22001".to_string()).is_data_exception());
+        // callers that return anyhow, such as the stats job, downcast to reach it
+        let wrapped = anyhow::Error::from(db_error("22001"));
+        assert!(
+            wrapped
+                .downcast_ref::<Error>()
+                .is_some_and(Error::is_data_exception)
+        );
     }
 }

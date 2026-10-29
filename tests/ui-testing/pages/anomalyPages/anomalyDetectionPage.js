@@ -31,6 +31,7 @@ const ANOMALY_OPERATOR_IDS = {
 };
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 const { cleanupTestAnomalies: apiCleanupTestAnomalies } = require('../../playwright-tests/utils/api-helper.js');
+const { discardEditorDraftIfAsked } = require('../alertsPages/editorDraftHelpers.js');
 
 class AnomalyDetectionPage {
     /**
@@ -744,6 +745,7 @@ class AnomalyDetectionPage {
         const btn = this.page.locator(this.selectors.cancelBtn);
         await btn.waitFor({ state: 'visible', timeout: 15000 });
         await btn.click({ force: true });
+        await discardEditorDraftIfAsked(this.page);
     }
 
     getStreamTypeSelectLocator() { return this.page.locator(this.selectors.streamTypeSelect); }

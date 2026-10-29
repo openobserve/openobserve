@@ -5,6 +5,7 @@
 //   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
 
 import { expect } from '@playwright/test';
+import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
 const modelPricingStrings = require('../../../../web/src/locales/languages/en-US.json').modelPricing;
 const { FilterBuilderDriver } = require('./filterBuilderPage.js');
 
@@ -181,11 +182,13 @@ export class ModelPricingPage {
     // ----------------------------------------------------------------
 
     async clickAdd() {
+        await clearEditorDrafts(this.page);
         await this.addBtn.click();
         await this.editorTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async clickEmptyAdd() {
+        await clearEditorDrafts(this.page);
         await this.emptyAddBtn.click();
         await this.editorTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
@@ -390,11 +393,13 @@ export class ModelPricingPage {
 
     async clickCancel() {
         await this.cancelBtn.click();
+        await discardEditorDraftIfAsked(this.page);
         await this.listTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async clickEditorBack() {
         await this.editorBackBtn.click();
+        await discardEditorDraftIfAsked(this.page);
         await this.listTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 

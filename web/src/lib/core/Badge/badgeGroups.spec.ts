@@ -19,6 +19,12 @@ describe("badgeGroups", () => {
     expect(r.labelKey).toBe("components.badge.alertType.realtime");
   });
 
+  it("resolves oncallResponseState exhausted to Nobody answered", () => {
+    const r = resolveBadge("oncallResponseState", "exhausted");
+    expect(r.variant).toBe("error-soft");
+    expect(r.labelKey).toBe("oncall.state_exhausted");
+  });
+
   it("resolves alertStatus to dot mode (no icon)", () => {
     const r = resolveBadge("alertStatus", "active");
     expect(r.mode).toBe("dot");
