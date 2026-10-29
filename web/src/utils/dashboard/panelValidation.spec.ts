@@ -687,6 +687,8 @@ describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline an
     ]);
     expect(run("gauge", { gauge_style: "dial" })).toHaveLength(1);
     expect(run("state-timeline", { state_value_align: "justify" })).toHaveLength(1);
+    expect(run("state-timeline", { state_timeline_display: "cells" })).toEqual([]);
+    expect(run("state-timeline", { state_timeline_display: "grid" })).toHaveLength(1);
   });
 
   it("rejects out-of-range numbers", () => {

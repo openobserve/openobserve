@@ -35,6 +35,7 @@ import {
   STATE_TIMELINE_MAX_SERIES,
   promqlSeriesCap,
   stateTimelineSourceRecord,
+  buildTimeCells,
 } from "./convertStateTimelineData";
 import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkProcessor";
 
@@ -42,6 +43,12 @@ import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkP
 vi.mock("@/utils/chartTheme", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/chartTheme")>()),
   chartColor: (token: string) => token,
+}));
+
+// The canvas mock measures one pixel per character; cell text is 11px, about 6.6px a character.
+vi.mock("./chartDimensionUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./chartDimensionUtils")>()),
+  calculateWidthText: (text: string) => text.length * 6.6,
 }));
 
 const S = 1000;
@@ -1520,5 +1527,215 @@ describe("state text alignment", () => {
   it("centres or right-aligns the state text", () => {
     expect(drawText({ state_value_align: "center" })).toMatchObject({ x: 200, align: "center" });
     expect(drawText({ state_value_align: "right" })).toMatchObject({ x: 296, align: "right" });
+  });
+});
+
+describe("state timeline cells display", () => {
+  const statusPanel = (config: any = {}) =>
+    sqlPanel({ state_timeline_display: "cells", ...config });
+  const render = (result: any, index = 0, width = 1000) => {
+    const [segment] = [segmentsOf(result)[index]];
+    const api = {
+      value: (i: number) => segment.value[i],
+      coord: ([x]: number[]) => [x === segment.value[0] ? 100 : 300, 10],
+      size: () => [0, 20],
+    };
+    return result.options.series[0].renderItem(
+      { coordSys: { x: 0, y: 0, width, height: 100 } },
+      api,
+    );
+  };
+
+  it("buildTimeCells: one cell per sample, a step wide, cut at the next sample, none for no value", () => {
+    expect(
+      buildTimeCells(
+        [
+          { t: 20 * S, state: "1" },
+          { t: 0, state: "1" },
+          { t: 5 * S, state: "2" },
+          { t: 40 * S, state: null },
+        ],
+        10 * S,
+      ),
+    ).toEqual([
+      { start: 0, end: 5 * S, state: "1" },
+      { start: 5 * S, end: 15 * S, state: "2" },
+      { start: 20 * S, end: 30 * S, state: "1" },
+    ]);
+  });
+
+  it("keeps equal neighbours as separate cells and draws no no-data segments", () => {
+    const data = [[row(0, "p1", 5), row(10, "p1", 5), row(30, "p1", 7)]];
+    const result = convertStateTimelineData(statusPanel(), data, store, null, sqlMeta, null);
+    expect(segmentsOf(result).map((d: any) => [d.state, d.start, d.end])).toEqual([
+      ["5", 0, 10 * S],
+      ["5", 10 * S, 20 * S],
+      ["7", 30 * S, 40 * S],
+    ]);
+    expect(legendNames(result)).not.toContain("No data");
+    expect(result.extras).toMatchObject({ isTimeSeries: true, rowEntities: ["p1"] });
+  });
+
+  it("shades numbers on one scale with no legend entries, and formats them with the panel unit", () => {
+    const data = [[row(0, "p1", 1), row(10, "p1", 50), row(20, "p1", 100)]];
+    const result = convertStateTimelineData(
+      statusPanel({ unit: "percent", decimals: 0 }),
+      data,
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    const colors = segmentsOf(result).map((d: any) => d.itemStyle.color);
+    expect(new Set(colors).size).toBe(3);
+    expect(legendNames(result)).toEqual([]);
+    expect(render(result).children[1].style.text).toBe("1%");
+  });
+
+  it("keeps the lowest and highest shades readable against the panel background in both themes", () => {
+    const data = [[row(0, "p1", 1), row(10, "p1", 50), row(20, "p1", 100)]];
+    const luminance = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const shadesFor = (theme: string) =>
+      segmentsOf(
+        convertStateTimelineData(
+          statusPanel(),
+          data,
+          { ...store, state: { ...store.state, theme } },
+          null,
+          sqlMeta,
+          null,
+        ),
+      ).map((d: any) => luminance(d.itemStyle.color));
+    const light = shadesFor("light");
+    const dark = shadesFor("dark");
+    expect(Math.max(...light)).toBeLessThan(0.9);
+    expect(Math.min(...dark)).toBeGreaterThan(0.08);
+    expect(Math.max(...dark)).toBeLessThan(0.9);
+    expect(new Set(dark).size).toBe(3);
+  });
+
+  it("colours by threshold steps and lists each step in the legend", () => {
+    const thresholds = {
+      mode: "absolute",
+      baseColor: "#00ff00",
+      steps: [{ value: 50, color: "#ff0000" }],
+    };
+    const data = [[row(0, "p1", 10), row(10, "p1", 60)]];
+    const result = convertStateTimelineData(
+      statusPanel({ thresholds, decimals: 0 }),
+      data,
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    expect(segmentsOf(result).map((d: any) => d.itemStyle.color)).toEqual(["#00ff00", "#ff0000"]);
+    expect(legendNames(result)).toEqual(["< 50", "≥ 50"]);
+  });
+
+  it("gives a text state the same colour as bands, so switching the display does not recolour it", () => {
+    const data = [[row(0, "p1", "running"), row(10, "p1", "degraded")]];
+    const bands = segmentsOf(
+      convertStateTimelineData(sqlPanel(), data, store, null, sqlMeta, null),
+    );
+    const cells = segmentsOf(
+      convertStateTimelineData(statusPanel(), data, store, null, sqlMeta, null),
+    );
+    expect(cells.map((segment: any) => segment.itemStyle.color)).toEqual(
+      bands.map((segment: any) => segment.itemStyle.color),
+    );
+  });
+
+  it("lets a value mapping name and colour a cell, and gives text values palette colours in the legend", () => {
+    const mappings = [{ type: "value", value: "0", text: "Down", color: "#990000" }];
+    const data = [[row(0, "p1", 0), row(10, "p1", "maintenance")]];
+    const result = convertStateTimelineData(
+      statusPanel({ mappings }),
+      data,
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    const [down, text] = segmentsOf(result);
+    expect(down.itemStyle.color).toBe("#990000");
+    expect(legendNames(result)).toEqual(expect.arrayContaining(["Down", "maintenance"]));
+    expect(text.itemStyle.color).toEqual(expect.any(String));
+  });
+
+  it("centres values by default, leaves a gap between cells and hides values when switched off", () => {
+    const data = [[row(0, "p1", 3)]];
+    const shown = convertStateTimelineData(statusPanel(), data, store, null, sqlMeta, null);
+    const drawn = render(shown);
+    expect(drawn.children[0].shape).toMatchObject({ x: 101, width: 198 });
+    expect(drawn.children[1].style).toMatchObject({ x: 200, align: "center" });
+    const hidden = convertStateTimelineData(
+      statusPanel({ show_state_text: false }),
+      data,
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    expect(render(hidden).type).toBe("rect");
+  });
+
+  it("leaves a value out of a cell too narrow to show it whole, instead of cutting the number", () => {
+    const narrow = (result: any) => {
+      const [segment] = segmentsOf(result);
+      return result.options.series[0].renderItem(
+        { coordSys: { x: 0, y: 0, width: 1000, height: 100 } },
+        {
+          value: (i: number) => segment.value[i],
+          coord: ([x]: number[]) => [x === segment.value[0] ? 100 : 140, 10],
+          size: () => [0, 20],
+        },
+      );
+    };
+    const data = [[row(0, "p1", 1234.56)]];
+    const status = convertStateTimelineData(
+      statusPanel({ decimals: 2 }),
+      data,
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    expect(narrow(status).type).toBe("rect");
+    expect(render(status).children[1].style.text).toBe("1234.56");
+    // A state timeline names states, so a long name is still cut to fit.
+    const timeline = convertStateTimelineData(
+      sqlPanel(),
+      [[row(0, "p1", "maintenance")]],
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    expect(narrow(timeline).children[1].style.overflow).toBe("truncate");
+  });
+
+  it("a state timeline still merges runs and draws without gaps", () => {
+    const data = [[row(0, "p1", "up"), row(10, "p1", "up")]];
+    const result = convertStateTimelineData(sqlPanel(), data, store, null, sqlMeta, null);
+    expect(segmentsOf(result)).toHaveLength(1);
+    expect(render(result).children[0].shape).toMatchObject({ x: 100, width: 200 });
+  });
+
+  it("an unset display draws bands, exactly as with Default", () => {
+    const data = [[row(0, "p1", "up"), row(10, "p1", "up")]];
+    const unset = convertStateTimelineData(sqlPanel(), data, store, null, sqlMeta, null);
+    const bands = convertStateTimelineData(
+      sqlPanel({ state_timeline_display: "bands" }),
+      data,
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    expect(segmentsOf(bands)).toEqual(segmentsOf(unset));
   });
 });
