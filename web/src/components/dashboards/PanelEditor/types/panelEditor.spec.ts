@@ -321,6 +321,7 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("custom_chart");
         expect(ALL_CHART_TYPES).toContain("state-timeline");
         expect(ALL_CHART_TYPES).toContain("hostmap");
+        expect(ALL_CHART_TYPES).toContain("treemap");
       });
 
       it("includes the bar gauge, which needs aggregation", () => {
@@ -354,6 +355,7 @@ describe("panelEditor types and utilities", () => {
         expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("heatmap");
         expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("geomap");
         expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("sankey");
+        expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("treemap");
       });
 
       it("should not contain table chart type", () => {

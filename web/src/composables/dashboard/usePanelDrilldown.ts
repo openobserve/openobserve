@@ -45,7 +45,7 @@ import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
 
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
-const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge"];
+const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap"];
 
 export function usePanelDrilldown({
   panelSchema,
@@ -600,6 +600,8 @@ export function usePanelDrilldown({
     }
     // A host map group header has a tooltip but is no cell to drill into.
     if (panelSchema.value.type === "hostmap" && params?.seriesIndex !== 0) return;
+    // A treemap breadcrumb navigates the tiles and carries no series name or value.
+    if (params?.selfType === "breadcrumb") return;
     const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
     // Query-source markers are read-only and explain themselves on hover.
     const isQueryMarker = isMarker && !!params?.data?.annotationDetails?.source;
