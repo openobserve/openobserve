@@ -126,7 +126,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 126: add held_action to slack_link_requests.
 // 127: add group_label_set to alert_states.
 // 128: widen alert_dedup_state.fingerprint to varchar(256).
-pub const DB_SCHEMA_VERSION: u64 = 128;
+// 129: add source, query_key, streams, run_count, updated_at and status to query_history.
+pub const DB_SCHEMA_VERSION: u64 = 129;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2911,7 +2912,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
         default = 14,
-        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less removes the age limit; each user still keeps at most 500 unstarred entries per source (logs, traces, metrics, dbm, profiles), the oldest of that source pruned first. It does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds

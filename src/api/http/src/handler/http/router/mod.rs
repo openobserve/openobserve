@@ -1376,7 +1376,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/savedviews", get(search::saved_view::get_views).post(search::saved_view::create_view))
         .route("/{org_id}/savedviews/{view_id}", get(search::saved_view::get_view).put(search::saved_view::update_view).delete(search::saved_view::delete_view))
 
-        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
+        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).delete(query_history::clear).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
         .route("/{org_id}/query_history/{id}", patch(query_history::star).delete(query_history::delete).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
 
         // Functions
@@ -4353,6 +4353,29 @@ mod tests {
         assert!(
             json.contains("/{org_id}/query_functions"),
             "query_functions is missing from the OpenAPI surface"
+        );
+    }
+
+    #[test]
+    fn query_history_list_publishes_both_response_shapes() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let ok = &spec["paths"]["/api/{org_id}/query_history"]["get"]["responses"]["200"];
+        assert_eq!(
+            ok["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/QueryHistoryListResponse"
+        );
+        let shapes = spec["components"]["schemas"]["QueryHistoryListResponse"]["oneOf"]
+            .as_array()
+            .expect("the list response is a oneOf");
+        let shapes = serde_json::to_string(shapes).unwrap();
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryEntry"),
+            "{shapes}"
+        );
+        assert!(shapes.contains("\"type\":\"array\""), "{shapes}");
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryCountResponse"),
+            "{shapes}"
         );
     }
 

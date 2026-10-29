@@ -257,7 +257,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-border-default h-full w-1 transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
-              <div class="relative h-full w-full">
+              <div
+                ref="queryEditorBoxRef"
+                class="relative h-full w-full"
+                @keydown.capture="recentHost?.onKeydown($event)"
+              >
                 <UnifiedQueryEditor
                   ref="queryEditorRef"
                   :languages="['sql', 'promql']"
@@ -275,8 +279,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :suggestions="currentEditorSuggestions"
                   :field-value-resolver="resolveFieldValues"
                   :values-time-range="valuesTimeRange"
+                  :recent-queries="recentQueries"
                   @update:query="handleQueryUpdate"
-                  @focus="_sqlOnFocus"
+                  @user-edit="
+                    (isBlank: boolean, wasBlank: boolean) => recentHost?.onEdit(isBlank, wasBlank)
+                  "
+                  @focus="onQueryEditorFocus"
                   @blur="_sqlOnBlur"
                   @language-change="handleLanguageChange"
                   @ask-ai="handleAskAI"
@@ -411,6 +419,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { RECENT_SEARCHES_EDITOR_HOST } from "@/composables/queryHistory/useRecentSearchesEditorHost";
 import {
   formulaInputs,
   formulaRefs,
@@ -462,6 +471,9 @@ export default defineComponent({
     const { showErrorNotification, showPositiveNotification } = useNotifications();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    // Only the Metrics page provides it; dashboards get no recents.
+    const recentHost = inject(RECENT_SEARCHES_EDITOR_HOST, null);
+    const queryEditorBoxRef = ref<HTMLElement | null>(null);
 
     const { getAllFunctions } = useFunctions();
     const functionList = ref<FunctionListItem[]>([]);
@@ -1157,10 +1169,21 @@ export default defineComponent({
       editingQueryName.value = "";
     };
 
+    const recentQueries = computed(() => recentHost?.queries.value ?? []);
+
+    const onQueryEditorFocus = () => {
+      _sqlOnFocus();
+      recentHost?.onFocus(queryEditorBoxRef.value);
+    };
+
     return {
       raw,
       t,
       router,
+      recentHost,
+      queryEditorBoxRef,
+      recentQueries,
+      onQueryEditorFocus,
       onDropDownClick,
       promqlMode,
       dashboardPanelData,
