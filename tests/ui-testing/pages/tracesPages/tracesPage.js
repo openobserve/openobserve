@@ -3250,4 +3250,61 @@ export class TracesPage {
   async expectWaterfallSpanRow(spanId) {
     await expect(this.page.locator(`${this.spanRow}[id="${spanId}"]`)).toBeVisible({ timeout: 30000 });
   }
+
+  startCollectingPageErrors() {
+    this.pageErrors = [];
+    this.page.on('pageerror', (error) => this.pageErrors.push(error.message));
+  }
+
+  getPageErrors() {
+    return [...(this.pageErrors || [])];
+  }
+
+  async navigateToTracesWithFilter({ filter, stream = 'default', period = '15m', org = process.env['ORGNAME'] || 'default' }) {
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    // Same url-safe base64 alphabet as b64EncodeUnicode in web/src/utils/formatters.ts.
+    const query = Buffer.from(filter, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '.');
+    await this.page.goto(`${baseUrl}/web/traces?stream=${encodeURIComponent(stream)}&period=${period}&query=${query}&org_identifier=${org}`);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  async navigateToTraceDetailsSpanUrl({ traceId, spanId, fromUs, toUs, stream = 'default', org = process.env['ORGNAME'] || 'default' }) {
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    await this.page.goto(`${baseUrl}/web/traces/trace-details?stream=${stream}&trace_id=${traceId}&span_id=${spanId}&from=${fromUs}&to=${toUs}&org_identifier=${org}`);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  async hardReload() {
+    await this.page.reload({ waitUntil: 'load' });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  async expectTracesListRendered() {
+    await expect(this.page.locator(this.searchBar)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.searchResultItem).first()).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectTracesSearchBarRendered() {
+    await expect(this.page.locator(this.searchBar)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.queryEditor).first()).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectTraceDetailsSelectedSpan(spanId) {
+    await expect(this.page.locator(this.traceDetailsHeader)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator('[data-test="trace-details-sidebar-header-toolbar-span-id"]').first()).toContainText(spanId, { timeout: 30000 });
+  }
+
+  /** Samples the animated query placeholder; `examples` are the fully typed strings (no sample extends them). */
+  async sampleQueryPlaceholder(durationMs = 12000, intervalMs = 100) {
+    const typewriter = this.page.locator(`${this.searchBar} .query-editor-placeholder-typewriter`);
+    await expect(typewriter).toHaveText(/\S/, { timeout: 30000 });
+    const samples = await typewriter.evaluate((el, { durationMs, intervalMs }) => new Promise((resolve) => {
+      const seen = new Set();
+      const timer = setInterval(() => seen.add(el.textContent || ''), intervalMs);
+      setTimeout(() => { clearInterval(timer); resolve([...seen]); }, durationMs);
+    }), { durationMs, intervalMs });
+    const nonEmpty = samples.filter((s) => s.trim());
+    const examples = nonEmpty.filter((s) => !nonEmpty.some((o) => o !== s && o.startsWith(s)));
+    return { samples: nonEmpty, examples };
+  }
 }
