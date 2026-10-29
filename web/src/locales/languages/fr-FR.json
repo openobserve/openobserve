@@ -8258,6 +8258,8 @@
       "urlHidden": "Aucun accès",
       "urlHiddenHint": "Vous ne pouvez pas consulter le tableau de bord de ce lien : son URL publique est donc masquée.",
       "orgDisabledHint": "Les liens publics sont désactivés pour cette organisation",
+      "orgDisabledBanner": "Les liens publics sont désactivés pour cette organisation, aucun lien n'est donc servi. Un administrateur peut les réactiver.",
+      "disabledPaused": "Désactivé · En pause",
       "takeOver": "Prendre le relais",
       "takeOverTitle": "Prendre le relais sur ce lien ?",
       "takeOverBody": "Vous devenez l'éditeur. La page publique affichera ce que vous êtes autorisé à voir, ce qui peut être plus ou moins qu'avant. Toute personne disposant de l'URL y garde accès, et le lien est actif dès maintenant.",
@@ -18504,7 +18506,9 @@
     "dataFresh": "Les données sont récentes",
     "dataGettingStale": "Les données deviennent obsolètes",
     "dataStale": "Les données sont périmées",
-    "lastRefreshed": "Dernière actualisation : {time}"
+    "lastRefreshed": "Dernière actualisation : {time}",
+    "refresh": "Actualiser",
+    "refreshWithAge": "Actualiser, dernière actualisation : {age}"
   },
   "synthetics": {
     "variables": {

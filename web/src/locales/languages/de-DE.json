@@ -8258,6 +8258,8 @@
       "urlHidden": "Kein Zugriff",
       "urlHiddenHint": "Sie können das Dashboard dieses Links nicht ansehen, daher ist seine öffentliche URL ausgeblendet.",
       "orgDisabledHint": "Öffentliche Links sind für diese Organisation deaktiviert",
+      "orgDisabledBanner": "Öffentliche Links sind für diese Organisation deaktiviert, daher wird kein Link bereitgestellt. Ein Administrator kann sie wieder aktivieren.",
+      "disabledPaused": "Deaktiviert · Pausiert",
       "takeOver": "Übernehmen",
       "takeOverTitle": "Diesen Link übernehmen?",
       "takeOverBody": "Sie werden zum Herausgeber. Die öffentliche Seite zeigt, was Sie sehen dürfen. Das kann mehr oder weniger sein als bisher. Wer die URL hat, behält den Zugriff, und der Link ist ab sofort aktiv.",
@@ -18504,7 +18506,9 @@
     "dataFresh": "Die Daten sind frisch",
     "dataGettingStale": "Daten werden veraltet",
     "dataStale": "Daten sind veraltet",
-    "lastRefreshed": "Zuletzt aktualisiert: {time}"
+    "lastRefreshed": "Zuletzt aktualisiert: {time}",
+    "refresh": "Aktualisieren",
+    "refreshWithAge": "Aktualisieren, zuletzt aktualisiert {age}"
   },
   "synthetics": {
     "variables": {

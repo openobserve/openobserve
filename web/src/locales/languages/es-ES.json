@@ -8258,6 +8258,8 @@
       "urlHidden": "Sin acceso",
       "urlHiddenHint": "No puedes ver el dashboard de este enlace, así que su URL pública está oculta.",
       "orgDisabledHint": "Los enlaces públicos están desactivados para esta organización",
+      "orgDisabledBanner": "Los enlaces públicos están desactivados para esta organización, por lo que no se sirve ningún enlace. Un administrador puede volver a activarlos.",
+      "disabledPaused": "Desactivado · En pausa",
       "takeOver": "Hacerse cargo",
       "takeOverTitle": "¿Hacerte cargo de este enlace?",
       "takeOverBody": "Pasarás a ser el publicador. La página pública mostrará lo que tienes permiso para ver, que puede ser más o menos que antes. Quien tenga la URL conserva el acceso, y el enlace se activa ahora.",
@@ -18504,7 +18506,9 @@
     "dataFresh": "Los datos están actualizados",
     "dataGettingStale": "Los datos se están volviendo obsoletos",
     "dataStale": "Los datos están obsoletos",
-    "lastRefreshed": "Última actualización: {time}"
+    "lastRefreshed": "Última actualización: {time}",
+    "refresh": "Actualizar",
+    "refreshWithAge": "Actualizar, última actualización {age}"
   },
   "synthetics": {
     "variables": {

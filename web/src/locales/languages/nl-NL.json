@@ -8258,6 +8258,8 @@
       "urlHidden": "Geen toegang",
       "urlHiddenHint": "Je kunt het dashboard van deze link niet bekijken, dus de openbare URL is verborgen.",
       "orgDisabledHint": "Openbare links zijn uitgeschakeld voor deze organisatie",
+      "orgDisabledBanner": "Openbare links zijn uitgeschakeld voor deze organisatie, dus er wordt geen link geserveerd. Een beheerder kan ze weer inschakelen.",
+      "disabledPaused": "Uitgeschakeld · Gepauzeerd",
       "takeOver": "Overnemen",
       "takeOverTitle": "Deze link overnemen?",
       "takeOverBody": "Je wordt de uitgever. De openbare pagina toont wat jij mag zien, en dat kan meer of minder zijn dan voorheen. Iedereen met de URL houdt toegang, en de link is vanaf nu actief.",
@@ -18504,7 +18506,9 @@
     "dataFresh": "Gegevens zijn vers",
     "dataGettingStale": "Gegevens worden muf",
     "dataStale": "Gegevens zijn verouderd",
-    "lastRefreshed": "Laatst ververst: {time}"
+    "lastRefreshed": "Laatst ververst: {time}",
+    "refresh": "Vernieuwen",
+    "refreshWithAge": "Vernieuwen, laatst vernieuwd {age}"
   },
   "synthetics": {
     "variables": {

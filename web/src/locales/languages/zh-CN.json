@@ -8258,6 +8258,8 @@
       "urlHidden": "无访问权限",
       "urlHiddenHint": "您无法查看此链接的仪表盘，因此其公开 URL 已隐藏。",
       "orgDisabledHint": "此组织已关闭公开链接",
+      "orgDisabledBanner": "此组织已关闭公开链接，因此不会提供链接。管理员可将其重新开启。",
+      "disabledPaused": "已禁用 · 已暂停",
       "takeOver": "接管",
       "takeOverTitle": "接管此链接？",
       "takeOverBody": "您将成为发布者。公开页面将显示您有权查看的内容，可能比之前多或少。拥有该 URL 的任何人仍可访问，链接将立即生效。",
@@ -18504,7 +18506,9 @@
     "dataFresh": "数据很新",
     "dataGettingStale": "数据变得陈旧了",
     "dataStale": "数据已过时",
-    "lastRefreshed": "上次刷新时间：{time}"
+    "lastRefreshed": "上次刷新时间：{time}",
+    "refresh": "刷新",
+    "refreshWithAge": "刷新，上次刷新 {age}"
   },
   "synthetics": {
     "variables": {

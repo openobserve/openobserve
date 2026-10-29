@@ -8258,6 +8258,8 @@
       "urlHidden": "액세스 권한 없음",
       "urlHiddenHint": "이 링크의 대시보드를 볼 수 없으므로 공개 URL이 숨겨집니다.",
       "orgDisabledHint": "이 조직에서는 공개 링크가 꺼져 있습니다",
+      "orgDisabledBanner": "이 조직에서는 공개 링크가 꺼져 있어 링크가 제공되지 않습니다. 관리자가 다시 켤 수 있습니다.",
+      "disabledPaused": "비활성화됨 · 일시 중지됨",
       "takeOver": "인계받기",
       "takeOverTitle": "이 링크를 인계받을까요?",
       "takeOverBody": "본인이 게시자가 됩니다. 공개 페이지에는 본인이 볼 수 있는 내용이 표시되며, 이전보다 많거나 적을 수 있습니다. URL이 있는 사람은 계속 액세스할 수 있으며, 링크는 지금 바로 활성화됩니다.",
@@ -18504,7 +18506,9 @@
     "dataFresh": "최신 데이터",
     "dataGettingStale": "데이터가 점점 부실해지고 있습니다",
     "dataStale": "데이터가 오래됨",
-    "lastRefreshed": "마지막 새로 고침: {time}"
+    "lastRefreshed": "마지막 새로 고침: {time}",
+    "refresh": "새로고침",
+    "refreshWithAge": "새로고침, 마지막 새로고침 {age}"
   },
   "synthetics": {
     "variables": {
