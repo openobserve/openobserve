@@ -45,7 +45,7 @@ import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
 
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
-const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap"];
+const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst"];
 
 export function usePanelDrilldown({
   panelSchema,

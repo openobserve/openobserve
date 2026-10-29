@@ -559,8 +559,16 @@ describe("DashboardQueryBuilder", () => {
           wrapper.vm.currentBreakdownLabel,
         ];
       };
+      expect(wells("sunburst")).toEqual(["Group", "Size", "Sub-group"]);
       expect(wells("bar")).toEqual(["X-Axis", "Y-Axis", "Breakdown"]);
       expect(wells("h-bar")).toEqual(["Y-Axis", "X-Axis", "Breakdown"]);
+      wrapper.unmount();
+      wrapper = createWrapper({ "data.type": "sunburst" });
+      const text = wrapper.text();
+      expect(text).toContain("Group");
+      expect(text).toContain("Sub-group");
+      expect(text).toContain("Size");
+      expect(text).not.toContain("X-Axis");
     });
 
     it("names the treemap wells by their job", () => {

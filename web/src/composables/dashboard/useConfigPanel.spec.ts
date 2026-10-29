@@ -1603,6 +1603,20 @@ describe("useConfigPanel – state timeline display", () => {
     expect(visible({ state_timeline_display: "cells" }, "merge-gaps")).toBe(false);
   });
 });
+describe("useConfigPanel – sunburst options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the label switch on sunburst only", () => {
+    expect(visible("sunburst", "data", "sunburst-labels")).toBe(true);
+    expect(visible("pie", "data", "sunburst-labels")).toBe(false);
+  });
+
+  it("shows no thresholds or series overrides on sunburst", () => {
+    expect(shouldShowThresholds({ data: { type: "sunburst", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "sunburst" } })).toBe(false);
+  });
+});
 
 describe("useConfigPanel – sparkline search visibility", () => {
   it("drops the sparkline option for an all-instant PromQL metric only", async () => {

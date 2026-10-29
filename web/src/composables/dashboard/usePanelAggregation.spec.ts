@@ -666,6 +666,69 @@ describe("usePanelAggregation", () => {
         expect(fields.y).toEqual([countRows]);
       });
     });
+    describe("sunburst chart type", () => {
+      const yField = (functionName: string | null) => ({
+        functionName,
+        args: [{ type: "field" }, { type: "extra" }],
+      });
+
+      it("keeps every x ring, one y counted and one breakdown", () => {
+        const sunburst = makePanelData("sunburst");
+        const ring = sunburst.data.queries[0].fields;
+        ring.x = [{ alias: "x1" }, { alias: "x2" }];
+        ring.y = [yField(null), yField("sum")];
+        ring.breakdown = [{ alias: "b1" }, { alias: "b2" }];
+        makeAggregation(sunburst).resetAggregationFunction();
+        expect(ring.x).toEqual([{ alias: "x1" }, { alias: "x2" }]);
+        expect(ring.y.map((item: any) => item.functionName)).toEqual(["count"]);
+        expect(ring.breakdown).toEqual([{ alias: "b1" }]);
+      });
+
+      it("turns a size the rings cannot add up into a count and keeps a sum", () => {
+        const sunburst = makePanelData("sunburst");
+        const ring = sunburst.data.queries[0].fields;
+        ring.x = [{ alias: "x1" }];
+        ring.y = [yField("avg")];
+        makeAggregation(sunburst).resetAggregationFunction();
+        expect(ring.y[0].functionName).toBe("count");
+        ring.y = [yField("sum")];
+        makeAggregation(sunburst).resetAggregationFunction();
+        expect(ring.y[0].functionName).toBe("sum");
+      });
+
+      it("trims to five rings, dropping the breakdown when the x fields fill them", () => {
+        const sunburst = makePanelData("sunburst");
+        const ring = sunburst.data.queries[0].fields;
+        ring.x = Array.from({ length: 6 }, (_, i) => ({ alias: `x${i + 1}` }));
+        ring.y = [yField(null)];
+        ring.breakdown = [{ alias: "b1" }];
+        makeAggregation(sunburst).resetAggregationFunction();
+        expect(ring.x.map((item: any) => item.alias)).toEqual(["x1", "x2", "x3", "x4", "x5"]);
+        expect(ring.breakdown).toEqual([]);
+      });
+
+      it("keeps the default count of the timestamp as the size, never a raw field", () => {
+        const sunburst = makePanelData("sunburst");
+        sunburst.meta = {
+          streamFields: {
+            groupedFields: [{ name: "s", schema: [{ name: "bytes", type: "Int64" }] }],
+          },
+        };
+        const ring = sunburst.data.queries[0].fields;
+        ring.y = [
+          {
+            alias: "y_axis_1",
+            column: "_timestamp",
+            functionName: "count",
+            args: [{ type: "field", value: { field: "_timestamp" } }],
+          },
+        ];
+        makeAggregation(sunburst).resetAggregationFunction();
+        expect(ring.y).toHaveLength(1);
+        expect(ring.y[0].functionName).toBe("count");
+        expect(ring.y[0].args[0].value.field).toBe("_timestamp");
+      });
+    });
 
     describe("starter queries", () => {
       it("leaves hand-written SQL in custom mode on a switch to a builder chart", () => {

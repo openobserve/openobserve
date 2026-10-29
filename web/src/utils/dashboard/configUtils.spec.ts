@@ -1629,6 +1629,26 @@ describe("configUtils", () => {
       expect(shouldShowAxisConfig(panel("treemap"))).toBe(false);
     });
   });
+  describe("sunburst", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("sunburst"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("sunburst"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("sunburst"))).toBe(false);
+    });
+  });
 });
 
 describe("pruneDependentOptions", () => {

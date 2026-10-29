@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'gauge',
               'bar-gauge',
               'treemap',
+              'sunburst',
             ].includes(props.data.type)
           "
           variant="ghost"

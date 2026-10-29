@@ -803,6 +803,101 @@ describe("validatePanel on distribution", () => {
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+describe("validatePanel on sunburst", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (type: string, fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one group, one size and a sub-group", () => {
+    expect(
+      run("sunburst", { x: [field("region")], y: [field("count")], breakdown: [field("s")] }),
+    ).toEqual([]);
+  });
+
+  it("rejects a missing group", () => {
+    expect(run("sunburst", { x: [], y: [field("c")] })).toHaveLength(1);
+  });
+
+  it("accepts several group rings plus a sub-group up to five levels", () => {
+    const x = ["region", "service", "host", "pod"].map(field);
+    expect(run("sunburst", { x, y: [field("c")], breakdown: [field("s")] })).toEqual([]);
+  });
+
+  it("rejects more than five levels across the group and sub-group fields", () => {
+    const x = ["a", "b", "c", "d", "e"].map(field);
+    const errors = run("sunburst", { x, y: [field("c")], breakdown: [field("s")] });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("at most 5 levels");
+  });
+
+  it("accepts a count or a sum as the size and rejects an aggregation the rings cannot add up", () => {
+    const sizeError = gt("dashboard.utils.sizeMustBeCountOrSum");
+    // The function list is mocked empty here, so only the size rule's own error is checked.
+    const errorsWith = (functionName: string) =>
+      run("sunburst", {
+        x: [field("region")],
+        y: [{ alias: "y_axis_1", type: "build", functionName, args: [] }],
+      });
+    expect(errorsWith("count")).not.toContain(sizeError);
+    expect(errorsWith("sum")).not.toContain(sizeError);
+    for (const fn of ["avg", "max", "count-distinct", "p95"]) {
+      expect(errorsWith(fn), fn).toContain(sizeError);
+    }
+  });
+
+  it("is not allowed on PromQL", () => {
+    expect(run("sunburst", {}, {}, "promql")).toContain(
+      gt("dashboard.utils.promqlChartTypeUnsupported"),
+    );
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "sunburst", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
 
 describe("validatePanel on a gauge range", () => {
   const run = (configs: any[]) => {
