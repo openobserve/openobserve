@@ -113,7 +113,7 @@ pip3 install -r requirements.txt
 ```bash
 export DEEPSEEK_API_KEY=your_api_key
 # optional overrides:
-export DEEPSEEK_MODEL=deepseek-flash           # model id
+export DEEPSEEK_MODEL=deepseek-v4-flash        # model id
 export DEEPSEEK_BASE_URL=https://api.deepseek.com
 export TRANSLATION_BATCH_SIZE=50               # strings per API call
 export TRANSLATION_CONCURRENCY=4               # batches in flight per locale (1 = serial)

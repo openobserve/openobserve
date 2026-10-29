@@ -185,6 +185,7 @@ class Tracer:
             "gen_ai.provider.name": self.provider,
             "gen_ai.request.model": model,
             "gen_ai.request.reasoning_effort": reasoning_effort or "default",
+            f"{self.content_prefix}.operation.name": "chat",
             "gen_ai.agent.name": agent_name,
             "ai.agent.key": agent_key,
             "ai.agent.name": agent_name,
@@ -317,15 +318,16 @@ class LlmCall:
         self.span.attributes.update(
             response_attributes(data, self.tracer.content_prefix, self.tracer.secrets, model or self.model)
         )
-        self.span.attributes["ai.pricing.peak"] = is_peak(started)
+        self.span.attributes[f"{self.tracer.content_prefix}.pricing.peak"] = is_peak(started)
 
     def reject(self, error):
         """Mark the latest attempt failed for a caller-side reason, such as an unusable response."""
         self.last_error = error
 
     def end(self, error=None):
-        attrs = {"ai.attempts": self.attempts}
-        attrs.update(usage_attributes(self.usage))
+        prefix = self.tracer.content_prefix
+        attrs = {f"{prefix}.attempts": self.attempts}
+        attrs.update(usage_attributes(self.usage, prefix))
         attrs["gen_ai.usage.cost"] = None if self.cost is None else round(self.cost, 10)
         self.tracer.end_span(self.span, attrs, error if error is not None else self.last_error)
 
@@ -561,7 +563,7 @@ def usage_from_response(data):
     }
 
 
-def usage_attributes(usage):
+def usage_attributes(usage, prefix="ai.llm"):
     """OpenObserve's extractor treats input_tokens as including gen_ai.usage.cache_read.input_tokens."""
     total = usage.get("total")
     if total is None and usage.get("input") is not None and usage.get("output") is not None:
@@ -572,7 +574,7 @@ def usage_attributes(usage):
         "gen_ai.usage.total_tokens": total,
         "gen_ai.usage.cache_read.input_tokens": usage.get("cache_read"),
         "gen_ai.usage.cache_creation.input_tokens": usage.get("cache_creation"),
-        "ai.usage.reasoning_tokens": usage.get("reasoning"),
+        f"{prefix}.usage.reasoning_tokens": usage.get("reasoning"),
     }
 
 

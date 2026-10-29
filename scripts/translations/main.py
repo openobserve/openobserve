@@ -21,7 +21,7 @@ Exit codes:
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
-    DEEPSEEK_MODEL     Model id (default "deepseek-flash").
+    DEEPSEEK_MODEL     Model id (default "deepseek-v4-flash").
     TRANSLATION_BATCH_SIZE  Strings per API call (default 50).
     TRANSLATION_CONCURRENCY Batches in flight per locale (default 4; 1 = serial).
 """

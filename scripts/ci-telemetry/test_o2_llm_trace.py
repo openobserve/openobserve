@@ -215,7 +215,7 @@ class UsageTest(unittest.TestCase):
         self.assertEqual(attrs["gen_ai.usage.cache_read.input_tokens"], 800)
         self.assertEqual(attrs["gen_ai.usage.output_tokens"], 300)
         self.assertEqual(attrs["gen_ai.usage.total_tokens"], 1300)
-        self.assertEqual(attrs["ai.usage.reasoning_tokens"], 120)
+        self.assertEqual(attrs["ai.llm.usage.reasoning_tokens"], 120)
         self.assertNotIn("gen_ai.usage.cache_read_input_tokens", attrs)
 
     def test_openai_cached_tokens_fallback(self):
@@ -300,7 +300,7 @@ class TracerTest(unittest.TestCase):
 
         a = attr_map(chat["attributes"])
         self.assertEqual(chat["status"]["code"], t.STATUS_OK)
-        self.assertEqual(a["ai.attempts"], "2")
+        self.assertEqual(a["ai.llm.attempts"], "2")
         for key, value in {
             "gen_ai.operation.name": "chat",
             "gen_ai.provider.name": "deepseek",
@@ -318,7 +318,7 @@ class TracerTest(unittest.TestCase):
             "gen_ai.usage.output_tokens": "300",
             "gen_ai.usage.total_tokens": "1300",
             "gen_ai.usage.cache_read.input_tokens": "800",
-            "ai.usage.reasoning_tokens": "120",
+            "ai.llm.usage.reasoning_tokens": "120",
         }.items():
             self.assertEqual(a[key], value, key)
         self.assertIn("gen_ai.usage.cost", a)
@@ -338,7 +338,7 @@ class TracerTest(unittest.TestCase):
         self.assertEqual(chat["status"]["code"], t.STATUS_ERROR)
         self.assertEqual(a["error.type"], "RuntimeError")
         self.assertEqual(a["error.message"], "boom")
-        self.assertEqual(a["ai.attempts"], "1")
+        self.assertEqual(a["ai.llm.attempts"], "1")
         self.assertNotIn("gen_ai.usage.cost", a)
         event = chat["events"][0]
         self.assertEqual(event["name"], "exception")
@@ -357,7 +357,7 @@ class TracerTest(unittest.TestCase):
         a = attr_map(next(s for s in recorder.spans() if s["name"] == "gen_ai.chat")["attributes"])
         self.assertEqual(a["gen_ai.usage.input_tokens"], "2000")
         self.assertEqual(a["gen_ai.usage.output_tokens"], "600")
-        self.assertEqual(a["ai.attempts"], "2")
+        self.assertEqual(a["ai.llm.attempts"], "2")
         self.assertNotIn("error.type", a)
 
     def test_export_failure_never_raises(self):
