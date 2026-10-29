@@ -128,6 +128,28 @@ async fn persist_alert_run_state(
     rule_value: Option<&str>,
     episode: &config::meta::alerts::recovery::EpisodeInput,
 ) -> bool {
+    let Some(recoveries) = persist_alert_run_state_deferred(
+        alert, alert_id, outcome, level, grouped, rule_value, episode,
+    )
+    .await
+    else {
+        return false;
+    };
+    crate::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
+    true
+}
+
+/// [`persist_alert_run_state`] that hands back the group recoveries its write committed, unsent.
+#[must_use]
+async fn persist_alert_run_state_deferred(
+    alert: &config::meta::alerts::alert::Alert,
+    alert_id: &str,
+    outcome: &RunOutcome,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    grouped: Option<&config::meta::alerts::grouping::GroupClassification>,
+    rule_value: Option<&str>,
+    episode: &config::meta::alerts::recovery::EpisodeInput,
+) -> Option<Vec<config::meta::alerts::recovery::RecoveryEvent>> {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
     // Every delivery path persists here, the grouped and deduplicated ones included.
@@ -147,74 +169,7 @@ async fn persist_alert_run_state(
     if let Some(classification) = grouped
         && !matches!(outcome, RunOutcome::Skipped)
     {
-        let prev = match load_tracked_group_states(alert_id).await {
-            Ok(p) => p,
-            Err(e) => {
-                log::warn!("[SCHEDULER] could not read group states for {alert_id}: {e}");
-                return false;
-            }
-        };
-        let at = now_micros();
-        let plan = if alert.query_condition.promql_rule_mode {
-            config::meta::alerts::prom_rule::plan_rule_updates(
-                alert_id,
-                classification,
-                &prev,
-                at,
-                alert.pending_period_sec,
-            )
-        } else {
-            config::meta::alerts::grouping::plan_group_updates(
-                alert_id,
-                classification,
-                &prev,
-                at,
-                alert.pending_period_sec,
-            )
-        };
-        let write = match db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
-            Ok(write) => write,
-            Err(e) => {
-                log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
-                return false;
-            }
-        };
-        let cleared = crate::alerts::lifecycle::group_plan_clears(&prev, &plan, &write, at);
-        crate::alerts::lifecycle::on_all_cleared(&alert.org_id, alert_id, &cleared).await;
-
-        // A composite reads only this multi-alert's rollup row. Nudge its
-        // parents on a rollup transition or a stale-to-fresh return, exactly
-        // as the single-row path does — otherwise a grouped child is sweep-only.
-        let rollup = plan.updates.iter().find(|update| {
-            update
-                .state
-                .as_ref()
-                .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
-        });
-        let transition_changed = rollup.is_some_and(|update| update.transition.is_some());
-        let stale_to_fresh = prev
-            .get(ROLLUP_GROUP_KEY)
-            .and_then(|state| state.level_at)
-            .is_some_and(|level_at| {
-                config::meta::alerts::composite::alert_stale_deadline_micros(
-                    level_at,
-                    &alert.trigger_condition,
-                    alert.tz_offset,
-                    composite_stale_k(),
-                )
-                .map(|deadline| at > deadline)
-                .unwrap_or(false)
-            });
-        if transition_changed || stale_to_fresh {
-            nudge_composite_parents(
-                &alert.org_id,
-                alert_id,
-                infra::table::alert_composites::ChildKind::Alert,
-                at,
-            )
-            .await;
-        }
-        return true;
+        return persist_group_run_state(alert, alert_id, classification).await;
     }
 
     // `Skipped` runs are dropped by `apply_outcome` so a silenced evaluation
@@ -226,7 +181,7 @@ async fn persist_alert_run_state(
                 "[SCHEDULER] could not read alert state for {}/{alert_id}: {e}",
                 alert.org_id
             );
-            return false;
+            return None;
         }
     };
 
@@ -311,14 +266,14 @@ async fn persist_alert_run_state(
     );
 
     if update.is_noop() && ledger.is_none() {
-        return true;
+        return Some(vec![]);
     }
     if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
         log::error!(
             "[SCHEDULER] could not persist alert state for {}/{alert_id}: {e}",
             alert.org_id
         );
-        return false;
+        return None;
     }
 
     // The clear hook ran before this commit; marking again keeps a render that raced it honest.
@@ -368,7 +323,104 @@ async fn persist_alert_run_state(
         )
         .await;
     }
-    true
+    Some(vec![])
+}
+
+/// The grouped branch of [`persist_alert_run_state_deferred`]: one plan, its closes as events.
+async fn persist_group_run_state(
+    alert: &config::meta::alerts::alert::Alert,
+    alert_id: &str,
+    classification: &config::meta::alerts::grouping::GroupClassification,
+) -> Option<Vec<config::meta::alerts::recovery::RecoveryEvent>> {
+    use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+
+    let prev = match load_tracked_group_states(alert_id).await {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("[SCHEDULER] could not read group states for {alert_id}: {e}");
+            return None;
+        }
+    };
+    let at = now_micros();
+    let plan = if alert.query_condition.promql_rule_mode {
+        config::meta::alerts::prom_rule::plan_rule_updates(
+            alert_id,
+            classification,
+            &prev,
+            at,
+            alert.pending_period_sec,
+            alert.keep_firing_for,
+        )
+    } else {
+        config::meta::alerts::grouping::plan_group_updates(
+            alert_id,
+            classification,
+            &prev,
+            at,
+            alert.pending_period_sec,
+            alert.keep_firing_for,
+        )
+    };
+    crate::alerts::recovery::log_orphaned_episodes(
+        alert_id,
+        plan.evicted.iter().filter_map(|key| prev.get(key)),
+        "evicted",
+    );
+    let write = match db::alerts::alert_states::persist_group_plan(
+        &plan,
+        alert_id,
+        infra::table::alert_states::PlanApply::Evaluation,
+    )
+    .await
+    {
+        Ok(write) => write,
+        Err(e) => {
+            log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
+            return None;
+        }
+    };
+    let cleared = crate::alerts::lifecycle::group_plan_clears(&prev, &plan, &write, at);
+    crate::alerts::lifecycle::on_all_cleared(&alert.org_id, alert_id, &cleared).await;
+
+    // A composite reads only this multi-alert's rollup row. Nudge its
+    // parents on a rollup transition or a stale-to-fresh return, exactly
+    // as the single-row path does — otherwise a grouped child is sweep-only.
+    let rollup = plan.updates.iter().find(|update| {
+        update
+            .state
+            .as_ref()
+            .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
+    });
+    let transition_changed = rollup.is_some_and(|update| update.transition.is_some());
+    let stale_to_fresh = prev
+        .get(ROLLUP_GROUP_KEY)
+        .and_then(|state| state.level_at)
+        .is_some_and(|level_at| {
+            config::meta::alerts::composite::alert_stale_deadline_micros(
+                level_at,
+                &alert.trigger_condition,
+                alert.tz_offset,
+                composite_stale_k(),
+            )
+            .map(|deadline| at > deadline)
+            .unwrap_or(false)
+        });
+    if transition_changed || stale_to_fresh {
+        nudge_composite_parents(
+            &alert.org_id,
+            alert_id,
+            infra::table::alert_composites::ChildKind::Alert,
+            at,
+        )
+        .await;
+    }
+    Some(
+        write
+            .closed
+            .iter()
+            .map(|close| close.recovery_event(&alert.org_id, alert_id, at))
+            .collect(),
+    )
 }
 
 /// Whether the alert's firing cycle lives on its rollup row: every alert but a multi-alert,
@@ -553,7 +605,7 @@ async fn dispatch_per_group(
     // The rollup outcome follows the classification, not an assumption: an
     // evaluation can reach dispatch with every group healthy.
     let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
-    if !persist_alert_run_state(
+    let Some(recoveries) = persist_alert_run_state_deferred(
         alert,
         &alert_id,
         &rollup_outcome,
@@ -563,7 +615,7 @@ async fn dispatch_per_group(
         &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
     )
     .await
-    {
+    else {
         // MN-1: dispatch only AFTER the plan commits. Sending against stale
         // state would page a group under the previous episode and its delivery
         // callback would be rejected as stale — a page with nothing recording
@@ -584,12 +636,14 @@ async fn dispatch_per_group(
             downtime_id: None,
             acked_by: None,
         });
-    }
+    };
 
     let states = match load_tracked_group_states(&alert_id).await {
         Ok(s) => s,
         Err(e) => {
             log::error!("[SCHEDULER trace_id {trace_id}] group dispatch: state read failed: {e}");
+            // The plan's closes already committed, so their recoveries are owed regardless.
+            crate::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
             return Some(GroupDispatchOutcome {
                 delivered: 0,
                 failed: 0,
@@ -703,6 +757,13 @@ async fn dispatch_per_group(
         if muted_groups.contains_key(&item.group_key) {
             continue;
         }
+        // Chosen before the send: a resolve only closes a ticket opened under the key it quotes.
+        let episode_key = alert.notify_on_recovery.then(|| {
+            states
+                .get(&item.group_key)
+                .and_then(|state| state.episode_id.clone())
+                .unwrap_or_else(config::ider::uuid)
+        });
         // The group's OWN row, level and value — never the worst group's
         // (MN-3). One send per group is what makes host-a and host-b page
         // independently.
@@ -719,7 +780,7 @@ async fn dispatch_per_group(
                 // last so a label value containing `{...}` cannot expand.
                 Some(&item.labels),
                 &[],
-                None,
+                episode_key.clone(),
             )
             .await;
 
@@ -777,21 +838,10 @@ async fn dispatch_per_group(
             infra::table::alert_states::DeliveryOutcome::Failed { at: resolved_at }
         };
 
-        if let Err(e) = db::alerts::alert_states::advance_delivery_state(
-            &alert_id,
-            &item.group_key,
-            item.episode,
-            record,
-        )
-        .await
-        {
-            log::error!(
-                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: could not record \
-                 delivery outcome: {e}",
-                item.group_key
-            );
-        }
+        let mint = episode_key.as_deref().filter(|_| ok);
+        record_group_delivery(alert, &alert_id, trace_id, item, record, mint).await;
     }
+    crate::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
 
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
@@ -812,6 +862,46 @@ async fn dispatch_per_group(
         downtime_id,
         acked_by,
     })
+}
+
+/// Records one group's delivery and the key it carried; a key the row cannot keep is logged (D1).
+async fn record_group_delivery(
+    alert: &config::meta::alerts::alert::Alert,
+    alert_id: &str,
+    trace_id: &str,
+    item: &config::meta::alerts::dispatch::DispatchItem,
+    record: infra::table::alert_states::DeliveryOutcome,
+    mint: Option<&str>,
+) {
+    let group_key = &item.group_key;
+    match db::alerts::alert_states::advance_delivery_state(
+        alert_id,
+        group_key,
+        item.episode,
+        record,
+        mint,
+    )
+    .await
+    {
+        Ok(advance) if advance.mint == infra::table::alert_states::MintOutcome::Orphaned => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {group_key}: episode key {} \
+                 reached {:?} but the group row is gone or holds another episode; that ticket \
+                 will not be resolved",
+                mint.unwrap_or_default(),
+                alert.destinations
+            );
+        }
+        Ok(_) => {}
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {group_key}: could not \
+                 record delivery outcome (episode key {:?}, destinations {:?}): {e}",
+                mint,
+                alert.destinations
+            );
+        }
+    }
 }
 
 /// The downtime of each muted group of a multi-alert, from one identity call over every row.
@@ -2844,7 +2934,7 @@ fn alert_group_by(alert: &config::meta::alerts::alert::Alert) -> Vec<String> {
 
 /// The downtime of each muted group of a multi-alert, by group key.
 #[cfg(feature = "enterprise")]
-async fn group_downtimes(
+pub(crate) async fn group_downtimes(
     alert: &config::meta::alerts::alert::Alert,
     folder_id: &str,
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],

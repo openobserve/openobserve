@@ -60,6 +60,7 @@ mod tests {
             episode_incident_id: None,
             recovering_since: None,
             firing_started_at: None,
+            group_label_set: None,
         }
     }
 

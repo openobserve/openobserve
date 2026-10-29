@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
 import i18n from "@/locales";
-import type { RoutingPreview } from "@/ts/interfaces/oncall";
+import type { Channel, RoutingPreview } from "@/ts/interfaces/oncall";
 import store from "@/test/unit/helpers/store";
 
 const stubs = {
@@ -62,6 +62,7 @@ function preview(over: Partial<RoutingPreview> = {}): RoutingPreview {
         pages_anyone: true,
         nobody_after_micros: 1_200_000_000,
         ends_with_whole_team: true,
+        channels: ["email"],
       },
     ],
     current_responder: {
@@ -252,10 +253,71 @@ describe("OnCallRoutingSimulator", () => {
     );
   });
 
+  describe("the responder's channels", () => {
+    const withLadder = (ladder: RoutingPreview["ladder"]) =>
+      preview({
+        ladder,
+        current_responder: {
+          user_email: "aarav@o2.ai",
+          reason: "on call",
+          would_a_page_land: true,
+          deliverable_channels: ["email", "sms"],
+        },
+      });
+    const p1 = (channels: Channel[]) => [
+      { priority: "P1", rungs: 1, pages_anyone: true, ends_with_whole_team: true, channels },
+    ];
+    const note = (wrapper: Wrapper) =>
+      wrapper.find('[data-test="oncall-simulator-responder-note"]');
+    const tone = (wrapper: Wrapper) =>
+      note(wrapper)
+        .classes()
+        .find((c) => c.startsWith("text-status"));
+
+    it.each<[string, Channel[], string, string]>([
+      [
+        "names only what the priority sends",
+        ["sms", "voice"],
+        "SMS · now",
+        "text-status-success-text",
+      ],
+      [
+        "lists every channel both sides share",
+        ["email", "sms"],
+        "Email, SMS · now",
+        "text-status-success-text",
+      ],
+      [
+        "warns when the priority sends nothing they receive",
+        ["voice"],
+        "This priority sends nothing they can receive",
+        "text-status-warning-text",
+      ],
+    ])("%s", async (_, sends, expected, colour) => {
+      const wrapper = render({ preview: withLadder(p1(sends)) });
+      await pickPriority(wrapper);
+      expect(note(wrapper).text()).toBe(expected);
+      expect(tone(wrapper)).toBe(colour);
+    });
+
+    it("with no priority chosen, lists what they can receive", () => {
+      const wrapper = render({ preview: withLadder(p1(["voice"])) });
+      expect(note(wrapper).text()).toBe("Email, SMS · now");
+    });
+  });
+
   it("marks a priority that would wake nobody", async () => {
     const wrapper = render({
       preview: preview({
-        ladder: [{ priority: "P1", rungs: 0, pages_anyone: false, ends_with_whole_team: false }],
+        ladder: [
+          {
+            priority: "P1",
+            rungs: 0,
+            pages_anyone: false,
+            ends_with_whole_team: false,
+            channels: [],
+          },
+        ],
       }),
     });
     await pickPriority(wrapper);
