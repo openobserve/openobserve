@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { maskSecret } from "@/composables/useCredentialSnippet";
-import type { CardSubstitutions } from "./types";
+import type { CardSubstitutions, RichCardInput } from "./types";
 
 /** Placeholder shown in masked code while the token is not known yet. */
 export const MASKED_TOKEN = "••••••••••••••••••••••••••••";
@@ -49,3 +49,26 @@ export function applySubsMasked(template: string, subs: CardSubstitutions): stri
     token: subs.token ? maskSecret(subs.token) : MASKED_TOKEN,
   });
 }
+
+// Single-quoted for POSIX shells, so globs like *app* reach the installer unexpanded.
+export const shellQuote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
+
+/** Applies the input's `sanitize` rule to a value before it reaches a command. */
+export const sanitizeInput = (inp: RichCardInput, value: string): string =>
+  inp.sanitize === "slug"
+    ? value
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+    : value;
+
+/** The `{flag:<id>}` expansion; a blank value uses the input's `fallback`, else drops the flag so the script's own default applies. */
+export const cliFlagArg = (
+  inp: RichCardInput,
+  value: string,
+  get: (id: string) => string = () => "",
+): string => {
+  const v = sanitizeInput(inp, value.trim()) || sanitizeInput(inp, inp.fallback?.(get) ?? "");
+  return v && inp.cliFlag ? ` \\\n  ${inp.cliFlag}=${shellQuote(v)}` : "";
+};

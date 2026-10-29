@@ -669,6 +669,7 @@
     "dateRangeCopied": "날짜 범위가 복사됨",
     "dateRangePasted": "날짜 범위가 붙여넣기됨",
     "dateRangePasteError": "날짜 범위를 구문 분석할 수 없음",
+    "dateRangePasteBlocked": "이 브라우저에서 클립보드 읽기가 차단되었습니다. 선택기를 연 상태에서 {shortcut}을 눌러 붙여넣으세요.",
     "pastSecond": "지난 {count}초 | 지난 {count}초",
     "pastMinute": "지난 {count}분 | 지난 {count}분",
     "pastHour": "지난 {count}시간 | 지난 {count}시간",
@@ -5754,6 +5755,22 @@
       "providerNameRum": "실제 사용자 모니터링",
       "quickInstallDesc": "**단일 명령**으로 OpenObserve 수집기를 설치하세요. 클러스터 이름을 설정하고 실행하기만 하면 됩니다. 이름이 모든 레코드에 태그를 지정하므로 여러 클러스터가 보고되면 구분할 수 있습니다.",
       "quickInstallTitle": "빠른 설치(권장)",
+      "dbInstallerMetricsOnlyNote": "이 명령은 메트릭만 수집합니다. 아래의 **데이터베이스 모니터링** 단계는 메트릭 + 데이터베이스 모니터링 명령에만 적용되므로, 해당 단계를 사용하려면 먼저 해당 명령으로 전환하세요.",
+      "dbInstallerDbmNote": "이 명령을 실행하기 전에 아래의 **데이터베이스 모니터링** 단계를 먼저 수행하세요. 수집기는 첫 시작부터 해당 단계에서 설정한 액세스와 로깅이 필요합니다. 이미 실행했나요? 해당 단계를 완료한 다음 같은 서비스 이름으로 이 명령을 다시 실행하세요. 설치된 수집기가 그 자리에서 업데이트됩니다.",
+      "dbInstallerDbmVariant": "메트릭 + 데이터베이스 모니터링",
+      "dbInstallerMysqlLogPathHelp": "수집기가 이 파일을 읽을 수 있어야 합니다. 보통 `/var/log/mysql/error.log`이며, RHEL에서는 `/var/log/mariadb/mariadb.log`입니다. 다음으로 찾을 수 있습니다: SHOW VARIABLES LIKE 'log_error';",
+      "dbInstallerManualHint": "Windows, 컨테이너 환경이거나 수집기를 직접 실행하려는 경우에는 대신 [수동](#manual) 설정을 사용하세요.",
+      "dbInstallerNote": "데이터베이스에 접근할 수 있는 Linux 또는 macOS 호스트에서 `sudo`로 실행하세요. 데이터베이스 사용자의 비밀번호를 묻기 때문에 비밀번호가 명령줄에 남지 않습니다(쿠버네티스 설치 프로그램과 마찬가지로 조직 액세스 키는 명령줄에 포함됩니다). OpenTelemetry Collector Contrib v{version}을 설치하고, 설정을 `/etc/otelcol-o2/` 아래에 작성한 뒤 서비스로 시작합니다.",
+      "dbInstallerNoteRedis": "Redis에 접근할 수 있는 Linux 또는 macOS 호스트에서 `sudo`로 실행하세요. Redis 비밀번호를 묻고(Redis에 인증이 없으면 Enter를 누르세요) 비밀번호가 명령줄에 남지 않습니다(쿠버네티스 설치 프로그램과 마찬가지로 조직 액세스 키는 명령줄에 포함됩니다). OpenTelemetry Collector Contrib v{version}을 설치하고, 설정을 `/etc/otelcol-o2/` 아래에 작성한 뒤 서비스로 시작합니다.",
+      "dbInstallerServiceNameHelp": "수집기 서비스의 이름을 지정하며, 제거 명령에서도 사용됩니다. 같은 호스트의 각 데이터베이스마다 다른 이름을 사용하세요. 소문자, 숫자, 대시만 사용할 수 있으며 그 외 문자는 대시로 바뀝니다. 비워 두면 설치 프로그램이 이름을 지정합니다.",
+      "dbInstallerServiceNameLabel": "서비스 이름",
+      "dbInstallerUserHelp": "1단계의 모니터링 사용자입니다.",
+      "dbInstallerUserLabel": "데이터베이스 사용자",
+      "dbQuickInstallDesc": "**명령 하나**로 OpenTelemetry Collector를 설치, 구성, 시작하세요. 데이터베이스 위치를 설정하고 실행하기만 하면 됩니다.",
+      "dbUninstallDesc": "설치 프로그램을 실행한 호스트에서 `sudo`로 실행하세요. 수집기 서비스를 중지하고 제거하며 `/etc/otelcol-o2/` 아래의 설정도 제거합니다. 이 명령은 위의 서비스 이름을 사용합니다. 비워 두었다면 설치 프로그램이 출력한 이름과 함께 `--name=`을 추가하세요.",
+      "dbUninstallLabel": "수집기 제거",
+      "setupModeAuto": "자동 (스크립트)",
+      "setupModeManual": "수동",
       "redisHostLabel": "Redis 호스트",
       "redisNoAuthNote": "Redis에 인증이 없으면 REDIS_PASSWORD=''를 사용하세요.",
       "redisTagline": "OpenTelemetry Collector로 Redis 메트릭을 수집하여 OpenObserve로 전송하세요.",
@@ -11562,7 +11579,8 @@
         "dailySentence": "매일 · {time}, {duration} 동안 · {zone}",
         "weeklySentence": "매주 {days} · {time}, {duration} 동안 · {zone}",
         "fromNoEnd": "{schedule}, {start}부터 (종료일 없음)",
-        "fromUntil": "{schedule}, {start}부터 {until}까지"
+        "fromUntil": "{schedule}, {start}부터 {until}까지",
+        "onceFor": "1회, {duration}"
       },
       "validation": {
         "conditionRequired": "조건을 추가하거나 조건 블록을 제거하세요.",
@@ -11903,8 +11921,8 @@
         "presets": {
           "30m": "30분",
           "1h": "1시간",
-          "2h": "2시간",
           "4h": "4시간",
+          "24h": "24시간",
           "custom": "사용자 지정"
         },
         "endsAt": "종료 시각",
@@ -11918,7 +11936,34 @@
         "mutedTooltip": "{name}이(가) {end}까지 음소거함",
         "exclude": "제외할 기간…",
         "firingMuted": "발생 중 · 음소거됨",
-        "firingMutedTooltip": "여전히 발생 중입니다. {name}에 의해 알림이 음소거되었습니다."
+        "firingMutedTooltip": "여전히 발생 중입니다. {name}에 의해 알림이 음소거되었습니다.",
+        "untilClear": "해소될 때까지",
+        "untilClearHint": "알림이 복구되거나 늦어도 24시간 후에 종료됩니다.",
+        "confirmUntilClear": "해소될 때까지 음소거",
+        "titleOne": "{name} 음소거",
+        "subtitleOne": "알림은 계속 실행되고 기록도 유지됩니다. 알림, 호출 및 워크플로우는 기간이 끝날 때까지 중지됩니다.",
+        "untilTime": "{time}까지.",
+        "groups": "그룹",
+        "groupsThis": "이 그룹",
+        "groupsAll": "이 알림의 모든 그룹",
+        "addGroup": "발생 그룹 추가",
+        "groupsHint": "이 그룹만 음소거되며 다른 그룹은 계속 알림을 보냅니다",
+        "confirm24h": {
+          "title": "24시간 동안 음소거할까요?",
+          "message": "‘해소될 때까지’는 알림이 복구되는 즉시 음소거를 종료합니다.",
+          "useUntilClear": "해소될 때까지 사용",
+          "ok": "24시간 음소거"
+        },
+        "muteGroup": "이 그룹 음소거",
+        "endNow": "지금 음소거 종료",
+        "endMute": "음소거 종료",
+        "mutedUntilClear": "해소될 때까지 음소거됨 · 최대 24시간",
+        "mutedUntilClearGroups": "해소될 때까지 음소거됨 · {count}개 그룹 | 해소될 때까지 음소거됨 · {count}개 그룹",
+        "mutedGroups": "음소거됨 · 그룹 {count}개 · {duration} 후 종료 | 음소거됨 · 그룹 {count}개 · {duration} 후 종료",
+        "mutedUntilClearTooltip": "{name}에 의해 알림이 복구될 때까지, 늦어도 {end}까지 음소거되었습니다",
+        "mutedGroupsTooltip": "{name}에 의해 {end}까지 음소거되었습니다. 그룹: {labels}",
+        "mutedUntilClearGroupsTooltip": "{name}에 의해 알림이 복구될 때까지, 늦어도 {end}까지 음소거되었습니다. 그룹: {labels}",
+        "untilTomorrow": "내일 {time}까지."
       },
       "corrected": "수정됨",
       "correctedBy": "{names}이(가) 점수 수정",
@@ -12004,7 +12049,66 @@
           "sent": "{count}개 대상에 테스트를 보냈습니다 | {count}개 대상에 테스트를 보냈습니다",
           "failed": "테스트가 {names}에 도달하지 못했습니다."
         }
+      },
+      "untilClear": {
+        "schedule": "해소될 때까지",
+        "atMost": "최대 24시간",
+        "endsWhenClears": "해소되면 종료",
+        "byTime": "{time}까지",
+        "whenCleared": "해소된 시각",
+        "endedBy": "{product}에 의해 종료됨",
+        "createdFrom": "{source}에서 생성됨"
+      },
+      "groupTarget": "그룹: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "알림에서 빠른 음소거",
+      "endedLabel": "종료됨"
+    },
+    "ack": {
+      "acknowledge": "확인",
+      "acknowledgeGroups": "발생 그룹 {count}개 확인 | 발생 그룹 {count}개 확인",
+      "unacknowledge": "확인 취소",
+      "takeOver": "인계받기",
+      "chip": "{who}님이 {source}에서 확인 · {time}",
+      "chipTooltip": "{who}님이 {source}에서 {time}에 확인했습니다",
+      "firingAcknowledged": "발생 · 확인됨",
+      "tile": "확인됨",
+      "groupsAcknowledged": "{count}개 확인됨",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "온콜",
+        "incident": "인시던트"
+      },
+      "history": {
+        "dedupSuppressed": "확인으로 억제됨 ({who})",
+        "acked": "{who}님이 {source}에서 확인함",
+        "ackedViaPage": "{who}님이 호출 {page}을 통해 확인함",
+        "ackedViaIncident": "{who}님이 인시던트 {incident}을 통해 확인함",
+        "unacked": "{who}님이 {source}에서 확인 취소함",
+        "unackedResume": "{who}님이 {source}에서 확인 취소함 · 반복은 {time}에 재개",
+        "takenOver": "{previous}에서 {who}님이 인수함 ({source})"
+      },
+      "refused": {
+        "ack": "이 알림을 확인할 수 없습니다. 확인 및 음소거에는 Admin 또는 Editor 역할이 필요하거나 알림의 온콜 응답자여야 합니다.",
+        "mute": "이 알림을 음소거할 수 없습니다. 확인 및 음소거에는 Admin 또는 Editor 역할이 필요하거나 알림의 온콜 응답자여야 합니다.",
+        "onCall": "온콜: {people}",
+        "canAct": "작업 가능: {people}",
+        "people": "온콜: {onCall}. 작업 가능: {canAct}"
+      },
+      "errors": {
+        "notFiring": "이 알림은 발생 상태가 아니므로 확인할 항목이 없습니다.",
+        "firingChanged": "이 페이지를 로드한 후 알림이 다시 발생했습니다. 새로고침 후 다시 시도하세요."
       }
+    },
+    "groupActions": {
+      "menu": "그룹 작업",
+      "viewHistory": "이 그룹의 기록 보기"
+    },
+    "firingState": {
+      "level": "수준",
+      "firingSince": "발생 시각",
+      "firingFor": "{duration} 동안 발생 중",
+      "incident": "인시던트"
     }
   },
   "alert_dependencies": {
@@ -12533,13 +12637,14 @@
       "openSlackSettings": "설정 › Slack에서 구성하세요"
     },
     "prebuilt": {
-      "slackDescription": "Slack 채널로 알림 보내기",
+      "slackDescription": "웹훅과 템플릿으로 새 메시지를 게시합니다. 호출이나 사용자 지정 Slack 레이아웃에 사용하세요.",
       "discordDescription": "Discord 채널로 알림 보내기",
       "msteamsDescription": "Teams 채널로 알림 보내기",
       "emailDescription": "HTML 형식의 이메일 알림 보내기",
       "pagerdutyDescription": "PagerDuty에 인시던트 생성",
       "opsgenieDescription": "Opsgenie에 알림 생성",
-      "servicenowDescription": "ServiceNow에 인시던트 생성"
+      "servicenowDescription": "ServiceNow에 인시던트 생성",
+      "slackAppDescription": "예약된 알림을 제자리에서 업데이트합니다. Slack에서 확인, 음소거, 조사할 수 있습니다. 연결된 워크스페이스가 필요합니다."
     },
     "import": {
       "title": "대상 가져오기",
@@ -12581,7 +12686,8 @@
     "severityCriticalDescription": "최고 우선순위 인시던트",
     "severityErrorDescription": "표준 오류 인시던트",
     "severityWarningDescription": "경고 수준 인시던트",
-    "severityInfoDescription": "정보 인시던트"
+    "severityInfoDescription": "정보 인시던트",
+    "urlRecipientsChannel": "URL / 수신자 / 채널"
   },
   "pipeline_destinations": {
     "header": "파이프라인 대상",
@@ -13104,7 +13210,7 @@
     "groupIntegrations": "연동",
     "groupAccount": "계정",
     "slackApp": "Slack",
-    "slackAppDesc": "Slack에서 OpenObserve에 질문하기",
+    "slackAppDesc": "Slack에서 OpenObserve에 질문하고 알림에 대해 조치",
     "generalDesc": "테마, 쿼리 기본값 및 핵심 환경설정",
     "orgDesc": "조직 매개변수 및 식별자",
     "cipherKeysDesc": "민감한 필드를 위한 암호화 키",
@@ -20602,7 +20708,9 @@
         "succeeded": "성공",
         "failed": "실패",
         "skipped": "건너뜀",
-        "pending": "대기 중"
+        "pending": "대기 중",
+        "acknowledged": "확인됨",
+        "ackevent": "확인 이벤트"
       },
       "alertLevel": {
         "ok": "확인",
@@ -20905,7 +21013,16 @@
       "alertSavedSuccessfully": "알림이 성공적으로 저장되었습니다.",
       "alertUpdatedSuccessfully": "알림이 성공적으로 업데이트되었습니다.",
       "openingDedupConfig": "{name}에 대한 중복 제거 구성 열기",
-      "editingAlert": "알림 편집 중: {name}"
+      "editingAlert": "알림 편집 중: {name}",
+      "ack": {
+        "acked": "{name} 확인함",
+        "ackedGroups": "{name}의 그룹 {count}개를 확인함 | {name}의 그룹 {count}개를 확인함",
+        "alreadyAcked": "{who}님이 이미 확인함",
+        "unacked": "{name} 확인 취소함",
+        "takenOver": "{name}의 확인을 인수했습니다",
+        "failed": "{name}을 확인할 수 없습니다",
+        "unackFailed": "{name}의 확인을 취소할 수 없습니다"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "암호화 키가 성공적으로 업데이트되었습니다.",
@@ -21217,7 +21334,14 @@
       "muted": "{time}까지 {count}개 항목을 음소거했습니다. {folder}에 저장되었습니다. | {time}까지 {count}개 항목을 음소거했습니다. {folder}에 저장되었습니다.",
       "muteFailed": "음소거를 생성할 수 없습니다",
       "viewDowntime": "다운타임 보기",
-      "itemsDropped": "선택한 항목 {count}개가 선택한 폴더 외부에 있어 제거되었습니다. | 선택한 항목 {count}개가 선택한 폴더 외부에 있어 제거되었습니다."
+      "itemsDropped": "선택한 항목 {count}개가 선택한 폴더 외부에 있어 제거되었습니다. | 선택한 항목 {count}개가 선택한 폴더 외부에 있어 제거되었습니다.",
+      "mutedUntilClear": "{name}을 해제될 때까지 음소거했습니다. 최대 {time}",
+      "alreadyMuted": "{name}은(는) 이미 {time}까지 음소거되어 있습니다",
+      "muteChanged": "페이지를 로드한 후 이 음소거가 변경되었습니다. 이제 {time}에 종료됩니다.",
+      "muteEnded": "음소거가 종료되었습니다. 알림이 재개됩니다.",
+      "mutedOne": "{name}을 {time}까지 음소거했습니다",
+      "timeTomorrow": "내일 {time}",
+      "notQuickMute": "이 음소거는 다운타임 페이지에서 설정되었습니다. 해당 페이지에서 변경하세요."
     }
   },
   "cipherKeys": {
@@ -23997,7 +24121,7 @@
     "deliveriesTitle": "전송 내역",
     "deliveriesNone": "아직 전송된 항목이 없습니다.",
     "deliveriesRun": "래더 실행 {run} — 인계로 인해 수신 팀의 호출 절차가 다시 시작되었습니다.",
-    "deliveryLanded": "전달됨",
+    "deliveryLanded": "전송됨",
     "deliveryFailed": "실패",
     "deliveriesTruncated": "{shown}건을 표시 중입니다 (총 {total}건).",
     "teamChannelTitle": "팀 채널",
@@ -24590,7 +24714,7 @@
     "myDeliveriesPage": "호출",
     "myDeliveriesLandedColumn": "전달",
     "myDeliveriesSent": "발송됨",
-    "myDeliveriesLanded": "{channel}을 통해 도달했습니다",
+    "myDeliveriesLanded": "{channel}을(를) 통해 전송됨",
     "myDeliveriesFailed": "{channel}을 통해 도달하지 못했습니다",
     "myDeliveriesNone": "아직 전송된 것이 없습니다.",
     "myDeliveriesNoUnread": "읽지 않은 항목이 없습니다.",
@@ -25214,7 +25338,7 @@
     "reachAlarmNoRetry": "재시도 예정이 없음 — 에스컬레이션이 종료되었습니다.",
     "reachAlarmNoTransport": "가능한 원인: 이 배포에 전송 수단이 구성되지 않았습니다.",
     "reachAlarmCheckTransports": "연락 가능한 대상 확인",
-    "reachLanded": "연락됨",
+    "reachLanded": "전송됨",
     "reachUnreached": "연락 안 됨",
     "onCallDetails": "온콜 세부정보",
     "shiftHandover": "인계",
@@ -25299,7 +25423,8 @@
     "scopeClaimServiceEverywhere": "{service}는 주변 클러스터와 네임스페이스를 누가 소유하든 모든 클러스터와 네임스페이스에서 이 팀을 호출합니다.",
     "scopeClaimServiceHere": "{service}는 {scope}에서만 이 팀을 호출합니다. 다른 곳에서는 해당 범위를 소유한 팀에게 전달됩니다.",
     "scopeNothingDiscovered": "아직 발견된 항목이 없어 선택할 수 있는 대상이 없습니다. 고급을 사용해 필드로 규칙을 작성하거나, 먼저 일부 텔레메트리를 보내십시오.",
-    "scopeAdvancedHint": "상위 수준에서 다루지 않는 필드와 값을 포함하여 모든 필드와 값에 매칭할 수 있습니다."
+    "scopeAdvancedHint": "상위 수준에서 다루지 않는 필드와 값을 포함하여 모든 필드와 값에 매칭할 수 있습니다.",
+    "simulatorSendsNothing": "이 우선순위는 받을 수 있는 것을 아무것도 보내지 않습니다"
   },
   "paidUsage": {
     "consentTitle": "유료 AI 사용을 켜시겠습니까?",
@@ -26411,17 +26536,14 @@
     "saveFailed": "계정을 저장하지 못했습니다. 다시 시도하세요.",
     "disconnectFailed": "계정 연결을 해제할 수 없습니다. 다시 시도하세요.",
     "connected": "연결됨",
-    "active": "활성",
-    "account": "계정",
     "fromNumber": "발신 번호",
-    "press4": "통화 키: 4 확인, 6 해결, 8 에스컬레이션",
+    "press4": "통화 키 (4 확인, 6 해결, 8 에스컬레이션)",
     "press4Available": "사용 가능",
     "press4NotAvailable": "사용 불가",
     "press4NotAvailableHint": "통화 시 문자에 포함된 링크에서 확인하도록 안내합니다.",
     "update": "업데이트",
     "disconnect": "연결 해제",
     "deploymentTitle": "이 배포의 {provider} 계정",
-    "deploymentNote": "문자와 통화는 이미 작동합니다. 운영자가 설정하므로 여기서 할 일은 없습니다.",
     "useOwn": "대신 자체 {provider} 계정 사용",
     "connectTitle": "{provider} 연결",
     "updateTitle": "{provider} 업데이트",
@@ -26429,7 +26551,7 @@
     "accountSid": "계정 SID",
     "authToken": "인증 토큰",
     "tokenKeep": "현재 토큰을 유지하려면 비워 두세요",
-    "fromHelp": "SMS를 보내고 통화할 수 있는 {provider} 번호이며 국가 코드를 포함해야 합니다.",
+    "fromHelp": "이 {provider} 계정의 번호이며, 국가 코드를 포함합니다.",
     "connect": "연결",
     "checking": "{provider} 확인 중…",
     "disconnectTitle": "{provider} 연결을 해제할까요?",
@@ -26442,8 +26564,21 @@
       "tokenRequired": "연결하려면 인증 토큰이 필요합니다.",
       "noMasterKey": "운영자에게 {variable} 설정을 요청하세요.",
       "accountRejected": "{provider}가 이 계정을 허용하지 않았습니다. 계정 SID와 인증 토큰, 그리고 계정이 활성 상태인지 확인하세요.",
-      "unreadable": "이 조직의 전화 제공업체 계정을 읽을 수 없습니다."
-    }
+      "unreadable": "이 조직의 전화 제공업체 계정을 읽을 수 없습니다.",
+      "fromNotOnAccount": "이 번호는 이 {provider} 계정의 번호가 아닙니다. {provider}의 Phone Numbers → Active numbers에 있는 번호를 사용하세요.",
+      "unavailable": "{provider}에 연결할 수 없습니다. 다시 시도하세요."
+    },
+    "statusChecking": "확인 중…",
+    "statusBroken": "작동하지 않음",
+    "statusUnchecked": "확인할 수 없음",
+    "cardMeta": "발신 {number} · 계정 {account}",
+    "deploymentMeta": "발신 {number}",
+    "uncheckedNow": "지금은 {provider}에 연결할 수 없습니다.",
+    "trial": "평가판 계정: 문자와 통화는 {provider}에서 인증된 번호로만 전달됩니다.",
+    "cantText": "이 번호는 문자를 보낼 수 없습니다",
+    "cantCall": "이 번호는 전화를 걸 수 없습니다",
+    "deploymentOwner": "운영자가 설정하므로 여기서 구성할 항목이 없습니다.",
+    "tokenNewAccount": "다른 계정에는 해당 계정의 인증 토큰이 필요합니다"
   },
   "slackApp": {
     "prereq": {
@@ -26683,7 +26818,10 @@
       "managedBy": "인스턴스 관리자가 관리함",
       "managedTitle": "인스턴스 관리자가 관리합니다.",
       "managedDetail": "자격 증명, 연결 및 {team}을(를) 사용하는 조직은 _meta에서 설정됩니다.",
-      "managedQuestions": "문의: {contact}"
+      "managedQuestions": "문의: {contact}",
+      "outboundQueue": "알림 메시지: {count}개 대기 중, 가장 오래된 것 {age} | 알림 메시지: {count}개 대기 중, 가장 오래된 것 {age}",
+      "outboundEmpty": "대기 중인 알림 메시지 없음",
+      "ageSeconds": "{count}초"
     },
     "channels": {
       "title": "채널 기본값",
@@ -26719,7 +26857,8 @@
       "instanceAdminOnly": "인스턴스 관리자 전용",
       "ownOrgOnlyHint": "인스턴스 워크스페이스에서는 채널을 자신의 조직에 매핑합니다",
       "claimableHint": "할당되지 않은 채널 및 {org} 소유 채널",
-      "servedOrgsHint": "이 워크스페이스가 서비스하는 모든 조직"
+      "servedOrgsHint": "이 워크스페이스가 서비스하는 모든 조직",
+      "alertRoutes": "대상 {count}개 | 대상 {count}개"
     },
     "people": {
       "title": "연결된 사용자",
@@ -26873,6 +27012,83 @@
       "remove": "제거",
       "saved": "조직이 저장되었습니다",
       "saveFailed": "조직을 저장하지 못했습니다."
+    },
+    "destination": {
+      "appTile": "{product} 앱",
+      "webhookTile": "{product} 웹훅",
+      "twoWay": "양방향",
+      "recommendedForAlertResponse": "알림 대응에 권장",
+      "choiceHint": "호출 및 슈퍼 클러스터는 웹훅을 사용합니다. Slack 앱 대상에서의 수동 및 실시간 전송은 별도 게시물입니다.",
+      "unavailableReason": "단일 클러스터에서 Enterprise Slack 앱이 필요합니다",
+      "unavailableFlag": "이 서버에서는 꺼져 있습니다. 운영자에게 {variable} 설정을 요청하세요.",
+      "unavailableMasterKey": "이 서버에는 암호화 키가 필요합니다. 운영자에게 {variable} 설정을 요청하세요.",
+      "unavailableCloud": "아직 해당 Cloud 리전에서 활성화되지 않았습니다.",
+      "unavailableNoAccess": "조직 관리자에게 Slack 앱 활성화를 요청하세요.",
+      "postOnly": "게시 전용",
+      "switchToApp": "{product} 앱으로 전환",
+      "switchThis": "이 대상 전환",
+      "switchBack": "되돌리기",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "워크스페이스",
+      "channel": "채널",
+      "mention": "멘션",
+      "mentionCritical": "심각한 알림에는 {'@'}here, 그 외에는 없음",
+      "mentionNone": "없음",
+      "mentionHelp": "반복 및 심각도 상향 시 사용됩니다",
+      "refireReuse": "재발생 시 재사용(분)",
+      "refireReuseHelp": "이 시간 내에 다시 발생하면 새 메시지를 게시하는 대신 이전 메시지를 수정합니다",
+      "buttons": "확인, 음소거 및 조사 버튼",
+      "buttonsHelp": "발생 건에 인시던트 또는 호출이 있으면 해결이 추가됩니다",
+      "autoInvestigate": "심각 알림 자동 조사",
+      "autoInvestigateHelp": "조직의 AI 서비스 계정으로 해당 계정 권한을 사용해 실행되며, 결과는 알림 스레드에 게시됩니다",
+      "templateDefault": "기본 {product} 템플릿({name})",
+      "sendTest": "테스트 보내기",
+      "setsDefault": "#{channel}의 기본 조직을 {org}로 설정",
+      "answersFor": "#{channel} 채널은 조직 {org}의 질문에 답합니다. {thisOrg}의 알림은 여기에 게시되고 스레드 답변은 {thisOrg}에서 이루어집니다. 채널 기본값은 변경되지 않습니다.",
+      "sharedTag": "공유 · {product} Connect",
+      "sharedTitle": "#{channel} 채널은 {workspace} 외부 사용자와 공유되어 있습니다.",
+      "sharedDetail": "외부 사용자는 알림 이름, 값, 차트 및 링크를 볼 수 있습니다. 해당 사용자가 버튼을 클릭하면 거부됩니다.",
+      "sharedConfirm": "이해했습니다. 이 공유 채널에 알림을 게시합니다",
+      "sharedRequired": "알림이 이 공유 채널에 게시될 수 있음을 확인하세요",
+      "versionMismatch": "노드가 서로 다른 버전을 실행 중입니다. 먼저 모든 노드를 업그레이드하세요.",
+      "oncallNotAllowed": "{product} 앱 대상은 온콜 팀 채널이 될 수 없습니다",
+      "answersForAnother": "#{channel} 채널은 다른 조직의 질문에 답합니다. {thisOrg}의 알림은 여기에 게시되고 스레드 답변은 {thisOrg}에서 이루어집니다. 채널 기본값은 변경되지 않습니다.",
+      "oncallTag": "온콜 룸",
+      "oncallTitle": "팀 {team}의 온콜 호출도 {destination}을(를) 통해 #{channel}에 게시됩니다.",
+      "oncallDetail": "여기의 알림은 별도로 게시됩니다.",
+      "oncallConfirm": "이해했습니다. 이 온콜 룸에 알림을 게시합니다",
+      "oncallRequired": "알림이 이 온콜 룸에 게시될 수 있음을 확인하세요",
+      "workspaceRequired": "워크스페이스를 선택하세요",
+      "refireRange": "0에서 {max}까지의 정수 분을 입력하세요",
+      "connectTitle": "버튼이 포함된 알림을 게시하려면 {product}를 연결하세요",
+      "connectDetail": "{product} 화면에서 채널을 선택하고 허용하세요. OpenObserve가 해당 채널의 이 대상을 생성합니다.",
+      "connected": "#{channel}에 대한 {name}이(가) 생성되었습니다. 설정을 확인하고 저장하세요.",
+      "saveFailed": "대상을 저장할 수 없습니다.",
+      "switched": "{name}이(가) 이제 {product} 앱을 통해 게시됩니다",
+      "switchedBack": "{name}이(가) 다시 웹훅을 통해 게시됩니다",
+      "switchFailed": "{name} 전환 실패: {reason}",
+      "switchedAll": "{count}개 대상 전환됨 | {count}개 대상 전환됨",
+      "switchThisDetail": "{product} 앱으로 전환하면 확인, 음소거 및 조사 버튼을 사용할 수 있습니다. 이름, 템플릿 및 알림은 그대로 유지되며, 되돌리기를 선택하면 웹훅이 복원됩니다."
+    },
+    "switchAll": {
+      "title": "{count}개의 웹훅 대상이 이 워크스페이스로 알림을 게시합니다. | {count}개의 웹훅 대상이 이 워크스페이스로 알림을 게시합니다.",
+      "detail": "확인, 음소거, 조사 버튼을 사용하려면 {product} 앱으로 전환하세요. 이름, 템플릿, 알림은 그대로 유지되며, 다시 전환하면 웹훅이 복원됩니다. | 확인, 음소거, 조사 버튼을 사용하려면 {product} 앱으로 전환하세요. 이름, 템플릿, 알림은 그대로 유지되며, 다시 전환하면 웹훅이 복원됩니다.",
+      "review": "검토",
+      "action": "모두 전환",
+      "summary": "{switched}개 전환됨 · {count}개 전환 불가"
+    },
+    "oncallUnlinked": {
+      "title": "{product}에 연결되지 않은 온콜 멤버",
+      "description": "호출에서 이들에게 DM을 보낼 수 없고, 연결하기 전까지 알림 및 호출 버튼 클릭은 대기 상태가 됩니다.",
+      "remind": "리마인드 보내기",
+      "columnPerson": "사용자",
+      "columnTeam": "팀",
+      "columnNextShift": "다음 교대",
+      "columnReminder": "리마인드",
+      "dmSent": "{time}에 DM 전송됨",
+      "notSent": "전송 안 됨",
+      "reminded": "리마인드가 {count}명에게 전송되었습니다 | 리마인드가 {count}명에게 전송되었습니다",
+      "remindFailed": "리마인드를 보낼 수 없습니다."
     }
   },
   "fleet": {

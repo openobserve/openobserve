@@ -389,6 +389,7 @@ where
                 StreamType::Logs => RpStreamType::Logs,
                 StreamType::Metrics => RpStreamType::Metrics,
                 StreamType::Traces => RpStreamType::Traces,
+                StreamType::Profiles => RpStreamType::Profiles,
                 StreamType::EnrichmentTables => RpStreamType::EnrichmentTables,
                 _ => RpStreamType::Logs,
             }),

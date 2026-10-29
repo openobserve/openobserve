@@ -18,13 +18,10 @@ use common::meta::authz::Authz;
 #[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     if o2_openfga::config::get_config().enabled {
-        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
+        use o2_openfga::authorizer;
 
-        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
-        let parent_type = if obj.parent_type.is_empty() {
-            ""
-        } else {
-            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+        let Some((obj_str, parent_type)) = ofga_object(obj_type, &obj) else {
+            return;
         };
 
         // Default folder is already created for new organizations. This also
@@ -55,30 +52,20 @@ pub fn ownership_tuples(
     obj_type: &str,
     obj: &Authz,
 ) -> Vec<o2_openfga::authorizer::authz::TupleKey> {
-    use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
-
-    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
-    let parent_type = if obj.parent_type.is_empty() {
-        ""
-    } else {
-        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+    let Some((obj_str, parent_type)) = ofga_object(obj_type, obj) else {
+        return vec![];
     };
-    authorizer::authz::ownership_tuples(org_id, &obj_str, &obj.parent, parent_type)
+    o2_openfga::authorizer::authz::ownership_tuples(org_id, &obj_str, &obj.parent, parent_type)
 }
 
 #[cfg(feature = "enterprise")]
 pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     if o2_openfga::config::get_config().enabled {
-        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
-
-        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
-        let parent_type = if obj.parent_type.is_empty() {
-            ""
-        } else {
-            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+        let Some((obj_str, parent_type)) = ofga_object(obj_type, &obj) else {
+            return;
         };
-
-        authorizer::authz::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        o2_openfga::authorizer::authz::remove_ownership(org_id, &obj_str, &obj.parent, parent_type)
+            .await;
     }
 }
 
@@ -138,4 +125,52 @@ pub async fn list_objects_for_user(
     _object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
     Ok(None)
+}
+
+/// OpenFGA object and parent type of `obj`; `None` when either type is unmapped.
+#[cfg(feature = "enterprise")]
+fn ofga_object(obj_type: &str, obj: &Authz) -> Option<(String, &'static str)> {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    // Unmapped types must not panic: ingestion calls this after the schema is saved.
+    let Some(model) = OFGA_MODELS.get(obj_type) else {
+        log::error!(
+            "[OFGA] no model for type {obj_type}, ownership of {} not tracked",
+            obj.obj_id
+        );
+        return None;
+    };
+    let parent_type = if obj.parent_type.is_empty() {
+        ""
+    } else if let Some(parent) = OFGA_MODELS.get(obj.parent_type.as_str()) {
+        parent.key
+    } else {
+        log::error!(
+            "[OFGA] no model for parent type {}, ownership of {obj_type}:{} not tracked",
+            obj.parent_type,
+            obj.obj_id
+        );
+        return None;
+    };
+    Some((format!("{}:{}", model.key, obj.obj_id), parent_type))
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ofga_object_skips_unmapped_types() {
+        assert!(ofga_object("no_such_type", &Authz::new("s")).is_none());
+
+        let mut obj = Authz::new("s");
+        obj.parent_type = "no_such_type".to_string();
+        obj.parent = "p".to_string();
+        assert!(ofga_object("logs", &obj).is_none());
+
+        assert_eq!(
+            ofga_object("logs", &Authz::new("s")),
+            Some(("logs:s".to_string(), ""))
+        );
+    }
 }

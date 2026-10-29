@@ -411,6 +411,7 @@ mod tests {
             prev,
             at,
             0,
+            0,
         )
     }
 
@@ -425,6 +426,7 @@ mod tests {
         GroupPlanWrite {
             written: true,
             evicted_firing,
+            ..Default::default()
         }
     }
 
