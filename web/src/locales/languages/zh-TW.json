@@ -24136,7 +24136,7 @@
     "ladderStopped_resolved": "此事件解決後，升級即停止。",
     "ladderNothingSent": "尚未呼叫任何人。",
     "escalationAckedIn": "{duration} 後已確認",
-    "escalationSnoozedUntil": "暫停至 {time}",
+    "escalationSnoozedUntil": "已暫停至 {time}",
     "notifiedAge": "已通知 · 存留時間",
     "channelUndeliverable": "{channel} 沒有對應的提供者 — 不會傳送任何通知",
     "assignTeamShort": "指派團隊",

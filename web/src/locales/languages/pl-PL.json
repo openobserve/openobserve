@@ -24141,7 +24141,7 @@
     "ladderStopped_resolved": "Eskalacja zatrzymała się, gdy to zostało rozwiązane.",
     "ladderNothingSent": "Nie wysłano jeszcze żadnego wezwania.",
     "escalationAckedIn": "potwierdzone w {duration}",
-    "escalationSnoozedUntil": "Wyciszone do {time}",
+    "escalationSnoozedUntil": "Wstrzymane do {time}",
     "notifiedAge": "Powiadomiono · Wiek",
     "channelUndeliverable": "{channel} nie ma za sobą żadnego dostawcy — nic nie jest wysyłane",
     "assignTeamShort": "Przypisz zespół",

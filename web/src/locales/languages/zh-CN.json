@@ -24141,7 +24141,7 @@
     "ladderStopped_resolved": "解决后升级已停止。",
     "ladderNothingSent": "尚未呼叫任何人。",
     "escalationAckedIn": "已在 {duration} 后确认",
-    "escalationSnoozedUntil": "暂停至 {time}",
+    "escalationSnoozedUntil": "已暂停至 {time}",
     "notifiedAge": "已通知 · 时长",
     "channelUndeliverable": "{channel} 没有对应的提供方 — 不会发送任何通知。",
     "assignTeamShort": "分配团队",

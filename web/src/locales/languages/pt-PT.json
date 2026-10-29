@@ -24141,7 +24141,7 @@
     "ladderStopped_resolved": "O escalonamento parou quando isto foi resolvido.",
     "ladderNothingSent": "Ainda não foi feito nenhum acionamento.",
     "escalationAckedIn": "reconhecido em {duration}",
-    "escalationSnoozedUntil": "Adiado até às {time}",
+    "escalationSnoozedUntil": "Silenciado até {time}",
     "notifiedAge": "Notificado · Idade",
     "channelUndeliverable": "{channel} não tem um fornecedor por trás — nada é enviado",
     "assignTeamShort": "Atribuir uma equipa",

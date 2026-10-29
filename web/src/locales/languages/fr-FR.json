@@ -24141,7 +24141,7 @@
     "ladderStopped_resolved": "L'escalade s'est arrêtée lorsque cette alerte a été résolue.",
     "ladderNothingSent": "Aucune notification n'a encore été envoyée.",
     "escalationAckedIn": "Acquitté en {duration}",
-    "escalationSnoozedUntil": "En pause jusqu'à {time}",
+    "escalationSnoozedUntil": "Mis en veille jusqu'à {time}",
     "notifiedAge": "Notifié · Âge",
     "channelUndeliverable": "{channel} ne dispose d'aucun fournisseur — rien n'est envoyé.",
     "assignTeamShort": "Assigner une équipe",

@@ -24141,7 +24141,7 @@
     "ladderStopped_resolved": "Escalatie gestopt toen dit werd opgelost.",
     "ladderNothingSent": "Er is nog niemand opgeroepen.",
     "escalationAckedIn": "bevestigd in {duration}",
-    "escalationSnoozedUntil": "Gesluimerd tot {time}",
+    "escalationSnoozedUntil": "Gepauzeerd tot {time}",
     "notifiedAge": "Geïnformeerd · Leeftijd",
     "channelUndeliverable": "{channel} heeft geen provider erachter — er wordt niets verzonden.",
     "assignTeamShort": "Team toewijzen",

@@ -24141,7 +24141,7 @@
     "ladderStopped_resolved": "이 알림이 해결되면서 에스컬레이션이 중지되었습니다.",
     "ladderNothingSent": "아직 아무도 호출되지 않았습니다.",
     "escalationAckedIn": "{duration} 만에 확인됨",
-    "escalationSnoozedUntil": "{time}까지 일시 중지",
+    "escalationSnoozedUntil": "{time}까지 일시중지됨",
     "notifiedAge": "알림 · 경과",
     "channelUndeliverable": "{channel}에 연결된 제공업체가 없어 아무것도 전송되지 않습니다.",
     "assignTeamShort": "팀 지정",

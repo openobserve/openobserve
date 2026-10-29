@@ -24141,7 +24141,7 @@
     "ladderStopped_resolved": "توقّف التصعيد عندما تم حل هذا التنبيه.",
     "ladderNothingSent": "لم يُرسل أي نداء بعد.",
     "escalationAckedIn": "تم التأكيد بعد {duration}",
-    "escalationSnoozedUntil": "مؤجّل حتى {time}",
+    "escalationSnoozedUntil": "تم التأجيل حتى {time}",
     "notifiedAge": "تم الإخطار · العمر",
     "channelUndeliverable": "{channel} ليس له مزوّد وراءه — لن يُرسَل شيء.",
     "assignTeamShort": "تعيين فريق",
