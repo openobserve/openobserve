@@ -74,7 +74,8 @@ export async function discardAndCleanupTestDashboard(page, dashboardName) {
   // app doesn't gate navigation on unsaved changes), but costs nothing to guard against.
   page.once('dialog', (dialog) => dialog.accept());
   await page.goto(
-    `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`
+    // Without folder=default the list can open on Favorites, whose "This folder" search misses the dashboard.
+    `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
   );
   await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 15000 });
   await deleteDashboard(page, dashboardName);
@@ -410,6 +411,16 @@ export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelN
   await buildPromQLPanel(page, pm, dashboardName, { chartType: "line", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL line panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL panel of any chart type and query — config sidebar opened and ready.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLChartWithConfig(page, pm, dashboardName, { chartType, query, panelName = "Test Panel" }) {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType, query, panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL panel with config ready", { chartType, query, dashboardName, panelName });
 }
 
 /**
