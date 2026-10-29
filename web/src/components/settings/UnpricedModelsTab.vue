@@ -339,10 +339,16 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
   },
 ];
 
-/** "research-agent · 1,870 spans": who sends the model, and how often. */
+/** "research-agent, +4 more · 1,870 spans": who sends the model, and how often. */
 function seenBy(row: UnpricedModel): I18nText {
   const spans = t("modelPricing.unpriced.spans", { count: row.spans.toLocaleString() }, row.spans);
-  return row.agents.length ? raw(`${row.agents.join(", ")} · ${spans}`) : spans;
+  if (!row.agents.length) return spans;
+  const hidden = row.agent_count - row.agents.length;
+  const names =
+    hidden > 0
+      ? [...row.agents, t("modelPricing.unpriced.moreAgents", { count: hidden.toLocaleString() })]
+      : row.agents;
+  return raw(`${names.join(", ")} · ${spans}`);
 }
 
 function perMillion(pricePerToken: number | undefined): string {

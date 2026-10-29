@@ -55,6 +55,7 @@ const unpricedResponse: { models: UnpricedModel[] } = {
       tokens: 2_330_000,
       cost: 0,
       agents: ["research-agent"],
+      agent_count: 1,
       matched: null,
     },
     {
@@ -64,6 +65,7 @@ const unpricedResponse: { models: UnpricedModel[] } = {
       tokens: 9_100_000,
       cost: 41.22,
       agents: ["support-bot"],
+      agent_count: 1,
       matched: {
         name: "GPT-5.4",
         match_pattern: "^gpt-5\\.4",
@@ -137,6 +139,16 @@ describe("UnpricedModelsTab", () => {
     expect(approximate.find('[data-test="model-pricing-unpriced-keep-btn"]').exists()).toBe(true);
     expect(approximate.find('[data-test="model-pricing-unpriced-mute-btn"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="model-pricing-unpriced-banner"]').exists()).toBe(true);
+  });
+
+  it("shows how many agents the server left out of a capped list", async () => {
+    const [first, second] = unpricedResponse.models;
+    wrapper = mountTab([
+      { ...first, agents: ["research-agent", "triage"], agent_count: 7 },
+      second,
+    ]);
+    const row = await waitForRow(wrapper, "acme-internal-llm");
+    expect(row.text()).toContain("research-agent, triage, +5 more");
   });
 
   it("keeps a historical gap visible after an exact price covers new spans", async () => {
@@ -237,6 +249,7 @@ describe("UnpricedModelsTab", () => {
       tokens: 1200,
       cost: 0,
       agents: [],
+      agent_count: 0,
       matched: null,
     };
     const open = vi.spyOn(window, "open").mockReturnValue(null);

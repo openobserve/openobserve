@@ -1651,6 +1651,7 @@ describe("Unpriced / approximate tab", () => {
         tokens: 2_330_000,
         cost: 0,
         agents: ["research-agent"],
+        agent_count: 1,
         matched: null,
       },
       {
@@ -1660,6 +1661,7 @@ describe("Unpriced / approximate tab", () => {
         tokens: 9_100_000,
         cost: 41.22,
         agents: ["support-bot"],
+        agent_count: 1,
         matched: {
           name: "GPT-5.4",
           match_pattern: "^gpt-5\\.4",

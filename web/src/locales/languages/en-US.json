@@ -16572,6 +16572,7 @@
       "colCost": "Cost recorded",
       "colActions": "Actions",
       "spans": "{count} span | {count} spans",
+      "moreAgents": "+{count} more",
       "noMatch": "No match",
       "approximate": "Approximate",
       "pricedNow": "Priced for new spans",

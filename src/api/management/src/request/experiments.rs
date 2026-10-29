@@ -594,15 +594,8 @@ pub async fn list_experiments(
         Ok(list) => list,
         Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
     };
-    // One Dataset query for the whole list — a lookup per experiment would be N+1.
-    let dataset_names: std::collections::HashMap<String, String> = datasets::list(&org_id)
-        .await
-        .map(|list| {
-            list.into_iter()
-                .map(|dataset| (dataset.id, dataset.name))
-                .collect()
-        })
-        .unwrap_or_default();
+    // One names-only Dataset query for the whole list — no per-experiment lookups or aggregates.
+    let dataset_names = datasets::list_names(&org_id).await.unwrap_or_default();
     let dataset_id = query
         .dataset_id
         .as_deref()
