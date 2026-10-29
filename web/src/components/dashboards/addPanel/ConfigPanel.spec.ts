@@ -3692,16 +3692,19 @@ describe("ConfigPanel", () => {
       expect(widthInput().props("error")).toBe(false);
     });
 
-    it("shows the track for h-bar only and the width wherever a converter reads it", () => {
-      wrapper = createWrapper({ dashboardPanelData: panelOf("h-bar") });
-      expect(widthInput().exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(true);
-      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
-      expect(widthInput().exists()).toBe(false);
-      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
-      wrapper = createWrapper({ dashboardPanelData: panelOf("stacked") }, { promqlMode: true });
-      expect(widthInput().exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
-    });
+    it.each([
+      ["h-bar", false, true, true],
+      ["bar", false, false, false],
+      ["stacked", true, true, false],
+    ])(
+      "shows the width and track controls for %s (promql %s) only where a converter reads them",
+      (type, promqlMode, hasWidth, hasTrack) => {
+        wrapper = createWrapper({ dashboardPanelData: panelOf(type) }, { promqlMode });
+        expect(widthInput().exists()).toBe(hasWidth);
+        expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(
+          hasTrack,
+        );
+      },
+    );
   });
 });
