@@ -853,7 +853,7 @@ pub async fn move_collectors(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "ListFleetTokens",
-    summary = "List enrollment tokens with their values",
+    summary = "List enrollment tokens; a token's value only on fleets the caller may PUT",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), PageQuery),
     responses(
@@ -1078,7 +1078,7 @@ pub async fn create_config(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "GetFleetConfig",
-    summary = "Get a configuration with its draft and version history",
+    summary = "Get a configuration with its draft and version history; the draft YAML is masked without fleet_configs PUT",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1268,7 +1268,7 @@ pub async fn publish_config_version(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "GetFleetConfigVersion",
-    summary = "Get one published version's YAML and hash",
+    summary = "Get one published version's YAML and hash; the YAML is masked without fleet_configs PUT",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
