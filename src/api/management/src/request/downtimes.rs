@@ -474,7 +474,7 @@ pub async fn delete_downtime(
 }
 
 #[cfg(not(feature = "enterprise"))]
-fn not_supported() -> Response {
+pub(crate) fn not_supported() -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -499,7 +499,7 @@ fn created(id: String) -> Response {
 }
 
 #[cfg(feature = "enterprise")]
-fn error_response(e: openobserve_core::downtimes::DowntimeError) -> Response {
+pub(crate) fn error_response(e: openobserve_core::downtimes::DowntimeError) -> Response {
     use openobserve_core::downtimes::DowntimeError;
     match e {
         DowntimeError::Disabled => MetaHttpResponse::forbidden("Downtimes are not enabled"),

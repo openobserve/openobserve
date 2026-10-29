@@ -31,7 +31,10 @@ use config::meta::alerts::{
     grouping::GroupPlan,
     state::{EvalLedgerWrite, StateUpdate},
 };
-use infra::{errors::Result, table::alert_states::DeliveryOutcome};
+use infra::{
+    errors::Result,
+    table::alert_states::{DeliveryOutcome, GroupPlanWrite},
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
     common::config::get_config as get_o2_config,
@@ -68,10 +71,8 @@ pub async fn persist(update: &StateUpdate, ledger: Option<&EvalLedgerWrite>) -> 
 }
 
 #[inline]
-pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<()> {
-    // Underscored because only the enterprise arm below reads it — the same
-    // shape `scheduler.rs` uses for its super-cluster-only bindings.
-    let _written = infra::table::alert_states::persist_group_plan(plan, alert_id).await?;
+pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<GroupPlanWrite> {
+    let write = infra::table::alert_states::persist_group_plan(plan, alert_id).await?;
 
     // A plan the §5.3 opt-out gate refused wrote nothing here, and broadcasting
     // it would be worse than pointless: a region that has not yet seen the
@@ -79,7 +80,7 @@ pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<()> 
     // and with the reaper gated to the job cluster, nothing there would sweep
     // them back up.
     #[cfg(feature = "enterprise")]
-    if _written {
+    if write.written {
         publish(AlertStateMessage::PersistGroupPlan {
             alert_id: alert_id.to_string(),
             plan: plan.clone(),
@@ -87,7 +88,7 @@ pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<()> 
         .await;
     }
 
-    Ok(())
+    Ok(write)
 }
 
 #[inline]

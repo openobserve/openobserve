@@ -60,11 +60,18 @@ function tokenCount(value) {
 
 export function genAiResponseAttributes(data, text, requestedModel) {
   const info = data?.info || {};
-  const inputTokens = tokenCount(info.tokens?.input);
-  const outputTokens = tokenCount(info.tokens?.output);
+  const nonCachedInputTokens = tokenCount(info.tokens?.input);
+  const visibleOutputTokens = tokenCount(info.tokens?.output);
   const cacheReadTokens = tokenCount(info.tokens?.cache?.read);
   const cacheWriteTokens = tokenCount(info.tokens?.cache?.write);
   const reasoningTokens = tokenCount(info.tokens?.reasoning);
+  // opencode splits cache and reasoning out; OpenObserve expects input to include cache and output to include reasoning.
+  const inputTokens = nonCachedInputTokens === undefined
+    ? undefined
+    : nonCachedInputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0);
+  const outputTokens = visibleOutputTokens === undefined
+    ? undefined
+    : visibleOutputTokens + (reasoningTokens ?? 0);
   const responseModel = info.modelID || requestedModel;
 
   const attributes = {
@@ -82,10 +89,10 @@ export function genAiResponseAttributes(data, text, requestedModel) {
     "gen_ai.usage.total_tokens": inputTokens !== undefined && outputTokens !== undefined
       ? inputTokens + outputTokens
       : undefined,
-    "gen_ai.usage.cache_read_tokens": cacheReadTokens,
-    "gen_ai.usage.cache_write_tokens": cacheWriteTokens,
+    "gen_ai.usage.cache_read.input_tokens": cacheReadTokens,
+    "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
     "gen_ai.usage.cost": Number.isFinite(info.cost) && info.cost >= 0 ? info.cost : undefined,
-    "ai.review.usage.reasoning_tokens": reasoningTokens,
+    "ai.usage.reasoning_tokens": reasoningTokens,
     "ai.review.output.chars": text.length,
     "ai.review.output.sha256": sha256(text),
   };

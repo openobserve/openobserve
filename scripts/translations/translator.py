@@ -39,6 +39,7 @@ import json
 import os
 import re
 import hashlib
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -627,6 +628,9 @@ _NAMED = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*\Z")
 _LIST = re.compile(r"\d+\Z")
 
 _client = None
+_tracer = None
+_tracer_lock = threading.Lock()
+_locale_spans = {}
 # Batches are translated concurrently (see translate_pending), so the lazy client
 # construction below must be race-free.
 _client_lock = threading.Lock()
@@ -842,6 +846,25 @@ def _get_client():
     return _client
 
 
+def _get_tracer():
+    """The run's tracer, created on first use so `main.py --check` never touches telemetry."""
+    global _tracer
+    if _tracer is None:
+        with _tracer_lock:
+            if _tracer is None:
+                sys.path.insert(0, os.path.join(_script_dir(), "..", "ci-telemetry"))
+                from o2_llm_trace import Tracer
+
+                _tracer = Tracer("github-actions.translations", "github.workflow.translations")
+    return _tracer
+
+
+def set_trace_outcome(outcome, attributes=None):
+    """Record the run outcome on the root span; a no-op when no API call was traced."""
+    if _tracer is not None:
+        _tracer.set_outcome(outcome, attributes=attributes)
+
+
 def _model():
     return os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
@@ -972,14 +995,24 @@ def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
     )
     temperature = 0.0
     last_err = None
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": payload},
+    ]
+    call = _get_tracer().llm_call(
+        _model(),
+        messages,
+        parent=_locale_spans.get(locale),
+        agent_name="translator",
+        agent_key=locale,
+        attributes={"ai.translations.locale": locale, "ai.translations.items": len(items)},
+    )
     for attempt in range(max_retries):
         try:
-            resp = _get_client().chat.completions.create(
+            resp = call.create(
+                _get_client(),
                 model=_model(),
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": payload},
-                ],
+                messages=messages,
                 stream=False,
                 temperature=temperature,
                 response_format={"type": "json_object"},
@@ -998,6 +1031,7 @@ def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
             # split below isolates just that index as None (retried next run).
             cleaned = [x if isinstance(x, str) and x.strip() else None for x in out]
             if all(c is not None for c in cleaned):
+                call.end()
                 return cleaned
             raise TranslationError(
                 f"{cleaned.count(None)} of {len(items)} translations were empty/invalid"
@@ -1005,10 +1039,13 @@ def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
         except (json.JSONDecodeError, TranslationError, KeyError, IndexError, TypeError) as e:
             # Malformed / wrong-length response — perturb temperature and retry.
             last_err = e
+            call.reject(e)
             temperature = 0.3 if temperature == 0.0 else min(temperature + 0.2, 1.0)
         except Exception as e:  # noqa: BLE001 — network / API / rate-limit errors
             last_err = e
+            call.reject(e)
             time.sleep(2 * (attempt + 1))
+    call.end()
 
     # Retries exhausted. Split to isolate the offending element so its neighbours
     # aren't lost with it. Recursion bottoms out naturally at a single string
@@ -1189,6 +1226,31 @@ def _validate(src, out):
 
 
 def translate_pending(pending, locale, module_terms):
+    """Translate all pending leaves for a locale, traced as one child span per locale."""
+    tracer = _get_tracer()
+    span = tracer.start_span(
+        "translations.locale",
+        {"ai.translations.locale": locale, "ai.translations.pending_leaves": len(pending)},
+    )
+    _locale_spans[locale] = span
+    error = None
+    translated = {}
+    try:
+        translated = _translate_pending(pending, locale, module_terms)
+        return translated
+    except Exception as exc:
+        error = exc
+        raise
+    finally:
+        _locale_spans.pop(locale, None)
+        tracer.end_span(
+            span,
+            {"ai.translations.translated_leaves": len(translated), "ai.translations.failed_leaves": len(pending) - len(translated)},
+            error,
+        )
+
+
+def _translate_pending(pending, locale, module_terms):
     """
     Translate all pending leaves for a locale in batches.
 

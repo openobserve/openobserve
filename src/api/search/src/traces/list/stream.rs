@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use axum::response::Response;
 use config::{
@@ -35,6 +35,80 @@ use super::{
     response::TraceBatch,
 };
 use crate::search::error_utils::map_error_to_http_response;
+
+#[cfg_attr(test, derive(Clone))]
+struct CandidateMerge {
+    cap: usize,
+    // Largest candidate per trace id, kept for pruned ids too, so a smaller row cannot re-enter.
+    candidates: HashMap<String, i64>,
+    rows: HashMap<String, json::Value>,
+}
+
+impl CandidateMerge {
+    fn new(cap: usize) -> Self {
+        Self {
+            cap,
+            candidates: HashMap::new(),
+            rows: HashMap::new(),
+        }
+    }
+
+    fn push_hits(&mut self, hits: Vec<json::Value>) {
+        for hit in hits {
+            let Some(trace_id) = trace_id_of(&hit)
+                .filter(|id| !id.is_empty())
+                .map(str::to_string)
+            else {
+                continue;
+            };
+            let candidate = candidate_of(&hit);
+            // A map, not the TopKHeap: a later partition can report a larger candidate for an id.
+            if self
+                .candidates
+                .get(&trace_id)
+                .is_some_and(|best| *best >= candidate)
+            {
+                continue;
+            }
+            self.candidates.insert(trace_id.clone(), candidate);
+            self.rows.insert(trace_id, hit);
+        }
+        self.prune();
+    }
+
+    // Dropping past the cap is safe: candidates never shrink, so the cap-th key never falls.
+    fn prune(&mut self) {
+        if self.rows.len() <= self.cap {
+            return;
+        }
+        let mut keys: Vec<(i64, String)> = self
+            .rows
+            .iter()
+            .map(|(id, row)| (candidate_of(row), id.clone()))
+            .collect();
+        keys.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+        for (_, id) in keys.drain(self.cap..) {
+            self.rows.remove(&id);
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.candidates.len()
+    }
+
+    fn into_page(self, from: i64, size: i64) -> Vec<json::Value> {
+        let mut rows: Vec<json::Value> = self.rows.into_values().collect();
+        rows.sort_by(|a, b| {
+            candidate_of(b)
+                .cmp(&candidate_of(a))
+                .then_with(|| trace_id_of(a).cmp(&trace_id_of(b)))
+        });
+        rows.into_iter()
+            .skip(from.max(0) as usize)
+            .take(size.max(0) as usize)
+            .collect()
+    }
+}
 
 pub fn stream_response(ctx: TraceSearchContext, plan: TraceListPlan, span: Span) -> Response {
     let trace_id = ctx.trace_id.clone();
@@ -139,6 +213,7 @@ async fn run(
 
     let total_partitions = partitions.len();
     let is_non_ts_order_by = plan.sort.by_duration;
+    let ranks_by_candidate = plan.sort.ranks_by_candidate(plan.mode);
     let partitions_desc: Vec<[i64; 2]> = if !is_non_ts_order_by && plan.sort.ascending {
         log::info!(
             "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=ASC",
@@ -150,7 +225,15 @@ async fn run(
             "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order={}",
             partitions.len(),
             if is_non_ts_order_by {
-                format!("non-ts ({}), TopKHeap", plan.sort.sql())
+                format!(
+                    "non-ts ({}), {}",
+                    plan.sort.sql(plan.mode),
+                    if ranks_by_candidate {
+                        "candidate merge"
+                    } else {
+                        "TopKHeap"
+                    }
+                )
             } else {
                 "DESC".to_string()
             }
@@ -165,7 +248,8 @@ async fn run(
     };
     let non_ts_col = "zo_sql_duration".to_string();
     let non_ts_is_desc = !plan.sort.ascending;
-    let mut topk_heap: Option<TopKHeap> = if is_non_ts_order_by {
+    let mut candidate_merge = ranks_by_candidate.then(|| CandidateMerge::new(heap_k));
+    let mut topk_heap: Option<TopKHeap> = if is_non_ts_order_by && !ranks_by_candidate {
         Some(TopKHeap::new(heap_k, &[(non_ts_col, non_ts_is_desc)]))
     } else {
         None
@@ -253,15 +337,20 @@ async fn run(
         }
 
         if is_non_ts_order_by {
-            for item in &deduped_hits {
-                if let Some(tid) = item.get("trace_id").and_then(|v| v.as_str())
-                    && !tid.is_empty()
-                {
-                    seen_trace_ids.insert(tid.to_string());
+            if let Some(merge) = candidate_merge.as_mut() {
+                // Every partition reports the same trace again; the merge keeps the largest.
+                merge.push_hits(deduped_hits);
+            } else {
+                for item in &deduped_hits {
+                    if let Some(tid) = item.get("trace_id").and_then(|v| v.as_str())
+                        && !tid.is_empty()
+                    {
+                        seen_trace_ids.insert(tid.to_string());
+                    }
                 }
-            }
-            if let Some(ref mut heap) = topk_heap {
-                heap.push_hits(deduped_hits);
+                if let Some(ref mut heap) = topk_heap {
+                    heap.push_hits(deduped_hits);
+                }
             }
             let progress = ((idx + 1) * 100) / total_partitions;
             let _ = sender
@@ -344,10 +433,16 @@ async fn run(
     }
 
     if is_non_ts_order_by {
-        let deliverable_q1 = topk_heap
-            .take()
-            .map(|h| h.into_sorted_vec(from as usize))
-            .unwrap_or_default();
+        let (total, deliverable_q1) = match candidate_merge.take() {
+            Some(merge) => (merge.len(), merge.into_page(from, size)),
+            None => (
+                total_across_partitions,
+                topk_heap
+                    .take()
+                    .map(|h| h.into_sorted_vec(from as usize))
+                    .unwrap_or_default(),
+            ),
+        };
 
         if deliverable_q1.is_empty() {
             let _ = sender.send(Ok(StreamResponses::Done)).await;
@@ -377,7 +472,7 @@ async fn run(
         for h in deliverable {
             results.add_hit(h);
         }
-        results.set_total(total_across_partitions);
+        results.set_total(total);
         if !range_error.is_empty() {
             results.function_error.push(range_error.clone());
         }
@@ -461,9 +556,121 @@ fn select_timestamp_page(
     hits.into_iter().skip(skip as usize).take(need).collect()
 }
 
+fn trace_id_of(hit: &json::Value) -> Option<&str> {
+    hit.get("trace_id").and_then(json::Value::as_str)
+}
+
+fn candidate_of(hit: &json::Value) -> i64 {
+    json::get_int_value(hit.get("zo_sql_candidate").unwrap_or_default())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn row(trace_id: &str, candidate: i64) -> json::Value {
+        json::json!({"trace_id": trace_id, "zo_sql_candidate": candidate})
+    }
+
+    fn ids(rows: &[json::Value]) -> Vec<&str> {
+        rows.iter().filter_map(trace_id_of).collect()
+    }
+
+    // The Q1 order `zo_sql_candidate DESC, trace_id ASC` (or ties cut the other way) then LIMIT.
+    fn sql_cut(mut hits: Vec<json::Value>, limit: usize, ids_ascending: bool) -> Vec<json::Value> {
+        hits.sort_by(|a, b| {
+            let by_id = trace_id_of(a).cmp(&trace_id_of(b));
+            candidate_of(b).cmp(&candidate_of(a)).then_with(|| {
+                if ids_ascending {
+                    by_id
+                } else {
+                    by_id.reverse()
+                }
+            })
+        });
+        hits.truncate(limit);
+        hits
+    }
+
+    fn page(
+        partitions: &[Vec<json::Value>],
+        from: i64,
+        size: i64,
+        ids_ascending: bool,
+    ) -> Vec<String> {
+        let heap_k = (from + size) as usize;
+        let mut merge = CandidateMerge::new(heap_k);
+        for hits in partitions {
+            merge.push_hits(sql_cut(hits.clone(), heap_k, ids_ascending));
+        }
+        ids(&merge.into_page(from, size))
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+    }
+
+    #[test]
+    fn candidate_merge_keeps_the_largest_row_per_trace_and_pages_by_candidate() {
+        // Example 3 of the spec: four partitions newest first, page size 2, trace A crosses all.
+        let partitions = [
+            vec![row("B", 4), row("E", 3)],
+            vec![row("A", 5), row("D", 4)],
+            vec![row("A", 5), row("C", 2)],
+            vec![row("A", 12)],
+        ];
+        let mut merge = CandidateMerge::new(10);
+        for hits in partitions {
+            merge.push_hits(hits);
+        }
+        merge.push_hits(vec![row("A", 1), row("", 99)]);
+        assert_eq!(merge.len(), 5);
+        assert_eq!(merge.rows["A"], row("A", 12));
+        assert_eq!(ids(&merge.clone().into_page(0, 2)), ["A", "B"]);
+        assert_eq!(ids(&merge.clone().into_page(2, 2)), ["D", "E"]);
+        assert_eq!(ids(&merge.into_page(-1, 10)), ["A", "B", "D", "E", "C"]);
+    }
+
+    #[test]
+    fn candidate_merge_ranks_the_issue_example_by_its_root_span() {
+        // Issue 15507: A = 9 s root span in the older partition plus a 1 s span in the newer one.
+        let mut merge = CandidateMerge::new(1);
+        merge.push_hits(vec![row("B", 2_000_000), row("A", 1_000_000)]);
+        merge.push_hits(vec![row("A", 9_000_000)]);
+        assert_eq!(merge.len(), 2);
+        assert_eq!(ids(&merge.into_page(0, 1)), ["A"]);
+    }
+
+    #[test]
+    fn candidate_merge_keeps_at_most_cap_rows_and_readmits_a_pruned_id_that_grows() {
+        // from=1&size=1 keeps two rows: C is pruned, ignored while smaller, back once larger.
+        let mut merge = CandidateMerge::new(2);
+        merge.push_hits(vec![row("A", 5), row("B", 4), row("C", 3)]);
+        assert_eq!(merge.rows.len(), 2);
+        assert!(!merge.rows.contains_key("C"));
+        merge.push_hits(vec![row("C", 2)]);
+        assert!(!merge.rows.contains_key("C"));
+        merge.push_hits(vec![row("C", 10), row("B", 4)]);
+        assert_eq!(merge.rows.len(), 2);
+        assert_eq!(merge.len(), 3);
+        assert_eq!(ids(&merge.clone().into_page(0, 2)), ["C", "A"]);
+        assert_eq!(ids(&merge.into_page(1, 1)), ["A"]);
+    }
+
+    #[test]
+    fn the_trace_id_tiebreaker_keeps_tied_candidates_stable_across_pages() {
+        // Six traces tie at the cutoff; every page fetches `LIMIT from + size` per partition.
+        let partitions = vec![
+            vec![row("D", 5), row("C", 5), row("B", 5), row("A", 5)],
+            vec![row("F", 5), row("E", 5), row("G", 3)],
+        ];
+        assert_eq!(page(&partitions, 0, 2, true), ["A", "B"]);
+        assert_eq!(page(&partitions, 2, 2, true), ["C", "D"]);
+        assert_eq!(page(&partitions, 4, 2, true), ["E", "F"]);
+        assert_eq!(page(&partitions, 6, 2, true), ["G"]);
+        // Without the tiebreaker a partition can cut the ties the other way: page 2 repeats page 1.
+        assert_eq!(page(&partitions, 0, 2, false), ["C", "D"]);
+        assert_eq!(page(&partitions, 2, 2, false), ["C", "D"]);
+    }
 
     #[test]
     fn timestamp_pagination_remembers_skipped_and_undelivered_ids() {

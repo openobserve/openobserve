@@ -26,76 +26,281 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <div class="bg-card-glass-bg flex-1 overflow-x-hidden overflow-y-auto py-2">
-      <div>
-        <OForm :form="form" id="add-destination-form" class="mt-2 mb-1 flex flex-col gap-2 px-3">
-          <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
-          <div v-if="isAlerts && !destination" class="w-full pb-3">
-            <div class="mb-2 text-sm font-medium">
-              {{ t("alert_destinations.destination_type") }}
-            </div>
-            <PrebuiltDestinationSelector
-              :model-value="dtVal"
-              @update:model-value="setDestinationType"
-              :search-query="destinationSearchQuery"
-              data-test="prebuilt-destination-selector"
-              @select="selectDestinationType"
-              @update:search-query="destinationSearchQuery = $event"
-            />
+      <div v-if="isSlackApp" class="mt-2 flex flex-col gap-4 px-3 pb-4">
+        <div v-if="!destination" class="w-full">
+          <div class="mb-2 text-sm font-medium">
+            {{ t("alert_destinations.destination_type") }}
           </div>
+          <PrebuiltDestinationSelector
+            :model-value="dtVal"
+            :slack-app="slackAppAvailable"
+            :unavailable-reason="slackAppUnavailableReason"
+            :can-manage-slack="canManageSlack"
+            data-test="prebuilt-destination-selector"
+            @update:model-value="setDestinationType"
+            @select="selectDestinationType"
+          />
+        </div>
+        <SlackAppDestinationForm
+          :key="slackAppFormKey"
+          :destination="slackAppDestination"
+          :templates="templates"
+          :confirmation="switchConfirmation"
+          @saved="onSlackAppSaved"
+          @cancel="emit('cancel:hideform')"
+        />
+      </div>
+      <template v-else>
+        <div>
+          <OForm :form="form" id="add-destination-form" class="mt-2 mb-1 flex flex-col gap-2 px-3">
+            <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
+            <div v-if="isAlerts && !destination" class="w-full pb-3">
+              <div class="mb-2 text-sm font-medium">
+                {{ t("alert_destinations.destination_type") }}
+              </div>
+              <PrebuiltDestinationSelector
+                :model-value="dtVal"
+                :slack-app="slackAppAvailable"
+                :unavailable-reason="slackAppUnavailableReason"
+                :can-manage-slack="canManageSlack"
+                @update:model-value="setDestinationType"
+                :search-query="destinationSearchQuery"
+                data-test="prebuilt-destination-selector"
+                @select="selectDestinationType"
+                @update:search-query="destinationSearchQuery = $event"
+              />
+            </div>
 
-          <!-- Destination Type and Name Display for Edit Mode -->
-          <div v-if="isAlerts && destination && dtVal" class="w-full pb-3">
-            <div class="flex gap-3">
-              <!-- Destination Type (Read-only) -->
-              <div class="w-1/2">
-                <div class="mb-1 text-sm leading-tight font-medium">
-                  {{ t("alert_destinations.destination_type") }}
+            <!-- Destination Type and Name Display for Edit Mode -->
+            <div v-if="isAlerts && destination && dtVal" class="w-full pb-3">
+              <div class="flex gap-3">
+                <!-- Destination Type (Read-only) -->
+                <div class="w-1/2">
+                  <div class="mb-1 text-sm leading-tight font-medium">
+                    {{ t("alert_destinations.destination_type") }}
+                  </div>
+                  <div
+                    class="border-card-glass-border rounded-default flex items-center border p-2"
+                    data-test="destination-type-readonly"
+                  >
+                    <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="me-2" />
+                    <span class="text-sm">{{ getDestinationTypeName(dtVal) }}</span>
+                    <OTag type="readonlyFlag" value="readonly" class="ms-2">{{
+                      t("alert_destinations.readonly")
+                    }}</OTag>
+                  </div>
                 </div>
-                <div
-                  class="border-card-glass-border rounded-default flex items-center border p-2"
-                  data-test="destination-type-readonly"
-                >
-                  <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="me-2" />
-                  <span class="text-sm">{{ getDestinationTypeName(dtVal) }}</span>
-                  <OTag type="readonlyFlag" value="readonly" class="ms-2">{{
-                    t("alert_destinations.readonly")
-                  }}</OTag>
+                <!-- Destination Name (Read-only) -->
+                <div class="w-1/2">
+                  <OFormInput
+                    data-test="add-destination-name-input"
+                    name="name"
+                    :label="t('alerts.name')"
+                    required
+                    readonly
+                    disabled
+                    tabindex="0"
+                  />
                 </div>
               </div>
-              <!-- Destination Name (Read-only) -->
-              <div class="w-1/2">
+            </div>
+
+            <!-- Prebuilt Destination Form (for alerts only) -->
+            <!-- Show for: create mode with destination_type selected OR edit mode for prebuilt destinations -->
+            <div
+              v-if="
+                isAlerts && (isPrebuiltDestination || (isUpdatingDestination && dtVal !== 'custom'))
+              "
+              class="w-full"
+            >
+              <SlackDestinationSetup
+                v-if="isNewSlackDestination"
+                :org-identifier="store.state.selectedOrganization.identifier"
+                :is-cloud="isCloudDeployment"
+                :is-enterprise="isEnterpriseDeployment"
+                @flow-change="handleSlackFlowChange"
+                @readiness-change="handleSlackReadinessChange"
+              />
+
+              <SlackAppSwitchBanner
+                v-if="destination && dtVal === 'slack'"
+                :destination="destination"
+                class="mb-3"
+                @switched="onSlackAppSaved"
+              />
+
+              <!-- Name Field for Create Mode -->
+              <div v-if="!destination && !isNewSlackDestination" class="w-1/2 pb-3">
                 <OFormInput
                   data-test="add-destination-name-input"
                   name="name"
                   :label="t('alerts.name')"
                   required
-                  readonly
-                  disabled
+                  tabindex="0"
+                />
+              </div>
+
+              <PrebuiltDestinationForm
+                v-if="dtVal && dtVal !== 'custom' && !isNewSlackDestination"
+                :destination-type="dtVal"
+                :hide-actions="true"
+                data-test="prebuilt-form"
+              />
+              <div v-else-if="isUpdatingDestination" class="p-3 text-center">
+                <OSpinner size="md" data-test="add-destination-loading-indicator" />
+                <div class="text-text-muted mt-2">{{ t("alert_destinations.loadingData") }}</div>
+              </div>
+
+              <!-- Template selector for prebuilt destinations -->
+              <div
+                v-if="dtVal && dtVal !== 'custom' && showPrebuiltAdvancedSettings"
+                class="w-1/2 py-1"
+              >
+                <OFormSelect
+                  data-test="add-destination-prebuilt-template-select"
+                  name="template"
+                  :label="t('alert_destinations.template')"
+                  :options="prebuiltTemplateOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  tabindex="0"
+                />
+                <div class="text-text-secondary mt-1 text-xs">
+                  {{
+                    t("alert_destinations.templateHelp", {
+                      type: getDestinationTypeName(dtVal),
+                      name: defaultPrebuiltTemplateName,
+                    })
+                  }}
+                </div>
+              </div>
+
+              <!-- None of these settings apply to email destinations -->
+              <div
+                v-if="showPrebuiltAdvancedSettings && dtVal !== 'email'"
+                class="mt-3 w-full"
+                data-test="prebuilt-additional-settings"
+              >
+                <div class="py-1 font-bold">
+                  {{ t("alert_destinations.additional_settings") }}
+                </div>
+
+                <!-- Custom Headers -->
+                <div class="py-2">
+                  <div class="pb-1 text-sm font-medium">
+                    {{ t("alert_destinations.custom_headers") }}
+                  </div>
+                  <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
+                    <div class="ms-0 w-5/12">
+                      <OFormInput
+                        :data-test="`add-destination-header-${header['key']}-key-input`"
+                        :name="`apiHeaders[${index}].key`"
+                        :placeholder="t('alert_destinations.api_header')"
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="ms-0 w-5/12">
+                      <OFormInput
+                        :data-test="`add-destination-header-${header['key']}-value-input`"
+                        :name="`apiHeaders[${index}].value`"
+                        :placeholder="t('alert_destinations.api_header_value')"
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="ms-0 w-1/6">
+                      <OButton
+                        :data-test="`add-destination-header-${header['key']}-delete-btn`"
+                        class="ms-1"
+                        variant="ghost"
+                        size="icon-circle-sm"
+                        :title="t('alert_templates.edit')"
+                        @click="deleteApiHeader(index)"
+                      >
+                        <OIcon name="delete" size="sm" />
+                      </OButton>
+                      <OButton
+                        data-test="add-destination-add-header-btn"
+                        v-if="index === apiHeaders.length - 1"
+                        class="ms-1"
+                        variant="ghost"
+                        size="icon-circle-sm"
+                        :title="t('alert_templates.edit')"
+                        @click="addApiHeader()"
+                      >
+                        <OIcon name="add" size="sm" />
+                      </OButton>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Skip TLS Verify Toggle -->
+                <div class="py-2">
+                  <OFormSwitch
+                    data-test="add-destination-skip-tls-verify-toggle"
+                    name="skip_tls_verify"
+                    :label="t('alert_destinations.skip_tls_verify')"
+                  />
+                </div>
+              </div>
+
+              <!-- Test Result Display -->
+              <DestinationTestResult
+                v-if="lastTestResult"
+                :result="lastTestResult"
+                :is-loading="isTestInProgress"
+                :show-success-response-body="dtVal === 'slack'"
+                data-test="prebuilt-test-result"
+                @retry="handleTestDestination"
+              />
+            </div>
+
+            <!-- Tabs for non-alert destinations OR custom alert destinations -->
+            <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
+              <div class="app-tabs-container me-2 h-9 w-fit">
+                <AppTabs
+                  data-test="add-destination-tabs"
+                  :tabs="tabs"
+                  class="tabs-selection-container"
+                  :active-tab="typeVal"
+                  @update:active-tab="setType"
+                />
+              </div>
+            </div>
+            <div
+              v-if="typeVal === 'email' && !getFormattedTemplates.length"
+              class="mb-3 flex w-full items-center"
+            >
+              <div class="me-2 text-sm font-medium">
+                {{ t("alert_destinations.noEmailTemplates") }}
+              </div>
+              <OButton variant="outline" size="sm" @click="createEmailTemplate">{{
+                t("alert_destinations.createEmailTemplate")
+              }}</OButton>
+            </div>
+            <!-- Name + Template row for custom alert destinations -->
+            <div v-if="isAlerts && dtVal === 'custom'" class="flex w-full gap-3">
+              <div class="w-1/2 py-1">
+                <OFormInput
+                  data-test="add-destination-name-input"
+                  name="name"
+                  :label="t('alerts.name')"
+                  required
+                  tabindex="0"
+                />
+              </div>
+              <div class="w-1/2 py-1">
+                <OFormSelect
+                  data-test="add-destination-template-select"
+                  name="template"
+                  :label="t('alert_destinations.template')"
+                  required
+                  :options="getFormattedTemplates"
                   tabindex="0"
                 />
               </div>
             </div>
-          </div>
-
-          <!-- Prebuilt Destination Form (for alerts only) -->
-          <!-- Show for: create mode with destination_type selected OR edit mode for prebuilt destinations -->
-          <div
-            v-if="
-              isAlerts && (isPrebuiltDestination || (isUpdatingDestination && dtVal !== 'custom'))
-            "
-            class="w-full"
-          >
-            <SlackDestinationSetup
-              v-if="isNewSlackDestination"
-              :org-identifier="store.state.selectedOrganization.identifier"
-              :is-cloud="isCloudDeployment"
-              :is-enterprise="isEnterpriseDeployment"
-              @flow-change="handleSlackFlowChange"
-              @readiness-change="handleSlackReadinessChange"
-            />
-
-            <!-- Name Field for Create Mode -->
-            <div v-if="!destination && !isNewSlackDestination" class="w-1/2 pb-3">
+            <!-- Name field for non-alert destinations (pipelines) -->
+            <div v-if="!isAlerts" class="w-full py-1">
               <OFormInput
                 data-test="add-destination-name-input"
                 name="name"
@@ -105,56 +310,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <PrebuiltDestinationForm
-              v-if="dtVal && dtVal !== 'custom' && !isNewSlackDestination"
-              :destination-type="dtVal"
-              :hide-actions="true"
-              data-test="prebuilt-form"
-            />
-            <div v-else-if="isUpdatingDestination" class="p-3 text-center">
-              <OSpinner size="md" data-test="add-destination-loading-indicator" />
-              <div class="text-text-muted mt-2">{{ t("alert_destinations.loadingData") }}</div>
-            </div>
-
-            <!-- Template selector for prebuilt destinations -->
-            <div
-              v-if="dtVal && dtVal !== 'custom' && showPrebuiltAdvancedSettings"
-              class="w-1/2 py-1"
+            <template
+              v-if="
+                (isAlerts && dtVal === 'custom' && typeVal === 'http') ||
+                (!isAlerts && typeVal === 'http')
+              "
             >
-              <OFormSelect
-                data-test="add-destination-prebuilt-template-select"
-                name="template"
-                :label="t('alert_destinations.template')"
-                :options="prebuiltTemplateOptions"
-                labelKey="label"
-                valueKey="value"
-                tabindex="0"
-              />
-              <div class="text-text-secondary mt-1 text-xs">
-                {{
-                  t("alert_destinations.templateHelp", {
-                    type: getDestinationTypeName(dtVal),
-                    name: defaultPrebuiltTemplateName,
-                  })
-                }}
-              </div>
-            </div>
-
-            <!-- None of these settings apply to email destinations -->
-            <div
-              v-if="showPrebuiltAdvancedSettings && dtVal !== 'email'"
-              class="mt-3 w-full"
-              data-test="prebuilt-additional-settings"
-            >
-              <div class="py-1 font-bold">
-                {{ t("alert_destinations.additional_settings") }}
-              </div>
-
-              <!-- Custom Headers -->
-              <div class="py-2">
-                <div class="pb-1 text-sm font-medium">
-                  {{ t("alert_destinations.custom_headers") }}
+              <div class="flex w-full gap-3">
+                <div class="w-1/2 py-1">
+                  <OFormInput
+                    data-test="add-destination-url-input"
+                    name="url"
+                    :label="t('alert_destinations.url')"
+                    required
+                    tabindex="0"
+                  />
                 </div>
+                <div class="py-1" :class="{ 'w-1/4': !isAlerts, 'w-1/2': isAlerts }">
+                  <OFormSelect
+                    data-test="add-destination-method-select"
+                    name="method"
+                    :label="t('alert_destinations.method')"
+                    required
+                    :options="apiMethods"
+                    tabindex="0"
+                  />
+                </div>
+                <div v-if="!isAlerts" class="w-1/4 py-1">
+                  <OFormSelect
+                    data-test="add-destination-output-format-select"
+                    name="output_format"
+                    :label="t('alert_destinations.output_format')"
+                    required
+                    :options="outputFormats"
+                    tabindex="0"
+                  />
+                </div>
+              </div>
+              <div class="w-full py-2">
+                <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
                 <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
                   <div class="ms-0 w-5/12">
                     <OFormInput
@@ -197,269 +391,111 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-
-              <!-- Skip TLS Verify Toggle -->
-              <div class="py-2">
+              <div class="w-full py-2">
                 <OFormSwitch
                   data-test="add-destination-skip-tls-verify-toggle"
                   name="skip_tls_verify"
                   :label="t('alert_destinations.skip_tls_verify')"
                 />
               </div>
-            </div>
 
-            <!-- Test Result Display -->
-            <DestinationTestResult
-              v-if="lastTestResult"
-              :result="lastTestResult"
-              :is-loading="isTestInProgress"
-              :show-success-response-body="dtVal === 'slack'"
-              data-test="prebuilt-test-result"
-              @retry="handleTestDestination"
-            />
-          </div>
-
-          <!-- Tabs for non-alert destinations OR custom alert destinations -->
-          <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
-            <div class="app-tabs-container me-2 h-9 w-fit">
-              <AppTabs
-                data-test="add-destination-tabs"
-                :tabs="tabs"
-                class="tabs-selection-container"
-                :active-tab="typeVal"
-                @update:active-tab="setType"
+              <!-- Test Result Display -->
+              <DestinationTestResult
+                v-if="isCustomWebhook && lastTestResult"
+                :result="lastTestResult"
+                :is-loading="isTestInProgress"
+                data-test="custom-test-result"
+                @retry="handleTestDestination"
               />
-            </div>
-          </div>
-          <div
-            v-if="typeVal === 'email' && !getFormattedTemplates.length"
-            class="mb-3 flex w-full items-center"
-          >
-            <div class="me-2 text-sm font-medium">
-              {{ t("alert_destinations.noEmailTemplates") }}
-            </div>
-            <OButton variant="outline" size="sm" @click="createEmailTemplate">{{
-              t("alert_destinations.createEmailTemplate")
-            }}</OButton>
-          </div>
-          <!-- Name + Template row for custom alert destinations -->
-          <div v-if="isAlerts && dtVal === 'custom'" class="flex w-full gap-3">
-            <div class="w-1/2 py-1">
-              <OFormInput
-                data-test="add-destination-name-input"
-                name="name"
-                :label="t('alerts.name')"
-                required
-                tabindex="0"
-              />
-            </div>
-            <div class="w-1/2 py-1">
-              <OFormSelect
-                data-test="add-destination-template-select"
-                name="template"
-                :label="t('alert_destinations.template')"
-                required
-                :options="getFormattedTemplates"
-                tabindex="0"
-              />
-            </div>
-          </div>
-          <!-- Name field for non-alert destinations (pipelines) -->
-          <div v-if="!isAlerts" class="w-full py-1">
-            <OFormInput
-              data-test="add-destination-name-input"
-              name="name"
-              :label="t('alerts.name')"
-              required
-              tabindex="0"
-            />
-          </div>
-
-          <template
-            v-if="
-              (isAlerts && dtVal === 'custom' && typeVal === 'http') ||
-              (!isAlerts && typeVal === 'http')
-            "
-          >
-            <div class="flex w-full gap-3">
-              <div class="w-1/2 py-1">
-                <OFormInput
-                  data-test="add-destination-url-input"
-                  name="url"
-                  :label="t('alert_destinations.url')"
-                  required
-                  tabindex="0"
-                />
-              </div>
-              <div class="py-1" :class="{ 'w-1/4': !isAlerts, 'w-1/2': isAlerts }">
-                <OFormSelect
-                  data-test="add-destination-method-select"
-                  name="method"
-                  :label="t('alert_destinations.method')"
-                  required
-                  :options="apiMethods"
-                  tabindex="0"
-                />
-              </div>
-              <div v-if="!isAlerts" class="w-1/4 py-1">
-                <OFormSelect
-                  data-test="add-destination-output-format-select"
-                  name="output_format"
-                  :label="t('alert_destinations.output_format')"
-                  required
-                  :options="outputFormats"
-                  tabindex="0"
-                />
-              </div>
-            </div>
-            <div class="w-full py-2">
-              <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
-              <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
-                <div class="ms-0 w-5/12">
-                  <OFormInput
-                    :data-test="`add-destination-header-${header['key']}-key-input`"
-                    :name="`apiHeaders[${index}].key`"
-                    :placeholder="t('alert_destinations.api_header')"
-                    tabindex="0"
-                  />
-                </div>
-                <div class="ms-0 w-5/12">
-                  <OFormInput
-                    :data-test="`add-destination-header-${header['key']}-value-input`"
-                    :name="`apiHeaders[${index}].value`"
-                    :placeholder="t('alert_destinations.api_header_value')"
-                    tabindex="0"
-                  />
-                </div>
-                <div class="ms-0 w-1/6">
-                  <OButton
-                    :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                    class="ms-1"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    :title="t('alert_templates.edit')"
-                    @click="deleteApiHeader(index)"
-                  >
-                    <OIcon name="delete" size="sm" />
-                  </OButton>
-                  <OButton
-                    data-test="add-destination-add-header-btn"
-                    v-if="index === apiHeaders.length - 1"
-                    class="ms-1"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    :title="t('alert_templates.edit')"
-                    @click="addApiHeader()"
-                  >
-                    <OIcon name="add" size="sm" />
-                  </OButton>
-                </div>
-              </div>
-            </div>
-            <div class="w-full py-2">
-              <OFormSwitch
-                data-test="add-destination-skip-tls-verify-toggle"
-                name="skip_tls_verify"
-                :label="t('alert_destinations.skip_tls_verify')"
-              />
-            </div>
-
-            <!-- Test Result Display -->
-            <DestinationTestResult
-              v-if="isCustomWebhook && lastTestResult"
-              :result="lastTestResult"
-              :is-loading="isTestInProgress"
-              data-test="custom-test-result"
-              @retry="handleTestDestination"
-            />
-          </template>
-          <template v-if="typeVal === 'email' && (!isAlerts || dtVal === 'custom')">
-            <!-- Recipients are organization users, picked from the list rather
+            </template>
+            <template v-if="typeVal === 'email' && (!isAlerts || dtVal === 'custom')">
+              <!-- Recipients are organization users, picked from the list rather
                  than typed: a mistyped address in a free-text field failed
                  silently at delivery time, with nothing in the UI to show for
                  it. Someone who is not a user yet is created in place via the
                  action below the options. -->
-            <OFormSelect
-              data-test="add-destination-emails-select"
-              name="emails"
-              :label="t('reports.recipients')"
-              required
-              multiple
-              searchable
-              :options="orgUserOptions"
-              labelKey="label"
-              valueKey="value"
-              :loading="isLoadingOrgUsers"
-              tabindex="0"
-            >
-              <template #after-options>
-                <OButton
-                  variant="ghost-primary"
-                  size="sm"
-                  class="w-full justify-start"
-                  icon-left="person-add"
-                  data-test="add-destination-create-user-btn"
-                  @click="openCreateUser"
-                >
-                  {{ t("user.add") }}
-                </OButton>
-              </template>
-            </OFormSelect>
-          </template>
-        </OForm>
-      </div>
-      <div
-        class="border-border-default flex w-full flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <!-- Left side: Test and Preview buttons (prebuilt and custom Web Hook alert destinations) -->
+              <OFormSelect
+                data-test="add-destination-emails-select"
+                name="emails"
+                :label="t('reports.recipients')"
+                required
+                multiple
+                searchable
+                :options="orgUserOptions"
+                labelKey="label"
+                valueKey="value"
+                :loading="isLoadingOrgUsers"
+                tabindex="0"
+              >
+                <template #after-options>
+                  <OButton
+                    variant="ghost-primary"
+                    size="sm"
+                    class="w-full justify-start"
+                    icon-left="person-add"
+                    data-test="add-destination-create-user-btn"
+                    @click="openCreateUser"
+                  >
+                    {{ t("user.add") }}
+                  </OButton>
+                </template>
+              </OFormSelect>
+            </template>
+          </OForm>
+        </div>
         <div
-          v-if="showPrebuiltFinalActions || isCustomWebhook"
-          class="flex flex-wrap items-center gap-2"
+          class="border-border-default flex w-full flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
         >
-          <OButton
-            data-test="destination-preview-button"
-            variant="outline"
-            size="sm"
-            @click="showPreview"
-            icon-left="preview"
+          <!-- Left side: Test and Preview buttons (prebuilt and custom Web Hook alert destinations) -->
+          <div
+            v-if="showPrebuiltFinalActions || isCustomWebhook"
+            class="flex flex-wrap items-center gap-2"
           >
-            {{ t("alert_destinations.preview") }}
-          </OButton>
-          <OButton
-            data-test="destination-test-button"
-            :loading="isTestInProgress"
-            variant="outline"
-            size="sm"
-            @click="handleTestDestination"
-            icon-left="send"
-          >
-            {{ t("alert_destinations.test") }}
-          </OButton>
-        </div>
-        <div v-else></div>
+            <OButton
+              data-test="destination-preview-button"
+              variant="outline"
+              size="sm"
+              @click="showPreview"
+              icon-left="preview"
+            >
+              {{ t("alert_destinations.preview") }}
+            </OButton>
+            <OButton
+              data-test="destination-test-button"
+              :loading="isTestInProgress"
+              variant="outline"
+              size="sm"
+              @click="handleTestDestination"
+              icon-left="send"
+            >
+              {{ t("alert_destinations.test") }}
+            </OButton>
+          </div>
+          <div v-else></div>
 
-        <!-- Right side: Cancel and Save buttons -->
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          <OButton
-            data-test="add-destination-cancel-btn"
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            @click="$emit('cancel:hideform')"
-            >{{ t("alerts.cancel") }}</OButton
-          >
-          <OButton
-            v-if="!isNewSlackDestination || showPrebuiltAdvancedSettings"
-            data-test="add-destination-submit-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            form="add-destination-form"
-            @click="onSaveClick"
-            >{{ t("alerts.save") }}</OButton
-          >
+          <!-- Right side: Cancel and Save buttons -->
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <OButton
+              data-test="add-destination-cancel-btn"
+              v-close-popup="true"
+              variant="outline"
+              size="sm-action"
+              @click="$emit('cancel:hideform')"
+              >{{ t("alerts.cancel") }}</OButton
+            >
+            <OButton
+              v-if="!isNewSlackDestination || showPrebuiltAdvancedSettings"
+              data-test="add-destination-submit-btn"
+              variant="primary"
+              size="sm-action"
+              type="submit"
+              form="add-destination-form"
+              @click="onSaveClick"
+              >{{ t("alerts.save") }}</OButton
+            >
+          </div>
         </div>
-      </div>
+      </template>
     </div>
 
     <!-- Creating a recipient without leaving the destination form. Reuses the
@@ -520,6 +556,16 @@ import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
 import SlackDestinationSetup from "./SlackDestinationSetup.vue";
+import SlackAppDestinationForm from "./SlackAppDestinationForm.vue";
+import SlackAppSwitchBanner from "./SlackAppSwitchBanner.vue";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
+import { orgAdminFlag } from "@/components/ai-assistant/share/chatShare";
+import type { SlackDisabledReason } from "@/types/slack";
+import {
+  isSlackAppDestination,
+  switchToSlackApp,
+  type SlackAppDestination,
+} from "@/utils/slackAppDestination";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
@@ -723,6 +769,68 @@ watch(
   { deep: true },
 );
 
+// The Slack app type has its own form: no URL, method or headers to fill.
+const isSlackApp = computed(
+  () =>
+    props.isAlerts &&
+    (!!switchDraft.value ||
+      (props.destination ? isSlackAppDestination(props.destination) : dtVal.value === "slack_app")),
+);
+const slackAppAvailable = computed(
+  () =>
+    props.isAlerts &&
+    (isEnterpriseDeployment.value || isCloudDeployment.value) &&
+    readSlackOrgConfig(store.state.zoConfig).enabled,
+);
+// An OSS build serves no reason of its own, so its edition is the reason.
+const slackAppUnavailableReason = computed<SlackDisabledReason>(() => {
+  if (!isEnterpriseDeployment.value && !isCloudDeployment.value) return "edition";
+  return readSlackOrgConfig(store.state.zoConfig).reason ?? "edition";
+});
+const canManageSlack = computed(() => orgAdminFlag(store.state) === true);
+const switchQuery = computed(() => router.currentRoute?.value.query ?? {});
+const switchDraft = computed(() => {
+  const q = switchQuery.value;
+  if (
+    !props.destination ||
+    q.name !== props.destination.name ||
+    typeof q.slack_app_installation !== "string"
+  )
+    return null;
+  const metadata = props.destination.metadata;
+  return switchToSlackApp(
+    {
+      ...props.destination,
+      metadata: typeof metadata === "string" ? metadata : JSON.stringify(metadata ?? {}),
+    },
+    q.slack_app_installation,
+  );
+});
+const switchConfirmation = computed(() => {
+  const q = switchQuery.value;
+  if (!switchDraft.value || typeof q.slack_app_refusal !== "string") return undefined;
+  return {
+    code: q.slack_app_refusal,
+    team: String(q.slack_app_team ?? ""),
+    destination: String(q.slack_app_room ?? ""),
+  };
+});
+const slackAppDestination = computed(
+  () =>
+    switchDraft.value ??
+    (props.destination && isSlackAppDestination(props.destination)
+      ? (props.destination as unknown as SlackAppDestination)
+      : null),
+);
+// The form seeds its values and confirm flags once, so a Review of another destination must remount it.
+const slackAppFormKey = computed(
+  () => `${slackAppDestination.value?.name ?? ""}:${switchConfirmation.value?.code ?? ""}`,
+);
+const onSlackAppSaved = (): void => {
+  emit("get:destinations");
+  emit("cancel:hideform");
+};
+
 const isNewSlackDestination = computed(
   () => props.isAlerts && !props.destination && dtVal.value === "slack",
 );
@@ -890,6 +998,10 @@ watch(
 
 const setupDestinationData = () => {
   originalSlackWebhookUrl.value = "";
+  if (props.destination && isSlackAppDestination(props.destination)) {
+    isUpdatingDestination.value = true;
+    return;
+  }
   if (props.destination) {
     isUpdatingDestination.value = true;
     // Resolve the destination_type discriminator FIRST; setDestType only records
@@ -1139,6 +1251,7 @@ const prebuiltTemplateOptions = computed(() => {
 const selectDestinationType = (type: string) => {
   form.setFieldValue("destination_type", type);
   clearTestResult();
+  if (type === "slack_app") return;
   slackManifestReady.value = false;
 
   if (type === "custom") {

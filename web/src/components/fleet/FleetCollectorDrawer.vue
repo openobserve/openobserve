@@ -497,7 +497,7 @@ function historyTitle(event: string): I18nText {
     assigned: t("fleet.collectors.eventAssigned"),
     sent: t("fleet.delivery.sent"),
     accepted: t("fleet.delivery.accepted"),
-    running: t("fleet.delivery.running"),
+    running: t("fleet.collectors.eventRunning"),
     rejected: t("fleet.delivery.rejected"),
     moved: t("fleet.collectors.eventMoved"),
     moved_by_token: t("fleet.collectors.eventMovedByToken"),

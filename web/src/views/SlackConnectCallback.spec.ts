@@ -22,10 +22,12 @@ import { makeSlackStore, ok } from "@/test/unit/helpers/slack";
 import { isSlackOAuthCallbackMessage } from "@/utils/slackOAuth";
 import { createStore } from "vuex";
 import organizations from "@/services/organizations";
+import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 import SlackConnectCallback from "./SlackConnectCallback.vue";
 
 vi.mock("@/services/slack", () => ({ default: { confirmConnection: vi.fn() } }));
 vi.mock("@/services/organizations", () => ({ default: { list: vi.fn() } }));
+vi.mock("@/utils/rum/ensureBrowserRum", () => ({ ensureBrowserRum: vi.fn() }));
 
 const refusal = (status: number, data: Record<string, unknown> = {}) =>
   Object.assign(new Error("refused"), {
@@ -70,6 +72,11 @@ afterEach(() => {
 });
 
 describe("SlackConnectCallback", () => {
+  it("starts RUM from the full config of the org this page resolved", async () => {
+    await mountCallback();
+    expect(ensureBrowserRum).toHaveBeenCalledWith("acme");
+  });
+
   it("in a popup, posts {type, code, state} to its same-origin opener and closes", async () => {
     const opener = { postMessage: vi.fn() };
     setOpener(opener);

@@ -18,10 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-w-0 flex-wrap items-center gap-2" data-test="profiles-label-filters">
     <span class="flex items-center text-sm whitespace-nowrap">
-      <span
-        class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
-        aria-hidden="true"
-      ></span>
       {{ t("panel.labelFilters") }}
     </span>
 

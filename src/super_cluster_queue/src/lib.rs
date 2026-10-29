@@ -15,6 +15,7 @@
 
 #![cfg(feature = "enterprise")]
 
+mod alert_acks;
 mod alert_states;
 mod alerts;
 mod anomaly_detection;
@@ -59,6 +60,7 @@ mod synthetics;
 mod synthetics_locations;
 mod synthetics_probe_tokens;
 mod synthetics_variables;
+mod system_settings;
 mod templates;
 mod user;
 
@@ -132,6 +134,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_kv_msg: kv::process,
         on_service_streams_msg: service_streams::process,
         on_rum_analytics_msg: rum_analytics::process,
+        on_system_settings_msg: system_settings::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
@@ -144,6 +147,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_anomaly_detection_msg: anomaly_detection::process,
         on_alert_state_msg: alert_states::process,
         on_downtime_msg: downtimes::process,
+        on_alert_ack_msg: alert_acks::process,
     };
     // On-call rides the scheduler topic with the triggers it belongs to, so a
     // response record always lands before the escalation timer that names it.

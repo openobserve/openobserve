@@ -84,7 +84,9 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     const rootStatement = statementOf(rcaEvidenceEntry().citations[0].hypothesis_id);
     expect(links[0].text()).not.toBe(rootStatement);
     expect(links[0].attributes("title")).toBe(rootStatement);
-    expect(citations[0].text()).toContain(rcaEvidenceEntry().citations[0].observation);
+    expect(citations[0].text()).toContain(
+      `Agent's reading: ${rcaEvidenceEntry().citations[0].observation}`,
+    );
     // A ruled-out hypothesis has no role name: the link is its statement.
     expect(links[1].text()).toBe(statementOf("h4"));
     // The result summary carries the query time; the card does not add the call's duration again.
@@ -243,5 +245,25 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     expect(byTest(wrapper, "rca-evidence-citation").text()).toContain(
       '<a href="https://evil.example">click</a>',
     );
+  });
+
+  it("agent inline code in the reading shows as code, never as backticks", () => {
+    const wrapper = mountCard(
+      rcaEvidenceEntry({
+        citations: [
+          {
+            hypothesis_id: "h1",
+            evidence_id: "e1",
+            polarity: "supports",
+            strength: "decisive",
+            observation: "`GET /api/data` errors start at the toggle",
+          },
+        ],
+      }),
+    );
+
+    const citation = byTest(wrapper, "rca-evidence-citation");
+    expect(citation.text()).not.toContain("`");
+    expect(citation.find("code").text()).toBe("GET /api/data");
   });
 });

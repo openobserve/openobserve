@@ -73,6 +73,18 @@ describe("RcaWhatHappened (03 VE31, VE36, VE-D4)", () => {
     ).toEqual([["1"], ["2"], []]);
   });
 
+  it("agent marks in an entry show as code and bold, never as raw markers", () => {
+    const [first] = rcaRunSummary().timeline;
+    const wrapper = mountTimeline(
+      rcaRunSummary({ timeline: [{ ...first, text: "The `adFailure` flag turns **on**" }] }),
+    );
+
+    const row = rows(wrapper)[0];
+    expect(row.text()).toContain("The adFailure flag turns on");
+    expect(row.find("code").text()).toBe("adFailure");
+    expect(row.find("strong").text()).toBe("on");
+  });
+
   it("VE31 markers: Confirmed has no tag; likely reads Likely; Unverified and Refuted tag their rows", () => {
     const wrapper = mountTimeline(
       rcaRunSummary({

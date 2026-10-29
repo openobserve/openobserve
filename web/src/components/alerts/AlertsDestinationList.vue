@@ -188,8 +188,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-secondary">—</span>
           </template>
 
+          <template #cell-url="{ row }">
+            <OTruncatedText v-if="isSlackApp(row)" :data-test="`destination-channel-${row.name}`">{{
+              slackChannelLabel(row)
+            }}</OTruncatedText>
+            <OTruncatedText v-else :tooltip="false">{{ destinationUrl(row) }}</OTruncatedText>
+          </template>
+
           <template #cell-type="{ row }">
-            <div class="flex items-center gap-2">
+            <div v-if="isSlackApp(row)" class="flex flex-col items-start gap-1">
+              <div class="flex items-center gap-2">
+                <OTag
+                  :data-test="`destination-type-badge-slack-app-${row.name}`"
+                  type="destinationKind"
+                  value="prebuilt"
+                  >{{ t("slackApp.destination.appTile", { product: slackProduct }) }}</OTag
+                >
+                <OTag
+                  :data-test="`destination-type-two-way-${row.name}`"
+                  variant="success-soft"
+                  size="sm"
+                  :label="t('slackApp.destination.twoWay')"
+                />
+              </div>
+              <OButton
+                v-if="row.previous_webhook"
+                variant="ghost-primary"
+                size="xs"
+                icon-left="undo"
+                :loading="switchPending.has(row.name)"
+                :data-test="`destination-switch-back-${row.name}`"
+                @click="switchBack(row)"
+                >{{ t("slackApp.destination.switchBack") }}</OButton
+              >
+            </div>
+            <div v-else-if="isSlackWebhook(row)" class="flex flex-col items-start gap-1">
+              <div class="flex items-center gap-2">
+                <OTag
+                  :data-test="`destination-type-badge-slack-webhook-${row.name}`"
+                  type="destinationKind"
+                  value="prebuilt"
+                  >{{ t("slackApp.destination.webhookTile", { product: slackProduct }) }}</OTag
+                >
+                <OIcon
+                  name="auto-awesome"
+                  size="sm"
+                  :title="t('alerts.prebuiltDestination', { type: slackProduct })"
+                />
+              </div>
+              <OButton
+                v-if="switchInstallation(row)"
+                variant="ghost-primary"
+                size="xs"
+                icon-left="sync"
+                :loading="switchPending.has(row.name)"
+                :data-test="`destination-switch-to-app-${row.name}`"
+                @click="switchToApp(row)"
+                >{{ t("slackApp.destination.switchToApp", { product: slackProduct }) }}</OButton
+              >
+            </div>
+            <div v-else class="flex items-center gap-2">
               <template v-if="getPrebuiltTypeName(row)">
                 <OTag
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
@@ -342,13 +400,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { bulkDeleteDestinationsMutation } from "@/services/alert_destination.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
@@ -389,6 +447,16 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { slackInstallationsQuery } from "@/services/slack.queries";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
+import { useOncallRoomNames, useSlackAppSwitch } from "@/composables/slack/useSlackAppSwitch";
+import {
+  isSlackAppDestination,
+  isSlackWebhookDestination,
+  slackWebhookTarget,
+  withoutSlackAppReview,
+  type SlackAppDestination,
+} from "@/utils/slackAppDestination";
 
 interface ConformDelete {
   visible: boolean;
@@ -425,11 +493,48 @@ export default defineComponent({
 
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
 
+    const slackProduct = raw("Slack");
+    const slackEnabled = computed(() => readSlackOrgConfig(store.state.zoConfig).enabled);
+    const slackOrg = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+    const slackInstallations = useQuery(() =>
+      Object.assign(slackInstallationsQuery(slackOrg.value, { silentForbidden: true }), {
+        enabled: slackEnabled.value && !!slackOrg.value,
+      }),
+    );
+    const workspaces = computed(() =>
+      (slackInstallations.data.value?.installations ?? []).filter(
+        (i) => i.status !== "revoked" && i.status !== "pending",
+      ),
+    );
+    const isSlackApp = (row: any): boolean => isSlackAppDestination(row);
+    const isSlackWebhook = (row: any): boolean => isSlackWebhookDestination(row);
+    const slackChannelLabel = (row: any) =>
+      t("slackApp.destination.channelInWorkspace", {
+        channel: raw(row.channel_name || row.channel_id),
+        workspace: raw(workspaces.value.find((i) => i.id === row.installation_id)?.team_name ?? ""),
+      });
+    const switchInstallation = (row: any): string | null => {
+      const target = slackWebhookTarget(row);
+      if (!target.channelId || oncallRooms.value.has(row.name)) return null;
+      return workspaces.value.find((i) => i.team_id === target.teamId)?.id ?? null;
+    };
+    const { pending: switchPending, switchOne, switchBack: switchBackOne } = useSlackAppSwitch();
+    const switchToApp = async (row: any) => {
+      const installationId = switchInstallation(row);
+      if (installationId && (await switchOne(row, installationId))) refreshDestinations();
+    };
+    const switchBack = async (row: SlackAppDestination) => {
+      if (await switchBackOne(row)) refreshDestinations();
+    };
+
     // Email destinations store recipients in emails[], not url. Method is HTTP-only.
-    const destinationUrl = (row: DestinationPayload): string =>
-      row.type === "email" ? (row.emails ?? []).join(", ") : (row.url ?? "");
+    const destinationUrl = (row: DestinationPayload): string => {
+      if (row.type === "email") return (row.emails ?? []).join(", ");
+      if (isSlackAppDestination(row)) return `#${(row as any).channel_name ?? ""}`;
+      return row.url ?? "";
+    };
     const destinationMethod = (row: DestinationPayload): string =>
-      row.type === "email" ? "" : (row.method ?? "").toUpperCase();
+      row.type === "email" || isSlackAppDestination(row) ? "" : (row.method ?? "").toUpperCase();
 
     const columns: OTableColumnDef[] = [
       {
@@ -455,7 +560,9 @@ export default defineComponent({
       },
       {
         id: "url",
-        header: t("alert_destinations.urlOrRecipients"),
+        header: slackEnabled.value
+          ? t("alert_destinations.urlRecipientsChannel")
+          : t("alert_destinations.urlOrRecipients"),
         accessorFn: destinationUrl,
         resizable: true,
         hideable: true,
@@ -503,6 +610,10 @@ export default defineComponent({
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
+    const hasSlackWebhooks = computed(
+      () => slackEnabled.value && destinations.value.some((d: any) => isSlackWebhookDestination(d)),
+    );
+    const oncallRooms = useOncallRoomNames(hasSlackWebhooks);
     const templates: Ref<Template[]> = ref([{ name: "test", body: "", type: "http" }]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,
@@ -556,11 +667,13 @@ export default defineComponent({
     });
 
     watch(
-      () => router.currentRoute.value.query.action,
-      (action) => {
+      () => [router.currentRoute.value.query.action, router.currentRoute.value.query.name],
+      ([action]) => {
         if (!action) {
           showDestinationEditor.value = false;
           showImportDestination.value = false;
+        } else {
+          updateRoute();
         }
       },
     );
@@ -638,7 +751,10 @@ export default defineComponent({
       const options = destinationsQuery(org, "alert", true);
       const applyRows = (list: any[]) => {
         const rows = list.filter(
-          (destination: any) => destination.type == "http" || destination.type == "email",
+          (destination: any) =>
+            destination.type == "http" ||
+            destination.type == "email" ||
+            isSlackAppDestination(destination),
         );
         destinations.value = rows;
         updateRoute();
@@ -708,8 +824,12 @@ export default defineComponent({
         if (!showDestinationEditor.value || editingDestination.value) editDestination(null);
       } else if (action === "update") {
         const name = router.currentRoute.value.query.name as string;
-        if (!showDestinationEditor.value || editingDestination.value?.name !== name)
-          editDestination(getDestinationByName(name));
+        const destination = getDestinationByName(name);
+        if (
+          destination &&
+          (!showDestinationEditor.value || editingDestination.value?.name !== name)
+        )
+          editDestination(destination, true);
       } else if (action === "import") {
         showImportDestination.value = true;
       }
@@ -717,31 +837,33 @@ export default defineComponent({
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
     };
-    const editDestination = (destination: any) => {
+    // Only the route's own Review may open the switch form; every other open drops its params.
+    const editDestination = (destination?: DestinationPayload | null, fromRoute = false) => {
       if (!destination) {
         track("Button Click", {
           button: "Add Destination",
           page: "Alert Destinations",
         });
       }
-      toggleDestinationEditor();
+      if (!showDestinationEditor.value) toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
         const { name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
-            ...restQuery,
+            ...withoutSlackAppReview(restQuery),
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
       } else {
         editingDestination.value = { ...destination };
+        const query = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
-            ...router.currentRoute.value.query,
+            ...(fromRoute ? query : withoutSlackAppReview(query)),
             action: "update",
             name: destination.name,
             org_identifier: store.state.selectedOrganization.identifier,
@@ -797,7 +919,7 @@ export default defineComponent({
         router.push({
           name: "alertDestinations",
           query: {
-            ...restQuery,
+            ...withoutSlackAppReview(restQuery),
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
@@ -1066,6 +1188,15 @@ export default defineComponent({
       selectedDestinations,
       getPrebuiltTypeName,
       getCustomDestinationLabel,
+      destinationUrl,
+      slackProduct,
+      isSlackApp,
+      isSlackWebhook,
+      slackChannelLabel,
+      switchInstallation,
+      switchPending,
+      switchToApp,
+      switchBack,
       isDefaultPrebuiltTemplate,
       oTableRef,
       currentPage,

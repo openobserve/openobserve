@@ -1,4 +1,4 @@
-"""PromQL Prometheus-parity and result-cache fixes #15142, #15002, #15186, #15164, #15204 and #15187."""
+"""PromQL Prometheus-parity, query-API and result-cache fixes #5152, #14925, #15142, #15002, #15150, #15186, #15164, #15204 and #15187."""
 
 from __future__ import annotations
 
@@ -27,6 +27,11 @@ BLOCK_CACHE_COUNTERS = (
     "zo_metrics_blocks_cache_hits_total",
     "zo_metrics_blocks_cache_misses_total",
     "zo_metrics_blocks_cache_partial_hits_total",
+)
+NAMELESS_SELECTORS = (
+    'topk(5, count by (__name__)({{env="dev"}}))',
+    'rate({{env="dev"}}[5m])',
+    '{{env="dev"}}',
 )
 
 
@@ -449,3 +454,120 @@ def test_escaped_quote_matcher_survives_at_end_reserialization_15187(client, cre
     )
     assert [s["metric"]["path"] for s in pinned] == ["api.v1"]
     assert _values_of(pinned) == ["13"] * 4, "@ end() pins every step to the last sample"
+
+
+@pytest.mark.parametrize("endpoint", ["query", "query_range"])
+@pytest.mark.parametrize("template", NAMELESS_SELECTORS)
+def test_selector_without_metric_name_is_a_400_not_a_panic_5152(client, endpoint, template):
+    """a selector with no metric name is answered with 400 "metric name is required" (#5152)."""
+    query = template.format(metric=_metric_name("nameless"))
+    at = _anchor(1)
+    params = (
+        {"query": query, "time": at}
+        if endpoint == "query"
+        else {"query": query, "start": at - 300, "end": at, "step": "60"}
+    )
+    status, body = _promql(client, endpoint, params)
+
+    assert status == 400, f"{query}: {body}"
+    assert body.get("errorType") == "bad_data", body
+    assert "metric name is required" in body.get("error", ""), body
+
+
+def test_same_selector_with_a_metric_name_returns_data_5152(client, created):
+    """the named form of the #5152 query returns the per-name count (#5152)."""
+    metric = _metric_name("named")
+    t = _anchor()
+    rows = [
+        row for inst in ("i1", "i2", "i3") for row in _series(metric, {"env": "dev", "inst": inst}, [(t + HALF, 1)])
+    ]
+    _ingest(client, rows, created)
+    _wait_for_samples(client, metric, 3)
+
+    result = _instant(client, f'topk(5, count by (__name__)({metric}{{env="dev"}}))', t + STEP)
+    assert [(s["metric"], s["value"][1]) for s in result] == [({"__name__": metric}, "3")]
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("day_of_week(vector(0))", "4"),
+        ("year(vector(4e10))", "3237"),
+        ("year(vector(-9e12))", "NaN"),
+        ("year(vector(-1e13))", "NaN"),
+        ("month(vector(-1e13))", "NaN"),
+        ("vector(1)/0", "+Inf"),
+        ("-vector(1)/0", "-Inf"),
+        ("vector(0)/0", "NaN"),
+        ("vector(1e21)", "1e+21"),
+        ("vector(1e-7)", "1e-07"),
+    ],
+)
+def test_date_functions_and_special_values_match_prometheus_14925(client, query, expected):
+    """date functions out of range give NaN, and +Inf, -Inf and exponents are written as Prometheus writes them (#14925)."""
+    assert _instant_value(client, query, _anchor(1)) == expected
+
+
+def test_count_values_labels_an_infinite_value_plus_inf_14925(client):
+    """count_values writes an infinite value into its label as +Inf (#14925)."""
+    result = _instant(client, 'count_values("v", vector(1)/0)', _anchor(1))
+    assert [(s["metric"], s["value"][1]) for s in result] == [({"v": "+Inf"}, "1")]
+
+
+def test_window_functions_return_prometheus_values_15150(client, created):
+    """mad_over_time, ts_of_*_over_time and histogram_fraction return Prometheus's values (#15150)."""
+    gauge = _metric_name("y")
+    hist = f"{_metric_name('frac')}_bucket"
+    t = _anchor(15)
+    rows = _series(gauge, {"job": "e2e"}, [(t + k * STEP + HALF, 10 * k) for k in range(6)])
+    for le, per_minute in (("0.5", 1), ("1", 3), ("+Inf", 4)):
+        rows += _series(hist, {"job": "e2e", "le": le}, [(t + k * STEP + HALF, per_minute * k) for k in range(6)])
+    _ingest(client, rows, created)
+    _wait_for_samples(client, gauge, 6)
+    _wait_for_samples(client, hist, 18)
+    # (t+40, t+340] holds 10, 20, 30, 40 and 50, at t+90 to t+330
+    at = t + 340
+
+    assert _instant_value(client, f"mad_over_time({gauge}[5m])", at) == "10"
+    assert _instant_value(client, f"ts_of_max_over_time({gauge}[5m])", at) == str(t + 330)
+    assert _instant_value(client, f"ts_of_min_over_time({gauge}[5m])", at) == str(t + 90)
+    assert _instant_value(client, f"ts_of_last_over_time({gauge}[5m])", at) == str(t + 330)
+    assert _instant_value(client, f"histogram_fraction(0, 1, rate({hist}[5m]))", at) == "0.75"
+
+
+def test_sort_by_label_and_limit_ratio_partition_series_15150(client, created):
+    """sort_by_label orders by the label, and limit_ratio(r) and limit_ratio(-(1-r)) split the series cleanly (#15150)."""
+    sorted_metric = _metric_name("sorted")
+    split_metric = _metric_name("split")
+    t = _anchor()
+    rows = [row for i in "dbac" for row in _series(sorted_metric, {"i": i}, [(t + HALF, 1)])]
+    rows += [row for i in range(40) for row in _series(split_metric, {"i": f"{i:02d}"}, [(t + HALF, i)])]
+    _ingest(client, rows, created)
+    _wait_for_samples(client, sorted_metric, 4)
+    _wait_for_samples(client, split_metric, 40)
+
+    def labels(query: str) -> list[str]:
+        return [s["metric"]["i"] for s in _instant(client, query, t + STEP)]
+
+    assert labels(f'sort_by_label({sorted_metric}, "i")') == ["a", "b", "c", "d"]
+    assert labels(f'sort_by_label_desc({sorted_metric}, "i")') == ["d", "c", "b", "a"]
+    for ratio in (0.1, 0.25, 0.5, 0.75, 0.9):
+        kept = set(labels(f"limit_ratio({ratio}, {split_metric})"))
+        rest = set(labels(f"limit_ratio(-(1 - {ratio}), {split_metric})"))
+        assert kept.isdisjoint(rest), f"ratio {ratio}: a series landed in both halves"
+        assert len(kept | rest) == 40, f"ratio {ratio}: the halves must cover every series"
+
+
+@pytest.mark.parametrize("name", ["double_exponential_smoothing", "holt_winters"])
+def test_smoothing_returns_the_prometheus_value_15187(client, created, name):
+    """both smoothing names give -1 on samples 5, 0 and 3 with factors 0.5 and 0.5 (#15187)."""
+    metric = _metric_name("smooth")
+    t = _anchor()
+    _ingest(
+        client,
+        _series(metric, {"job": "e2e"}, [(t + HALF, 5), (t + STEP + HALF, 0), (t + 2 * STEP + HALF, 3)]),
+        created,
+    )
+    _wait_for_samples(client, metric, 3)
+
+    assert _instant_value(client, f"{name}({metric}[5m], 0.5, 0.5)", t + 3 * STEP) == "-1"
