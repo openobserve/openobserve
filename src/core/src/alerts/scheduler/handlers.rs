@@ -1524,10 +1524,7 @@ async fn handle_composite_alert_trigger(
         #[cfg(feature = "enterprise")]
         let opens_incident = composite_opens_incident(
             has_targets,
-            definition.definition.creates_incident
-                && o2_enterprise::enterprise::common::config::get_config()
-                    .incidents
-                    .enabled,
+            definition.definition.creates_incident && crate::alerts::incidents::incidents_enabled(),
         );
         if delivery.should_deliver() && has_targets {
             let notification_alert = composite_notification_alert(&definition.definition);
@@ -2544,7 +2541,13 @@ async fn trigger_rca_for_alert_firing(
 
     let cfg = get_o2_config();
     // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
-    if !cfg.incidents.rca_enabled || !cfg.ai.enabled || !cfg.ai.has_agent_target() {
+    if !cfg.incidents.rca_enabled
+        || !cfg.ai.enabled
+        || !cfg.ai.has_agent_target()
+        || !o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::AiAssistant,
+        ])
+    {
         release_alert_firing_hold(&alert.org_id, &opened).await;
         return;
     }
@@ -3064,9 +3067,7 @@ pub(crate) async fn correlate_muted_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
-        .incidents
-        .enabled;
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
     if !correlates_muted_firing(alert.creates_incident, incidents_enabled, downtime) {
         return;
     }
@@ -4175,9 +4176,7 @@ async fn handle_alert_triggers(
         let correlation_rows = unmuted_rows.as_deref().unwrap_or(data.as_slice());
         #[cfg(feature = "enterprise")]
         let (incident_handled_notification, incident_notify_error) = if alert.creates_incident
-            && o2_enterprise::enterprise::common::config::get_config()
-                .incidents
-                .enabled
+            && crate::alerts::incidents::incidents_enabled()
             && let Some(first_row) = correlation_rows.first()
         {
             match crate::alerts::incidents::correlate_alert_to_incident(

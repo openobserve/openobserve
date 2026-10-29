@@ -627,6 +627,28 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
     .await;
 }
 
+/// Whether the operator switched incident correlation on and the license grants it.
+#[cfg(feature = "enterprise")]
+pub fn incidents_enabled() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::Incidents,
+        ])
+}
+
+/// Whether O2's agent may answer an analysis: operator switch, agent target and assistant license.
+#[cfg(feature = "enterprise")]
+pub fn rca_agent_available() -> bool {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    cfg.ai.enabled
+        && cfg.ai.has_agent_target()
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::AiAssistant,
+        ])
+}
+
 /// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
@@ -2414,7 +2436,7 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = cfg.incidents.enabled && cfg.incidents.rca_enabled && cfg.ai.has_agent_target();
+    let will_run = incidents_enabled() && cfg.incidents.rca_enabled && rca_agent_available();
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     }
@@ -2782,7 +2804,7 @@ pub async fn trigger_rca_for_incident(
 
     let config = get_o2_config();
 
-    if !config.incidents.enabled || !config.incidents.rca_enabled {
+    if !incidents_enabled() || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, ending run {run_id}");
         end_failed(ERROR_RCA_DISABLED, RCA_DISABLED_REASON, None).await;
         return Ok(());

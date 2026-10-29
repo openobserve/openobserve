@@ -2370,9 +2370,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
     let (incident_notified, incident_notify_error) = if alert.creates_incident
-        && o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
+        && crate::alerts::incidents::incidents_enabled()
     {
         let synthetic_row = manual_trigger_row(&alert);
         let notify = std::slice::from_ref(&synthetic_row);
@@ -4623,6 +4621,7 @@ pub async fn permitted_alerts(
                 use_self_context: false,
                 use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
+                feature: None,
             },
             user_role,
             false,

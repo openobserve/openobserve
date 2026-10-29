@@ -1407,6 +1407,7 @@ async fn filter_permitted_dashboards(
                 use_self_context: false,
                 use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
+                feature: None,
             },
             user_role,
             false,
