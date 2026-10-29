@@ -1781,6 +1781,7 @@ mod tests {
                         name: service.clone(),
                         ends_at: 1,
                         incident_mode: Default::default(),
+                        ..Default::default()
                     })
             })
             .map(|d| d.id)
