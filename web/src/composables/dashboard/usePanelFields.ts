@@ -22,6 +22,7 @@ import {
   HOSTMAP_NUMERIC_Y_FUNCTION,
 } from "@/utils/dashboard/convertHostmapData";
 import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
+import { TREEMAP_MAX_LEVELS } from "@/utils/dashboard/convertTreemapData";
 
 const colors = [
   "#5960b2",
@@ -60,6 +61,13 @@ export const usePanelFields = ({
     );
   });
 
+  // Every group field and the sub-group each add one nesting level.
+  const treemapLevels = computed(() => {
+    const fields =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields;
+    return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
+  });
+
   const isAddXAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
@@ -87,6 +95,8 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
         );
+      case "treemap":
+        return treemapLevels.value >= TREEMAP_MAX_LEVELS;
       case "table":
         return false;
       default:
@@ -113,6 +123,11 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1
         );
+      case "treemap":
+        return (
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length >= 1 || treemapLevels.value >= TREEMAP_MAX_LEVELS
+        );
       case "hostmap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
@@ -135,6 +150,7 @@ export const usePanelFields = ({
       case "donut":
       case "gauge":
       case "bar-gauge":
+      case "treemap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1

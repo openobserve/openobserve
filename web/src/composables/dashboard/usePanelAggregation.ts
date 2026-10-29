@@ -24,6 +24,7 @@ import {
   HOSTMAP_DEFAULT_COLOR,
   HOSTMAP_MAX_GROUP_LEVELS,
 } from "@/utils/dashboard/convertHostmapData";
+import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/convertTreemapData";
 
 // Types that reset their own queries on a switch, so no builder state carries into them.
 const NON_BUILDER_TYPES = ["html", "markdown", "custom_chart"];
@@ -372,6 +373,35 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
+        break;
+      case "treemap":
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (!itemY.isDerived && !TREEMAP_SIZE_FUNCTIONS.includes(itemY.functionName)) {
+              itemY.functionName = "count";
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.x = query.fields.x.slice(0, TREEMAP_MAX_LEVELS);
+          query.fields.y = query.fields.y.slice(0, 1);
+          query.fields.z = [];
+          query.fields.breakdown = query.fields.breakdown.slice(
+            0,
+            Math.min(1, TREEMAP_MAX_LEVELS - query.fields.x.length),
+          );
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+          query.config.time_shift = [];
+        });
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         break;
       case "metric":
         // we have multiple queries for geomap, so if we are moving away, we need to reset

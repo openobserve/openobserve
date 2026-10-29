@@ -604,6 +604,68 @@ describe("usePanelAggregation", () => {
         expect(empty.data.queries[0].fields.y).toEqual([]);
       });
     });
+    describe("treemap chart type", () => {
+      const yField = (functionName: string | null) => ({
+        functionName,
+        args: [{ type: "field" }, { type: "extra" }],
+      });
+
+      it("keeps every group level, one y counted and one breakdown", () => {
+        const panelData = makePanelData("treemap");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x1" }, { alias: "x2" }];
+        fields.y = [yField(null), yField("sum")];
+        fields.breakdown = [{ alias: "b1" }, { alias: "b2" }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toEqual([{ alias: "x1" }, { alias: "x2" }]);
+        expect(fields.y.map((item: any) => item.functionName)).toEqual(["count"]);
+        expect(fields.breakdown).toEqual([{ alias: "b1" }]);
+      });
+
+      it("turns a size a parent tile cannot add up into a count, and keeps a sum", () => {
+        const panelData = makePanelData("treemap");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x1" }];
+        fields.y = [yField("avg")];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.y[0].functionName).toBe("count");
+        expect(fields.y[0].args).toEqual([{ type: "field" }]);
+
+        fields.y = [yField("sum")];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.y[0].functionName).toBe("sum");
+      });
+
+      it("trims to five levels, dropping the breakdown before a group field", () => {
+        const panelData = makePanelData("treemap");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = ["x1", "x2", "x3", "x4", "x5", "x6"].map((alias) => ({ alias }));
+        fields.y = [yField("count")];
+        fields.breakdown = [{ alias: "b1" }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x.map((item: any) => item.alias)).toEqual(["x1", "x2", "x3", "x4", "x5"]);
+        expect(fields.breakdown).toEqual([]);
+      });
+
+      it("keeps the count of rows as the tile size instead of a raw column", () => {
+        const panelData = makePanelData("treemap");
+        const fields = panelData.data.queries[0].fields;
+        const countRows = {
+          alias: "y_axis_1",
+          functionName: "count",
+          args: [{ type: "field", value: { field: "_timestamp" } }],
+          isDerived: false,
+        };
+        fields.y = [countRows];
+        panelData.meta = {
+          streamFields: {
+            groupedFields: [{ name: "test_stream", schema: [{ name: "bytes", type: "Int64" }] }],
+          },
+        };
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.y).toEqual([countRows]);
+      });
+    });
 
     describe("starter queries", () => {
       it("leaves hand-written SQL in custom mode on a switch to a builder chart", () => {

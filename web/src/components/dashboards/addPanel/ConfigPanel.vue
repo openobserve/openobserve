@@ -838,6 +838,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <OSwitch
+          v-if="dashboardPanelData.data.type === 'treemap'"
+          v-show="isConfigOptionVisible('data', 'treemap-breadcrumb')"
+          :model-value="dashboardPanelData.data.config.treemap_show_breadcrumb !== false"
+          :label="t('dashboard.treemapShowBreadcrumb')"
+          data-test="dashboard-config-treemap_show_breadcrumb"
+          size="lg"
+          @update:model-value="(value: any) => setDefaultOnFlag('treemap_show_breadcrumb', value)"
+        />
+        <OSwitch
           v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
           v-show="isConfigOptionVisible('data', 'heatmap-histogram-mode')"
           v-model="heatmapHistogramModeModel"
@@ -4650,6 +4659,7 @@ export default defineComponent({
         "gauge",
         "bar-gauge",
         "distribution",
+        "treemap",
         "sankey",
         "hostmap",
       ].includes(dashboardPanelData.data.type);

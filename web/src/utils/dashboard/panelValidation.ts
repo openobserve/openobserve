@@ -32,6 +32,7 @@ import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/conve
 import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionData";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { STATE_TIMELINE_DISPLAYS } from "@/utils/dashboard/convertStateTimelineData";
+import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/convertTreemapData";
 import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
 import { MAX_LINE_THICKNESS, isValidLineThickness } from "@/utils/dashboard/promqlChartSeriesProps";
 import {
@@ -545,6 +546,35 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "treemap": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (!fields?.x?.length) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addAtLeastOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      if ((fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0) > TREEMAP_MAX_LEVELS) {
+        errors.push(t("dashboard.utils.treemapTooManyLevels", { count: TREEMAP_MAX_LEVELS }));
+      }
+      const size = fields?.y?.[0];
+      // A raw expression is the user's own SQL; only a builder function can be checked.
+      if (
+        size?.type === "build" &&
+        !size.isDerived &&
+        !TREEMAP_SIZE_FUNCTIONS.includes(size.functionName)
+      ) {
+        errors.push(t("dashboard.utils.sizeMustBeCountOrSum"));
+      }
+      break;
+    }
     case "hostmap": {
       if (fields?.y?.length !== 1) {
         const errorMsg =
@@ -941,6 +971,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "heatmap",
     "state-timeline",
     "distribution",
+    "treemap",
     "hostmap",
     "metric",
     "gauge",

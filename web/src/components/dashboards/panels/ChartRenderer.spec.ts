@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import { use as echartsUse } from "echarts/core";
-import { LineChart, PictorialBarChart } from "echarts/charts";
+import { LineChart, PictorialBarChart, TreemapChart } from "echarts/charts";
 import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
 import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
@@ -67,6 +67,7 @@ vi.mock("echarts/charts", () => ({
   TreeChart: vi.fn(),
   GraphChart: vi.fn(),
   PictorialBarChart: vi.fn(),
+  TreemapChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -125,6 +126,9 @@ describe("ChartRenderer series registration", () => {
 
   it("registers the pictorial bar series the bar gauge draws in LCD mode", () => {
     expect(registeredAtImport).toContain(PictorialBarChart);
+  });
+  it("registers the treemap series", () => {
+    expect(registeredAtImport).toContain(TreemapChart);
   });
 });
 

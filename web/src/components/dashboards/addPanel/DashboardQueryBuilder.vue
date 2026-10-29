@@ -180,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked' ||
           dashboardPanelData.data.type == 'state-timeline' ||
           dashboardPanelData.data.type == 'distribution' ||
+          dashboardPanelData.data.type == 'treemap' ||
           dashboardPanelData.data.type == 'hostmap'
         "
       >
@@ -217,6 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
                 <span v-else-if="dashboardPanelData.data.type == 'distribution'">{{
                   t("panel.breakdownTooltipDistribution")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'treemap'">{{
+                  t("panel.breakdownTooltipTreemap")
                 }}</span>
                 <span v-else-if="dashboardPanelData.data.type == 'hostmap'">{{
                   t("panel.breakdownTooltipHostmap")
@@ -705,6 +709,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
+import { TREEMAP_MAX_LEVELS } from "@/utils/dashboard/convertTreemapData";
 
 // Minimal shape of a dashboard panel query slot as read by the PromQL builder.
 interface DashboardQuerySlot {
@@ -781,6 +786,8 @@ export default defineComponent({
     // Hierarchy, row and category charts name each well by its job, as the sankey builder does.
     const roleLabels = computed((): { x: string; y: string; b: string | null } | null => {
       switch (dashboardPanelData.data.type) {
+        case "treemap":
+          return { x: t("panel.wellGroup"), y: t("panel.wellSize"), b: t("panel.wellSubgroup") };
         default:
           return null;
       }
@@ -1176,6 +1183,8 @@ export default defineComponent({
         case "pie":
         case "donut":
           return t("dashboard.oneLabelFieldMessage");
+        case "treemap":
+          return t("dashboard.treemapLevelsHint", { count: TREEMAP_MAX_LEVELS });
         case "metric":
         case "distribution":
           return t("dashboard.xaxisFieldNAMessage");
@@ -1221,6 +1230,7 @@ export default defineComponent({
         case "donut":
         case "gauge":
         case "bar-gauge":
+        case "treemap":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");

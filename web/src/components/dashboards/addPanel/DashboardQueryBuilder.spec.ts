@@ -563,6 +563,21 @@ describe("DashboardQueryBuilder", () => {
       expect(wells("h-bar")).toEqual(["Y-Axis", "X-Axis", "Breakdown"]);
     });
 
+    it("names the treemap wells by their job", () => {
+      wrapper?.unmount();
+      wrapper = createWrapper({ "data.type": "treemap" });
+      expect([
+        wrapper.vm.currentXLabel,
+        wrapper.vm.currentYLabel,
+        wrapper.vm.currentBreakdownLabel,
+      ]).toEqual(["Group", "Size", "Sub-group"]);
+      const text = wrapper.text();
+      expect(text).toContain("Group");
+      expect(text).toContain("Sub-group");
+      expect(text).toContain("Size");
+      expect(text).not.toContain("X-Axis");
+    });
+
     it("should handle x-axis field removal", async () => {
       mockUseDashboardPanelData.removeXAxisItem("field1");
       expect(mockUseDashboardPanelData.removeXAxisItem).toHaveBeenCalledWith("field1");

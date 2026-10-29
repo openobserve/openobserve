@@ -1609,6 +1609,26 @@ describe("configUtils", () => {
       expect(shouldShowAxisConfig(distribution)).toBe(false);
     });
   });
+  describe("treemap", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("treemap"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("treemap"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("treemap"))).toBe(false);
+    });
+  });
 });
 
 describe("pruneDependentOptions", () => {
