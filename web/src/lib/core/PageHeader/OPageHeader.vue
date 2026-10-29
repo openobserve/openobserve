@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :class="tabsBelow ? ROW_CLASS : 'contents'">
       <!-- flex-1 is basis-0, so the min-w floor is what forces the actions to wrap. -->
       <div
-        class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch md:max-lg:min-w-40 @max-4xl/page:h-auto @max-4xl/page:self-stretch"
+        class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch max-md:gap-2 md:max-lg:min-w-40 @max-4xl/page:h-auto @max-4xl/page:self-stretch"
         :class="[
           hasBack() ? 'max-md:min-w-40' : 'max-md:min-w-24',
           hasTabs() && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="more-vert" size="sm" />
               </OButton>
             </template>
-            <div class="flex max-w-56 flex-wrap gap-1 p-1.5">
+            <div class="flex max-w-56 flex-wrap gap-2 p-1.5">
               <slot name="actions-overflow" />
             </div>
           </ODropdown>

@@ -266,6 +266,7 @@ interface ColorConfig {
     | "continuous-light-to-dark-blue";
   fixedColor?: string[];
   seriesBy?: SeriesBy;
+  colorBySeries?: Array<{ value: string; color?: string }>;
 }
 
 function getDomainPartitions(chartMin: number, chartMax: number, numPartitions: number) {
@@ -332,6 +333,83 @@ export const getSeriesColor = (
   }
 };
 
+// Below this redmean distance two palette colours read as one hue: the amber/yellow pair sits at 20-34.
+const NEAR_COLOR_DISTANCE = 60;
+
+const toRgb = (value: string): [number, number, number] | null => {
+  const hex = /^#([0-9a-f]{6})$/i.exec(value.trim());
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const rgb = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(value.trim());
+  return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
+};
+
+const isNearColor = (a: string, b: string): boolean => {
+  const x = toRgb(a);
+  const y = toRgb(b);
+  if (!x || !y) return a === b;
+  const rMean = (x[0] + y[0]) / 2;
+  const [dr, dg, db] = [x[0] - y[0], x[1] - y[1], x[2] - y[2]];
+  const distance = Math.sqrt(
+    (2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db,
+  );
+  return distance < NEAR_COLOR_DISTANCE;
+};
+
+/** Name-hashed palette colours; a name leaves its hash slot only when an earlier name or a reserved colour already holds that colour. */
+export const getDistinctSeriesColors = (
+  names: string[],
+  palette: string[],
+  reserved: string[] = [],
+): Map<string, string> => {
+  const colors = new Map<string, string>();
+  const takenColors = [...reserved];
+  const takenSlots = new Set(
+    palette.flatMap((color, i) => (reserved.some((r) => isNearColor(color, r)) ? [i] : [])),
+  );
+  const isApart = (slot: number) => takenColors.every((c) => !isNearColor(palette[slot], c));
+  const take = (name: string, slot: number) => {
+    takenSlots.add(slot);
+    takenColors.push(palette[slot]);
+    colors.set(name, palette[slot]);
+  };
+  // Sorted, so the same set of names always gets the same colours.
+  const unique = [...new Set(names)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  // Uncontested hash slots are claimed before any probing, so a probe never takes another name's own colour.
+  const displaced = unique.filter((name) => {
+    const home = getSeriesHash(name, palette);
+    if (takenSlots.has(home) || !isApart(home)) return true;
+    take(name, home);
+    return false;
+  });
+  displaced.forEach((name) => {
+    const home = getSeriesHash(name, palette);
+    const slots = palette.map((_, i) => (home + i) % palette.length);
+    const isFree = (slot: number) => !takenSlots.has(slot);
+    take(name, slots.find((i) => isFree(i) && isApart(i)) ?? slots.find(isFree) ?? home);
+  });
+  return colors;
+};
+
+/** Per-chart override of getSeriesColor's name hash: returns the distinct colour, or undefined where getSeriesColor decides. */
+export const createDistinctSeriesColor = (
+  names: string[],
+  colorCfg: ColorConfig | null | undefined,
+  theme: string,
+): ((name: string) => string | undefined) => {
+  if (colorCfg && colorCfg.mode !== "palette-classic-by-series") return () => undefined;
+  const mappings = (colorCfg?.colorBySeries ?? []).filter((m) => m?.color);
+  const mapped = new Set(mappings.map((m) => m.value));
+  const colors = getDistinctSeriesColors(
+    names.filter((name) => !mapped.has(name)),
+    getColorPalette(theme),
+    mappings.map((m) => String(m.color)),
+  );
+  return (name) => colors.get(name);
+};
+
 // Dashboard table row-highlight palette. The light/dark swap lives in the
 // --color-chart-table-* tokens (base.css / dark.css); this resolves them via
 // chartColor(). `_theme` kept for call-site compatibility, ignored.
@@ -375,12 +453,12 @@ export const colorToRgba = (color: string, alpha: number): string => {
 };
 
 /**
- * Dashed split-line style for chart grids — subtle so the lines recede behind
+ * Solid split-line style for chart grids — subtle so the lines recede behind
  * the data. Theme-aware: faint white on dark, faint black on light. Shared by
  * the PromQL and SQL chart builders so the grid look stays consistent.
  */
 export const getGridLineStyle = (_theme?: string) => ({
-  type: "dashed",
+  type: "solid",
   width: 1,
   // light/dark swap lives in the --color-chart-gridline token (base/dark css).
   color: chartColor("--color-chart-gridline"),
