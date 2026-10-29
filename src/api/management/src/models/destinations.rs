@@ -225,7 +225,8 @@ pub struct Destination {
     #[serde(default)]
     #[schema(example = "my_alert_webhook")]
     pub name: String,
-    /// Webhook URL for HTTP destinations. Required when `type` is `http`.
+    /// Webhook URL for HTTP destinations. Required when `type` is `http`. Read back as its origin
+    /// by callers without PUT on the destination.
     #[serde(default)]
     #[schema(example = "https://example.com/webhook")]
     pub url: String,
@@ -236,7 +237,8 @@ pub struct Destination {
     /// Whether to skip TLS certificate verification for HTTP destinations.
     #[serde(default)]
     pub skip_tls_verify: bool,
-    /// Optional HTTP headers to include with webhook requests.
+    /// Optional HTTP headers to include with webhook requests. Values read back blank for callers
+    /// without PUT on the destination.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     /// REQUIRED for alert destinations. Name of the template to use for formatting alert messages.
@@ -281,11 +283,11 @@ impl Destination {
     pub fn redact_secrets(&mut self) {
         self.url = url_origin(&self.url);
         clear(self.headers.iter_mut().flat_map(|h| h.values_mut()));
-        clear(credential_values(self.metadata.iter_mut()));
+        redact_metadata(&mut self.metadata);
         if let Some(previous) = self.slack_app.previous_webhook.as_mut() {
             previous.url = url_origin(&previous.url);
             clear(previous.headers.iter_mut().flat_map(|h| h.values_mut()));
-            clear(credential_values(previous.metadata.iter_mut()));
+            redact_metadata(&mut previous.metadata);
         }
     }
 
@@ -490,19 +492,20 @@ impl From<destination_usage::DestinationUse> for DestinationUseResponse {
     }
 }
 
-/// PagerDuty's `routing_key` is the one credential stored in metadata today.
-fn credential_values<'a, I>(entries: I) -> impl Iterator<Item = &'a mut String>
-where
-    I: Iterator<Item = (&'a String, &'a mut String)>,
-{
-    entries
-        .filter(|(key, _)| {
-            let key = key.to_ascii_lowercase();
-            ["key", "token", "secret", "password"]
-                .iter()
-                .any(|part| key.contains(part))
-        })
-        .map(|(_, value)| value)
+/// Metadata credentials: PagerDuty's `routing_key`, and the `credential_<field>` copies older
+/// prebuilt destinations kept, such as `credential_webhookUrl`; a URL keeps its origin.
+fn redact_metadata(metadata: &mut HashMap<String, String>) {
+    for (key, value) in metadata.iter_mut() {
+        let key = key.to_ascii_lowercase();
+        if ["key", "token", "secret", "password"]
+            .iter()
+            .any(|part| key.contains(part))
+        {
+            value.clear();
+        } else if key.contains("url") || key.contains("webhook") {
+            *value = url_origin(value);
+        }
+    }
 }
 
 fn clear<'a>(values: impl Iterator<Item = &'a mut String>) {
@@ -900,6 +903,11 @@ mod tests {
         d.metadata = HashMap::from([
             ("routing_key".to_string(), "R0UT1NG".to_string()),
             ("render_format".to_string(), "slack".to_string()),
+            (
+                "credential_webhookUrl".to_string(),
+                "https://hooks.slack.com/services/T1/B1/s3cr3t".to_string(),
+            ),
+            ("credential_channel".to_string(), "#operations".to_string()),
         ]);
         d.redact_secrets();
         let json = serde_json::to_value(&d).unwrap();
@@ -907,6 +915,11 @@ mod tests {
         assert_eq!(json["headers"]["Authorization"], "");
         assert_eq!(json["metadata"]["routing_key"], "");
         assert_eq!(json["metadata"]["render_format"], "slack");
+        assert_eq!(
+            json["metadata"]["credential_webhookUrl"],
+            "https://hooks.slack.com"
+        );
+        assert_eq!(json["metadata"]["credential_channel"], "#operations");
         assert_eq!(json["previous_webhook"]["url"], "https://hooks.slack.com");
         assert_eq!(
             json["previous_webhook"]["metadata"]["slack_channel_id"],
