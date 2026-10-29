@@ -68,11 +68,11 @@ class EvidenceTests(unittest.TestCase):
     def write_diagnostics(self):
         files = {
             "proof/result.json": b'{"success":false,"comparisonVerified":false}\n',
-            "proof/baseline-shuffle.json": b'{"tests":[{"name":"case","state":"failed"}]}\n',
-            "proof/baseline-shuffle.json.progress.jsonl": b'{"name":"case","error":"expected row"}\n',
-            "proof/baseline-shuffle.log": b"AssertionError: expected row\n",
-            "proof/baseline-shuffle.resources.txt": b"Maximum resident set size: 123\n",
-            "proof/baseline-shuffle-coverage/coverage-summary.json": b'{"total":{"lines":{"covered":3,"total":5}}}\n',
+            "proof/workers-6-second.json": b'{"tests":[{"name":"case","state":"failed"}]}\n',
+            "proof/workers-6-second.json.progress.jsonl": b'{"name":"case","error":"expected row"}\n',
+            "proof/workers-6-second.log": b"AssertionError: expected row\n",
+            "proof/workers-6-second.resources.txt": b"Maximum resident set size: 123\n",
+            "proof/workers-6-second-coverage/coverage-summary.json": b'{"total":{"lines":{"covered":3,"total":5}}}\n',
         }
         for name, data in files.items():
             path = self.source / name

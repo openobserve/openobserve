@@ -15,8 +15,8 @@ MAX_DIAGNOSTIC_FILES = 128
 
 
 def diagnostic_paths():
-    paths = ["proof/result.json", "proof/trials.json", "proof/gates.json", "proof/environment.json"]
-    for version in ("baseline-normal", "candidate-normal", "baseline-shuffle", "candidate-shuffle"):
+    paths = ["proof/result.json", "proof/trials.json", "proof/sample.json", "proof/environment.json"]
+    for version in ("workers-7-first", "workers-6-first", "workers-6-second", "workers-7-last"):
         paths.extend("proof/" + version + suffix for suffix in (
             ".json", ".json.progress.jsonl", ".log", ".resources.txt", ".launch.json",
             "-merge.log", "-merge.resources.txt", "-merge.launch.json",

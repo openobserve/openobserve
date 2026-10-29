@@ -13,9 +13,9 @@ import tempfile
 import time
 
 DEADLINE = None
-BASE = '3960df0f12760f4e8628a5a9104fef65048ff369'
-TARGET = 'src/components/alerts/AlertList.spec.ts'
-EXPECTED = {'baseline': '82bfaec613aae3405ad9ea3575c7672be224c2aef47e6fb33ad5342ca774ae63', 'candidate': 'dcf2857d8fa0b23f7d3c7d6351cc5bc5b828f779328e1dcd6f95c62a53b36284'}
+BASE = '743990d3839a4fa8de4f3fcf31b8d7ca3f00c282'
+WEB_TREE = '337d85bc38dec7e0e17afea5108d96d4b4a2c0c0'
+TRIALS = [('workers-7-first', 7), ('workers-6-first', 6), ('workers-6-second', 6), ('workers-7-last', 7)]
 
 
 def digest(data):
@@ -83,7 +83,7 @@ def run(command, web, env, log, timeout):
 
 
 def cases(report):
-    return sorted((record['file'], test['name'], test['mode'], test['state']) for record in report['records'] for test in record['tests'])
+    return sorted((record['file'], record['project'], record['pool'], test['id'], test['name'], test['mode'], test['state']) for record in report['records'] for test in record['tests'])
 
 
 def compare(output, left, right):
@@ -120,9 +120,9 @@ def compare(output, left, right):
                 covered_differences[path] = differences
         save(output / (right + '-covered-location-differences.json'), covered_differences)
         result['coveredLocationsEqual'] = not covered_differences
-        result['equivalent'] = scope_valid and ca == cb and len(ca) == 117 and not a['errors'] and not b['errors'] and not summary_differences and not covered_differences
-        result['allTestsPassed'] = all(x[-1] == 'passed' for x in ca + cb)
-        result['comparisonVerified'] = result['equivalent'] and result['allTestsPassed']
+        result['equivalent'] = scope_valid and ca == cb and bool(ca) and not a['errors'] and not b['errors'] and not summary_differences and not covered_differences
+        result['allTestsPassedOrSkipped'] = all(x[-1] in ('passed', 'skipped') for x in ca + cb)
+        result['comparisonVerified'] = result['equivalent'] and result['allTestsPassedOrSkipped']
     except (OSError, KeyError, ValueError) as error:
         result.update({'equivalent': False, 'comparisonVerified': False, 'error': str(error)})
     return result
@@ -135,14 +135,40 @@ def attach_runtime_status(comparison, trials):
     return comparison
 
 
+def case_digest(tests):
+    values = sorted((t['id'], t['name'], t['mode'], t['state']) for t in tests)
+    return digest(json.dumps(values, separators=(',', ':')).encode())
+
+
+def validate_report(report, sample, workers, runtime):
+    records = report['records']
+    actual = sorted((r['file'], r['project'], r['pool'], len(r['tests']), case_digest(r['tests'])) for r in records)
+    expected = sorted((r['file'], r['project'], r['pool'], r['cases'], r['caseDigest']) for r in sample['files'])
+    options = report['options']
+    expected_projects = sorted(set(r['project'] for r in sample['files']))
+    projects = options['projects']
+    return (report['reason'] == 'passed' and not report['errors'] and actual == expected
+            and report['runtime'] == runtime and runtime['availableParallelism'] == 8
+            and runtime['node'] == 'v24.22.0' and runtime['vitest'] == '4.1.11'
+            and options['maxWorkers'] == workers and options['pool'] == 'forks'
+            and options['isolate'] is True and options['watch'] is False
+            and sorted(p['name'] for p in projects) == expected_projects
+            and all(p['maxWorkers'] == workers and p['pool'] == 'forks' and p['isolate'] is True
+                    and p['environment'] == p['name'] for p in projects))
+
+
+def verify_trials(trials, source_hash):
+    return ([(t['name'], t['workers']) for t in trials] == TRIALS
+            and all(t.get('reportVerified') is True and t.get('sourceBefore') == source_hash
+                    and t.get('sourceAfter') == source_hash and t['test']['exit'] == 0
+                    and t.get('merge', {}).get('exit') == 0 for t in trials))
+
+
 def main():
     global DEADLINE
     parser = argparse.ArgumentParser()
     parser.add_argument('--web', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
-    parser.add_argument('--baseline', required=True, type=Path)
-    parser.add_argument('--candidate', required=True, type=Path)
-    parser.add_argument('--seed', default='1729')
     parser.add_argument('--test-timeout', type=int, default=240)
     parser.add_argument('--merge-timeout', type=int, default=90)
     parser.add_argument('--overall-timeout', type=int, default=1320)
@@ -151,83 +177,102 @@ def main():
     DEADLINE = time.monotonic() + args.overall_timeout - 15
     web, output = args.web.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    node = Path(shutil.which('node')).resolve()
-    env = os.environ | {'PATH': str(node.parent) + os.pathsep + os.environ['PATH']}
-    assert capture([str(node), '-p', 'process.version'], web, env) == 'v24.22.0', 'Expected exact Node24.22.0'
-    assert capture(['npm', '--version'], web, env) == '11.19.1', 'Expected exact npm11.19.1'
-    inputs = {'baseline': args.baseline.read_bytes(), 'candidate': args.candidate.read_bytes()}
-    assert {name: digest(data) for name, data in inputs.items()} == EXPECTED, 'Frozen inputs changed'
-    original = (web / TARGET).read_bytes()
-    assert original == inputs['baseline'], 'Probe checkout must start with exact baseline spec'
-    assert subprocess.check_output(['git', 'show', BASE + ':web/' + TARGET], cwd=web) == original
-    assert not capture(['git', 'diff', BASE, '--', ':(top)web'], web, env), 'Probe web tree differs from pinned baseline'
-    assert capture(['git', 'rev-parse', 'HEAD:web'], web, env) == 'd51379f81d6f4521be4ae1bfe69fc6c5dba4a17d', 'Unexpected tracked web tree'
-    before = inventory(web)
-    save(output / 'source-inventory.json', before)
-    save(output / 'environment.json', {'baseline': BASE, 'probeHead': capture(['git', 'rev-parse', 'HEAD'], web, env), 'node': capture([str(node), '-p', 'process.version'], web, env), 'nodeExecutable': str(node), 'nodeExecutableSha256': digest(node.read_bytes()), 'npm': capture(['npm', '--version'], web, env), 'platform': sys.platform, 'cpuCount': os.cpu_count(), 'uname': list(os.uname()), 'inputs': EXPECTED, 'seed': args.seed, 'overallTimeoutSeconds': args.overall_timeout, 'cleanupReserveSeconds': 15})
-    for name, data in inputs.items():
-        (output / ('AlertList.' + name + '.spec.ts')).write_bytes(data)
-    verifier = Path(__file__).with_name('verify-bodies.mjs')
-    body_check = run([str(node), str(verifier), str(web), str(args.baseline.resolve()), str(args.candidate.resolve())], web, env, output / 'body-parity.json', 60)
-    assert body_check['exit'] == 0, 'Test body/assertion AST changed'
+    result = {'success': False, 'complete': False, 'comparisonVerified': False, 'performanceAcceptance': False}
     trials = []
-    gates = []
-    result = {'success': False, 'complete': False, 'comparisonVerified': False}
+    before = None
     try:
-        (web / TARGET).write_bytes(inputs['candidate'])
-        for name, command, cap in [('format', ['npm', 'run', 'format:check'], 180), ('lint', [str(node), 'node_modules/eslint/bin/eslint.js', TARGET, '--no-fix'], 60)]:
-            print('Starting candidate ' + name, flush=True)
-            gates.append({'name': name, **run(command, web, env, output / ('candidate-' + name + '.log'), cap)})
-            save(output / 'gates.json', gates)
-        assert (web / TARGET).read_bytes() == inputs['candidate'], 'Read-only gates changed candidate'
-        (web / TARGET).write_bytes(original)
-        with tempfile.TemporaryDirectory(prefix='.alertlist-proof-', dir=web) as temporary:
+        node = Path(shutil.which('node')).resolve()
+        env = os.environ | {'PATH': str(node.parent) + os.pathsep + os.environ['PATH']}
+        assert 'VITEST_MAX_WORKERS' not in env, 'Unexpected worker environment override'
+        assert capture([str(node), '-p', 'process.version'], web, env) == 'v24.22.0', 'Expected exact Node24.22.0'
+        assert capture(['npm', '--version'], web, env) == '11.19.1', 'Expected exact npm11.19.1'
+        assert not capture(['git', 'diff', BASE, '--', ':(top)web'], web, env), 'Probe web tree differs from pinned baseline'
+        assert not capture(['git', 'status', '--porcelain', '--', '.'], web, env), 'Dirty web checkout'
+        assert capture(['git', 'rev-parse', 'HEAD:web'], web, env) == WEB_TREE, 'Unexpected tracked web tree'
+        sample = json.loads(Path(__file__).with_name('sample.json').read_text())
+        assert sample['webTree'] == WEB_TREE and sample['referenceMerge'] == BASE
+        assert len(sample['files']) == 76 and sum(f['cases'] for f in sample['files']) == 3772
+        assert all(digest((web / f['file']).read_bytes()) == f['sourceSha256'] for f in sample['files'])
+        before = inventory(web)
+        source_hash = digest(json.dumps(before, sort_keys=True).encode())
+        save(output / 'source-inventory.json', before)
+        save(output / 'sample.json', sample)
+        runtime_code = "const os=require('node:os'); console.log(JSON.stringify({node:process.version,vitest:require('./node_modules/vitest/package.json').version,platform:process.platform,architecture:process.arch,heapLimit:require('node:v8').getHeapStatistics().heap_size_limit,nodeOptions:process.env.NODE_OPTIONS ?? null,availableParallelism:os.availableParallelism(),cpuCount:os.cpus().length,cpuModels:[...new Set(os.cpus().map(c=>c.model))].sort()}))"
+        runtime = json.loads(capture([str(node), '-e', runtime_code], web, env))
+        assert runtime['availableParallelism'] == 8, 'This screen requires eight available CPUs'
+        save(output / 'environment.json', {'baseline': BASE, 'webTree': WEB_TREE, 'probeHead': capture(['git', 'rev-parse', 'HEAD'], web, env), 'runtime': runtime, 'nodeExecutableSha256': digest(node.read_bytes()), 'npm': '11.19.1', 'sourceDigest': source_hash, 'overallTimeoutSeconds': args.overall_timeout, 'cleanupReserveSeconds': 15, 'configuredRunnerLabel': 'ubicloud-standard-8', 'familyEvidence': 'Inspect actual GitHub job setup VM Family log before assigning price'})
+        with tempfile.TemporaryDirectory(prefix='.worker-proof-', dir=web) as temporary:
             temporary = Path(temporary)
             config, reporter = temporary / 'config.mts', temporary / 'reporter.mjs'
-            reporter.write_text('import fs from "node:fs";\nimport { reportedTest } from ' + json.dumps(str(web / 'scripts/ui-tests/reporter.ts')) + ';\n' + '''export default class Measure {
-  onInit() { this.start = performance.now(); }
-  onTestCaseResult(test) { fs.appendFileSync(process.env.BENCH_REPORT + '.progress.jsonl', JSON.stringify({ at: new Date().toISOString(), name: test.fullName, result: test.result() }) + '\\n'); }
-  onTestRunEnd(modules, errors, reason) { fs.writeFileSync(process.env.BENCH_REPORT, JSON.stringify({ reason, errors, wallMs: performance.now() - this.start, resources: process.resourceUsage(), memory: process.memoryUsage(), records: modules.map(m => ({ file: m.relativeModuleId, project: m.project.name, state: m.state(), diagnostic: m.diagnostic(), tests: [...m.children.allTests()].map(reportedTest) })) }, null, 2)); }
-}\n''')
-            config.write_text('import config from ' + json.dumps(str(web / 'vitest.config.ts')) + ';\nexport default { ...config, cacheDir: ' + json.dumps(str(temporary / 'cache')) + ', test: { ...config.test, projects: undefined, include: [' + json.dumps(TARGET) + '], environment: "jsdom", isolate: true, setupFiles: ["src/test/unit/helpers/setupTests.ts"], logHeapUsage: true, reporters: process.env.BENCH_BLOB ? ["default", ' + json.dumps(str(reporter)) + ', ["blob", { outputFile: process.env.BENCH_BLOB }]] : ["default"], coverage: { ...config.test.coverage, thresholds: undefined, reportOnFailure: true, reporter: process.env.BENCH_BLOB ? [] : ["json-summary", "json"], reportsDirectory: process.env.BENCH_COVERAGE } } };\n')
+            reporter.write_text('import fs from "node:fs";\nimport os from "node:os";\nimport v8 from "node:v8";\nimport { reportedTest } from ' + json.dumps(str(web / 'scripts/ui-tests/reporter.ts')) + ';\n' + REPORTER)
+            config.write_text('import config from ' + json.dumps(str(web / 'vitest.config.ts')) + ';\nconst sample = ' + json.dumps(sample['files']) + ';\n' + CONFIG.replace('__CACHE__', json.dumps(str(temporary / 'cache'))).replace('__REPORTER__', json.dumps(str(reporter))))
             shutil.copy2(config, output / 'effective-config.mts')
             shutil.copy2(reporter, output / 'effective-reporter.mjs')
-            for version, seed in [('baseline', None), ('candidate', None), ('baseline', args.seed), ('candidate', args.seed)]:
-                name = version + ('-shuffle' if seed else '-normal')
+            for name, workers in TRIALS:
                 print('Starting ' + name, flush=True)
-                (web / TARGET).write_bytes(inputs[version])
-                current = inventory(web)
-                assert {k: v for k, v in current.items() if k != TARGET} == {k: v for k, v in before.items() if k != TARGET}, 'Unchanged-source drift'
+                current_hash = digest(json.dumps(inventory(web), sort_keys=True).encode())
+                assert current_hash == source_hash, 'Source drift before trial'
                 trial_env = env | {'BENCH_REPORT': str(output / (name + '.json')), 'BENCH_BLOB': str(output / (name + '-blobs/blob.json')), 'BENCH_COVERAGE': str(output / (name + '-coverage'))}
-                command = [str(node), 'node_modules/vitest/vitest.mjs', 'run', '--config', str(config), '--pool', 'forks', '--maxWorkers', '1', '--coverage', '--shard', '1/1']
-                if seed:
-                    command += ['--sequence.shuffle', '--sequence.seed', seed]
+                command = [str(node), 'node_modules/vitest/vitest.mjs', 'run', '--config', str(config), '--pool', 'forks', '--maxWorkers', str(workers), '--coverage']
                 cache = temporary / 'cache'
                 if cache.exists():
                     shutil.rmtree(cache)
-                cache_before = {str(f.relative_to(cache)): {'bytes': f.stat().st_size, 'sha256': digest(f.read_bytes())} for f in cache.rglob('*') if f.is_file()}
-                trial = {'name': name, 'sourceHash': digest(inputs[version]), 'cachePolicy': 'clear tempfile-owned optimizer cache before every trial; merge reuses its own trial cache', 'cacheBefore': cache_before, 'environment': {k: v for k, v in trial_env.items() if k.startswith('BENCH_')}, 'test': run(command, web, trial_env, output / (name + '.log'), args.test_timeout)}
-                if Path(trial_env['BENCH_BLOB']).is_file() and trial['test']['exit'] not in ('timeout', 'deadline'):
-                    merge_env = {k: v for k, v in trial_env.items() if k != 'BENCH_BLOB'}
-                    merge_command = [str(node), 'node_modules/vitest/vitest.mjs', 'run', '--config', str(config), '--coverage', '--merge-reports', str(output / (name + '-blobs'))]
-                    trial['merge'] = run(merge_command, web, merge_env, output / (name + '-merge.log'), args.merge_timeout)
+                trial = {'name': name, 'workers': workers, 'sourceBefore': current_hash, 'cachePolicy': 'clear tempfile-owned optimizer cache before every trial; merge reuses trial cache', 'test': run(command, web, trial_env, output / (name + '.log'), args.test_timeout)}
                 trials.append(trial)
+                trial['sourceAfter'] = digest(json.dumps(inventory(web), sort_keys=True).encode())
+                report_path = Path(trial_env['BENCH_REPORT'])
+                if report_path.is_file():
+                    report = json.loads(report_path.read_text())
+                    trial['reportVerified'] = validate_report(report, sample, workers, runtime) and all(Path(path).is_relative_to(cache) for path in [report['options']['cacheDir'], *(p['cacheDir'] for p in report['options']['projects'])])
+                save(output / 'trials.json', trials)
+                blob = Path(trial_env['BENCH_BLOB'])
+                if blob.is_file() and trial['test']['exit'] not in ('timeout', 'deadline'):
+                    trial['blobBytes'] = blob.stat().st_size
+                    merge_env = {k: v for k, v in trial_env.items() if k != 'BENCH_BLOB'}
+                    merge_command = [str(node), 'node_modules/vitest/vitest.mjs', 'run', '--config', str(config), '--pool', 'forks', '--maxWorkers', str(workers), '--coverage', '--merge-reports', str(blob.parent)]
+                    trial['merge'] = run(merge_command, web, merge_env, output / (name + '-merge.log'), args.merge_timeout)
                 save(output / 'trials.json', trials)
                 print(name + ' test=' + str(trial['test']['exit']) + ' merge=' + str(trial.get('merge', {}).get('exit')), flush=True)
                 if trial['test']['exit'] in ('timeout', 'deadline') or trial.get('merge', {}).get('exit') in ('timeout', 'deadline'):
                     break
-            comparisons = [attach_runtime_status(compare(output, 'baseline-normal', 'candidate-normal'), trials), attach_runtime_status(compare(output, 'baseline-shuffle', 'candidate-shuffle'), trials)]
-            result = {'success': len(gates) == 2 and all(g['exit'] == 0 for g in gates) and len(trials) == 4 and all(t['test']['exit'] == 0 and t.get('merge', {}).get('exit') == 0 for t in trials) and all(c['equivalent'] and c['allTestsPassed'] for c in comparisons), 'complete': len(trials) == 4 and all(t['test']['exit'] not in ('timeout', 'deadline') and t.get('merge', {}).get('exit') not in (None, 'timeout', 'deadline') for t in trials), 'comparisonVerified': all(c['comparisonVerified'] for c in comparisons), 'incompleteReason': 'overall deadline exhausted' if time.monotonic() >= DEADLINE else ('bounded command timeout' if any(t['test']['exit'] == 'timeout' or t.get('merge', {}).get('exit') == 'timeout' for t in trials) else None), 'comparisons': comparisons, 'trials': [{'name': t['name'], 'testExit': t['test']['exit'], 'mergeExit': t.get('merge', {}).get('exit')} for t in trials], 'gates': [{'name': g['name'], 'exit': g['exit']} for g in gates], 'cachePolicy': 'symmetric cold optimizer cache per trial', 'performanceAcceptance': False}
+            comparisons = [attach_runtime_status(compare(output, TRIALS[0][0], name), trials) for name, _ in TRIALS[1:]]
+            verified = verify_trials(trials, source_hash) and all(c['comparisonVerified'] for c in comparisons)
+            result.update({'success': verified, 'complete': len(trials) == 4 and all(t['test']['exit'] not in ('timeout', 'deadline') and t.get('merge', {}).get('exit') not in (None, 'timeout', 'deadline') for t in trials), 'comparisonVerified': verified, 'comparisons': comparisons, 'trials': [{'name': t['name'], 'workers': t['workers'], 'reportVerified': t.get('reportVerified', False), 'testExit': t['test']['exit'], 'mergeExit': t.get('merge', {}).get('exit')} for t in trials], 'cachePolicy': 'symmetric cold optimizer cache per trial'})
     except Exception as error:
         result['error'] = repr(error)
-        raise
     finally:
-        (web / TARGET).write_bytes(original)
-        result['originalSpecRestored'] = (web / TARGET).read_bytes() == original
-        result['sourceInventoryRestored'] = inventory(web) == before
+        try:
+            result['sourceInventoryUnchanged'] = before is not None and inventory(web) == before
+        except (OSError, subprocess.SubprocessError) as error:
+            result['sourceInventoryUnchanged'] = False
+            result['sourceAuditError'] = repr(error)
+        if not result['sourceInventoryUnchanged']:
+            result['success'] = result['comparisonVerified'] = False
+        if not result['complete']:
+            result['incompleteReason'] = 'Deadline, failed preflight or missing trial; no retries'
         save(output / 'result.json', result)
     print(json.dumps(result, indent=2), flush=True)
-    return 0 if result['success'] and result['sourceInventoryRestored'] else 1
+    return 0 if result['success'] else 1
+
+
+REPORTER = r'''export default class Measure {
+  onInit(ctx) { this.ctx = ctx; this.start = performance.now(); }
+  onTestRunStart() {
+    const c = this.ctx.config;
+    this.options = { cacheDir: this.ctx.vite.config.cacheDir, maxWorkers: c.maxWorkers, pool: c.pool, isolate: c.isolate, watch: c.watch, projects: this.ctx.projects.map(p => ({ name: p.name, configuredMaxWorkers: p.config.maxWorkers ?? null, maxWorkers: p.config.maxWorkers || c.maxWorkers, pool: p.config.pool, isolate: p.config.isolate, environment: p.config.environment, cacheDir: p.vite.config.cacheDir })).sort((a,b) => a.name.localeCompare(b.name)) };
+  }
+  onTestModuleEnd() { this.lastModuleMs = performance.now() - this.start; }
+  onCoverage() { this.coverageMs = performance.now() - this.start; }
+  onTestCaseResult(test) { fs.appendFileSync(process.env.BENCH_REPORT + '.progress.jsonl', JSON.stringify({ at: new Date().toISOString(), name: test.fullName, result: test.result() }) + '\n'); }
+  onTestRunEnd(modules, errors, reason) {
+    const runtime = { node: process.version, vitest: JSON.parse(fs.readFileSync(new URL('../node_modules/vitest/package.json', import.meta.url))).version, platform: process.platform, architecture: process.arch, heapLimit: v8.getHeapStatistics().heap_size_limit, nodeOptions: process.env.NODE_OPTIONS ?? null, availableParallelism: os.availableParallelism(), cpuCount: os.cpus().length, cpuModels: [...new Set(os.cpus().map(c => c.model))].sort() };
+    fs.writeFileSync(process.env.BENCH_REPORT, JSON.stringify({ reason, errors, runtime, options: this.options, wallMs: performance.now() - this.start, lastModuleMs: this.lastModuleMs, coverageMs: this.coverageMs, resources: process.resourceUsage(), memory: process.memoryUsage(), records: modules.map(m => ({ file: m.relativeModuleId, project: m.project.name, pool: m.toTestSpecification().pool, state: m.state(), diagnostic: m.diagnostic(), tests: [...m.children.allTests()].map(reportedTest) })) }, null, 2));
+  }
+}
+'''
+
+CONFIG = '''export default { ...config, cacheDir: __CACHE__, test: { ...config.test, isolate: true, pool: "forks", sequence: { ...config.test.sequence, shuffle: false }, projects: config.test.projects.map(p => ({ ...p, test: { ...p.test, include: sample.filter(f => f.project === p.test.name).map(f => f.file) } })), logHeapUsage: true, reporters: process.env.BENCH_BLOB ? ["default", __REPORTER__, ["blob", { outputFile: process.env.BENCH_BLOB }]] : ["default"], coverage: { ...config.test.coverage, thresholds: undefined, reportOnFailure: true, reporter: process.env.BENCH_BLOB ? [] : ["json-summary", "json"], reportsDirectory: process.env.BENCH_COVERAGE } } };
+'''
 
 
 def interrupted(signum, frame):

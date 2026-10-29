@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -18,8 +19,8 @@ class ComparisonTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.output = Path(self.temp.name)
-        self.report = {"errors": [], "records": [{"file": proof.TARGET, "tests": [
-            {"name": f"case {n}", "mode": "run", "state": "passed"} for n in range(117)
+        self.report = {"errors": [], "records": [{"file": "src/example.spec.ts", "project": "jsdom", "pool": "forks", "tests": [
+            {"id": str(n), "name": f"case {n}", "mode": "run", "state": "passed"} for n in range(117)
         ]}]}
         self.summary = {"total": {"lines": {"total": 2, "covered": 1}}, "/src/AlertList.vue": {"lines": {"total": 2, "covered": 1}}}
         self.coverage = {"/src/AlertList.vue": {
@@ -41,7 +42,7 @@ class ComparisonTests(unittest.TestCase):
     def test_identical_reports_pass(self):
         result = self.compare()
         self.assertTrue(result["equivalent"])
-        self.assertTrue(result["allTestsPassed"])
+        self.assertTrue(result["allTestsPassedOrSkipped"])
 
     def test_failed_or_missing_runtime_cannot_verify_matching_reports(self):
         trials = [{"name": name, "test": {"exit": 0}, "merge": {"exit": 0}} for name in ("baseline", "candidate")]
@@ -70,8 +71,8 @@ class ComparisonTests(unittest.TestCase):
         self.write("candidate.json", self.report)
         self.assertFalse(self.compare()["equivalent"])
 
-    def test_wrong_case_count_fails(self):
-        self.report["records"][0]["tests"].pop()
+    def test_empty_matching_case_lists_fail(self):
+        self.report["records"][0]["tests"].clear()
         for name in ("baseline", "candidate"):
             self.write(name + ".json", self.report)
         self.assertFalse(self.compare()["equivalent"])
@@ -85,7 +86,7 @@ class ComparisonTests(unittest.TestCase):
         self.report["records"][0]["tests"][0]["state"] = "failed"
         for name in ("baseline", "candidate"):
             self.write(name + ".json", self.report)
-        self.assertFalse(self.compare()["allTestsPassed"])
+        self.assertFalse(self.compare()["allTestsPassedOrSkipped"])
         self.assertFalse(self.compare()["comparisonVerified"])
 
     def test_per_source_change_fails_even_when_total_matches(self):
@@ -112,6 +113,115 @@ class ComparisonTests(unittest.TestCase):
         self.coverage["/src/AlertList.vue"]["s"]["0"] = 100
         self.write("candidate-coverage/coverage-final.json", self.coverage)
         self.assertTrue(self.compare()["equivalent"])
+
+
+class TrialValidationTests(unittest.TestCase):
+    def setUp(self):
+        tests = [{"id": "1", "name": "case", "mode": "run", "state": "passed"},
+                 {"id": "2", "name": "existing skip", "mode": "skip", "state": "skipped"}]
+        self.sample = {"files": [{"file": "src/a.spec.ts", "project": "jsdom", "pool": "forks", "cases": 2, "caseDigest": proof.case_digest(tests)}]}
+        self.runtime = {"node": "v24.22.0", "vitest": "4.1.11", "availableParallelism": 8, "cpuModels": ["CPU"]}
+        self.report = {"reason": "passed", "errors": [], "runtime": dict(self.runtime), "options": {"maxWorkers": 7, "pool": "forks", "isolate": True, "watch": False, "projects": [{"name": "jsdom", "maxWorkers": 7, "pool": "forks", "isolate": True, "environment": "jsdom"}]}, "records": [{"file": "src/a.spec.ts", "project": "jsdom", "pool": "forks", "tests": tests}]}
+        self.trials = [{"name": name, "workers": workers, "reportVerified": True, "sourceBefore": "hash", "sourceAfter": "hash", "test": {"exit": 0}, "merge": {"exit": 0}} for name, workers in proof.TRIALS]
+
+    def valid(self):
+        return proof.validate_report(self.report, self.sample, 7, self.runtime)
+
+    def test_exact_reference_with_existing_skip_passes(self):
+        self.assertTrue(self.valid())
+        self.assertTrue(proof.verify_trials(self.trials, "hash"))
+
+    def test_omitted_or_reordered_trial_fails(self):
+        self.assertFalse(proof.verify_trials(self.trials[:-1], "hash"))
+        self.assertFalse(proof.verify_trials(list(reversed(self.trials)), "hash"))
+
+    def test_source_drift_fails(self):
+        self.trials[1]["sourceAfter"] = "other"
+        self.assertFalse(proof.verify_trials(self.trials, "hash"))
+
+    def test_runtime_drift_fails(self):
+        self.report["runtime"]["cpuModels"] = ["different"]
+        self.assertFalse(self.valid())
+
+    def test_wrong_runtime_even_on_both_sides_fails(self):
+        self.runtime["node"] = self.report["runtime"]["node"] = "v24.22.1"
+        self.assertFalse(self.valid())
+
+    def test_worker_mismatch_fails_at_root_and_project(self):
+        self.report["options"]["maxWorkers"] = 6
+        self.assertFalse(self.valid())
+        self.report["options"]["maxWorkers"] = 7
+        self.report["options"]["projects"][0]["maxWorkers"] = 6
+        self.assertFalse(self.valid())
+        self.trials[1]["workers"] = 7
+        self.assertFalse(proof.verify_trials(self.trials, "hash"))
+
+    def test_missing_or_duplicate_file_fails(self):
+        record = self.report["records"].pop()
+        self.assertFalse(self.valid())
+        self.report["records"] = [record, record]
+        self.assertFalse(self.valid())
+
+    def test_missing_case_or_changed_disposition_fails(self):
+        self.report["records"][0]["tests"].pop()
+        self.assertFalse(self.valid())
+
+    def test_changed_skip_disposition_fails(self):
+        self.report["records"][0]["tests"][1]["mode"] = "run"
+        self.report["records"][0]["tests"][1]["state"] = "passed"
+        self.assertFalse(self.valid())
+
+    def test_matching_trial_cases_still_require_reference_identity(self):
+        self.report["records"][0]["tests"][0]["name"] = "replaced case"
+        self.assertFalse(self.valid())
+
+    def test_setup_project_or_isolation_changes_fail(self):
+        self.report["options"]["projects"][0]["environment"] = "node"
+        self.assertFalse(self.valid())
+        self.report["options"]["projects"][0]["environment"] = "jsdom"
+        self.report["options"]["isolate"] = False
+        self.assertFalse(self.valid())
+
+    def test_failed_merge_or_unverified_report_fails(self):
+        self.trials[2]["merge"]["exit"] = 1
+        self.assertFalse(proof.verify_trials(self.trials, "hash"))
+        self.trials[2]["merge"]["exit"] = 0
+        self.trials[2]["reportVerified"] = False
+        self.assertFalse(proof.verify_trials(self.trials, "hash"))
+
+
+class ReporterTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("node"), "Node is required for reporter syntax and lifecycle")
+    def test_project_worker_fallback_and_runtime_capture(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "probe").mkdir()
+            (root / "node_modules/vitest").mkdir(parents=True)
+            (root / "node_modules/vitest/package.json").write_text('{"version":"4.1.11"}')
+            (root / "probe/reporter.mjs").write_text('import fs from "node:fs"; import os from "node:os"; import v8 from "node:v8"; const reportedTest=t=>t;\n' + proof.REPORTER)
+            harness = root / "check.mjs"
+            harness.write_text('''import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import Measure from './probe/reporter.mjs';
+const m = new Measure();
+const config = { maxWorkers: 6, pool: 'forks', isolate: true, watch: false };
+m.onInit({ config, vite: { config: { cacheDir: '/cache' } }, projects: [{ name: 'jsdom', config: { ...config, maxWorkers: undefined, environment: 'jsdom' }, vite: { config: { cacheDir: '/cache/jsdom' } } }] });
+m.onTestRunStart(); m.onTestModuleEnd(); m.onCoverage();
+const test = { id: '1', name: 'case', mode: 'run', state: 'passed' };
+m.onTestCaseResult({ fullName: 'case', result: () => ({ state: 'passed' }) });
+m.onTestRunEnd([{ relativeModuleId: 'src/a.spec.ts', project: { name: 'jsdom' }, toTestSpecification: () => ({ pool: 'forks' }), state: () => 'passed', diagnostic: () => ({}), children: { allTests: () => [test] } }], [], 'passed');
+const report = JSON.parse(fs.readFileSync(process.env.BENCH_REPORT));
+assert.equal(report.options.projects[0].configuredMaxWorkers, null);
+assert.equal(report.options.projects[0].maxWorkers, 6);
+assert.equal(report.options.maxWorkers, 6);
+assert.equal(report.runtime.vitest, '4.1.11');
+assert.ok(report.runtime.heapLimit > 0);
+assert.equal(report.records[0].pool, 'forks');
+assert.equal(report.records[0].tests[0].id, '1');
+assert.ok(report.coverageMs >= report.lastModuleMs);
+assert.equal(JSON.parse(fs.readFileSync(process.env.BENCH_REPORT + '.progress.jsonl')).result.state, 'passed');
+''')
+            subprocess.run([shutil.which("node"), str(harness)], env=os.environ | {"BENCH_REPORT": str(root / "report.json")}, check=True, timeout=10)
 
 
 class CommandTests(unittest.TestCase):

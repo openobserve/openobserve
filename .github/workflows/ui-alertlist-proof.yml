@@ -1,4 +1,4 @@
-name: Isolated AlertList proof
+name: Isolated UI worker-count proof
 
 on:
   push:
@@ -17,20 +17,18 @@ concurrency:
 jobs:
   proof:
     if: github.event.repository.private == false
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubicloud-standard-8
+    timeout-minutes: 28
     defaults:
       run:
         shell: bash
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - name: Initialize proof budget
         timeout-minutes: 1
         run: |
-          printf 'PROOF_EVIDENCE=%s\nPROOF_ARTIFACT=%s\n' "$RUNNER_TEMP/alertlist-evidence" "$RUNNER_TEMP/alertlist-artifact" >> "$GITHUB_ENV"
+          printf 'PROOF_EVIDENCE=%s\nPROOF_ARTIFACT=%s\n' "$RUNNER_TEMP/worker-evidence" "$RUNNER_TEMP/worker-artifact" >> "$GITHUB_ENV"
           printf 'PROOF_JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/alertlist-evidence"
+          mkdir -p "$RUNNER_TEMP/worker-evidence"
 
       - uses: actions/checkout@v5
         id: checkout
@@ -42,13 +40,13 @@ jobs:
       - name: Fetch pinned baseline
         timeout-minutes: 2
         run: |
-          timeout --signal=TERM --kill-after=10s 90s git fetch --no-tags --depth=1 --no-recurse-submodules origin 3960df0f12760f4e8628a5a9104fef65048ff369
-          test "$(git rev-parse FETCH_HEAD)" = 3960df0f12760f4e8628a5a9104fef65048ff369
+          timeout --signal=TERM --kill-after=10s 90s git fetch --no-tags --depth=1 --no-recurse-submodules origin 743990d3839a4fa8de4f3fcf31b8d7ca3f00c282
+          test "$(git rev-parse FETCH_HEAD)" = 743990d3839a4fa8de4f3fcf31b8d7ca3f00c282
 
       - name: Verify pinned source and record runner
         timeout-minutes: 1
         run: |
-          test "$(git rev-parse HEAD:web)" = d51379f81d6f4521be4ae1bfe69fc6c5dba4a17d
+          test "$(git rev-parse HEAD:web)" = 337d85bc38dec7e0e17afea5108d96d4b4a2c0c0
           test -z "$(git status --porcelain -- web)"
           {
             git rev-parse HEAD
@@ -79,7 +77,7 @@ jobs:
           { node --version; npm --version; } > "$PROOF_EVIDENCE/runtime.txt"
           /usr/bin/time -v -o "$PROOF_EVIDENCE/install-resources.txt" npm ci 2>&1 | tee "$PROOF_EVIDENCE/install.log"
 
-      - name: Compare frozen fixtures with real covered blobs
+      - name: Compare 7-6-6-7 workers with real covered blobs
         timeout-minutes: 24
         run: |
           remaining=$((1440 - $(date +%s) + PROOF_JOB_STARTED))
@@ -88,12 +86,10 @@ jobs:
           python3 .github/ui-alertlist-proof/run-proof.py \
             --web web \
             --output "$PROOF_EVIDENCE/proof" \
-            --baseline .github/ui-alertlist-proof/AlertList.baseline.spec.ts \
-            --candidate .github/ui-alertlist-proof/AlertList.candidate.spec.ts \
-            --seed 1729 --test-timeout 240 --merge-timeout 90 --overall-timeout "$remaining" \
+            --test-timeout 240 --merge-timeout 90 --overall-timeout "$remaining" \
             2>&1 | tee "$PROOF_EVIDENCE/proof-driver.log"
 
-      - name: Verify fixture restoration
+      - name: Verify source remains unchanged
         if: always() && steps.checkout.outcome == 'success'
         timeout-minutes: 1
         run: |
@@ -110,7 +106,7 @@ jobs:
         if: always() && steps.checkout.outcome == 'success'
         timeout-minutes: 2
         with:
-          name: isolated-alertlist-proof-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/alertlist-artifact/
+          name: isolated-worker-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-artifact/
           retention-days: 1
           if-no-files-found: error

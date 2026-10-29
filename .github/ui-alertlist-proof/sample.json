@@ -1,0 +1,665 @@
+{
+  "webTree": "337d85bc38dec7e0e17afea5108d96d4b4a2c0c0",
+  "referenceRun": "40860745861",
+  "referenceMerge": "743990d3839a4fa8de4f3fcf31b8d7ca3f00c282",
+  "files": [
+    {
+      "file": "src/components/DateTime.rail.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 51,
+      "caseDigest": "1596fd693516d68da5ebf8fe17ab4e1e11254aa8bba239edc2fa2cf96c7588d3",
+      "sourceSha256": "cc8a3c6eaf97a5cb3cb72022a41a816c7901c946f82324ed915649fee7d58988"
+    },
+    {
+      "file": "src/components/O2AIChat.stream.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 143,
+      "caseDigest": "64bc42257f7ae9f25e8855dc5c5ddfb620d3ea18638d69accd06737ad8a78f06",
+      "sourceSha256": "e8650c5b577e9dec65572a26b41adcec4d7019f89aea3113d114c3d3fbb9f18c"
+    },
+    {
+      "file": "src/components/QueryEditor.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 40,
+      "caseDigest": "5047fc05bff897c88ce8b38e3928c68137b425531e2ddb7bb92f3c9430537dbb",
+      "sourceSha256": "b4cd9d94eaf977775210b6dcbf7188b047b1bde38f35a39df7d1d767a7b7bb25"
+    },
+    {
+      "file": "src/components/alerts/AddAlert.prefill.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 8,
+      "caseDigest": "d6beb86817ee5cdddfc1d470327e4304b39a6d4d7262e8387fa28a22beb56791",
+      "sourceSha256": "fadbe470ebb35b1a13b91b0c036f8731676e2b553a95231122669f991412ba66"
+    },
+    {
+      "file": "src/components/alerts/AlertGroupChart.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 14,
+      "caseDigest": "f59a5b4d73963d00d953e7c755adc6f2b72faa81896f39581c3b8f7c2ccef5a0",
+      "sourceSha256": "67b9e6f51ae97ac000dcdc112bae93ce290d1f8c7f1d005273e666b360fb264c"
+    },
+    {
+      "file": "src/components/alerts/AlertList.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 117,
+      "caseDigest": "f0e02eef22e029c9a7b8a739007eb882d10418ad7fa2d19740107175964d1bc5",
+      "sourceSha256": "82bfaec613aae3405ad9ea3575c7672be224c2aef47e6fb33ad5342ca774ae63"
+    },
+    {
+      "file": "src/components/alerts/AlertListSlo.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 26,
+      "caseDigest": "bc710e8d66af5c69da29b02c2b1d138572ee99965d28ec32d744b7893e652137",
+      "sourceSha256": "9a1fc52225362a7d5c42e095b81dd9855188b55a73d51bef0a316eee1f8e04dd"
+    },
+    {
+      "file": "src/components/alerts/FilterCondition.suggest.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 3,
+      "caseDigest": "baf67ec44a1fe4b89806bdb828c5e2345815898e08e5852a1065337be835cc78",
+      "sourceSha256": "62fcef181dc739807e010002ae973cf17ac0207cc6f9ed12d9ca38c4eaa49ebf"
+    },
+    {
+      "file": "src/components/alerts/QueryEditorDialog.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 49,
+      "caseDigest": "97a47d06c3882736ccf21a81cab93434537cd66a03b0f316915f82f5a60b629b",
+      "sourceSha256": "3155b70420881047b63ebe0af8ecffb383ba3eb59d21ed9d7695a223947d1640"
+    },
+    {
+      "file": "src/components/dashboards/SelectDashboardDropdown.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 24,
+      "caseDigest": "21f5f230d0aa306d3cb2d985b7bb8ff3851d9002d6b101e602e944250b2374f4",
+      "sourceSha256": "25f678494962deb11388a0e535c3faa564d2bfecbb869195502a9fb9b57a6a70"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/ConfigPanel.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 250,
+      "caseDigest": "660ff518c4fb4a9dd5fe737d1ea30fad6b640c08f7ad07793b79c69151ee6f58",
+      "sourceSha256": "9f5f89e9fc299db315276f57d84fbf0ce712492c486bd99be97aad1a90008a16"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/ConfigPanel.thresholds.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 26,
+      "caseDigest": "64516095e0a607a8269d00049a3d92bcf53c9e745961f33b401e5aa644cd76c5",
+      "sourceSha256": "b533de1e6e96a239738579d7324695aa6f4f5291654b88f3103bd76a2a16645f"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/Drilldown.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 47,
+      "caseDigest": "2ab7baa0c9a012e41cd9a8abb700c9ee4cf1708d956e6cfd0df2a032f09fdd02",
+      "sourceSha256": "de9cc2d163f776b5da2d512f7c43d5cfe0926d4cb00bfe6774897cacddf306ab"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/DrilldownUserGuide.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 44,
+      "caseDigest": "54e654fa78bda79461a6104ec8f714470ce8b1dab251e3d501b70c05694ed3ad",
+      "sourceSha256": "82bce2af5786c4edbd95c1d1454aef9795da3e06a65d7f3624ca8a7b3691fd2d"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/MarkLineConfig.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 36,
+      "caseDigest": "49c7a9ba3f99a8835be34a4a2e2906e84d43ff9136290432e92942f5df32f55e",
+      "sourceSha256": "3cd87ed5f67d9671a90077986a5193d8d0fb034d326e28c16dc99e78dbb36d75"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/SortByBtnGrp.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 29,
+      "caseDigest": "44f491791de85a5c6cd4a9b96fd7434d893f56a37e7147fc42593caa959ce468",
+      "sourceSha256": "1232860bb2f571c6a18d09d318d00fefbfd23c7b8017b8efbddd28e9b6f289cd"
+    },
+    {
+      "file": "src/components/fleet/FleetCollectorMetrics.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 7,
+      "caseDigest": "965983d604a2250038f97355c57342c7b7bbe78dc53ff6fd5a66cd01b320e4e2",
+      "sourceSha256": "92c3c96d8dc739b2b8eec574695aadab1bcebfde581a3032e7ef0fea071f5855"
+    },
+    {
+      "file": "src/components/fleet/FleetOverview.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 3,
+      "caseDigest": "a7233ebede0c72bdef00842bf6ddd6132fb0cf4fa3ceac6a0188e78ee5ffb4a1",
+      "sourceSha256": "1a01dbe714613207e4793c20e0b9301bd0997699c43cb2c67c45043589050736"
+    },
+    {
+      "file": "src/components/fleet/FleetTokens.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 41,
+      "caseDigest": "f923bdce5a844db0cf6b625b0bbec9700442043662c6f7eb334a9aaf59dce425",
+      "sourceSha256": "7721504736f020eccacb98704ae63074c27f017822456b8feaa55a5e130a2f60"
+    },
+    {
+      "file": "src/components/functions/AddFunction.spec.js",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 25,
+      "caseDigest": "9727209abe70f09360e5db76c7c7b1fd3df66fbfa40bff8e7871dc0f9cfffd23",
+      "sourceSha256": "53e3a4e892c77ac7ab0ff919f28fbd44aac20e6608d386f1f763ea8fa924cabc"
+    },
+    {
+      "file": "src/components/functions/EnrichmentTableList.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 42,
+      "caseDigest": "4b4b8033b20381de39ba5b6994387dd99d30d2f6b2fa70a98f303c2e30f8f969",
+      "sourceSha256": "adf38a0b9aaf8a47623e14c53277b905c9957e59e51b7739d4450d7155869b9b"
+    },
+    {
+      "file": "src/components/functions/FunctionList.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 66,
+      "caseDigest": "ccb3ea720361609913839c061c327c3d2dbdb577f0b3048e4c888b33e69d19cf",
+      "sourceSha256": "68588e99d83e84ff4156b34c3129da06660bd9e6d75ee9a4ec81a3ead31d0c21"
+    },
+    {
+      "file": "src/components/iam/roles/EditRole.spec.js",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 227,
+      "caseDigest": "0765900577ebb8b7e24b5cfa6b3df20994f92d3256a9851f21910fd8bb5cd638",
+      "sourceSha256": "dd6dbea943efabe6a9050a367534a7a184ca53ce9bf078d68903654c1575b23d"
+    },
+    {
+      "file": "src/components/ingestion/servers/Nginx.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 6,
+      "caseDigest": "e5d70f1c0ca4e827bd2949573cf667425000ae905ecc4dd0d80fa07417f614ef",
+      "sourceSha256": "12bdfbf431968e64336faa069a64e863ebfb617b9761cb55ec174632b60e1524"
+    },
+    {
+      "file": "src/components/login/Login.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 63,
+      "caseDigest": "c0ee99f727995c66ca65d735624699ca80e2922acddb619bbd026a09115131d4",
+      "sourceSha256": "2a0a648a015375a4c4ecd941d8263fc69f2d189695abb3db59488b19c719c61c"
+    },
+    {
+      "file": "src/components/logstream/Schema.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 178,
+      "caseDigest": "bfd46424df47c1c05dbabd63924948b9a550684afc8cfc3988b454c1b8113dbd",
+      "sourceSha256": "8a66155364a6d1b8cf2d2939e3f8723500c61c2c3d312c7b23d1f007e7ca3899"
+    },
+    {
+      "file": "src/components/oncall/OnCallRuleEditor.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 27,
+      "caseDigest": "8deffa22e3db95c50b9abd117bfe3e9d68ea0705fd22c06a45c946861062a3e9",
+      "sourceSha256": "ef98f0bd4c5035ff04897006f7719b11483fed484045290702a052c622c7978f"
+    },
+    {
+      "file": "src/components/oncall/OnCallTeamAttention.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 26,
+      "caseDigest": "fd6d3b72a90b1068279567551690371590347c1073dd5f866e8c2d1cf6879875",
+      "sourceSha256": "0fdd151ea4954dcbaf16f4bbd1de5a6d1da73376e9d6071933e27cf073ff52b6"
+    },
+    {
+      "file": "src/components/pipeline/NodeForm/ConditionOrOperator.spec.js",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 34,
+      "caseDigest": "4ad6ca0ef7bc228ab5e05076902f98da64701fb3925b99d3378049b823c64316",
+      "sourceSha256": "9a5e684385c91458bc20eea911085e0267ed426e6e67a7ce1ee4d0d992a42b32"
+    },
+    {
+      "file": "src/components/rum/errorTracking/view/ErrorHeader.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 22,
+      "caseDigest": "4b5f2e9a791d80e635508723af0cdba3dee31c532ce2037bbbe80c633a61632f",
+      "sourceSha256": "048d6778601b5c133732d7ac01323a5ec6879d32264d23d4f2eae525729a5612"
+    },
+    {
+      "file": "src/components/rum/errorTracking/view/ErrorImpactStrip.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 10,
+      "caseDigest": "54556d3ed8ac368fe4beb65c2e12b6806371ce5b21e34dfc322f563820d58ef4",
+      "sourceSha256": "8098b430c4579ce0d751d65e47988043fbb7675c6bff8a0e47b80bb41ac0dd48"
+    },
+    {
+      "file": "src/components/rum/productAnalytics/AnalyticsFunnels.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 85,
+      "caseDigest": "26225fe4239339f58067d92439ab2d66de174d872ec6dc64aeac4b85d321200d",
+      "sourceSha256": "494b43be2f2132c68e067caca06c640aaea34f269bdf81439cb1c0b1c5642401"
+    },
+    {
+      "file": "src/components/rum/productAnalytics/SavedFunnelsPage.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 28,
+      "caseDigest": "56fc8f3b0fd51ebafec3b540a49ae26632d33a12df3c8da0ffab2c70420a7112",
+      "sourceSha256": "d925b0f4950baf09e688b17cb877dee363f5261c58493376ab03b449174d7983"
+    },
+    {
+      "file": "src/components/rum/productAnalytics/funnelParts/funnelFilterParts.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 21,
+      "caseDigest": "55738acfec047e383b2a9ba960a4cfad778867e1145d3576a196e6a0b4151565",
+      "sourceSha256": "b931298df2ea54531c2f4c178930f7da4fc497e67e463de0740d89a433e7bb41"
+    },
+    {
+      "file": "src/components/rum/sessionReplay/SessionLocationColumn.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 17,
+      "caseDigest": "42f27c9c67001702b3e2a2c741277644765c42e123772748e2172abcd1c64deb",
+      "sourceSha256": "48dc37ffa0a664ca9bf46741d40bd918ca297fe8ddab7b9f5fb1aeabf56553b4"
+    },
+    {
+      "file": "src/components/settings/LinkedAccountsDialog.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 5,
+      "caseDigest": "4de710517389f6dd0969378efca84cb6ef8ec208b94d238c57febbc21de3014a",
+      "sourceSha256": "723f4239dbccec0e9d2395cc6af4b51c2aa81ef06aad8fd62ed66d63f1bc3848"
+    },
+    {
+      "file": "src/components/settings/ModelPricingList.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 100,
+      "caseDigest": "30b4274edade0e9b21ba7d06f48df61b8c180c0c5eda7ca9c2269274fa70393e",
+      "sourceSha256": "c9504cfda167b4a8ad93e26379a6c00a673f5d727420d0946adabc8ad08a4daf"
+    },
+    {
+      "file": "src/components/settings/SlackLinkingSection.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 15,
+      "caseDigest": "056df1b854e4b5deb6a45c63a09ed95f463e815b92b6e15aa7ef05d965e71615",
+      "sourceSha256": "acceee59d777c424dc2ca47053f4b2c0838fe9cdf11dadc06014de7ad0c891f4"
+    },
+    {
+      "file": "src/enterprise/components/AIObservability/ExperimentForm.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 41,
+      "caseDigest": "1aa6d9f4b1404fd56e30e7c0d6528fc988b2f64d88b994a0874ef677bd909c67",
+      "sourceSha256": "019c3d224729d257df0f0a674658edce8e920773c21195cd89f70781aff46529"
+    },
+    {
+      "file": "src/enterprise/components/OnlineEvals.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 8,
+      "caseDigest": "fa631c8be9881accbca5350622afb17702e1e8dff51ac362622f53ced19e291b",
+      "sourceSha256": "4f88d5fa2b6b280ba2178c3b351a58254628762763a8a60379a371074858f519"
+    },
+    {
+      "file": "src/layouts/MainLayout.nav.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 10,
+      "caseDigest": "cc65548c6164a69cb65cb579c11926a6affc4e5e6f19f4534e4e72c0307ba8f5",
+      "sourceSha256": "30bc9e55c5757b99c06cb4f9784c15b9feebd86d9991c6108a1f142f8441d7ad"
+    },
+    {
+      "file": "src/plugins/correlation/CorrelatedLogsTable.viewTrace.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 2,
+      "caseDigest": "cf857a1461be3217b9ac27a4502f4e502296859a26c9ff90237158e9c79ff576",
+      "sourceSha256": "adea10a8069ed5c8dc7a33135b8577961f94e0737eca31d6c4c645d048b4238d"
+    },
+    {
+      "file": "src/plugins/logs/Index.buildParserLoad.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 1,
+      "caseDigest": "63f8ddbd15fe813fe6a022b3f5508ffa808d5d5bac983ada3b419b7b17c3e99d",
+      "sourceSha256": "ea165889ce88e01289a02e974780ae5d1e2f53d28e71005d9e897042871eb4c8"
+    },
+    {
+      "file": "src/plugins/logs/Index.permalink.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 8,
+      "caseDigest": "28d8878aadd721aa4a4564151130e09d009da8462966f3a138083c615b5f9315",
+      "sourceSha256": "2a2b1d37d75c75f81c00ad2a5116719a6bcba7a6b66caa4243cc58b9b409753e"
+    },
+    {
+      "file": "src/plugins/logs/SearchBar.heldFilter.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 4,
+      "caseDigest": "dd904ede4f586303e78b0fed61302d26bcfb7a264ada6cdc79c94b540d1c9dd0",
+      "sourceSha256": "74b1654d9a7bf54f5806e8b33d80605b4ddc6de98f6357a21da640f9af53b087"
+    },
+    {
+      "file": "src/plugins/logs/SearchBar.sessionValues.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 1,
+      "caseDigest": "4d0ae5eb08d90e122f86ceb67916f30df3d0d4427efa4bb2049d1fba759f4db6",
+      "sourceSha256": "f36e3319c1d1abe1d3ca5c1ffc56ab699e976a3400e17b44a340d04626261ea8"
+    },
+    {
+      "file": "src/plugins/logs/SearchHistory.spec.js",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 29,
+      "caseDigest": "226666986622643a6b762198d9466dcee8b3001ad5b80cefa39e13de94b68b6a",
+      "sourceSha256": "eb2e14ecfa6bfa3ccae6d61d6b80ec134317af4e1b3b0bf2ff7da405c4326beb"
+    },
+    {
+      "file": "src/plugins/logs/SearchResult.jk.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 27,
+      "caseDigest": "458fe118337ed3d972c9a09b3cc9f70bd86b69383d4119558095eee0fabd3e30",
+      "sourceSha256": "e392b1c5a311c2e8a182310079b81d3cf0af15806a5cd7b7032a73308acfd4d6"
+    },
+    {
+      "file": "src/plugins/logs/SearchResult.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 109,
+      "caseDigest": "85224bb8fdd2fb58cf6b19bdbec9c327d36a132b669b78138b8f709e9e26e1a2",
+      "sourceSha256": "be19029430fef03e19cc55428fd1736bd4d3cc6b0796df7cea6f0931f5399bbf"
+    },
+    {
+      "file": "src/plugins/logs/SearchSchedulersList.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 74,
+      "caseDigest": "e086282ff3bba1323b4ff0e17708e61ecf139a5e8320191b8d1e7330b92f3339",
+      "sourceSha256": "4478605a8fb94122e4e2c3a2b789915d817f644ef6ea6259bcc0ff9353edd5a4"
+    },
+    {
+      "file": "src/plugins/metrics/explorer/MetricBreakdown.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 102,
+      "caseDigest": "6b7a1505d9dd129139af3563061fd53625120d321b5ccfce151cae3bc84cf205",
+      "sourceSha256": "7ff42f188fd46896b764d439ba6edd1d9e2b97d4907c58b2222001d3be9c462e"
+    },
+    {
+      "file": "src/plugins/metrics/explorer/MetricCard.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 47,
+      "caseDigest": "02a4e4053fb3045dc75be1cbc0f974152ada64fec6bf9c4ec8ae1ad2b2cd8725",
+      "sourceSha256": "ba6bbee343a16c115e91611c06407a40cc2d98f8e4c8190664694d30900b2c36"
+    },
+    {
+      "file": "src/plugins/profiles/Index.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 71,
+      "caseDigest": "4e679d614b8a52a6f7fa013e7c7859cf62fbf43ad878d6c7663cd439046c1bb5",
+      "sourceSha256": "59552554ad5b13a405181fe1aca6fb1e185fd2217d9573c72720855c475236f1"
+    },
+    {
+      "file": "src/plugins/traces/Index.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 135,
+      "caseDigest": "6ac619161cb58b5b9dbd2d65b1d57a7b3686a588f20e432f71e4ddf423c694df",
+      "sourceSha256": "e264cbf61b332bd367231887abdff4330a067c4b315dfbab821fd4058fac19e5"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 175,
+      "caseDigest": "5cdf9ad2e2eb18a3c80be96230cd4e3f5746243075ace07f7211bbb5928ccecf",
+      "sourceSha256": "4b3de9acc363fc23ff0e78684795b4e9018cdd9366065c8ff8173390df5dc947"
+    },
+    {
+      "file": "src/plugins/workflows/nodes/WorkflowBranch.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 26,
+      "caseDigest": "a42251d56c10e9c6bd170b19496e58e3d7ea5e6825f4986d73922195381c28e4",
+      "sourceSha256": "06082617fcff9baf38740be15192e48dd29acc0a49e260c5b106a448b7f50eb1"
+    },
+    {
+      "file": "src/test/unit/HomeView.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 29,
+      "caseDigest": "8639cc7bee5afd6c0e44d4b01e426c85cf7077dc8250ae99fed6a1c8af4794cf",
+      "sourceSha256": "3e97230eacf43d09449d34e606bcf3429421150a9457c74038c2ba2876194cb2"
+    },
+    {
+      "file": "src/test/unit/plugins/pipelines/CustomNode.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 19,
+      "caseDigest": "812718daa0b2c27ffa3bfe5756d6ca71bcf37a455c76f93f9a8388b8ed39ea4e",
+      "sourceSha256": "775af7a965e8df621f29a810ebe811f194faf2f59f76a9c5429901f7321c40c7"
+    },
+    {
+      "file": "src/utils/alertSourceStatus.spec.ts",
+      "project": "node",
+      "pool": "forks",
+      "cases": 6,
+      "caseDigest": "827da829d84de0f1c744927bc4378cd8f9875728d87c4226d4f26ebe4d25f0bc",
+      "sourceSha256": "24de97d6787e4fbb28c8e5cf887342edcec8ceaa3b6fee9b467f70997ae43ede"
+    },
+    {
+      "file": "src/utils/cookies.spec.ts",
+      "project": "node",
+      "pool": "forks",
+      "cases": 31,
+      "caseDigest": "9865792854286fbc0e97c340f91a0b72ff6622e3cbbf39e10cb9e38f229ad036",
+      "sourceSha256": "c6ededba3072473787181af6fb297f2bf7af70ef8cde41f71d38040f750bfb03"
+    },
+    {
+      "file": "src/utils/csv.spec.ts",
+      "project": "node",
+      "pool": "forks",
+      "cases": 9,
+      "caseDigest": "282451ba0c169258fd16cfc21b126c066617d46298eaa0969a129a5f57d3af83",
+      "sourceSha256": "646fff32558d1d49e74a92991511214be050825e23ace95e49cb0c56786d70d0"
+    },
+    {
+      "file": "src/utils/dashboard/seriesOverrides.builders.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 75,
+      "caseDigest": "193ba9477a1058accb89571575842280d9b6346f0d8a237e66b751951ce47005",
+      "sourceSha256": "6da37b9774355f2af6f73335ae0d3da95eb050badba40d8b5e0a456f2aca21b0"
+    },
+    {
+      "file": "src/utils/dateTimeRangeParse.spec.ts",
+      "project": "node",
+      "pool": "forks",
+      "cases": 78,
+      "caseDigest": "095f800a9c1cb71d2e3f6a388924424ad74458b975ebdad59f36b45d76ad4e68",
+      "sourceSha256": "7f51af729dd5363a4ba765f05cbb84124150796baed88ffdc7582dbde8065cab"
+    },
+    {
+      "file": "src/utils/query/sqlDiagnostics.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 127,
+      "caseDigest": "5d2d1246185149d8601438dca1da569962bd6f54652247c6a32aab656597477e",
+      "sourceSha256": "39fcd0ac46c670b7e6d65e751e491d109eb2d9b6a3c57b8084d259e54fca916e"
+    },
+    {
+      "file": "src/views/AlertLibrary/AlertLibrary.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 89,
+      "caseDigest": "884e6a720c78e67daf234bc677df76c52a162010a8e0d7eb28c11c45aa842b5e",
+      "sourceSha256": "eade8813c55f5240873be3e158dcf2501a9beab20f884e257b0b5546da108613"
+    },
+    {
+      "file": "src/views/AzureMarketplaceSetup.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 20,
+      "caseDigest": "473a4c5139d5a5506283f8e84044fd0cbd79b35eb0fa69b03ebba858f4e674fa",
+      "sourceSha256": "782c6a48b09b98d4c461d1527084c5b0d17ccd35966a914ae4445c666178ac49"
+    },
+    {
+      "file": "src/views/IdentityAccessManagement.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 62,
+      "caseDigest": "8b627b53f399149f98454029d7be5cf5f1d669dee349b68c8c4820ac0ce10b57",
+      "sourceSha256": "9fd8440c3d4e62dda1823f6256b247fb055dcebc9e1ec1e7c9e8655f4f6499b5"
+    },
+    {
+      "file": "src/views/Infrastructure/HostDetailDrawer.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 37,
+      "caseDigest": "f018d3580abfce8da06ec1b17104bd83ec8a6559c1060b6797335a5eefe4d1cf",
+      "sourceSha256": "f0dde7e870556b1ce37915d90c1ce154cf0bc7dca0b5cb810331bb7382a4650c"
+    },
+    {
+      "file": "src/views/Infrastructure/kubernetes2/MapView.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 75,
+      "caseDigest": "1bfa315c2c3015d609fa488df040d75b5605908899830a1e8b30c782e829f8ca",
+      "sourceSha256": "4cbaff2ca806d5cf2cab354897679e5b01fb4479152810c2a8c9a2865fd5803b"
+    },
+    {
+      "file": "src/views/Infrastructure/kubernetes2/k8sDock.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 9,
+      "caseDigest": "5d4b3c1f0409c85443363ad4abb3b25b2b9740761e5df2c98411edebdd0089a9",
+      "sourceSha256": "55786c86fb164ccc0b941ba37e0ae235874c17ed75a602ea883358e7a489a8f2"
+    },
+    {
+      "file": "src/views/LogStream.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 83,
+      "caseDigest": "0401216698481cc5f3ba98bc36391fa8649ee885321a7d93872e330fb1eea333",
+      "sourceSha256": "bf86fc398a63ecdbed7f8fcbe1edc466e2bde00193fc248aebe6e54245f5f835"
+    },
+    {
+      "file": "src/views/RUM/AppAnalytics.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 70,
+      "caseDigest": "d5ec9cffd1f8cb325fcf4b69a0651135f784015781f27fb0cb115fb5ef971f99",
+      "sourceSha256": "aa045c92e670e3b8a86ebb5712a0f6999cc859da0eaa87f60f146e34f96bd6f5"
+    },
+    {
+      "file": "src/views/RUM/NamedEventEditor.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 27,
+      "caseDigest": "b446d7842714c4e99705a1d6ce9726d38ad7a9580053e0c2ce9cca26660f2ffb",
+      "sourceSha256": "b097a80547e0511255fa2c7ab97f519c0062a1673bb178d61f371d603faabdec"
+    },
+    {
+      "file": "src/views/alerts/AlertDetail.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 44,
+      "caseDigest": "fac43c07c0c15de48d90af0567ed5ce6ef6223499e9f7abc29cbb2de53fac644",
+      "sourceSha256": "7664760db1eb92e533cda11534fe77c4dea647a25f54c1c5cb5c959c292441c0"
+    },
+    {
+      "file": "src/views/synthetics/MonitorResults.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 20,
+      "caseDigest": "63a6f5dc88e49b8cdaff01967eca77e66be0ad067a5125229510b7f381cd6f5c",
+      "sourceSha256": "28649b86f7ea09ccdf7f7bf9ac3f84fd0aee50110222c8d9462212a78e922b3e"
+    },
+    {
+      "file": "src/views/synthetics/MonitorRuns.spec.ts",
+      "project": "jsdom",
+      "pool": "forks",
+      "cases": 37,
+      "caseDigest": "024c15bba292698711fdf83f145188d25602e0775683e3ed67524b930c4fd2d5",
+      "sourceSha256": "b2e1ac95d0050e7db941bd930b77368489c69c117166a3267e7b32e7cb522ce6"
+    }
+  ],
+  "selection": {
+    "baseFiles": 48,
+    "addedMediumFiles": [
+      "src/components/alerts/AddAlert.prefill.spec.ts",
+      "src/components/iam/roles/EditRole.spec.js",
+      "src/plugins/logs/SearchResult.jk.spec.ts",
+      "src/components/fleet/FleetTokens.spec.ts",
+      "src/views/LogStream.spec.ts",
+      "src/components/alerts/AlertListSlo.spec.ts",
+      "src/plugins/logs/SearchResult.spec.ts",
+      "src/components/functions/FunctionList.spec.ts",
+      "src/views/RUM/AppAnalytics.spec.ts",
+      "src/components/rum/productAnalytics/AnalyticsFunnels.spec.ts",
+      "src/components/alerts/QueryEditorDialog.spec.ts",
+      "src/views/RUM/NamedEventEditor.spec.ts",
+      "src/components/functions/EnrichmentTableList.spec.ts",
+      "src/plugins/metrics/explorer/MetricBreakdown.spec.ts",
+      "src/components/DateTime.rail.spec.ts",
+      "src/components/rum/productAnalytics/SavedFunnelsPage.spec.ts",
+      "src/views/alerts/AlertDetail.spec.ts",
+      "src/components/O2AIChat.stream.spec.ts",
+      "src/components/settings/ModelPricingList.spec.ts",
+      "src/components/dashboards/addPanel/ConfigPanel.thresholds.spec.ts",
+      "src/views/AlertLibrary/AlertLibrary.spec.ts",
+      "src/utils/query/sqlDiagnostics.spec.ts",
+      "src/plugins/logs/Index.permalink.spec.ts",
+      "src/plugins/traces/Index.spec.ts",
+      "src/plugins/profiles/Index.spec.ts",
+      "src/enterprise/components/AIObservability/ExperimentForm.spec.ts",
+      "src/views/Infrastructure/kubernetes2/MapView.spec.ts",
+      "src/plugins/logs/SearchSchedulersList.spec.ts"
+    ],
+    "criterion": "Smallest20\u201332 additions with aggregate elapsed file phases/(7*longest file phases)>=1.25 in both saved runs; medium r2 phase10\u201330s,test2\u201320s;rank by min(r1,r2) phases",
+    "phaseKeys": [
+      "duration",
+      "collectDuration",
+      "setupDuration",
+      "environmentSetupDuration",
+      "prepareDuration"
+    ],
+    "r1": {
+      "sumSeconds": 594.048481152,
+      "longestSeconds": 67.375909287
+    },
+    "r2": {
+      "sumSeconds": 920.3569368010001,
+      "longestSeconds": 90.102924138
+    },
+    "limitation": "Summed overlapping diagnostics are a queue-density heuristic, not CPU time or wall forecast"
+  }
+}
