@@ -240,6 +240,8 @@ export default class DashboardPanelConfigs {
     this.legendWidthUnitInactive = page.locator('[data-test="dashboard-config-legend-width-unit-inactive"]');
     this.legendHeightUnitActive = page.locator('[data-test="dashboard-config-legend-height-unit-active"]');
     this.legendHeightUnitInactive = page.locator('[data-test="dashboard-config-legend-height-unit-inactive"]');
+    // Pie/donut only: multi-select toggle group with "value" and "percent" items
+    this.legendValues = page.locator('[data-test="dashboard-config-legend-values"]');
 
     // Gauge & Maps
     this.geomapRenderer = page.locator('[data-test="dashboard-geomap-renderer"]');
@@ -419,6 +421,83 @@ export default class DashboardPanelConfigs {
   // dropdown trigger to open.
   async legendPosition(position) {
     await this._clickVirtualOption("dashboard-config-legend-position", position);
+  }
+
+  // Select legend type ("Auto" | "Plain" | "Scroll"). OToggleGroup, items always rendered.
+  async selectLegendsType(type) {
+    await this._clickVirtualOption("dashboard-config-legends-scrollable", type);
+  }
+
+  /**
+   * Legend values toggle item for a pie/donut panel.
+   * @param {"value"|"percent"} key - the item's value, carried in data-test-label
+   */
+  getLegendValuesOption(key) {
+    return this.page.locator(
+      `[data-test="dashboard-config-legend-values-option"][data-test-label="${key}"]`
+    );
+  }
+
+  /**
+   * Bring the Legend values toggle group to exactly the given selection.
+   * Clicks only the items whose state differs, then waits for each to reflect it.
+   * @param {Array<"value"|"percent">} keys - items that should end up pressed
+   */
+  async setLegendValues(keys) {
+    await this.scrollSidebarToElement(this.legendValues);
+    for (const key of ["value", "percent"]) {
+      const option = this.getLegendValuesOption(key);
+      const wanted = keys.includes(key) ? "on" : "off";
+      if ((await option.getAttribute("data-state")) !== wanted) {
+        await option.click();
+      }
+      await expect(option).toHaveAttribute("data-state", wanted, { timeout: 5000 });
+    }
+  }
+
+  /** Flip the Show Legends switch. */
+  async toggleShowLegends() {
+    await this.showLegend.click();
+  }
+
+  /**
+   * Assert the Legend values control is shown (both items) or absent.
+   * @param {boolean} visible
+   */
+  async expectLegendValuesVisible(visible = true) {
+    if (!visible) {
+      await expect(this.legendValues).toBeHidden();
+      return;
+    }
+    await this.scrollSidebarToElement(this.legendValues);
+    await expect(this.getLegendValuesOption("value")).toBeVisible();
+    await expect(this.getLegendValuesOption("percent")).toBeVisible();
+  }
+
+  /**
+   * Assert the PromQL Aggregation Function selector is shown or hidden.
+   * @param {boolean} visible
+   */
+  async expectAggregationVisible(visible = true) {
+    if (visible) {
+      await expect(this.aggregation).toBeVisible();
+    } else {
+      await expect(this.aggregation).toBeHidden();
+    }
+  }
+
+  /**
+   * Assert the Legend values toggle group shows exactly the given selection.
+   * @param {Array<"value"|"percent">} keys - items expected to be pressed
+   */
+  async expectLegendValuesSelected(keys) {
+    await this.scrollSidebarToElement(this.legendValues);
+    for (const key of ["value", "percent"]) {
+      await expect(this.getLegendValuesOption(key)).toHaveAttribute(
+        "data-state",
+        keys.includes(key) ? "on" : "off"
+      );
+    }
   }
 
   // Select chart alignment ("Auto" | "Left" | "Center"). Same OToggleGroup shape as

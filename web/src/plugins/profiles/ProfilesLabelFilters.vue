@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-bind="item.filter ? { radius: 'sm', divided: true } : {}"
       :class="
         item.filter
-          ? 'border-border-default bg-surface-panel overflow-hidden border [&>*:not(:first-child)]:!border-s'
+          ? 'border-border-default bg-surface-panel overflow-hidden border [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s'
           : 'flex'
       "
       :data-test="item.filter ? `profiles-filter-chip-${item.filter.key}` : undefined"
