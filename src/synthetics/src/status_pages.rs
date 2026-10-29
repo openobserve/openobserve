@@ -186,6 +186,95 @@ struct RebuilderState {
     /// Highest `updated_at` consumed so far (the delta watermark).
     watermark: i64,
     tick_count: u64,
+    /// Per check, the `last_triggered_at` of the last run this loop counted.
+    seen_runs: HashMap<String, i64>,
+}
+
+/// Records one tick's view of a check and says whether it is a new result.
+///
+/// Streaks count RUNS, not rebuild ticks: the rebuilder ticks far more often
+/// than most checks run, so counting ticks confirmed a single DOWN as three
+/// failures. `CheckStateRow` carries no result timestamp, so the run marker is
+/// `last_triggered_at` (set when the scheduler fans out a run). A changed value
+/// means at least one new run since the last count; the status read alongside
+/// it may still be the previous run's, so counting can lag by one run but
+/// never multiplies.
+fn observe_run(
+    down_streaks: &mut HashMap<String, i32>,
+    seen_runs: &mut HashMap<String, i64>,
+    s: &table::CheckStateRow,
+) -> bool {
+    let fresh = seen_runs.insert(s.id.clone(), s.last_triggered_at) != Some(s.last_triggered_at);
+    if s.last_check_status == engine::CHECK_STATUS_DOWN {
+        if fresh {
+            *down_streaks.entry(s.id.clone()).or_insert(0) += 1;
+        }
+    } else {
+        down_streaks.remove(&s.id);
+    }
+    fresh
+}
+
+/// Per-check thresholds from the pages the check is mapped to. A check on
+/// several pages uses the STRICTEST settings (max of each value), so one
+/// result stream never opens or resolves an org-wide notice earlier than any
+/// of its pages allows.
+fn thresholds_by_check(data: &TickData) -> HashMap<String, engine::Thresholds> {
+    let page_of_component: HashMap<&str, &str> = data
+        .components
+        .iter()
+        .map(|c| (c.id.as_str(), c.status_page_id.as_str()))
+        .collect();
+    let page_th: HashMap<&str, engine::Thresholds> = data
+        .pages
+        .iter()
+        .map(|p| (p.id.as_str(), page_thresholds(p)))
+        .collect();
+    let mut out: HashMap<String, engine::Thresholds> = HashMap::new();
+    for m in &data.mappings {
+        let Some(th) = page_of_component
+            .get(m.component_id.as_str())
+            .and_then(|pid| page_th.get(pid))
+        else {
+            continue;
+        };
+        out.entry(m.synthetics_id.clone())
+            .and_modify(|cur| *cur = strictest(*cur, *th))
+            .or_insert(*th);
+    }
+    out
+}
+
+fn page_thresholds(p: &infra::table::entity::status_pages::Model) -> engine::Thresholds {
+    let d = engine::Thresholds::default();
+    engine::Thresholds {
+        confirm_failures: if p.confirm_failures > 0 {
+            p.confirm_failures
+        } else {
+            d.confirm_failures
+        },
+        confirm_recovery: if p.confirm_recovery > 0 {
+            p.confirm_recovery
+        } else {
+            d.confirm_recovery
+        },
+        confirm_after_micros: p
+            .confirm_after_secs
+            .filter(|s| *s > 0)
+            .and_then(|s| (s as i64).checked_mul(1_000_000)),
+    }
+}
+
+fn strictest(a: engine::Thresholds, b: engine::Thresholds) -> engine::Thresholds {
+    engine::Thresholds {
+        confirm_failures: a.confirm_failures.max(b.confirm_failures),
+        confirm_recovery: a.confirm_recovery.max(b.confirm_recovery),
+        // Only time-confirm when every page allows it; then the longest wait.
+        confirm_after_micros: match (a.confirm_after_micros, b.confirm_after_micros) {
+            (Some(x), Some(y)) => Some(x.max(y)),
+            _ => None,
+        },
+    }
 }
 
 async fn tick(
@@ -196,14 +285,15 @@ async fn tick(
     let conn = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let data = load(conn, now, rt).await?;
+    let mut fresh: HashSet<String> = HashSet::new();
+    rt.seen_runs
+        .retain(|id, _| data.states.iter().any(|s| &s.id == id));
     for s in &data.states {
-        if s.last_check_status == engine::CHECK_STATUS_DOWN {
-            *down_streaks.entry(s.id.clone()).or_insert(0) += 1;
-        } else {
-            down_streaks.remove(&s.id);
+        if observe_run(down_streaks, &mut rt.seen_runs, s) {
+            fresh.insert(s.id.clone());
         }
     }
-    apply_engine_actions(conn, &data, down_streaks, now).await?;
+    apply_engine_actions(conn, &data, down_streaks, &fresh, now).await?;
     // Re-read notices only if actions changed them; a second bounded read per
     // tick is cheaper than tracking per-action deltas in the POC.
     let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
@@ -318,6 +408,7 @@ async fn apply_engine_actions(
     conn: &sea_orm::DatabaseConnection,
     data: &TickData,
     down_streaks: &HashMap<String, i32>,
+    fresh: &HashSet<String>,
     now: i64,
 ) -> Result<(), infra::errors::Error> {
     let checks: Vec<engine::EngineCheck> = data
@@ -330,6 +421,7 @@ async fn apply_engine_actions(
             consecutive_failures: down_streaks.get(&s.id).copied().unwrap_or(0),
             first_fail_at: None,
             failing_since: None,
+            fresh_result: fresh.contains(&s.id),
         })
         .collect();
 
@@ -361,12 +453,13 @@ async fn apply_engine_actions(
         }
     }
 
-    let actions = engine::incident_actions(
+    let th_by_check = thresholds_by_check(data);
+    let actions = engine::incident_actions_with(
         &checks,
         &open_by_check,
         &recently_resolved,
         &data.snoozed,
-        &engine::Thresholds::default(),
+        |id| th_by_check.get(id).copied().unwrap_or_default(),
         now,
     );
     for action in actions {
@@ -619,8 +712,19 @@ fn build_page_snapshot(
                 });
             }
         }
-        let has_checks = data.mappings.iter().any(|m| m.component_id == component.id);
-        if !has_checks {
+        let mapped: Vec<&str> = data
+            .mappings
+            .iter()
+            .filter(|m| m.component_id == component.id)
+            .map(|m| m.synthetics_id.as_str())
+            .collect();
+        if mapped.is_empty() {
+            status = engine::ComponentStatus::NoData;
+        } else if status == engine::ComponentStatus::Operational
+            && all_checks_in_error(&mapped, &data.states)
+        {
+            // Every probe is failing to produce a verdict: we cannot say the
+            // service is up, so show "no data" rather than plain Operational.
             status = engine::ComponentStatus::NoData;
         }
         current_components.push(engine::CurrentComponent {
@@ -652,7 +756,24 @@ fn build_page_snapshot(
         generated_at: now,
         components: history_components,
     };
-    (current, history, page_notice_ids.into_iter().collect())
+    // Sorted: HashSet order is random per process, and this list feeds the
+    // serialized snapshot whose hash decides whether to rewrite it.
+    (current, history, sorted_ids(page_notice_ids))
+}
+
+fn sorted_ids(set: HashSet<String>) -> Vec<String> {
+    let mut ids: Vec<String> = set.into_iter().collect();
+    ids.sort_unstable();
+    ids
+}
+
+fn all_checks_in_error(mapped: &[&str], states: &[table::CheckStateRow]) -> bool {
+    mapped.iter().all(|id| {
+        states
+            .iter()
+            .find(|s| s.id == *id)
+            .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR)
+    })
 }
 
 fn public_notice(
@@ -722,6 +843,81 @@ pub async fn run_domain_verifier() {
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn run_domain_verifier() {}
+
+#[cfg(test)]
+mod fast_pass_tests {
+    use super::*;
+
+    fn row(id: &str, status: i32, run: i64) -> table::CheckStateRow {
+        table::CheckStateRow {
+            id: id.into(),
+            last_check_status: status,
+            consecutive_failures: 0,
+            last_triggered_at: run,
+        }
+    }
+
+    #[test]
+    fn down_streak_counts_runs_not_ticks() {
+        let (mut d, mut seen) = (HashMap::new(), HashMap::new());
+        let down = engine::CHECK_STATUS_DOWN;
+        assert!(observe_run(&mut d, &mut seen, &row("c", down, 100)));
+        for _ in 0..10 {
+            assert!(!observe_run(&mut d, &mut seen, &row("c", down, 100)));
+        }
+        assert_eq!(d["c"], 1);
+        assert!(observe_run(&mut d, &mut seen, &row("c", down, 200)));
+        assert_eq!(d["c"], 2);
+        observe_run(
+            &mut d,
+            &mut seen,
+            &row("c", engine::CHECK_STATUS_ERROR, 300),
+        );
+        assert!(!d.contains_key("c"));
+    }
+
+    #[test]
+    fn strictest_takes_max_and_requires_time_confirm_everywhere() {
+        let a = engine::Thresholds {
+            confirm_failures: 3,
+            confirm_recovery: 4,
+            confirm_after_micros: Some(10),
+        };
+        let b = engine::Thresholds {
+            confirm_failures: 7,
+            confirm_recovery: 2,
+            confirm_after_micros: None,
+        };
+        let s = strictest(a, b);
+        assert_eq!((s.confirm_failures, s.confirm_recovery), (7, 4));
+        assert_eq!(s.confirm_after_micros, None);
+        let c = engine::Thresholds {
+            confirm_after_micros: Some(30),
+            ..a
+        };
+        assert_eq!(strictest(a, c).confirm_after_micros, Some(30));
+    }
+
+    #[test]
+    fn notice_ids_serialize_in_a_stable_order() {
+        let ids = ["n3", "n1", "n2", "n9", "n0"];
+        let fwd: HashSet<String> = ids.iter().map(|s| s.to_string()).collect();
+        let rev: HashSet<String> = ids.iter().rev().map(|s| s.to_string()).collect();
+        let a = serde_json::to_string(&sorted_ids(fwd)).unwrap();
+        let b = serde_json::to_string(&sorted_ids(rev)).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a, r#"["n0","n1","n2","n3","n9"]"#);
+    }
+
+    #[test]
+    fn all_error_component_is_not_operational() {
+        let e = engine::CHECK_STATUS_ERROR;
+        let states = vec![row("a", e, 1), row("b", e, 1), row("c", 1, 1)];
+        assert!(all_checks_in_error(&["a", "b"], &states));
+        assert!(!all_checks_in_error(&["a", "c"], &states));
+        assert!(!all_checks_in_error(&["a", "missing"], &states));
+    }
+}
 
 #[cfg(test)]
 mod tests {

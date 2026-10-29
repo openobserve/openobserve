@@ -184,7 +184,11 @@ async fn handle_dead_letter(
     // check that is already in Error dead-letters silently, which is the common
     // case when a private agent has gone away and every run of every check it
     // served is expiring.
-    match synthetics_checks::update_last_check_status(db, &row.synthetics_id, 4)
+    match synthetics_checks::update_last_check_status(
+        db,
+        &row.synthetics_id,
+        config::meta::status_pages::CHECK_STATUS_ERROR,
+    )
     .await
     {
         Ok(true) => {

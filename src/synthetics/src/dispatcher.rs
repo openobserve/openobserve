@@ -311,7 +311,11 @@ async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) ->
     // nothing, while the first failure after a pass sends one message. Without
     // it the other regions' LIST would keep showing the last status they
     // themselves ran, or "Unknown".
-    match synthetics_checks::update_last_check_status(db, &row.synthetics_id, 4).await {
+    match synthetics_checks::update_last_check_status(
+        db,
+        &row.synthetics_id,
+        config::meta::status_pages::CHECK_STATUS_ERROR,
+    ).await {
         Ok(true) => {
             #[cfg(feature = "enterprise")]
             if o2_enterprise::enterprise::common::config::get_config()
