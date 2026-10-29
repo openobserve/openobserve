@@ -112,6 +112,14 @@ describe("OTab", () => {
     expect(wrapper.find('[role="tab"]').attributes("data-state")).toBe("inactive");
   });
 
+  it("keeps the active styling on a disabled active tab, and the disabled one elsewhere", () => {
+    const active = mountTab({ name: "tab1", activeTab: "tab1", disable: true });
+    expect(active.find('[role="tab"]').classes()).toContain("text-tabs-active-text");
+    expect(active.find('[role="tab"]').classes()).not.toContain("text-tabs-disabled-text");
+    const inactive = mountTab({ name: "tab2", activeTab: "tab1", disable: true });
+    expect(inactive.find('[role="tab"]').classes()).toContain("text-tabs-disabled-text");
+  });
+
   it("sets aria-disabled when disable is true", () => {
     const wrapper = mountTab({ disable: true });
     expect(wrapper.find('[role="tab"]').attributes("aria-disabled")).toBe("true");

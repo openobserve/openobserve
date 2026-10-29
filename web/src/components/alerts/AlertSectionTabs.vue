@@ -25,24 +25,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ships this pattern for Stream Pipelines / Functions.
 -->
 <template>
-  <OTabs
-    :model-value="activeSectionKey"
-    align="left"
-    data-test="alert-section-tabs"
-    @change="navigateToSection"
-  >
-    <OTab
-      v-for="section in sections"
-      :key="section.key"
-      :name="section.key"
-      :data-test="`alert-section-tab-${section.key}`"
+  <!-- The tabs only navigate, so a license-locked alert page still reaches the free destinations and templates. -->
+  <FeatureLockExempt class="contents">
+    <OTabs
+      :model-value="activeSectionKey"
+      align="left"
+      data-test="alert-section-tabs"
+      @change="navigateToSection"
     >
-      <OIcon :name="section.icon" size="sm" class="shrink-0" />
-      <span :class="section.key === activeSectionKey ? '' : 'max-md:hidden'">{{
-        section.label
-      }}</span>
-    </OTab>
-  </OTabs>
+      <OTab
+        v-for="section in sections"
+        :key="section.key"
+        :name="section.key"
+        :data-test="`alert-section-tab-${section.key}`"
+      >
+        <OIcon :name="section.icon" size="sm" class="shrink-0" />
+        <span :class="section.key === activeSectionKey ? '' : 'max-md:hidden'">{{
+          section.label
+        }}</span>
+        <OIcon
+          v-if="section.licenseLocked"
+          name="lock"
+          size="xs"
+          class="text-warning-600 shrink-0"
+          :data-test="`alert-section-tab-${section.key}-lock`"
+          aria-hidden="true"
+        />
+      </OTab>
+    </OTabs>
+  </FeatureLockExempt>
 </template>
 
 <script setup lang="ts">
@@ -54,7 +65,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { featureState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -68,6 +81,7 @@ interface Section {
   label: I18nText;
   icon: IconName;
   to: RouteLocationRaw;
+  licenseLocked?: boolean;
 }
 
 const sections = computed<Section[]>(() => {
@@ -76,16 +90,25 @@ const sections = computed<Section[]>(() => {
   const hideLibrary = (store.state.zoConfig?.custom_hide_menus ?? "")
     .split(",")
     .includes("alertLibrary");
+  // Destinations and templates stay free; only the alert pages themselves follow the license.
+  const alerts = featureState(store.state.zoConfig?.features, "alerts");
+  const alertsHidden = alerts === "hidden";
+  const licenseLocked = alerts === "locked";
   return [
     // "All Alerts", not "Alerts": the page title above this strip already says
     // "Alerts", so a tab repeating it names nothing. The rail's Alerts
     // subsection uses the same string for the same reason.
-    {
-      key: "alertList",
-      label: t("alerts.allAlerts"),
-      icon: "shield-alert-outline",
-      to: { name: "alertList", query },
-    },
+    ...(alertsHidden
+      ? []
+      : [
+          {
+            key: "alertList",
+            label: t("alerts.allAlerts"),
+            icon: "shield-alert-outline" as IconName,
+            to: { name: "alertList", query },
+            licenseLocked,
+          },
+        ]),
     {
       key: "alertDestinations",
       label: t("alert_destinations.header"),
@@ -100,7 +123,7 @@ const sections = computed<Section[]>(() => {
     },
     // Last: the catalog is where you go once to fetch an alert, not where you
     // work. The rail's Reliability flyout lists these four in this same order.
-    ...(hideLibrary
+    ...(hideLibrary || alertsHidden
       ? []
       : [
           {
@@ -108,6 +131,7 @@ const sections = computed<Section[]>(() => {
             label: t("alert_library.header"),
             icon: "menu-book" as IconName,
             to: { name: "alertLibrary", query },
+            licenseLocked,
           },
         ]),
   ];
