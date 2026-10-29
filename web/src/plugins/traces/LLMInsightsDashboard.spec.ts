@@ -43,6 +43,7 @@ const mockRouteQuery: Record<string, string> = {};
 
 import { reactive, ref } from "vue";
 import type { DataHealthResponse } from "@/services/gen-ai-data-health.service";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 
 const mockStoreState = reactive({ selectedOrganization: { identifier: "test-org" } });
 
@@ -707,6 +708,54 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     const wrapper = await mountAndEnter();
 
     expect((wrapper.vm as any).filterMode).toBe("stream");
+  });
+
+  it.each([{ env: "production" }, { version: "2" }])(
+    "keeps an env/version-only URL scope over the remembered Stream choice: %o",
+    async (query) => {
+      localStorage.setItem(SCOPE_MODE_CHOICE_LS_KEY, "stream");
+      Object.assign(mockRouteQuery, query);
+      mockListAgents.mockResolvedValue({
+        agents: [
+          agentAt("first", "s_staging", "staging", "1"),
+          agentAt("linked", "s_prod", "production", "2"),
+        ],
+      });
+      const wrapper = await mountAndEnter();
+      // Vue Test Utils omits script-setup state from its public-instance type.
+      const vm = wrapper.vm as unknown as {
+        filterMode: string;
+        selectedEnv: string;
+        selectedVersion: string;
+      };
+      expect([vm.filterMode, vm.selectedEnv, vm.selectedVersion]).toEqual([
+        "agent",
+        "production",
+        "2",
+      ]);
+      expect(panelMounts).toEqual(["s_prod"]);
+      expect(mockRouterReplace).toHaveBeenLastCalledWith({
+        query: expect.objectContaining(query),
+      });
+    },
+  );
+
+  it("shows explicit Stream panels while the agents registry is still pending", async () => {
+    mockRouteQuery.type = "stream";
+    const agentsResult = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    mockListAgents.mockReturnValue(agentsResult.promise);
+    const wrapper = mountDashboard();
+    // Vue Test Utils omits the script-setup method from its public-instance type.
+    const vm = wrapper.vm as unknown as {
+      refresh: (start?: number, end?: number, force?: boolean) => Promise<void>;
+    };
+    const pending = vm.refresh(undefined, undefined, false);
+    await flushPromises();
+    expect(panelMounts).toEqual(["default"]);
+    agentsResult.resolve({ agents: [agentAt("omp", "s1", "production", "1")] });
+    await pending;
+    await flushPromises();
+    expect(panelMounts).toEqual(["default"]);
   });
 
   it("remembers a toggle click as the explicit choice and writes it to the URL", async () => {

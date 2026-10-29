@@ -196,9 +196,9 @@ pub async fn get_by_id(id: &str) -> Result<Option<ModelPricingDefinition>, Error
 }
 
 /// Return the distinct org IDs that have at least one model pricing definition.
-/// Used for startup cache warming.
+/// Startup and coordinator-driven cache loads must see committed prices, not replica lag.
 pub async fn list_orgs() -> Result<Vec<String>, Error> {
-    let client = get_orm_client_ro().await;
+    let client = get_orm_client_rw().await;
     let rows: Vec<(String,)> = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -210,7 +210,7 @@ pub async fn list_orgs() -> Result<Vec<String>, Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<ModelPricingDefinition>, Error> {
-    let client = get_orm_client_ro().await;
+    let client = get_orm_client_rw().await;
     let rows = Entity::find()
         .filter(Column::Org.eq(org_id))
         .order_by(Column::Name, sea_orm::Order::Asc)

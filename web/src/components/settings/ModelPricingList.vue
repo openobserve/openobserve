@@ -1002,6 +1002,7 @@ const tabOptions = computed(() => [
 
 function onTabChange() {
   selectedIds.value = [];
+  if (selectedTab.value === "unpriced") refreshUnpriced();
   // The other params (an Unpriced deep link's stream) stay, so a reload reopens this exact view.
   router.replace({ query: { ...router.currentRoute.value.query, tab: selectedTab.value } });
 }
