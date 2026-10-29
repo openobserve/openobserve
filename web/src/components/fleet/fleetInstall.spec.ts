@@ -15,7 +15,6 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  CLUSTER_NAME_PLACEHOLDER,
   GATEWAY_RELEASE,
   HELM_ENV,
   INSTALL_ENV,
@@ -123,10 +122,11 @@ describe("installCommand", () => {
     expect(cmd).toContain("--set opamp.token='o2ft_abc123'");
   });
 
-  it("names the cluster with a placeholder until one is given, for agents and gateways", () => {
+  it("names the cluster only once one is given, for agents and gateways", () => {
     for (const role of ["agent", "gateway"] as const) {
-      expect(installCommand("kubernetes", { ...target, role })).toContain(
-        `--set-string clusterName='${CLUSTER_NAME_PLACEHOLDER}'`,
+      expect(installCommand("kubernetes", { ...target, role })).not.toContain("clusterName");
+      expect(installCommand("kubernetes", { ...target, role, clusterName: "  " })).not.toContain(
+        "clusterName",
       );
       expect(installCommand("kubernetes", { ...target, role, clusterName: " prod-us " })).toContain(
         "--set-string clusterName='prod-us'",

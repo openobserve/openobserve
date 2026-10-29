@@ -152,7 +152,7 @@ describe("FleetInstallCommand", () => {
     await flushPromises();
     expect(w.find('[data-test="fleet-install-command-cluster-name"]').exists()).toBe(false);
     await choose(w, "kubernetes");
-    expect(code(w)).toContain("--set-string clusterName='<cluster-name>'");
+    expect(code(w)).not.toContain("clusterName");
     w.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "prod-us-east");
     await w.vm.$nextTick();
     expect(code(w)).toContain("--set-string clusterName='prod-us-east'");

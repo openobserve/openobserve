@@ -271,11 +271,31 @@ export const CATALOG: CatalogItem[] = [
 
 export const compKey = (kind: EditorKind, id: string) => `${kind}:${id}`;
 
+// The otlp exporter became otlp_grpc, the one upstream rename that dropping underscores does not undo.
+const RENAMED: Partial<Record<EditorKind, Record<string, string>>> = {
+  exporter: { otlpgrpc: "otlp" },
+};
+
+/** Compares component types across upstream's snake_case renames (k8s_attributes is k8sattributes). */
+export function typeKey(kind: EditorKind, type: string): string {
+  const key = type.toLowerCase().replace(/_/g, "");
+  return RENAMED[kind]?.[key] ?? key;
+}
+
+const idKey = (kind: EditorKind, id: string) => {
+  const [type, ...name] = id.split("/");
+  return [typeKey(kind, type), ...name].join("/");
+};
+
 export function catalogFor(c: EditorComponent): CatalogItem | undefined {
+  const type = typeKey(c.kind, c.type);
+  const sameType = (i: CatalogItem) => i.kind === c.kind && typeKey(i.kind, i.type) === type;
   return (
-    CATALOG.find((i) => i.kind === c.kind && i.idHint === c.id) ??
-    CATALOG.find((i) => i.kind === c.kind && i.type === c.type && !i.idHint) ??
-    CATALOG.find((i) => i.kind === c.kind && i.type === c.type)
+    CATALOG.find(
+      (i) => i.kind === c.kind && !!i.idHint && idKey(i.kind, i.idHint) === idKey(c.kind, c.id),
+    ) ??
+    CATALOG.find((i) => sameType(i) && !i.idHint) ??
+    CATALOG.find(sameType)
   );
 }
 

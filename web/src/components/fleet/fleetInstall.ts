@@ -28,9 +28,6 @@ export const INSTALL_ENV = ["O2_ENDPOINT", "O2_TOKEN"];
 /** Environment only the Helm chart adds: the pod's downward API plus its clusterName value. */
 export const HELM_ENV = ["K8S_NODE_NAME", "K8S_POD_NAME", "K8S_NAMESPACE", "K8S_CLUSTER_NAME"];
 
-/** Stands in the Helm command until the user names the cluster. */
-export const CLUSTER_NAME_PLACEHOLDER = "<cluster-name>";
-
 export const INSTALL_PLATFORMS: InstallPlatform[] = [
   "linux",
   "macos",
@@ -110,13 +107,18 @@ function windowsCommand(t: InstallTarget): string {
   ].join("\n");
 }
 
+// --set-string keeps a numeric name a string; Helm splits --set values on unescaped commas.
+function clusterNameSet(name?: string): string[] {
+  const value = name?.trim();
+  return value ? [`--set-string clusterName=${q(value.replace(/,/g, "\\,"))}`] : [];
+}
+
 // One release runs one role: its token enrols every pod into one fleet, and a fleet shares one configuration.
 function helmCommand(t: InstallTarget): string {
   const gateway = t.role === "gateway";
   const sets = [
     ...(gateway ? ["--set agent.enabled=false", "--set gateway.enabled=true"] : []),
-    // --set-string keeps a numeric name a string; Helm splits --set values on unescaped commas.
-    `--set-string clusterName=${q((t.clusterName?.trim() || CLUSTER_NAME_PLACEHOLDER).replace(/,/g, "\\,"))}`,
+    ...clusterNameSet(t.clusterName),
     `--set image.repository=${IMAGE}`,
     ...(t.version ? [`--set image.tag=${q(t.version)}`] : []),
     `--set opamp.endpoint=${q(opampEndpoint(t))}`,
