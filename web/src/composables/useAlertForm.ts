@@ -27,6 +27,11 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, debounce, set } from "lodash-es";
+import {
+  alertConditionsPayload,
+  loadAlertConditions,
+  type LegacyAlertConditions,
+} from "@/utils/alerts/alertConditionsLoad";
 
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
@@ -87,11 +92,6 @@ import {
   removeConditionGroup as removeConditionGroupUtil,
   transformFEToBE as transformFEToBEUtil,
   retransformBEToFE as retransformBEToFEUtil,
-  detectConditionsVersion,
-  convertV0ToV2,
-  convertV1ToV2,
-  convertV1BEToV2,
-  ensureIds,
   type TransformContext,
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
@@ -1080,7 +1080,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return !!(
         conditions.column &&
         (isUnaryOperator(conditions.operator) ||
-          (conditions.value !== undefined && conditions.value !== ""))
+          (conditions.value !== undefined &&
+            conditions.value !== "" &&
+            !(Array.isArray(conditions.value) && conditions.value.length === 0)))
       );
     }
     if (conditions.filterType === "group" && Array.isArray(conditions.conditions)) {
@@ -2438,10 +2440,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     if (formData.value.is_real_time !== "composite") {
       // VERSION HANDLING - wrap conditions with version field for backend
-      payload.query_condition.conditions = {
-        version: 2,
-        conditions: form.state.values.query_condition.conditions,
-      };
+      payload.query_condition.conditions = alertConditionsPayload(
+        form.state.values.query_condition.conditions,
+        loadedLegacyConditions,
+      );
     }
 
     if (beingUpdated.value) {
@@ -2541,7 +2543,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   // ── Data Initialization (replaces created() hook) ───────────────────────
 
+  // A V0/V1 rule is shown as V2; while it stays unedited, Save writes back the stored shape.
+  let loadedLegacyConditions: LegacyAlertConditions | null = null;
+
   const initializeFormData = async () => {
+    loadedLegacyConditions = null;
     // Build the full alert object in a LOCAL var, apply every transform, then
     // seed the ONE form with a single form.reset (Rule ③ — NOT a per-field
     // setFieldValue loop, NOT a mirror). The form-only extras (logGroupBy /
@@ -2672,50 +2678,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         stale_child_policy: "use_last_state",
       };
       data.children ??= [];
-    } else if (
-      data.query_condition.conditions?.version === "2" ||
-      data.query_condition.conditions?.version === 2
-    ) {
-      data.query_condition.conditions = ensureIds(data.query_condition.conditions.conditions);
-    } else if (
-      data.query_condition.conditions &&
-      !Array.isArray(data.query_condition.conditions) &&
-      Object.keys(data.query_condition.conditions).length != 0
-    ) {
-      const version = detectConditionsVersion(data.query_condition.conditions);
-
-      if (version === 0) {
-        data.query_condition.conditions = ensureIds(convertV0ToV2(data.query_condition.conditions));
-      } else if (version === 1) {
-        if (data.query_condition.conditions.and || data.query_condition.conditions.or) {
-          data.query_condition.conditions = ensureIds(
-            convertV1BEToV2(data.query_condition.conditions),
-          );
-        } else if (data.query_condition.conditions.label && data.query_condition.conditions.items) {
-          data.query_condition.conditions = ensureIds(
-            convertV1ToV2(data.query_condition.conditions),
-          );
-        }
-      } else {
-        data.query_condition.conditions = ensureIds(data.query_condition.conditions);
-      }
-    } else if (
-      Array.isArray(data.query_condition.conditions) &&
-      data.query_condition.conditions.length > 0
-    ) {
-      data.query_condition.conditions = ensureIds(convertV0ToV2(data.query_condition.conditions));
-    } else if (
-      data.query_condition.conditions == null ||
-      data.query_condition.conditions == undefined ||
-      data.query_condition.conditions.length == 0 ||
-      Object.keys(data.query_condition.conditions).length == 0
-    ) {
-      data.query_condition.conditions = {
-        filterType: "group",
-        logicalOperator: "AND",
-        conditions: [],
-        groupId: getUUID(),
-      };
+    } else {
+      const loaded = loadAlertConditions(data.query_condition.conditions);
+      data.query_condition.conditions = loaded.tree;
+      loadedLegacyConditions = loaded.legacy;
     }
 
     // Seed the ONE form (single source of truth) with the fully-transformed obj.

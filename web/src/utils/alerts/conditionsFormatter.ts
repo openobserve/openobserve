@@ -1,6 +1,6 @@
 /**
  * Shared utility for formatting V2 condition structures into strings. Used by:
- * 1. UI Preview (FilterGroup.vue) - human-readable display of conditions
+ * 1. Display text - human-readable rendering of conditions
  * 2. SQL Generation (alertQueryBuilder.ts) - WHERE clauses in SQL queries
  *
  * V2 format:
@@ -26,6 +26,7 @@
 
 import type { StreamFieldsMap } from "./alertQueryBuilder";
 import { sqlLiteral, sqlLike } from "@/utils/query/sqlFilterBuilder";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 
 export interface FormatOptions {
   // Whether to generate SQL format (uppercase AND/OR, SQL operators) or display format (lowercase)
@@ -80,6 +81,142 @@ export function unaryOperatorText(operator: unknown): string {
  */
 function isGroup(item: any): boolean {
   return item && item.filterType === "group" && Array.isArray(item.conditions);
+}
+
+const NUMERIC_TYPES = ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64"];
+const FLOAT_TYPES = ["Float16", "Float32", "Float64"];
+
+type ExtendedOperator = "in" | "not_in" | "starts_with" | "ends_with" | "re_match" | "re_not_match";
+
+// Lower case with spaces and underscores dropped, so "Starts With", "startswith" and "starts_with" meet.
+const EXTENDED_OPERATORS: Record<string, ExtendedOperator> = {
+  in: "in",
+  notin: "not_in",
+  startswith: "starts_with",
+  endswith: "ends_with",
+  rematch: "re_match",
+  regex: "re_match",
+  renotmatch: "re_not_match",
+  notregex: "re_not_match",
+};
+
+const extendedOperator = (operator: unknown): ExtendedOperator | null => {
+  if (typeof operator !== "string") return null;
+  const key = operator.toLowerCase().replace(/[\s_]/g, "");
+  return Object.hasOwn(EXTENDED_OPERATORS, key) ? EXTENDED_OPERATORS[key] : null;
+};
+
+/** The items of an `in` / `not_in` value: an array, a JSON array string, or one scalar. */
+export function conditionListValues(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value.trim().startsWith("[")) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Not JSON: the whole text is one value.
+    }
+  }
+  if (value === undefined || value === null || value === "") return [];
+  return [value];
+}
+
+/** Whether a condition carries the value its operator needs (lists need at least one item). */
+export function conditionHasValue(operator: unknown, value: unknown): boolean {
+  if (isUnaryOperator(operator)) return true;
+  const op = extendedOperator(operator);
+  if (op === "in" || op === "not_in") return conditionListValues(value).length > 0;
+  return value !== undefined && value !== null && value !== "";
+}
+
+const isNumericColumn = (columnType: string | undefined) =>
+  columnType !== undefined && [...NUMERIC_TYPES, ...FLOAT_TYPES].includes(columnType);
+
+const caseFolds = (ignoreCase: boolean, columnType: string | undefined) =>
+  ignoreCase && (columnType === undefined || STRING_TYPES.includes(columnType));
+
+const listLiteral = (item: unknown, numeric: boolean, fold: boolean): string => {
+  if (numeric && String(item).trim() !== "" && Number.isFinite(Number(item))) return String(item);
+  const text = String(item ?? "");
+  return sqlLiteral(fold ? text.toLowerCase() : text);
+};
+
+/** SQL for the operators the condition builder added; mirrors the backend's build_extended_expr. */
+function extendedSql(
+  column: string,
+  op: ExtendedOperator,
+  value: unknown,
+  ignoreCase: boolean,
+  columnType: string | undefined,
+): string {
+  const fold = caseFolds(ignoreCase, columnType);
+  const target = fold ? `lower(${column})` : column;
+  if (op === "in" || op === "not_in") {
+    const items = conditionListValues(value);
+    if (!items.length) return "";
+    const numeric = isNumericColumn(columnType);
+    const literals = items.map((item) => listLiteral(item, numeric, fold)).join(", ");
+    return `${target} ${op === "in" ? "IN" : "NOT IN"} (${literals})`;
+  }
+  // The backend refuses the text operators on a non-text column, so there is no SQL to show.
+  if (columnType !== undefined && !STRING_TYPES.includes(columnType)) return "";
+  const text = String(value ?? "");
+  if (op === "starts_with" || op === "ends_with") {
+    return sqlLike(
+      target,
+      fold ? text.toLowerCase() : text,
+      op === "starts_with" ? "start" : "end",
+    );
+  }
+  const pattern = ignoreCase ? `(?i)${text}` : text;
+  return `${op}(${column}, '${escapeSingleQuotes(pattern)}')`;
+}
+
+/** Case-folded SQL for `case_insensitive` on the original operators; mirrors build_case_insensitive_expr. */
+function ignoreCaseSql(column: string, operator: string, value: unknown): string | null {
+  const text = String(value ?? "");
+  const op = operator.toLowerCase().replace(/[\s_]/g, "");
+  if (op === "contains" || op === "strmatch") {
+    return `str_match_ignore_case(${column}, ${sqlLiteral(text)})`;
+  }
+  if (op === "notcontains")
+    return sqlLike(`lower(${column})`, text.toLowerCase(), "contains", true);
+  if (["=", "!=", "<>", ">", ">=", "<", "<="].includes(op)) {
+    return `lower(${column}) ${op} ${sqlLiteral(text.toLowerCase())}`;
+  }
+  return null;
+}
+
+const displayList = (value: unknown) =>
+  `(${conditionListValues(value)
+    .map((item) => sqlLiteral(item))
+    .join(", ")})`;
+
+/** One leaf as text: SQL in sqlMode, readable text otherwise; empty when it cannot be written. */
+function formatLeaf(
+  item: any,
+  column: string,
+  options: { sqlMode: boolean; formatValues: boolean; streamFieldsMap?: StreamFieldsMap },
+): string {
+  const { sqlMode, formatValues, streamFieldsMap } = options;
+  const columnType = streamFieldsMap?.[item.column]?.type;
+  const extended = extendedOperator(item.operator);
+  if (extended) {
+    // Like the backend, the operators added with case_insensitive also honour the legacy flag.
+    const folds = item.case_insensitive === true || item.ignore_case === true;
+    if (sqlMode) return extendedSql(column, extended, item.value, folds, columnType);
+    const shown =
+      extended === "in" || extended === "not_in" ? displayList(item.value) : sqlLiteral(item.value);
+    return `${column} ${item.operator} ${shown}`;
+  }
+  if (sqlMode && item.case_insensitive === true && caseFolds(true, columnType)) {
+    const folded = ignoreCaseSql(column, item.operator, item.value);
+    if (folded) return folded;
+  }
+  const formattedValue = formatValues
+    ? formatValue(item.column, item.operator, item.value, streamFieldsMap)
+    : sqlLiteral(item.value);
+  return getFormattedCondition(column, item.operator, formattedValue, sqlMode, columnType);
 }
 
 /**
@@ -214,6 +351,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
     quoteColumn,
   } = options;
   const outputColumn = (column: string): string => (quoteColumn ? quoteColumn(column) : column);
+  const leafOptions = { sqlMode, formatValues, streamFieldsMap };
 
   // Recursive function to parse group/condition nodes
   const parseNode = (node: any): string => {
@@ -244,19 +382,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
           item.operator &&
           (item.value !== undefined || isUnaryOperator(item.operator))
         ) {
-          // Step 1: Format the value (add quotes if needed, based on type)
-          const formattedValue = formatValues
-            ? formatValue(item.column, item.operator, item.value, streamFieldsMap)
-            : sqlLiteral(item.value);
-
-          // Step 2: Build the condition string (column operator value)
-          conditionStr = getFormattedCondition(
-            outputColumn(item.column),
-            item.operator,
-            formattedValue,
-            sqlMode,
-            streamFieldsMap?.[item.column]?.type,
-          );
+          conditionStr = formatLeaf(item, outputColumn(item.column), leafOptions);
         }
 
         // Step 3: Add logical operator prefix (except for first item at index 0)
@@ -286,17 +412,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
       node.operator &&
       (node.value !== undefined || isUnaryOperator(node.operator))
     ) {
-      const formattedValue = formatValues
-        ? formatValue(node.column, node.operator, node.value, streamFieldsMap)
-        : sqlLiteral(node.value);
-
-      return getFormattedCondition(
-        outputColumn(node.column),
-        node.operator,
-        formattedValue,
-        sqlMode,
-        streamFieldsMap?.[node.column]?.type,
-      );
+      return formatLeaf(node, outputColumn(node.column), leafOptions);
     }
 
     return "";

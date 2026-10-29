@@ -70,13 +70,14 @@ vi.mock("@/components/common/AppTabs.vue", () => ({
   },
 }));
 
-// Mock FilterGroup component
-vi.mock("@/components/alerts/FilterGroup.vue", () => ({
+// Mock the shared condition builder
+vi.mock("@/components/filterBar/FilterBuilder.vue", () => ({
   default: {
-    name: "FilterGroup",
-    template: "<div data-test='mock-filter-group'></div>",
-    props: ["streamFields", "streamFieldsMap", "showSqlPreview", "sqlQuery", "group", "depth"],
-    emits: ["add-condition", "add-group", "remove-group", "input:update"],
+    name: "FilterBuilder",
+    template: "<div data-test='mock-filter-builder'></div>",
+    props: ["profile", "modelValue", "fields"],
+    emits: ["update:modelValue", "update:valid"],
+    methods: { validate: () => [] },
   },
 }));
 
@@ -166,6 +167,9 @@ vi.mock("@/composables/useSuggestions", async () => {
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
+  useLocalOrganization: vi.fn(() => null),
+  useLocalCurrentUser: vi.fn(() => null),
+  useLocalTimezone: vi.fn(() => null),
   b64EncodeUnicode: vi.fn((str: string) => Buffer.from(str).toString("base64")),
   getUUID: vi.fn(() => "mock-uuid"),
   getImageURL: vi.fn((name: string) => `/images/${name}`),
@@ -787,29 +791,25 @@ describe("QueryConfig.vue", () => {
   });
 
   describe("Group and Condition Management", () => {
-    it("should emit update-group event", async () => {
-      const groupData = { id: "test-group", conditions: [] };
-      await wrapper.vm.updateGroup(groupData);
-
-      expect(wrapper.emitted("update-group")).toBeTruthy();
-      expect(wrapper.emitted("update-group")![0]).toEqual([groupData]);
-    });
-
-    it("should emit remove-group event", async () => {
-      const groupData = { id: "test-group" };
-      await wrapper.vm.removeConditionGroup(groupData);
-
-      expect(wrapper.emitted("remove-group")).toBeTruthy();
-      expect(wrapper.emitted("remove-group")![0]).toEqual([groupData]);
-    });
-
-    it("should emit input:update event", async () => {
-      const name = "test-field";
-      const field = { value: "test-value" };
-      await wrapper.vm.onInputUpdate(name, field);
+    it("emits input:update with the builder's new tree", async () => {
+      const tree = { filterType: "group", logicalOperator: "AND", conditions: [] };
+      await wrapper.vm.onConditionsChange(tree);
 
       expect(wrapper.emitted("input:update")).toBeTruthy();
-      expect(wrapper.emitted("input:update")![0]).toEqual([name, field]);
+      expect(wrapper.emitted("input:update")![0]).toEqual(["conditions", tree]);
+    });
+
+    it("hands the builder the stream columns as typed fields", async () => {
+      await setQCProps({
+        columns: [
+          { label: "level", value: "level", type: "Utf8" },
+          { label: "code", value: "code", type: "Int64" },
+        ],
+      });
+      expect(wrapper.vm.conditionFields).toEqual([
+        { name: "level", label: "level", type: "string" },
+        { name: "code", label: "code", type: "number" },
+      ]);
     });
   });
 
@@ -1298,17 +1298,13 @@ describe("QueryConfig.vue", () => {
   describe("Emits", () => {
     it("should emit all expected events", async () => {
       await wrapper.vm.updateTab("sql");
-      await wrapper.vm.updateGroup({});
-      await wrapper.vm.removeConditionGroup({});
-      await wrapper.vm.onInputUpdate("test", {});
+      await wrapper.vm.onConditionsChange({});
       await wrapper.vm.updateSqlQuery("SELECT *");
       await wrapper.vm.updatePromqlQuery("up");
       await wrapper.vm.handleVrlFunctionUpdate("vrl");
       await wrapper.vm.handleValidateSql();
 
       expect(wrapper.emitted()).toHaveProperty("update:tab");
-      expect(wrapper.emitted()).toHaveProperty("update-group");
-      expect(wrapper.emitted()).toHaveProperty("remove-group");
       expect(wrapper.emitted()).toHaveProperty("input:update");
       expect(wrapper.emitted()).toHaveProperty("update:sqlQuery");
       expect(wrapper.emitted()).toHaveProperty("update:promqlQuery");
@@ -1318,8 +1314,6 @@ describe("QueryConfig.vue", () => {
 
     it("should not emit events when not triggered", () => {
       expect(wrapper.emitted("update:tab")).toBeFalsy();
-      expect(wrapper.emitted("update-group")).toBeFalsy();
-      expect(wrapper.emitted("remove-group")).toBeFalsy();
       expect(wrapper.emitted("input:update")).toBeFalsy();
       expect(wrapper.emitted("update:sqlQuery")).toBeFalsy();
       expect(wrapper.emitted("update:promqlQuery")).toBeFalsy();
@@ -1432,11 +1426,13 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render FilterGroup in custom mode", async () => {
+    it("should render the condition builder in custom mode", async () => {
       wrapper.vm.localTab = "custom";
       await nextTick();
 
-      expect(wrapper.find('[data-test="mock-filter-group"]').exists()).toBe(true);
+      const builder = wrapper.findComponent({ name: "FilterBuilder" });
+      expect(builder.exists()).toBe(true);
+      expect(builder.props("profile")).toBe("alert");
     });
 
     it("should render QueryEditorDialog", () => {
@@ -1973,8 +1969,8 @@ describe("QueryConfig.vue", () => {
   //  AddAlert wiring). Drives the actual composed schema via
   //  hostForm.handleSubmit(); asserts validity + that the RENDERED group-by
   //  inputs track the field array.
-  //  (FilterGroup is mocked here, so conditions-tree form binding is covered by
-  //  QueryConfig.schema.spec.ts + FilterGroup.spec.ts, not this file.)
+  //  (FilterBuilder is mocked here; its tree is covered by QueryConfig.schema.spec.ts
+  //  and the alerts round-trip fixtures in utils/alerts/alertConditionsLoad.spec.ts.)
   // ══════════════════════════════════════════════════════════════════════════
   describe("Real OForm behavior", () => {
     it("binds into the ancestor form — no OForm of its own", () => {

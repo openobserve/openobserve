@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            provides FORM_CONTEXT_KEY. The OForm* fields below bind by nested
            `name=` (trigger_condition.*, query_condition.*, logGroupBy[]) into that
            form; the composed schema in AddAlert.schema.ts validates them on save.
-           Non-form widgets (tabs / editors / VRL / FilterGroup) are bridged. -->
+           Non-form widgets (tabs / editors / VRL / condition builder) are bridged. -->
       <div class="box-border w-full min-w-0 px-3 py-2">
         <!-- Query Mode Tabs (hidden for real-time alerts) -->
         <div v-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
@@ -961,20 +961,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Filters section — scheduled -->
             <div v-if="isRealTime === 'false'" ref="filtersSectionRef" class="mt-1 px-3">
               <div v-show="showFilters" ref="customPreviewRef">
-                <FilterGroup
-                  :stream-fields="columns"
-                  :stream-fields-map="streamFieldsMap"
-                  :show-sql-preview="false"
-                  :sql-query="generatedSqlQuery"
-                  :group="inputData.conditions"
-                  :depth="0"
-                  module="alerts"
-                  name-prefix="query_condition.conditions"
-                  @add-condition="updateGroup"
-                  @add-group="updateGroup"
-                  @remove-group="removeConditionGroup"
-                  @input:update="onInputUpdate"
+                <FilterBuilder
+                  ref="conditionsBuilderRef"
+                  profile="alert"
+                  :model-value="inputData.conditions"
+                  :fields="conditionFields"
+                  :load-values="conditionValueLoader"
+                  data-test="alert-conditions"
+                  @update:model-value="onConditionsChange"
+                  @update:valid="conditionsValid = $event"
                 />
+                <div
+                  v-if="showConditionsError"
+                  class="text-input-error-text mt-1 text-xs"
+                  role="alert"
+                  data-test="alert-conditions-error"
+                >
+                  {{ t("filterBar.validation.incomplete") }}
+                </div>
               </div>
             </div>
 
@@ -1024,20 +1028,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div v-show="showFilters" ref="customPreviewRef">
-                <FilterGroup
-                  :stream-fields="columns"
-                  :stream-fields-map="streamFieldsMap"
-                  :show-sql-preview="false"
-                  :sql-query="generatedSqlQuery"
-                  :group="inputData.conditions"
-                  :depth="0"
-                  module="alerts"
-                  name-prefix="query_condition.conditions"
-                  @add-condition="updateGroup"
-                  @add-group="updateGroup"
-                  @remove-group="removeConditionGroup"
-                  @input:update="onInputUpdate"
+                <FilterBuilder
+                  ref="conditionsBuilderRef"
+                  profile="alert"
+                  :model-value="inputData.conditions"
+                  :fields="conditionFields"
+                  :load-values="conditionValueLoader"
+                  data-test="alert-conditions"
+                  @update:model-value="onConditionsChange"
+                  @update:valid="conditionsValid = $event"
                 />
+                <div
+                  v-if="showConditionsError"
+                  class="text-input-error-text mt-1 text-xs"
+                  role="alert"
+                  data-test="alert-conditions-error"
+                >
+                  {{ t("filterBar.validation.incomplete") }}
+                </div>
               </div>
             </div>
           </div>
@@ -1870,7 +1878,9 @@ import { savedBrowserTimezone } from "@/utils/timezoneAliases";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
-import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { streamValuesLoader } from "@/components/filterBar/streamValues";
+import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1909,7 +1919,7 @@ export default defineComponent({
     AlertMultiToggle,
     ForecastAlertFields,
     AlertQueryPreview,
-    FilterGroup,
+    FilterBuilder,
     QueryEditorDialog,
     CustomConfirmDialog,
     UnifiedQueryEditor,
@@ -2017,8 +2027,6 @@ export default defineComponent({
   },
   emits: [
     "update:tab",
-    "update-group",
-    "remove-group",
     "input:update",
     "update:sqlQuery",
     "update:promqlQuery",
@@ -3300,24 +3308,40 @@ export default defineComponent({
     };
 
     // ── Conditions tree ↔ form bridge ────────────────────────────────────────
-    // The 2 <FilterGroup> usages carry name-prefix="query_condition.conditions"
-    // so FilterCondition binds each row's column/operator/value into THIS form.
-    // Structural changes (add/remove/toggle/reorder) arrive as a NEW immutable
-    // tree from FilterGroup and are written to the form by the ancestor
-    // (useAlertForm.updateGroup/removeConditionGroup → setFieldValue). We just
-    // forward the events. (The old code mutated the readonly `props.inputData`
-    // read-view in place, which silently failed — nothing was added.)
-    const updateGroup = (data: any) => {
-      emit("update-group", data);
+    const conditionsBuilderRef = ref<InstanceType<typeof FilterBuilder> | null>(null);
+    const conditionsValid = ref(true);
+    const conditionFields = computed<FilterField[]>(() =>
+      (props.columns as any[])
+        .map((column: any) =>
+          typeof column === "string" ? { value: column, label: column } : column,
+        )
+        .filter((column: any) => column?.value)
+        .map((column: any) => ({
+          name: String(column.value),
+          label: String(column.label ?? column.value),
+          type: toFilterFieldType(column.type),
+        })),
+    );
+
+    const conditionValueLoader = computed(() =>
+      streamValuesLoader({
+        org: store.state.selectedOrganization?.identifier,
+        streamType: props.streamType,
+        streamName: props.streamName,
+      }),
+    );
+
+    const onConditionsChange = (next: unknown) => {
+      setFV("query_condition.conditions", next);
+      emit("input:update", "conditions", next);
     };
 
-    const removeConditionGroup = (data: any) => {
-      emit("remove-group", data);
-    };
-
-    const onInputUpdate = (name: string, field: any) => {
-      emit("input:update", name, field);
-    };
+    // Unfinished chips are only marked once a save was tried, so a fresh alert does not open in red.
+    const submissionAttempts = form ? form.useStore((s: any) => s.submissionAttempts ?? 0) : ref(0);
+    const showConditionsError = computed(
+      () => submissionAttempts.value > 0 && !conditionsValid.value,
+    );
+    watch(submissionAttempts, () => conditionsBuilderRef.value?.validate());
 
     const sqlOrPromqlQuery = computed(() => {
       return localTab.value === "sql" ? props.sqlQuery : props.promqlQuery;
@@ -3854,6 +3878,7 @@ export default defineComponent({
         selectedFunction: selectedFunction.value,
         frequencyMode: frequencyMode.value,
         hasConditions: !!props.inputData.conditions?.conditions?.length,
+        conditionsValid: conditionsValid.value,
         hasGroupBy: isEventBased.value ? hasLogGroupByFields.value : hasMetricGroupByFields.value,
         aggregationEnabled: localIsAggregationEnabled.value,
         // SECONDS, raw from zoConfig — the schema derives ceil(secs/60) itself.
@@ -3869,6 +3894,7 @@ export default defineComponent({
         selectedFunction,
         frequencyMode,
         () => props.inputData.conditions,
+        conditionsValid,
         localIsAggregationEnabled,
         hasLogGroupByFields,
         hasMetricGroupByFields,
@@ -3891,9 +3917,12 @@ export default defineComponent({
       tabOptions,
       shouldShowTabs,
       updateTab,
-      updateGroup,
-      removeConditionGroup,
-      onInputUpdate,
+      conditionsBuilderRef,
+      conditionsValid,
+      conditionFields,
+      conditionValueLoader,
+      onConditionsChange,
+      showConditionsError,
       sqlOrPromqlQuery,
       viewSqlEditor,
       localSqlQuery,
