@@ -36,6 +36,8 @@ export const slackKeys = {
     orgKey(org, "slack", "installation", id, "channels", q),
   channelDefaults: (org: string, id: string) =>
     orgKey(org, "slack", "installation", id, "channelDefaults"),
+  oncallUnlinked: (org: string, id: string) =>
+    orgKey(org, "slack", "installation", id, "oncallUnlinked"),
   helpContact: (org: string, id: string) => orgKey(org, "slack", "installation", id, "helpContact"),
   orgAccess: (org: string, id: string) => orgKey(org, "slack", "installation", id, "orgAccess"),
   linkLists: (org: string) => orgKey(org, "slack", "links", "list"),

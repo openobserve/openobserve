@@ -36,6 +36,7 @@ import SlackInstallConfirmation from "./SlackInstallConfirmation.vue";
 import SlackLinkingSection from "./SlackLinkingSection.vue";
 import SlackOrgAccess from "./SlackOrgAccess.vue";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
+import SlackSwitchAllCard from "./SlackSwitchAllCard.vue";
 import SlackUninstallDialog from "./SlackUninstallDialog.vue";
 import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
 
@@ -194,6 +195,7 @@ const openDialog = (mode: DialogMode): void => {
             {{ t("slackApp.workspaces.addAnother") }}
           </OButton>
         </div>
+        <SlackSwitchAllCard :key="`switch-${current.id}`" :installation="current" />
         <SlackWorkspaceCard
           :key="current.id"
           :installation="current"

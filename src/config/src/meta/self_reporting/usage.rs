@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     SIZE_IN_MB, get_config,
     meta::{
+        alerts::ack::{AckAction, AckSource},
         dashboards::usage_report::DashboardInfo,
         search::{SearchEventContext, SearchEventType},
         stream::{FileMeta, StreamType},
@@ -111,6 +112,9 @@ pub enum RunOutcome {
     /// Condition matched inside a downtime window; nothing was delivered.
     #[serde(rename = "suppressed")]
     Suppressed,
+    /// Not a run: an ack, unack or take over of the alert, written by the ack service.
+    #[serde(rename = "ack_event")]
+    AckEvent,
 }
 
 impl RunOutcome {
@@ -133,6 +137,7 @@ impl RunOutcome {
             Self::NotifyFailed => 5,
             Self::Pending => 6,
             Self::Suppressed => 7,
+            Self::AckEvent => 8,
         }
     }
 
@@ -146,6 +151,7 @@ impl RunOutcome {
             5 => Some(Self::NotifyFailed),
             6 => Some(Self::Pending),
             7 => Some(Self::Suppressed),
+            8 => Some(Self::AckEvent),
             _ => None,
         }
     }
@@ -160,6 +166,7 @@ impl RunOutcome {
             Self::NotifyFailed => "notify_failed",
             Self::Pending => "pending",
             Self::Suppressed => "suppressed",
+            Self::AckEvent => "ack_event",
         }
     }
 }
@@ -203,6 +210,7 @@ pub fn normalize_outcome(
         "notify_failed" => Some(RunOutcome::NotifyFailed),
         "pending" => Some(RunOutcome::Pending),
         "suppressed" => Some(RunOutcome::Suppressed),
+        "ack_event" => Some(RunOutcome::AckEvent),
 
         // ── legacy vocabulary ──
         "condition_not_satisfied" => Some(RunOutcome::Normal),
@@ -341,6 +349,15 @@ pub struct TriggerData {
     pub synthetics_location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub downtime_id: Option<String>,
+    /// Whose ack withheld this run's send, or who acted on an `ack_event` row.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acked_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ack_action: Option<AckAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ack_source: Option<AckSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taken_over_from: Option<String>,
     /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery_attempted: Option<bool>,
@@ -401,6 +418,10 @@ impl Default for TriggerData {
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
             trigger_source: None,
             triggered_by: None,
@@ -460,6 +481,10 @@ impl TriggerData {
             synthetics_error_source: Some(String::new()),
             synthetics_location: Some(String::new()),
             downtime_id: Some(String::new()),
+            acked_by: Some(String::new()),
+            ack_action: Some(AckAction::Ack),
+            ack_source: Some(AckSource::Api),
+            taken_over_from: Some(String::new()),
             delivery_attempted: Some(true),
             trigger_source: Some(String::new()),
             triggered_by: Some(String::new()),
@@ -1235,6 +1260,44 @@ mod run_outcome_tests {
     }
 
     #[test]
+    fn ack_rows_use_the_history_contract_strings_and_older_rows_decode() {
+        assert_eq!(RunOutcome::AckEvent.as_str(), "ack_event");
+        assert_eq!(RunOutcome::from_i32(8), Some(RunOutcome::AckEvent));
+        assert!(!RunOutcome::AckEvent.is_firing());
+        assert_eq!(
+            normalize_outcome("ack_event", &TriggerDataType::Alert, None),
+            Some(RunOutcome::AckEvent)
+        );
+        let event = TriggerData {
+            status: RunOutcome::AckEvent,
+            acked_by: Some("bob@acme.com".to_string()),
+            ack_action: Some(AckAction::TakeOver),
+            ack_source: Some(AckSource::Slack),
+            taken_over_from: Some("dana@acme.com".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["status"], "ack_event");
+        assert_eq!(json["ack_action"], "take_over");
+        assert_eq!(json["ack_source"], "slack");
+        assert_eq!(json["taken_over_from"], "dana@acme.com");
+        assert_eq!(serde_json::from_value::<TriggerData>(json).unwrap(), event);
+        let suppressed = TriggerData {
+            status: RunOutcome::Suppressed,
+            acked_by: Some("bob@acme.com".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&suppressed).unwrap();
+        assert_eq!(json["status"], "suppressed");
+        assert!(json.get("ack_action").is_none());
+        let bare = serde_json::to_value(TriggerData::default()).unwrap();
+        assert!(bare.get("acked_by").is_none());
+        for field in ["acked_by", "ack_action", "ack_source", "taken_over_from"] {
+            assert!(TriggerData::get_field_names().contains(&field.to_string()));
+        }
+    }
+
+    #[test]
     fn test_run_outcome_from_i32_rejects_unknown() {
         assert_eq!(RunOutcome::from_i32(-1), None);
         assert_eq!(RunOutcome::from_i32(99), None);
@@ -1863,6 +1926,10 @@ mod tests {
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
             trigger_source: None,
             triggered_by: None,

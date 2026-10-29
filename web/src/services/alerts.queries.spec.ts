@@ -14,14 +14,34 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { promRulePreviewQuery, alertHistoryQuery } from "./alerts.queries";
+import {
+  promRulePreviewQuery,
+  alertHistoryQuery,
+  alertAcksQuery,
+  ackAlertMutation,
+  unackAlertMutation,
+  muteAlertMutation,
+  extendAlertMuteMutation,
+  cancelAlertMuteMutation,
+} from "./alerts.queries";
+import { alertKeys } from "./alerts.querykeys";
+import { downtimeKeys } from "./downtimes.querykeys";
+import { announcementKeys } from "./announcements.querykeys";
 import alerts from "./alerts";
 import search from "./search";
 
 vi.mock("./search", () => ({ default: { metrics_query: vi.fn() } }));
 
 vi.mock("./alerts", () => ({
-  default: { getHistory: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }) },
+  default: {
+    getHistory: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }),
+    listAlertAcks: vi.fn(),
+    ackAlert: vi.fn(),
+    unackAlert: vi.fn(),
+    muteAlert: vi.fn(),
+    extendAlertMute: vi.fn(),
+    cancelAlertMute: vi.fn(),
+  },
 }));
 
 const ORG = "test-org";
@@ -99,5 +119,73 @@ describe("promRulePreviewQuery", () => {
     await expect(
       (promRulePreviewQuery("org", "foo", 600).queryFn as () => Promise<number>)(),
     ).rejects.toThrow("Incomplete");
+  });
+});
+
+describe("ack and mute queries", () => {
+  const ACK = {
+    group_key: "",
+    firing_started_at: 1,
+    acked_by: "bob@acme.io",
+    acked_at: 2,
+    ack_source: "slack" as const,
+  };
+
+  it("reads the acks in force under the alert scope", async () => {
+    vi.mocked(alerts.listAlertAcks).mockResolvedValue({ data: { acks: [ACK] } } as never);
+    const options = alertAcksQuery(ORG, "a1");
+    expect(options.queryKey).toEqual(alertKeys.acks(ORG, "a1"));
+    expect(options.queryKey.slice(0, alertKeys.all(ORG).length)).toEqual(alertKeys.all(ORG));
+    expect(await (options.queryFn as () => Promise<unknown>)()).toEqual([ACK]);
+    expect(alerts.listAlertAcks).toHaveBeenCalledWith(ORG, "a1", undefined);
+  });
+
+  it("returns the server's ack answer and refreshes every alert read", async () => {
+    vi.mocked(alerts.ackAlert).mockResolvedValue({ data: { changed: true, acks: [ACK] } } as never);
+    const options = ackAlertMutation(ORG);
+    const run = options.mutationFn as (v: unknown) => Promise<unknown>;
+    const result = await run({ alertId: "a1", body: { all_groups: true }, folderId: "f1" });
+    expect(alerts.ackAlert).toHaveBeenCalledWith(ORG, "a1", { all_groups: true }, "f1");
+    expect(result).toEqual({ changed: true, acks: [ACK] });
+    expect(options.meta?.invalidates).toEqual([alertKeys.all(ORG)]);
+    expect(options.meta?.silentError).toBe(true);
+    expect(unackAlertMutation(ORG).meta?.invalidates).toEqual([alertKeys.all(ORG)]);
+  });
+
+  it("refreshes alerts and downtimes after a mute, and the banner after extend or cancel", async () => {
+    vi.mocked(alerts.muteAlert).mockResolvedValue({ data: { downtime_id: "d1" } } as never);
+    const mute = muteAlertMutation(ORG);
+    await (mute.mutationFn as (v: unknown) => Promise<unknown>)({
+      alertId: "a1",
+      body: { minutes: 60 },
+    });
+    expect(alerts.muteAlert).toHaveBeenCalledWith(ORG, "a1", { minutes: 60 }, undefined);
+    expect(mute.meta?.invalidates).toEqual([alertKeys.all(ORG), downtimeKeys.all(ORG)]);
+    expect(mute.meta?.silentError).toBe(true);
+
+    vi.mocked(alerts.extendAlertMute).mockResolvedValue({ data: { version: 3 } } as never);
+    const extend = extendAlertMuteMutation(ORG);
+    await (extend.mutationFn as (v: unknown) => Promise<unknown>)({
+      alertId: "a1",
+      downtimeId: "d1",
+      body: { version: 2, until_clear: true },
+    });
+    expect(alerts.extendAlertMute).toHaveBeenCalledWith(
+      ORG,
+      "a1",
+      "d1",
+      { version: 2, until_clear: true },
+      undefined,
+    );
+    const withBanner = [alertKeys.all(ORG), downtimeKeys.all(ORG), announcementKeys.all(ORG)];
+    expect(extend.meta?.invalidates).toEqual(withBanner);
+
+    const cancel = cancelAlertMuteMutation(ORG);
+    await (cancel.mutationFn as (v: unknown) => Promise<unknown>)({
+      alertId: "a1",
+      downtimeId: "d1",
+    });
+    expect(alerts.cancelAlertMute).toHaveBeenCalledWith(ORG, "a1", "d1", undefined);
+    expect(cancel.meta?.invalidates).toEqual(withBanner);
   });
 });

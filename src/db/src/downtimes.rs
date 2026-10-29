@@ -406,6 +406,9 @@ mod tests {
 
     fn downtime(org: &str, id: &str) -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: id.to_string(),
             org: org.to_string(),
             folder_id: "default".to_string(),

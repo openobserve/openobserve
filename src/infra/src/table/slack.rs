@@ -15,7 +15,7 @@
 
 use sea_orm::{ConnectionTrait, DbErr};
 
-/// Creates the six Slack tables; for tests, since the migrator replays the whole history.
+/// Creates the Slack tables, `slack_alert_messages` included, without replaying the migrator.
 pub async fn create_tables_for_test<C: ConnectionTrait>(conn: &C) -> Result<(), DbErr> {
     super::migration::create_slack_tables(conn).await
 }
