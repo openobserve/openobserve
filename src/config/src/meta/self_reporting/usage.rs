@@ -1023,8 +1023,7 @@ pub fn is_system_stream(org_id: &str, stream_name: &str) -> bool {
     if stream_name.starts_with("_o2_") {
         return true;
     }
-    // Besides `triggers` and `usage` (per-org usage reporting), non-underscore names are written
-    // only to `_meta`; users may reuse them.
+    // Other non-underscore names are written only to `_meta`; users may reuse them.
     if INTERNAL_STREAM_NAMES.contains(&stream_name) {
         return stream_name.starts_with('_')
             || stream_name == TRIGGERS_STREAM
