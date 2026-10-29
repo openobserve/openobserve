@@ -119,6 +119,7 @@ const mountEditor = async (props: Record<string, unknown> = {}) => {
           AddUser: true,
           DestinationPreview: true,
           SlackDestinationSetup: true,
+          SlackAppDestinationForm: true,
         },
       },
     },
@@ -381,6 +382,19 @@ describe("AddDestination drafts", () => {
     await flushPromises();
     expect(emitted.cancel).toBe(1);
     expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  it("keeps no draft once the Slack app type is picked, and its Cancel closes without asking", async () => {
+    await mountEditor();
+    await fillCustomWebhook();
+    await edit({ destination_type: "slack_app" });
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft(newScope)).toBeNull();
+
+    wrapper!.findComponent({ name: "SlackAppDestinationForm" }).vm.$emit("cancel");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
+    expect(emitted.cancel).toBe(1);
   });
 
   it("Save in the leave dialog saves without closing the editor itself", async () => {
