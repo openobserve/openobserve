@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedProfileType"
             :label="t('profiles.profileType')"
             label-position="inside"
-            :options="profileTypeOptions"
+            :options="profileTypeSelectOptions"
             class="w-full"
             data-test="profiles-type-select"
           />
@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("profiles.partialResult", { percent: sampledPercent }) }}
           </OBanner>
-          <!-- Views on the left, Function Details beside them (below them on phones). -->
+          <!-- Views on the left, Function details beside them (below them on phones). -->
           <div class="md:flex md:min-h-0 md:flex-1">
             <div class="md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col">
               <OTable
@@ -655,6 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useThemeRevision } from "@/composables/useTheme";
 import { useRoute, useRouter, type LocationQuery } from "vue-router";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -685,6 +686,7 @@ import ProfilesFunctionMenu from "./ProfilesFunctionMenu.vue";
 import ProfilesFunctionDetails from "./ProfilesFunctionDetails.vue";
 import ProfilesCompare, { type CompareState } from "./ProfilesCompare.vue";
 import { calleesOf, callersOf } from "./sandwich";
+import { formatPercent } from "./format";
 import { copyToClipboard } from "@/utils/clipboard";
 import streamService from "@/services/stream";
 import profilesService, {
@@ -751,6 +753,7 @@ const defaultCompareState = (): CompareState => ({
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
 const store = useStore();
+const themeRevision = useThemeRevision();
 const route = useRoute();
 const router = useRouter();
 const pageRouteName = route.name;
@@ -789,7 +792,7 @@ const resultsExpanded = ref(false);
 const flameGraphRef = ref<{ focus: (path: string) => void } | null>(null);
 // The function the Sandwich view shows; null means the one with the most self samples.
 const sandwichFunction = ref<string | null>(null);
-// The function in the Function Details panel; null hides the panel.
+// The function in the Function details panel; null hides the panel.
 const detailsName = ref<string | null>(null);
 // The focused flame graph frame, kept here so it outlives a view switch and goes into the URL.
 const flameFocus = ref<string | null>(null);
@@ -808,7 +811,7 @@ const searchSummary = computed(() => {
     for (const child of node.children ?? []) walk(child, inMatch || hit);
   };
   for (const child of result.root.children ?? []) walk(child, false);
-  const percent = `${((matched / result.root.total) * 100).toFixed(1)}%`;
+  const percent = formatPercent(matched, result.root.total);
   return t("profiles.searchSummary", { count, percent }, count);
 });
 
@@ -917,6 +920,14 @@ const profileTypeOptions = computed<SelectOption[]>(() =>
     value: `${item.type}\u0000${item.unit}`,
   })),
 );
+// A type seeded from the URL is shown by its label, not its raw id, until meta lists it.
+const profileTypeSelectOptions = computed<SelectOption[]>(() => {
+  const selected = selectedProfileType.value;
+  const options = profileTypeOptions.value;
+  if (!selected || options.some((option) => option.value === selected)) return options;
+  const [type, unit = ""] = selected.split("\u0000");
+  return [...options, { label: raw(`${type} (${seriesUnitLabel(type, unit)})`), value: selected }];
+});
 const tagKeyOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.label_names ?? []).map((value) => ({ label: raw(value), value })),
 );
@@ -950,7 +961,7 @@ const hasProfileData = computed(() => (mergeResult.value?.total ?? 0) > 0);
 const sampledPercent = computed(() => {
   const result = mergeResult.value;
   if (!result?.truncated || !result.total) return "";
-  return `${((result.merged_total / result.total) * 100).toFixed(1)}%`;
+  return formatPercent(result.merged_total, result.total);
 });
 const seriesPoints = computed(() => seriesResponse.value?.series ?? []);
 const seriesStepSecs = computed(() => Math.max(1, seriesResponse.value?.step_secs ?? 1));
@@ -964,9 +975,17 @@ const isCpuMetric = computed(
   () => currentType.value.toLowerCase() === "cpu" && /nano/i.test(currentUnit.value),
 );
 
-const seriesColors = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) =>
-  cssToken(`--color-chart-series-${step}`, ""),
-);
+// Token values change with the theme, so they are re-read whenever it switches.
+const seriesColors = computed(() => {
+  void themeRevision.value;
+  return {
+    palette: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) =>
+      cssToken(`--color-chart-series-${step}`, ""),
+    ),
+    others: cssToken("--color-border-strong", ""),
+  };
+});
+type SeriesDatum = [number, number | null];
 type SeriesLine = {
   key: string;
   label: string;
@@ -985,11 +1004,12 @@ const seriesLines = computed<SeriesLine[]>(() => {
         label: currentType.value,
         value: "",
         others: false,
-        color: seriesColors[0],
+        color: seriesColors.value.palette[0],
         points: seriesPoints.value,
       },
     ];
   }
+  const { palette, others } = seriesColors.value;
   let colorIndex = 0;
   // Values in their own order (v1.4.0, v1.5.0, v1.10.0), so a value keeps its colour; Others last.
   const ordered = [...groups].sort(
@@ -1004,29 +1024,38 @@ const seriesLines = computed<SeriesLine[]>(() => {
       : group.value || t("profiles.breakdownNoValue"),
     value: group.value,
     others: group.others,
-    color: group.others
-      ? cssToken("--color-border-strong", "")
-      : seriesColors[colorIndex++ % seriesColors.length],
+    color: group.others ? others : palette[colorIndex++ % palette.length],
     points: group.series,
   }));
 });
 
 const seriesChartData = computed(() => {
   const lines = seriesLines.value;
+  // In-use memory is a snapshot, so an empty bucket is missing data, not 0 B.
+  const gapValue = currentType.value.toLowerCase().startsWith("inuse_") ? null : 0;
   const lineData = lines.map((line) =>
-    line.points.map((point) => [Math.floor(point.timestamp / 1000), seriesDisplayValue(point)]),
+    withGaps(
+      line.points.map((point): SeriesDatum => [
+        Math.floor(point.timestamp / 1000),
+        seriesDisplayValue(point),
+      ]),
+      (seriesResponse.value?.step_secs ?? 0) * 1000,
+      gapValue,
+    ),
   );
   const seriesData = lineData.flat();
   const runRange = lastRun.value?.range;
   return {
     options: {
+      // In dark mode the ECharts theme draws its own background, which would box the chart in.
+      backgroundColor: "transparent",
       // Tooltip, grid and y axis follow the Logs histogram (utils/logs/convertLogData.ts).
       tooltip: {
         show: true,
         trigger: "axis",
         textStyle: { fontSize: 12 },
         axisPointer: { type: "cross", label: { show: true, fontSize: 12 } },
-        valueFormatter: (v: number) => formatSeriesValue(v as number),
+        valueFormatter: (v: number | null | undefined) => formatSeriesValue(v),
       },
       grid: { containLabel: true, left: 20, right: 20, top: 8, bottom: 5 },
       // Drag across the chart to pick a time range, as on the Logs histogram; the toolbox itself stays hidden.
@@ -1062,18 +1091,27 @@ const seriesChartData = computed(() => {
           formatter: (v: number) => formatSeriesAxisLabel(v),
         },
       },
-      series: lines.map((line, index) => ({
-        type: "line",
-        name: line.label,
-        smooth: true,
-        // With symbols off, a lone point draws nothing, and two read as a bare segment.
-        showSymbol: line.points.length < 3,
-        color: line.color || undefined,
-        lineStyle: { width: 2 },
-        // An area under one line reads as volume; under several it hides the lines below.
-        areaStyle: lines.length === 1 ? { opacity: 0.12 } : undefined,
-        data: lineData[index],
-      })),
+      series: lines.map((line, index) => {
+        const isolated = isolatedPoints(lineData[index]);
+        const fewPoints = line.points.length < 3;
+        return {
+          type: "line",
+          name: line.label,
+          smooth: false,
+          // With symbols off, a lone point (or one cut off by a gap) draws nothing, and two read as a bare segment.
+          showSymbol: fewPoints || isolated.size > 0,
+          symbol:
+            fewPoints || !isolated.size
+              ? undefined
+              : (_value: unknown, params: { dataIndex: number }) =>
+                  isolated.has(params.dataIndex) ? "emptyCircle" : "none",
+          color: line.color || undefined,
+          lineStyle: { width: 2 },
+          // An area under one line reads as volume; under several it hides the lines below.
+          areaStyle: lines.length === 1 ? { opacity: 0.12 } : undefined,
+          data: lineData[index],
+        };
+      }),
     },
   };
 });
@@ -1110,12 +1148,12 @@ const sandwichCallees = computed(() =>
 const treeCoverage = (name: string | null, drawn: number) => {
   const exact = mergeResult.value?.top.find((row) => row.name === name)?.total ?? 0;
   if (exact <= 0 || drawn / exact >= 0.995) return "";
-  return `${((drawn / exact) * 100).toFixed(1)}%`;
+  return formatPercent(drawn, exact);
 };
 const sandwichCoverage = computed(() =>
   treeCoverage(sandwichName.value, sandwichCallees.value?.total ?? 0),
 );
-// Function Details: exact Self and Total from the Top list, callers and callees from the drawn tree.
+// Function details: exact Self and Total from the Top list, callers and callees from the drawn tree.
 const detailsRow = computed(
   () => mergeResult.value?.top.find((row) => row.name === detailsName.value) ?? null,
 );
@@ -1286,23 +1324,57 @@ const formatCpuCore = (value: number) => {
 
 const isBytesUnit = computed(() => /byte|^b$/i.test(currentUnit.value));
 
-/** Byte ticks on round binary steps (0, 2.5, 5 GB), not decimal steps shown as 3.73 GB. */
-const byteAxisInterval = (points: number[][]) => {
-  const max = Math.max(0, ...points.map(([, value]) => value));
+/** Drops a line to `gapValue` across empty buckets (null breaks it), so a gap is not drawn as a slope. */
+const withGaps = (points: SeriesDatum[], stepMs: number, gapValue: number | null) => {
+  // Without the server's bucket size a gap cannot be told from normal spacing.
+  if (!(stepMs > 0)) return points;
+  const filled: SeriesDatum[] = [];
+  for (const point of points) {
+    const previous = filled.at(-1);
+    if (previous && point[0] - previous[0] > stepMs * 1.5) {
+      const gapStart = previous[0] + stepMs;
+      const gapEnd = point[0] - stepMs;
+      filled.push([gapStart, gapValue]);
+      if (gapValue !== null && gapEnd > gapStart) filled.push([gapEnd, gapValue]);
+    }
+    filled.push(point);
+  }
+  return filled;
+};
+
+/** Indexes of points with no non-null neighbour, which a line cannot draw without a symbol. */
+const isolatedPoints = (points: SeriesDatum[]) => {
+  const isolated = new Set<number>();
+  points.forEach(([, value], index) => {
+    if (value === null) return;
+    const before = points[index - 1]?.[1] ?? null;
+    const after = points[index + 1]?.[1] ?? null;
+    if (before === null && after === null) isolated.add(index);
+  });
+  return isolated;
+};
+
+/** Byte ticks on round binary steps (0, 2.5, 5 GiB), not decimal steps shown as 3.73 GiB. */
+const byteAxisInterval = (points: SeriesDatum[]) => {
+  // A loop, not Math.max(...spread), which overflows the call stack on long multi-line runs.
+  let max = 0;
+  for (const [, value] of points) if (value !== null && value > max) max = value;
   if (!max) return undefined;
   const unitSize = 1024 ** Math.min(4, Math.floor(Math.log(max) / Math.log(1024)));
   return niceStep(max / unitSize / 3) * unitSize;
 };
 
-/** Short axis labels from the shared chart formatter, as on the Logs histogram (1.50K, 2.50GB, 2.00s). */
+/** Short axis labels as on the Logs histogram (1.50K, 2.00s); bytes use the table's binary units (2.5 GiB). */
 const formatSeriesAxisLabel = (value: number) => {
+  if (isBytesUnit.value) return formatBytes(value);
   let unit = "numbers";
-  if (isBytesUnit.value) unit = "bytes";
-  else if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
+  if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
   return formatUnitValue(getUnitValue(value, unit, "", 2));
 };
 
-const formatSeriesValue = (value: number) => {
+const formatSeriesValue = (value: number | null | undefined) => {
+  // In-use gaps are null so the line breaks; formatting them would read as a real 0 B.
+  if (value === null || value === undefined) return "—";
   if (isCpuMetric.value) return formatCpuCore(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
   if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
@@ -1314,8 +1386,6 @@ const shareOf = (value: number) => {
   const total = mergeResult.value?.total ?? 0;
   return total > 0 ? (value / total) * 100 : 0;
 };
-const formatPercent = (value: number, total: number) =>
-  total > 0 ? `${((value / total) * 100).toFixed(2)}%` : "0.00%";
 
 const highlightName = (name: string) => {
   const query = searchQuery.value.trim();

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 
 /**
@@ -29,6 +29,16 @@ export function useTheme() {
   const store = useStore();
   const isDark = computed(() => store.state.theme === "dark");
   return { isDark };
+}
+
+/** Changes on a light/dark switch and on a colour preset, which only fires `themeColorChanged`; read it in a computed that reads tokens. */
+export function useThemeRevision() {
+  const store = useStore();
+  const presetRevision = ref(0);
+  const onThemeColorChanged = () => presetRevision.value++;
+  onMounted(() => window.addEventListener("themeColorChanged", onThemeColorChanged));
+  onBeforeUnmount(() => window.removeEventListener("themeColorChanged", onThemeColorChanged));
+  return computed(() => `${store?.state?.theme}:${presetRevision.value}`);
 }
 
 export default useTheme;
