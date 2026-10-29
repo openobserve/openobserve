@@ -13,20 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Light values stay at or above 4.5:1 on the table's selected-row fill, not only on white.
 export const LIGHT_MODE_COLORS = {
   key: "#B71C1C", // red color for keys
-  stringValue: "#047857", // Softer green for strings - easy on eyes
-  numberValue: "#2563EB", // Royal blue for numbers - distinct from red keys
+  stringValue: "#065F46", // Softer green for strings - easy on eyes
+  numberValue: "#1D4ED8", // Royal blue for numbers - distinct from red keys
   booleanValue: "#6D28D9", // Soft purple for booleans - distinct but calm
   objectValue: "#4B5563", // Neutral gray for objects - subtle and professional
-  arrayValue: "#0E7490", // Calm teal for arrays - professional and clear
-  nullValue: "#6B7280", // Medium gray for null - appropriately muted
+  arrayValue: "#155E75", // Calm teal for arrays - professional and clear
+  nullValue: "#4B5563", // Medium gray for null - appropriately muted
   // Semantic types for log data
   url: "#1D4ED8", // Strong blue for URLs - clearly indicates links
   ip: "#D97706", // Bold amber for IP addresses - highly visible
-  email: "#9333EA", // Vivid purple for emails - distinct and readable
-  timestamp: "#2563EB", // Dark red for timestamps - important and visible
-  uuid: "#047857", // Dark teal for UUIDs - unique and readable
+  email: "#7E22CE", // Vivid purple for emails - distinct and readable
+  timestamp: "#1D4ED8", // Dark red for timestamps - important and visible
+  uuid: "#065F46", // Dark teal for UUIDs - unique and readable
   path: "#4338CA", // Deep indigo for file paths - system-related and clear
 } as const;
 
