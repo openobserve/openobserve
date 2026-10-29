@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        class="border-card-glass-border bg-card-glass-bg flex min-h-9 shrink-0 items-center border-b max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
