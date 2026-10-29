@@ -1293,7 +1293,7 @@ async function save(): Promise<boolean> {
     });
     if (!(await saveChannelAfterPolicy())) {
       emit("policy-written");
-      return;
+      return false;
     }
     toast({ variant: "success", message: t("oncall.policySaved") });
     policyDraft.markSaved();
