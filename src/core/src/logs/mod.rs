@@ -273,6 +273,12 @@ async fn write_logs_by_stream(
             stream_skipped = true;
             continue; // skip
         }
+        // before the new-stream hooks, so a stream that cannot be stored is never announced
+        if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Logs, &stream_name) {
+            let columnar = columnar.take_if(|c| c.stream_name() == stream_name);
+            reject_stream_rows(&stream_name, &json_data, columnar, status, &e.to_string());
+            continue;
+        }
 
         if crate::ingestion::checks_for_new_stream(org_id)
             && !infra::schema::exists(org_id, StreamType::Logs, &stream_name).await
@@ -368,6 +374,41 @@ async fn write_logs_by_stream(
         }
     }
     Ok(stream_skipped)
+}
+
+/// Fails every row of a stream the write refuses, in the shape the caller's response reports.
+fn reject_stream_rows(
+    stream_name: &str,
+    json_data: &[(i64, Map<String, Value>)],
+    columnar: Option<columnar::JsonColumnar>,
+    status: &mut IngestionStatus,
+    reason: &str,
+) {
+    match status {
+        IngestionStatus::Record(status) => {
+            let rows = json_data.len() + columnar.map_or(0, |c| c.rows());
+            status.failed += rows as u32;
+            status.error = reason.to_string();
+        }
+        IngestionStatus::Bulk(bulk_res) => {
+            let doc_ids = json_data
+                .iter()
+                .map(|(_, record)| record.get("_id").and_then(Value::as_str).map(String::from))
+                .chain(columnar.into_iter().flat_map(|mut c| c.take_bulk_ids()));
+            // `errors` stays as is: Fluent Bit retries a whole chunk on it and duplicates its rows
+            for doc_id in doc_ids {
+                bulk::add_record_status(
+                    stream_name.to_string(),
+                    doc_id,
+                    String::new(),
+                    None,
+                    bulk_res,
+                    Some(bulk::STREAM_NAME_TOO_LONG.to_string()),
+                    Some(reason.to_string()),
+                );
+            }
+        }
+    }
 }
 
 async fn write_logs(
@@ -733,6 +774,42 @@ mod tests {
     use config::utils::json::json;
 
     use super::*;
+
+    #[test]
+    fn test_reject_stream_rows_fails_every_row() {
+        let rows: Vec<(i64, Map<String, Value>)> = vec![
+            (0, json!({"_id": "a"}).as_object().unwrap().clone()),
+            (0, json!({"message": "b"}).as_object().unwrap().clone()),
+        ];
+
+        let mut record = IngestionStatus::Record(ingestion_common::RecordStatus::default());
+        reject_stream_rows("s", &rows, None, &mut record, "too long");
+        let IngestionStatus::Record(status) = record else {
+            unreachable!()
+        };
+        assert_eq!((status.successful, status.failed), (0, 2));
+        assert_eq!(status.error, "too long");
+
+        let mut bulk = IngestionStatus::Bulk(ingestion_common::BulkResponse {
+            took: 0,
+            errors: false,
+            items: vec![],
+        });
+        reject_stream_rows("s", &rows, None, &mut bulk, "too long");
+        let IngestionStatus::Bulk(bulk) = bulk else {
+            unreachable!()
+        };
+        assert!(!bulk.errors);
+        let ids: Vec<&str> = bulk
+            .items
+            .iter()
+            .map(|item| item["index"]._id.as_str())
+            .collect();
+        assert_eq!(ids, ["a", ""]);
+        let error = bulk.items[0]["index"].error.as_ref().unwrap();
+        assert_eq!(error.err_type, bulk::STREAM_NAME_TOO_LONG);
+        assert_eq!(error.reason, "too long");
+    }
 
     #[test]
     fn test_set_parsing_error() {
