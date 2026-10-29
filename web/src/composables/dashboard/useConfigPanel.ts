@@ -130,6 +130,7 @@ export const shouldShowHeatmapYBucket = (dashboardPanelData: any, promqlMode: bo
 /** The only sections an HTML panel shows; every other section configures an ECharts option it never builds. */
 export const HTML_PANEL_SECTIONS: Record<string, readonly SectionId[]> = {
   "alert-list": ["general", "alertList"],
+  "flame-graph": ["general", "data", "flameGraph"],
 };
 
 export const isSectionAllowedForType = (sectionId: SectionId, type: unknown): boolean =>
@@ -934,6 +935,12 @@ export function useConfigPanel(
       "alert-list-max": {
         label: t("dashboard.alertListMax"),
         visible: dashboardPanelData.data.type === "alert-list",
+      },
+    },
+    flameGraph: {
+      "flame-graph-fields": {
+        label: [t("dashboard.flameGraphStackField"), t("dashboard.flameGraphValueField")],
+        visible: dashboardPanelData.data.type === "flame-graph",
       },
     },
   }));

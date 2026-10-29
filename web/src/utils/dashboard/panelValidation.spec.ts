@@ -969,6 +969,79 @@ describe("validatePanel on the alert list", () => {
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+describe("validatePanel on the flame graph", () => {
+  const run = (
+    type: string,
+    query: Partial<{ query: string; customQuery: boolean }>,
+    config: any = {},
+    queryType = "sql",
+  ) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              query: "",
+              customQuery: false,
+              fields: { x: [], y: [], breakdown: [], z: [] },
+              ...query,
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const sql = { customQuery: true, query: 'SELECT * FROM "demo_app"' };
+
+  it("needs a query but asks for no builder fields", () => {
+    expect(run("flame-graph", sql)).toEqual([]);
+    const empty = gt("dashboard.utils.queryIsEmpty", { index: 1 });
+    expect(run("flame-graph", { customQuery: true, query: "" })).toEqual([empty]);
+  });
+
+  it("is not allowed on PromQL", () => {
+    const unsupported = gt("dashboard.utils.promqlChartTypeUnsupported");
+    expect(run("flame-graph", { customQuery: true, query: "up" }, {}, "promql")).toContain(
+      unsupported,
+    );
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            {
+              type: "flame-graph",
+              id: "p-flame-graph",
+              title: "t",
+              layout: { x: 0, y: 0, w: 1, h: 1, i: "flame-graph" },
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {} }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
 
 describe("validatePanel on a gauge range", () => {
   const run = (configs: any[]) => {

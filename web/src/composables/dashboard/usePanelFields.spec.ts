@@ -730,4 +730,15 @@ describe("usePanelFields", () => {
       expect(addMany("breakdown", 3)).toBe(0);
     });
   });
+  describe("flame graph slots", () => {
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "flame-graph";
+      fields.addXAxisItem({ name: "field_x" });
+      fields.addYAxisItem({ name: "field_y" });
+      fields.addBreakDownAxisItem({ name: "field_b" });
+      expect(panelData.data.queries[0].fields.x).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.y).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
+    });
+  });
 });
