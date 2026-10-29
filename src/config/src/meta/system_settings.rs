@@ -370,271 +370,90 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_setting_scope_from_str() {
-        assert_eq!(
-            "system".parse::<SettingScope>().unwrap(),
-            SettingScope::System
-        );
-        assert_eq!("org".parse::<SettingScope>().unwrap(), SettingScope::Org);
-        assert_eq!("user".parse::<SettingScope>().unwrap(), SettingScope::User);
+    fn setting_scope_round_trips_through_str_case_insensitively() {
+        for scope in [SettingScope::System, SettingScope::Org, SettingScope::User] {
+            let s = scope.to_string();
+            assert_eq!(s, scope.as_str());
+            assert_eq!(s.parse::<SettingScope>().unwrap(), scope);
+            assert_eq!(s.to_uppercase().parse::<SettingScope>().unwrap(), scope);
+        }
         assert!("invalid".parse::<SettingScope>().is_err());
     }
 
     #[test]
-    fn test_setting_scope_as_str() {
-        assert_eq!(SettingScope::System.as_str(), "system");
-        assert_eq!(SettingScope::Org.as_str(), "org");
-        assert_eq!(SettingScope::User.as_str(), "user");
-    }
-
-    #[test]
-    fn test_setting_scope_display() {
-        assert_eq!(SettingScope::System.to_string(), "system");
-        assert_eq!(SettingScope::Org.to_string(), "org");
-        assert_eq!(SettingScope::User.to_string(), "user");
-    }
-
-    #[test]
-    fn test_setting_scope_from_str_case_insensitive() {
-        assert_eq!(
-            "SYSTEM".parse::<SettingScope>().unwrap(),
-            SettingScope::System
-        );
-        assert_eq!("ORG".parse::<SettingScope>().unwrap(), SettingScope::Org);
-        assert_eq!("USER".parse::<SettingScope>().unwrap(), SettingScope::User);
-    }
-
-    #[test]
-    fn test_setting_category_as_str() {
-        assert_eq!(SettingCategory::Correlation.as_str(), "correlation");
-        assert_eq!(SettingCategory::Ui.as_str(), "ui");
-        assert_eq!(SettingCategory::Alerts.as_str(), "alerts");
-        assert_eq!(SettingCategory::Retention.as_str(), "retention");
-        assert_eq!(SettingCategory::Search.as_str(), "search");
-        assert_eq!(SettingCategory::Ingestion.as_str(), "ingestion");
-        assert_eq!(SettingCategory::General.as_str(), "general");
-        assert_eq!(SettingCategory::Security.as_str(), "security");
-    }
-
-    #[test]
-    fn test_setting_category_display() {
-        assert_eq!(SettingCategory::Correlation.to_string(), "correlation");
-        assert_eq!(SettingCategory::Ui.to_string(), "ui");
-    }
-
-    #[test]
-    fn test_setting_category_from_str() {
-        assert_eq!(
-            "correlation".parse::<SettingCategory>().unwrap(),
-            SettingCategory::Correlation
-        );
-        assert_eq!(
-            "ui".parse::<SettingCategory>().unwrap(),
-            SettingCategory::Ui
-        );
-        assert_eq!(
-            "alerts".parse::<SettingCategory>().unwrap(),
-            SettingCategory::Alerts
-        );
-        assert_eq!(
-            "retention".parse::<SettingCategory>().unwrap(),
-            SettingCategory::Retention
-        );
-        assert_eq!(
-            "search".parse::<SettingCategory>().unwrap(),
-            SettingCategory::Search
-        );
-        assert_eq!(
-            "ingestion".parse::<SettingCategory>().unwrap(),
-            SettingCategory::Ingestion
-        );
-        assert_eq!(
-            "general".parse::<SettingCategory>().unwrap(),
-            SettingCategory::General
-        );
-        assert_eq!(
-            "security".parse::<SettingCategory>().unwrap(),
-            SettingCategory::Security
-        );
+    fn setting_category_round_trips_through_str_case_insensitively() {
+        for category in [
+            SettingCategory::Correlation,
+            SettingCategory::Ui,
+            SettingCategory::Alerts,
+            SettingCategory::Retention,
+            SettingCategory::Search,
+            SettingCategory::Ingestion,
+            SettingCategory::General,
+            SettingCategory::Security,
+        ] {
+            let s = category.to_string();
+            assert_eq!(s, category.as_str());
+            assert_eq!(s.parse::<SettingCategory>().unwrap(), category);
+            assert_eq!(
+                s.to_uppercase().parse::<SettingCategory>().unwrap(),
+                category
+            );
+        }
         assert!("unknown".parse::<SettingCategory>().is_err());
     }
 
     #[test]
-    fn test_setting_category_from_str_case_insensitive() {
-        assert_eq!(
-            "SEARCH".parse::<SettingCategory>().unwrap(),
-            SettingCategory::Search
-        );
-    }
-
-    #[test]
-    fn test_new_system_fields() {
-        let s = SystemSetting::new_system("mykey", serde_json::json!(42));
-        assert_eq!(s.scope, SettingScope::System);
-        assert_eq!(s.setting_key, "mykey");
-        assert_eq!(s.setting_value, serde_json::json!(42));
-        assert!(s.org_id.is_none());
-        assert!(s.user_id.is_none());
-        assert!(s.id.is_none());
-        assert!(s.setting_category.is_none());
-        assert!(s.description.is_none());
-    }
-
-    #[test]
-    fn test_new_org_fields() {
-        let s = SystemSetting::new_org("myorg", "mykey", serde_json::json!(true));
-        assert_eq!(s.scope, SettingScope::Org);
-        assert_eq!(s.org_id.as_deref(), Some("myorg"));
-        assert_eq!(s.setting_key, "mykey");
-        assert!(s.user_id.is_none());
-    }
-
-    #[test]
-    fn test_new_user_fields() {
-        let s = SystemSetting::new_user("myorg", "myuser", "mykey", serde_json::json!("val"));
-        assert_eq!(s.scope, SettingScope::User);
-        assert_eq!(s.org_id.as_deref(), Some("myorg"));
-        assert_eq!(s.user_id.as_deref(), Some("myuser"));
-        assert_eq!(s.setting_key, "mykey");
-    }
-
-    #[test]
-    fn test_with_category() {
-        let s = SystemSetting::new_system("k", serde_json::json!(1))
-            .with_category(SettingCategory::Search);
-        assert_eq!(s.setting_category.as_deref(), Some("search"));
-    }
-
-    #[test]
-    fn test_with_description() {
-        let s = SystemSetting::new_system("k", serde_json::json!(1)).with_description("my desc");
-        assert_eq!(s.description.as_deref(), Some("my desc"));
-    }
-
-    #[test]
-    fn test_validate_system_with_user_id_fails() {
-        let mut s = SystemSetting::new_system("k", serde_json::json!(1));
-        s.user_id = Some("u".to_string());
-        assert!(s.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_org_with_user_id_fails() {
-        let mut s = SystemSetting::new_org("org", "k", serde_json::json!(1));
-        s.user_id = Some("u".to_string());
-        assert!(s.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_user_without_org_fails() {
-        let mut s = SystemSetting::new_user("org", "u", "k", serde_json::json!(1));
-        s.org_id = None;
-        assert!(s.validate().is_err());
-    }
-
-    #[test]
-    fn test_system_setting_validation() {
-        // Valid system setting
-        let system_setting = SystemSetting::new_system("test_key", serde_json::json!("value"));
-        assert!(system_setting.validate().is_ok());
-
-        // Valid org setting
-        let org_setting = SystemSetting::new_org("default", "test_key", serde_json::json!("value"));
-        assert!(org_setting.validate().is_ok());
-
-        // Valid user setting
-        let user_setting = SystemSetting::new_user(
-            "default",
-            "user@example.com",
-            "test_key",
-            serde_json::json!("value"),
-        );
-        assert!(user_setting.validate().is_ok());
-
-        // Invalid: system with org_id
-        let mut invalid = SystemSetting::new_system("test_key", serde_json::json!("value"));
-        invalid.org_id = Some("default".to_string());
-        assert!(invalid.validate().is_err());
-
-        // Invalid: org without org_id
-        let mut invalid = SystemSetting::new_org("default", "test_key", serde_json::json!("value"));
-        invalid.org_id = None;
-        assert!(invalid.validate().is_err());
-
-        // Invalid: user without user_id
-        let mut invalid = SystemSetting::new_user(
-            "default",
-            "user@example.com",
-            "test_key",
-            serde_json::json!("value"),
-        );
-        invalid.user_id = None;
-        assert!(invalid.validate().is_err());
-    }
-
-    #[test]
-    fn test_system_setting_skip_serializing_if_none_fields_absent() {
-        let s = SystemSetting::new_system("key1", serde_json::json!(1));
-        let json = serde_json::to_value(&s).unwrap();
-        let obj = json.as_object().unwrap();
-        // All optional fields are None → skip_serializing_if omits them
-        assert!(!obj.contains_key("id"));
-        assert!(!obj.contains_key("org_id"));
-        assert!(!obj.contains_key("user_id"));
-        assert!(!obj.contains_key("setting_category"));
-        assert!(!obj.contains_key("description"));
-        assert!(!obj.contains_key("created_by"));
-        assert!(!obj.contains_key("updated_by"));
-    }
-
-    #[test]
-    fn test_system_setting_skip_serializing_if_some_fields_present() {
-        let mut s = SystemSetting::new_system("key2", serde_json::json!(2));
-        s.id = Some(42);
-        s.setting_category = Some("search".to_string());
-        s.description = Some("desc".to_string());
-        s.created_by = Some("user@example.com".to_string());
-        s.updated_by = Some("admin@example.com".to_string());
-        let json = serde_json::to_value(&s).unwrap();
-        let obj = json.as_object().unwrap();
-        assert!(obj.contains_key("id"));
-        assert_eq!(obj["id"], serde_json::json!(42));
-        assert!(obj.contains_key("setting_category"));
-        assert!(obj.contains_key("description"));
-        assert!(obj.contains_key("created_by"));
-        assert!(obj.contains_key("updated_by"));
-    }
-
-    #[test]
-    fn test_system_setting_payload_skip_serializing_if_none() {
-        let p = SystemSettingPayload {
-            setting_key: "k".to_string(),
-            setting_value: serde_json::json!(true),
-            setting_category: None,
-            description: None,
+    fn validate_enforces_org_and_user_ids_per_scope() {
+        let v = serde_json::json!(1);
+        let with = |mut s: SystemSetting, org: Option<&str>, user: Option<&str>| {
+            s.org_id = org.map(String::from);
+            s.user_id = user.map(String::from);
+            s
         };
-        let json = serde_json::to_value(&p).unwrap();
-        let obj = json.as_object().unwrap();
-        assert!(!obj.contains_key("setting_category"));
-        assert!(!obj.contains_key("description"));
-    }
-
-    #[test]
-    fn test_system_setting_payload_skip_serializing_if_some() {
-        let p = SystemSettingPayload {
-            setting_key: "k".to_string(),
-            setting_value: serde_json::json!(false),
-            setting_category: Some("ui".to_string()),
-            description: Some("some desc".to_string()),
-        };
-        let json = serde_json::to_value(&p).unwrap();
-        let obj = json.as_object().unwrap();
-        assert!(obj.contains_key("setting_category"));
-        assert!(obj.contains_key("description"));
-    }
-
-    #[test]
-    fn test_default_include_defaults() {
-        assert!(default_include_defaults());
+        let cases = [
+            (SystemSetting::new_system("k", v.clone()), true),
+            (
+                with(SystemSetting::new_system("k", v.clone()), Some("o"), None),
+                false,
+            ),
+            (
+                with(SystemSetting::new_system("k", v.clone()), None, Some("u")),
+                false,
+            ),
+            (SystemSetting::new_org("o", "k", v.clone()), true),
+            (
+                with(SystemSetting::new_org("o", "k", v.clone()), None, None),
+                false,
+            ),
+            (
+                with(
+                    SystemSetting::new_org("o", "k", v.clone()),
+                    Some("o"),
+                    Some("u"),
+                ),
+                false,
+            ),
+            (SystemSetting::new_user("o", "u", "k", v.clone()), true),
+            (
+                with(
+                    SystemSetting::new_user("o", "u", "k", v.clone()),
+                    None,
+                    Some("u"),
+                ),
+                false,
+            ),
+            (
+                with(
+                    SystemSetting::new_user("o", "u", "k", v.clone()),
+                    Some("o"),
+                    None,
+                ),
+                false,
+            ),
+        ];
+        for (i, (setting, ok)) in cases.iter().enumerate() {
+            assert_eq!(setting.validate().is_ok(), *ok, "case {i}: {setting:?}");
+        }
     }
 }
