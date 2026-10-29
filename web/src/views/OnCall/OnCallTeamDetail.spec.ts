@@ -1199,6 +1199,26 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(false);
   });
 
+  /// There is no team to edit on "Team not found", including one deleted while the page was open.
+  it("offers Edit team only while the team is loaded", async () => {
+    service.getTeam.mockRejectedValueOnce({ response: { status: 404 } });
+    const missing = render();
+    await flushPromises();
+    expect(missing.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(false);
+    missing.unmount();
+
+    queryClient.clear();
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(true);
+
+    service.getTeam.mockRejectedValueOnce({ response: { status: 404 } });
+    await wrapper.find('[data-test="oncall-team-refresh"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(false);
+  });
+
   /// The org-level team list is the one fetch every on-call build serves
   /// regardless of team id, so only its 404 is a real "feature unavailable" signal.
   it("still shows the unavailable gate when the build has no on-call routes at all", async () => {
