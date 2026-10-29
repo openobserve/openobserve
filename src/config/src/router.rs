@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 40] = [
+const QUERIER_ROUTES: [(&str, usize); 42] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
@@ -58,6 +58,9 @@ const QUERIER_ROUTES: [(&str, usize); 40] = [
     ("node/list", 2),           // /api/_meta/node/list
     ("gen_ai/data_health", 2),  // /api/{org_id}/gen_ai/data_health
     ("llm/models/unpriced", 2), // /api/{org_id}/llm/models/unpriced
+    // Queriers own the built-in GitHub sync, so its node-local sync time lives there.
+    ("llm/models/built-in", 2), // /api/{org_id}/llm/models/built-in
+    ("llm/models/refresh-built-in", 2), // /api/{org_id}/llm/models/refresh-built-in
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
@@ -237,6 +240,12 @@ mod tests {
         assert!(is_querier_route(
             "/api/org1/traces/time_range?trace_id=a,b,c"
         ));
+        // Built-in catalogue status and refresh read the querier's sync state.
+        assert!(is_querier_route(
+            "/api/org1/llm/models/built-in?metadata_only=true"
+        ));
+        assert!(is_querier_route("/api/org1/llm/models/refresh-built-in"));
+        assert!(!is_querier_route("/api/org1/llm/models"));
         // the org-level entry must not swallow the OTLP ingest route
         assert!(!is_querier_route("/api/org1/traces"));
     }

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use axum::{
     Json,
@@ -33,7 +33,9 @@ use {
     openobserve_core::auth::{UserEmail, check_permissions},
 };
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse, request::gen_ai_health::MAX_AGENT_NAMES,
+};
 
 fn source_priority(source: &PricingSource) -> u8 {
     match source {
@@ -661,11 +663,21 @@ fn resolve_unpriced(
             existing.row.spans += row.spans;
             existing.row.tokens += row.tokens;
             existing.row.cost += row.cost;
+            // Counts per status overlap, so the larger is a floor for the merged distinct count.
+            existing.row.agent_count = existing.row.agent_count.max(row.agent_count);
+            let mut seen: HashSet<String> = existing.row.agents.iter().cloned().collect();
             for agent in row.agents {
-                if !existing.row.agents.contains(&agent) {
+                if existing.row.agents.len() >= MAX_AGENT_NAMES {
+                    break;
+                }
+                if seen.insert(agent.clone()) {
                     existing.row.agents.push(agent);
                 }
             }
+            existing.row.agent_count = existing
+                .row
+                .agent_count
+                .max(existing.row.agents.len() as i64);
             continue;
         }
         let matched = resolved.map(|r| UnpricedModelMatch {
@@ -1644,6 +1656,7 @@ mod tests {
             tokens,
             cost: 0.0,
             agents: vec!["a".to_string()],
+            agent_count: 1,
         }
     }
 
@@ -1696,6 +1709,23 @@ mod tests {
         // The model is null on the wire, not an empty name.
         let wire = config::utils::json::to_value(&out[0]).unwrap();
         assert_eq!(wire.get("model"), Some(&config::utils::json::Value::Null));
+    }
+
+    #[test]
+    fn test_resolve_unpriced_caps_merged_agent_names_and_keeps_the_count() {
+        use config::meta::model_pricing::CostStatus;
+        let names = |range: std::ops::Range<usize>| range.map(|i| format!("agent-{i}")).collect();
+        let mut unpriced = unpriced_row("m", CostStatus::Unpriced, 10);
+        unpriced.agents = names(0..8);
+        unpriced.agent_count = 25;
+        let mut approximate = unpriced_row("m", CostStatus::Approximate, 10);
+        approximate.agents = names(4..10);
+        approximate.agent_count = 6;
+        let out = resolve_unpriced(vec![unpriced, approximate], &[], 0);
+        let agents = &out[0].row.agents;
+        assert_eq!(agents.len(), MAX_AGENT_NAMES);
+        assert_eq!(agents.iter().collect::<HashSet<_>>().len(), MAX_AGENT_NAMES);
+        assert_eq!(out[0].row.agent_count, 25);
     }
 
     #[test]

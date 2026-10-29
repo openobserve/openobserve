@@ -49,7 +49,10 @@ export interface UnpricedModel {
   spans: number;
   tokens: number;
   cost: number;
+  /** Up to 10 agent names that sent the model. */
   agents: string[];
+  /** Distinct agent names behind the row, including those past the list cap. */
+  agent_count: number;
   /** True when an exact definition covers new spans, but recorded costs still have a gap. */
   priced_now?: boolean;
   /** The pricing definition the model resolves to today, if any. */

@@ -285,7 +285,8 @@ and prints each check with the page that fixes it. Show its output to the user a
 ```
 
 Exit codes: `0` GenAI spans arrived and no check is in error, `1` a check is in error, `2`
-configuration problem, or no GenAI span before the timeout (every check covering 0 spans counts as
+configuration problem, a server without the data health API (upgrade it), or no GenAI span before
+the timeout (every check covering 0 spans counts as
 none). On `2` with no GenAI spans: confirm the OpenAI/Anthropic instrumentor is installed, the init
 lines run before the client import, the process exits cleanly, and the stream name matches.
 
