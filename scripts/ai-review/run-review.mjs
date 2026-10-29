@@ -10,9 +10,11 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
+  addUsage,
   cleanAttributes,
   genAiRequestAttributes,
   genAiResponseAttributes,
+  genAiUsageAttributes,
   sha256,
 } from "./telemetry.mjs";
 import { REVIEW_PASS_TAG, reviewPassCount, reviewPassTag, selectOwnReviewComment } from "./src/comments.mjs";
@@ -103,6 +105,8 @@ const REVIEW_INLINE = (process.env.REVIEW_INLINE || "false").toLowerCase() === "
 // Paid reviews per PR; the count lives in the review comment, so deleting that comment resets it.
 const REVIEW_MAX_PASSES = Number.parseInt(process.env.REVIEW_MAX_PASSES, 10) > 0 ? Number.parseInt(process.env.REVIEW_MAX_PASSES, 10) : 2;
 const REVIEW_IGNORE_PASS_LIMIT = process.env.REVIEW_IGNORE_PASS_LIMIT === "true";
+// The runner appends the limit note itself, so a copy the coordinator echoes from the previous review is stripped.
+const PASS_LIMIT_NOTE_RE = /\n*> \[!NOTE\]\n> This PR has used its \d+ automatic reviews[^\n]*/g;
 // Where the raw findings JSON is written for the workflow to upload; unset skips it.
 const REVIEW_ARTIFACT_DIR = process.env.REVIEW_ARTIFACT_DIR || "";
 
@@ -601,6 +605,10 @@ class TraceRecorder {
       console.log(`[${isoNow()}] Exported ${this.exportedSpanCount}/${this.spanCount} trace spans to OpenObserve`);
     } catch (err) {
       console.warn(`[${isoNow()}] Trace export failed: ${formatTraceExportError(err)}`);
+      // A forceFlush timeout hides the per-span exporter errors that would say why.
+      for (const failure of /exporter rejected/.test(err?.message || "") ? [] : this.exportFailures) {
+        console.warn(`[${isoNow()}]   ${failure.spanNames.join(",")}: ${formatTraceExportError(failure.error)}`);
+      }
     } finally {
       try {
         await withDeadline("trace shutdown", this.provider.shutdown());
@@ -791,6 +799,7 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
   TRACE.setSpanAttributes(llmSpan, genAiRequestAttributes(truncatedSystem, truncatedUser));
 
   let attempt = 0;
+  let failedUsage = null;
   try {
     for (;;) {
       attempt += 1;
@@ -808,7 +817,8 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         if (result.rejectedPermissions > 0) {
           console.warn(`[${isoNow()}] ${agentName}: rejected ${result.rejectedPermissions} permission request(s)`);
         }
-        const responseAttributes = genAiResponseAttributes({ info: result.info }, result.text, MODEL_ID);
+        const info = failedUsage ? { ...result.info, ...addUsage(failedUsage, result.info) } : result.info;
+        const responseAttributes = genAiResponseAttributes({ info }, result.text, MODEL_ID);
         TRACE.setSpanAttributes(llmSpan, responseAttributes);
         TRACE.endSpan(llmSpan, {
           "gen_ai.response.id": result.responseId,
@@ -819,6 +829,7 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         });
         return { text: result.text, responseId: result.responseId };
       } catch (err) {
+        failedUsage = addUsage(failedUsage, err?.usage);
         const retry = shouldRetry({
           err,
           attempt,
@@ -833,6 +844,7 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
     }
   } catch (err) {
     const timedOut = err?.name === "TimeoutError";
+    if (failedUsage) TRACE.setSpanAttributes(llmSpan, genAiUsageAttributes(failedUsage));
     TRACE.endSpan(llmSpan, { "error.timeout": timedOut, "timeout.ms": timeoutMs, "ai.review.attempts": attempt }, err);
     throw err;
   }
@@ -1024,6 +1036,7 @@ function sanitizeReviewBody(body) {
   // from the prompt or from a previous review can't end up carrying two of them.
   cleaned = cleaned.replace(new RegExp(ANY_REVIEW_MARKER, "gi"), "");
   cleaned = cleaned.replace(new RegExp(REVIEW_PASS_TAG, "gi"), "");
+  cleaned = cleaned.replace(PASS_LIMIT_NOTE_RE, "");
 
   // Drop any preamble the model emitted before the review proper ("Now I have all the
   // context. Let me produce the consolidated review."). Runs after marker stripping so a
@@ -1273,18 +1286,45 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 
 // ─── GitHub integration ────────────────────────────────────────────────────
 
+// ok is false when the bot's comments could not be read, so neither the previous review nor the pass count is known.
 function findExistingReviewComment(prNumber) {
   if (!REVIEW_BOT_LOGIN) {
     console.log(`[${isoNow()}] REVIEW_BOT_LOGIN is not set; not looking for a previous review`);
-    return null;
+    return { comment: null, ok: false };
   }
   try {
     const pages = JSON.parse(gh(`api --paginate --slurp "repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments"`));
-    return selectOwnReviewComment(pages.flat(), REVIEW_BOT_LOGIN, ANY_REVIEW_MARKER);
+    return { comment: selectOwnReviewComment(pages.flat(), REVIEW_BOT_LOGIN, ANY_REVIEW_MARKER), ok: true };
   } catch (err) {
     console.warn(`[${isoNow()}] Could not list PR comments, so no previous review is used: ${execErrorText(err).slice(0, 300)}`);
-    return null;
+    return { comment: null, ok: false };
   }
+}
+
+function passLimitNote() {
+  return `> [!NOTE]\n> This PR has used its ${REVIEW_MAX_PASSES} automatic reviews; later pushes are not reviewed. Run the AI Code Review workflow by hand with \`ignore_pass_limit\` to review it again.`;
+}
+
+function isPlaceholderComment(body) {
+  return body.includes(PAIRED_POINTER_TAG) || body.includes(NOTICE_TAG);
+}
+
+function passesDoneIn(comment) {
+  if (!comment) return 0;
+  return reviewPassCount(comment.body, isPlaceholderComment(comment.body) ? 0 : 1);
+}
+
+function withPassTag(body, count) {
+  return `${body.replace(new RegExp(`\\n?${REVIEW_PASS_TAG}`, "gi"), "")}\n${reviewPassTag(count)}`;
+}
+
+// Recorded before any reviewer starts, so a run cancelled by a newer push still uses up its pass; returns the comment id.
+function claimReviewPass(prNumber, existingComment, count) {
+  if (existingComment) {
+    return updateReviewComment(prNumber, existingComment.id, withPassTag(existingComment.body, count)).id;
+  }
+  const placeholder = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!NOTE]\n> Review in progress.`;
+  return postReviewComment(prNumber, withPassTag(placeholder, count));
 }
 
 function postReviewComment(prNumber, body) {
@@ -1419,6 +1459,28 @@ async function main() {
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
     prepareReviewTree(rootSpan);
 
+    // Counted before the key check, so a misconfiguration notice keeps the PR's review count.
+    const existingSpan = TRACE.startSpan("github.pr.existing_review_lookup", { "github.pr.number": prNumber }, rootSpan);
+    const lookup = findExistingReviewComment(prNumber);
+    const existingComment = lookup.comment;
+    const passesDone = passesDoneIn(existingComment);
+    TRACE.endSpan(existingSpan, {
+      "github.pr.existing_review_found": Boolean(existingComment),
+      "github.pr.existing_review_comment_id": existingComment?.id,
+    });
+    TRACE.setSpanAttributes(rootSpan, { "review.passes_done": passesDone, "review.max_passes": REVIEW_MAX_PASSES });
+    if (!REVIEW_IGNORE_PASS_LIMIT && !lookup.ok) {
+      outcome = "misconfigured";
+      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_count_unknown" });
+      throw new Error("Cannot read this PR's review comments (no reviewer app token, or the comment list failed), so the review limit cannot be checked; not reviewing.");
+    }
+    if (!REVIEW_IGNORE_PASS_LIMIT && passesDone >= REVIEW_MAX_PASSES) {
+      console.log(`[${isoNow()}] PR #${prNumber} already had ${passesDone}/${REVIEW_MAX_PASSES} reviews; skipping. Dispatch the workflow with ignore_pass_limit to review again.`);
+      outcome = "skipped";
+      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_limit_reached" });
+      return;
+    }
+
     if (!apiKey()) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, {
@@ -1435,9 +1497,8 @@ async function main() {
         // The key's env var name is named in the log but not in the comment: it carries the
         // provider name, and the posted comment must not.
         const notice = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`;
-        const existing = findExistingReviewComment(prNumber);
-        if (existing) updateReviewComment(prNumber, existing.id, notice);
-        else postReviewComment(prNumber, notice);
+        if (existingComment) updateReviewComment(prNumber, existingComment.id, withPassTag(notice, passesDone));
+        else postReviewComment(prNumber, withPassTag(notice, passesDone));
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
@@ -1540,29 +1601,21 @@ async function main() {
 
     // 5. Check for existing review (re-review mode)
     let existingReview = null;
-    let existingCommentId = null;
-    const existingSpan = TRACE.startSpan("github.pr.existing_review_lookup", { "github.pr.number": prNumber }, rootSpan);
-    const existingComment = findExistingReviewComment(prNumber);
-    TRACE.endSpan(existingSpan, {
-      "github.pr.existing_review_found": Boolean(existingComment),
-      "github.pr.existing_review_comment_id": existingComment?.id,
-    });
     if (existingComment) {
-      existingCommentId = existingComment.id;
-      if (existingComment.body.includes(PAIRED_POINTER_TAG) || existingComment.body.includes(NOTICE_TAG)) {
-        console.log(`[${isoNow()}] Replacing pointer/notice comment #${existingCommentId} with a review`);
+      if (isPlaceholderComment(existingComment.body)) {
+        console.log(`[${isoNow()}] Replacing pointer/notice comment #${existingComment.id} with a review`);
       } else {
         existingReview = existingComment.body;
-        console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingCommentId}`);
+        console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingComment.id}`);
       }
     }
-    const passesDone = existingReview ? reviewPassCount(existingReview) : 0;
-    TRACE.setSpanAttributes(rootSpan, { "review.passes_done": passesDone, "review.max_passes": REVIEW_MAX_PASSES });
-    if (passesDone >= REVIEW_MAX_PASSES && !REVIEW_IGNORE_PASS_LIMIT) {
-      console.log(`[${isoNow()}] PR #${prNumber} already had ${passesDone}/${REVIEW_MAX_PASSES} reviews; skipping. Dispatch the workflow with ignore_pass_limit to review again.`);
-      outcome = "skipped";
-      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_limit_reached" });
-      return;
+    let existingCommentId = existingComment?.id ?? null;
+    if (lookup.ok) {
+      try {
+        existingCommentId = claimReviewPass(prNumber, existingComment, passesDone + 1);
+      } catch (err) {
+        throw new Error(`Could not record the review pass, so the review limit cannot be enforced; not reviewing: ${execErrorText(err).slice(0, 300)}`);
+      }
     }
 
     // 6. Run reviewers in parallel
@@ -1678,10 +1731,8 @@ async function main() {
     finalReview = sanitizeReviewBody(finalReview);
     // A run where every reviewer failed reviewed nothing, so it does not use up a pass.
     const passes = allAgentsFailed ? passesDone : passesDone + 1;
-    if (passes >= REVIEW_MAX_PASSES) {
-      finalReview += `\n\n> [!NOTE]\n> This PR has used its ${REVIEW_MAX_PASSES} automatic reviews; later pushes are not reviewed. Run the AI Code Review workflow by hand with \`ignore_pass_limit\` to review it again.`;
-    }
-    finalReview += `\n${reviewPassTag(passes)}`;
+    if (passes >= REVIEW_MAX_PASSES) finalReview += `\n\n${passLimitNote()}`;
+    finalReview = withPassTag(finalReview, passes);
     TRACE.endSpan(sanitizeSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 
