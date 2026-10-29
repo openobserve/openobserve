@@ -220,8 +220,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
+            <OTooltip v-if="profilingLocked && spanProfileRequest" :content="profilingLockedReason">
+              <span class="ms-1 inline-flex">
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  class="h-full text-xs!"
+                  disabled
+                  data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
+                >
+                  <template #icon-left>
+                    <OIcon name="lock" size="sm" />
+                  </template>
+                  {{ t("traces.viewProfile") }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
-              v-if="spanProfileMatch"
+              v-else-if="spanProfileMatch"
               variant="outline"
               size="xs"
               class="ms-1 h-full text-xs!"
@@ -451,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="serviceStreamsEnabled"
           name="correlated-logs"
           :label="t('correlation.correlatedLogs')"
-          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
+          :suffix-icon="correlationTabLocked ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-logs"
           class="font-normal! capitalize"
         />
@@ -459,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="serviceStreamsEnabled"
           name="correlated-metrics"
           :label="t('correlation.correlatedMetrics')"
-          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
+          :suffix-icon="correlationTabLocked ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
           class="font-normal! capitalize"
         />
@@ -915,8 +931,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="correlated-logs"
           class="traces-correlated-logs-container h-full max-h-full overflow-hidden p-0"
         >
+          <LicenseDeniedState
+            v-if="correlationLicenseLocked"
+            :features="['correlation']"
+            data-test="trace-details-sidebar-correlated-logs-license-denied"
+          />
           <CorrelatedLogsTable
-            v-if="correlationProps"
+            v-else-if="correlationProps"
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
@@ -954,8 +975,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="correlated-metrics"
           class="traces-correlated-metrics-container h-full max-h-full overflow-hidden p-0"
         >
+          <LicenseDeniedState
+            v-if="correlationLicenseLocked"
+            :features="['correlation']"
+            data-test="trace-details-sidebar-correlated-metrics-license-denied"
+          />
           <TelemetryCorrelationDashboard
-            v-if="correlationProps"
+            v-else-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="metrics"
             :service-name="correlationProps.serviceName"
@@ -1039,6 +1065,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
@@ -1215,6 +1243,7 @@ export default defineComponent({
     LLMContentRenderer,
     OTable,
     CorrelatedLogsTable,
+    LicenseDeniedState,
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
     ),
@@ -1285,6 +1314,15 @@ export default defineComponent({
       const num = parseInt(String(count), 10);
       return !isNaN(num) && num > 0 ? num : null;
     });
+
+    const correlationAccess = useLockedAffordance("correlation");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    const { locked: correlationLicenseLocked } = useLicenseLock("correlation");
+    const correlationTabLocked = computed(
+      () => !correlationAccess.value.allowed || correlationLicenseLocked.value,
+    );
+    const { locked: profilingLocked, lockedReason: profilingLockedReason } =
+      useLicenseLock("continuous_profiling");
 
     const activeTabModel = computed({
       get: () => props.activeTab,
@@ -1909,7 +1947,7 @@ export default defineComponent({
     );
 
     const viewSpanLogs = async () => {
-      if (config.isEnterprise === "true") {
+      if (config.isEnterprise === "true" && !correlationLicenseLocked.value) {
         const clickedSpan = spanKey(props.span);
         await loadCorrelation();
         // The user moved to another span while this lookup ran: do nothing.
@@ -2142,7 +2180,7 @@ export default defineComponent({
     watch(
       spanProfileRequest,
       (req) => {
-        if (req) detectSpanProfile(req);
+        if (req && !profilingLocked.value) detectSpanProfile(req);
       },
       { immediate: true },
     );
@@ -2412,7 +2450,7 @@ export default defineComponent({
      * Load correlation data for this span (called when user clicks on correlation tabs)
      */
     const loadCorrelation = (): Promise<void> => {
-      if (correlationProps.value) return Promise.resolve();
+      if (correlationProps.value || correlationLicenseLocked.value) return Promise.resolve();
       const key = spanKey(props.span);
       if (correlationRequest?.key !== key) {
         const promise: Promise<void> = fetchCorrelation(key).finally(() => {
@@ -2762,12 +2800,14 @@ export default defineComponent({
       });
     };
 
-    const correlationAccess = useLockedAffordance("correlation");
-    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-
     return {
       t,
       correlationAccess,
+      correlationLicenseLocked,
+      correlationTabLocked,
+      profilingLocked,
+      profilingLockedReason,
+      spanProfileRequest,
       activeTabModel,
       filterActions,
       closeSidebar,

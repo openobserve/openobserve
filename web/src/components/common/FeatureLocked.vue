@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useFeatureLockActions, useFeatureNames } from "@/composables/useFeatureLock";
@@ -43,5 +43,5 @@ const { featureName } = useFeatureNames();
 
 const key = computed(() => String(route.params.feature ?? ""));
 const meta = computed(() => LOCKED_FEATURES[key.value]);
-const label = computed(() => featureName(key.value) ?? t("featureLock.thisFeature"));
+const label = computed(() => raw(featureName(key.value)) || t("featureLock.thisFeature"));
 </script>

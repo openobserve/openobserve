@@ -636,6 +636,39 @@ describe("OverviewTab", () => {
     });
   });
 
+  describe("license-locked alerts and anomaly detection", () => {
+    const lockFeatures = (features: Record<string, string>) =>
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        anomaly_detection_enabled: true,
+        features,
+      });
+
+    it("should request neither alert history nor anomalies when both are locked", async () => {
+      lockFeatures({ alerts: "locked", anomaly_detection: "locked" });
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(alertsService.getHistory).not.toHaveBeenCalled();
+      expect(anomalyService.list).not.toHaveBeenCalled();
+      expect(anomalyService.getAllHistory).not.toHaveBeenCalled();
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
+    });
+
+    it("should load alert history and anomalies when both are enabled", async () => {
+      lockFeatures({ alerts: "enabled", anomaly_detection: "enabled" });
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(alertsService.getHistory).toHaveBeenCalled();
+      expect(anomalyService.list).toHaveBeenCalled();
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+    });
+  });
+
   describe("enterprise sections", () => {
     beforeEach(() => {
       // `config` is a plain object read by `incidentsAccess` (useLockedAffordance)

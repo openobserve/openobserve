@@ -317,6 +317,61 @@ describe("LogStream Component", () => {
     });
   });
 
+  describe("continuous profiling license lock", () => {
+    const profilesToggle = (w: any) =>
+      w
+        .findAllComponents({ name: "OToggleGroupItem" })
+        .find((i: any) => i.props("value") === "profiles");
+
+    afterEach(() => {
+      store.state.zoConfig.features = {};
+      store.state.zoConfig.profiling_enabled = false;
+    });
+
+    it("disables the profiles toggle and drops a remembered profiles tab when locked", async () => {
+      store.state.zoConfig.profiling_enabled = true;
+      store.state.zoConfig.features = { continuous_profiling: "locked" };
+      resetListViewState();
+      useListViewState("logStreams", { streamType: "profiles" } as never);
+      const w = mountLogStream();
+      await flushPromises();
+
+      expect(profilesToggle(w)?.props("disabled")).toBe(true);
+      expect(profilesToggle(w)?.props("tooltip")).toBeTruthy();
+      expect(w.vm.selectedStreamType).toBe("logs");
+      w.unmount();
+    });
+
+    it("falls back from the profiles tab when the lock arrives after mount", async () => {
+      store.state.zoConfig.profiling_enabled = true;
+      store.state.zoConfig.features = {};
+      resetListViewState();
+      useListViewState("logStreams", { streamType: "profiles" } as never);
+      const w = mountLogStream();
+      await flushPromises();
+      expect(w.vm.selectedStreamType).toBe("profiles");
+
+      store.state.zoConfig.features = { continuous_profiling: "locked" };
+      await flushPromises();
+
+      expect(w.vm.selectedStreamType).toBe("logs");
+      expect(w.vm.streamActiveTab).toBe("logs");
+      expect(profilesToggle(w)?.props("disabled")).toBe(true);
+      w.unmount();
+    });
+
+    it("keeps the profiles toggle live when profiling is enabled", async () => {
+      store.state.zoConfig.profiling_enabled = true;
+      store.state.zoConfig.features = { continuous_profiling: "enabled" };
+      const w = mountLogStream();
+      await flushPromises();
+
+      expect(profilesToggle(w)?.props("disabled")).toBe(false);
+      expect(profilesToggle(w)?.props("tooltip")).toBeUndefined();
+      w.unmount();
+    });
+  });
+
   describe("View state restore", () => {
     it("restores saved filter, type, page and sort on mount", async () => {
       resetListViewState();

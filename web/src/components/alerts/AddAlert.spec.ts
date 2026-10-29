@@ -1369,6 +1369,23 @@ describe("AddAlert (OForm owner)", () => {
       expect(document.querySelector('[data-test="alert-save-mode-dialog"]')).not.toBeNull();
     });
 
+    it("locks the anomaly alert type while anomaly_detection is license-locked", async () => {
+      store.state.zoConfig.features = { anomaly_detection: "locked" };
+      try {
+        wrapper = mountAlert();
+        await flushPromises();
+        const anomaly = wrapper.vm.alertTypeOptions.find((o: any) => o.value === "anomaly");
+        expect(anomaly?.locked).toBe(true);
+        const item = wrapper.find('[data-test="add-alert-type-tab-anomaly"]');
+        expect(item.attributes("disabled")).toBeDefined();
+        wrapper.vm.onAlertTypeChange("anomaly");
+        await flushPromises();
+        expect(wrapper.vm.form.state.values.is_real_time).not.toBe("anomaly");
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+    });
+
     it("falls back to Builder and keeps the SQL when Alert Type switches to Realtime", async () => {
       wrapper = mountAlert();
       await flushPromises();

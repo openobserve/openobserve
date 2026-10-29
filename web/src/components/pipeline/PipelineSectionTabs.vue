@@ -25,32 +25,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Section tabs — standard non-dense OTabs. The active underline sits on the
        header's bottom divider automatically (OTabs draws its indicator flush at
        the bottom). The active tab is derived from the route; clicking navigates. -->
-  <OTabs
-    :model-value="activeSectionKey"
-    align="left"
-    data-test="pipeline-section-tabs"
-    @change="navigateToSection"
-  >
-    <OTab
-      v-for="s in visibleSections"
-      :key="s.key"
-      :name="s.key"
-      :data-test="`pipeline-section-tab-${s.key}`"
+  <!-- The tabs only navigate, so a license-locked pipelines page still reaches the free functions and enrichment tables. -->
+  <FeatureLockExempt class="contents">
+    <OTabs
+      :model-value="activeSectionKey"
+      align="left"
+      data-test="pipeline-section-tabs"
+      @change="navigateToSection"
     >
-      <OIcon :name="s.icon" size="sm" class="shrink-0" />
-      <span :class="s.key === activeSectionKey ? '' : 'max-md:hidden'">{{ s.label }}</span>
-      <span
-        v-if="s.count != null"
-        class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
-        :class="
-          s.key === activeSectionKey
-            ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
-            : 'bg-surface-subtle text-text-secondary'
-        "
-        >{{ s.count }}</span
+      <OTab
+        v-for="s in visibleSections"
+        :key="s.key"
+        :name="s.key"
+        :data-test="`pipeline-section-tab-${s.key}`"
       >
-    </OTab>
-  </OTabs>
+        <OIcon :name="s.icon" size="sm" class="shrink-0" />
+        <span :class="s.key === activeSectionKey ? '' : 'max-md:hidden'">{{ s.label }}</span>
+        <span
+          v-if="s.count != null"
+          class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
+          :class="
+            s.key === activeSectionKey
+              ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
+              : 'bg-surface-subtle text-text-secondary'
+          "
+          >{{ s.count }}</span
+        >
+        <OIcon
+          v-if="s.licenseLocked"
+          name="lock"
+          size="xs"
+          class="text-warning-600 shrink-0"
+          :data-test="`pipeline-section-tab-${s.key}-lock`"
+          aria-hidden="true"
+        />
+      </OTab>
+    </OTabs>
+  </FeatureLockExempt>
 </template>
 
 <script setup lang="ts">
@@ -61,6 +72,8 @@ import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
+import { featureState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -95,6 +108,7 @@ interface Section {
   visible: boolean;
   /** Optional count pill shown after the label (omitted = no badge). */
   count?: number;
+  licenseLocked?: boolean;
 }
 
 const sections = computed<Section[]>(() => {
@@ -102,13 +116,15 @@ const sections = computed<Section[]>(() => {
   const hideStreamPipelines = store.state.zoConfig?.custom_hide_menus
     ?.split(",")
     .includes("pipelines");
+  const pipelines = featureState(store.state.zoConfig?.features, "pipelines");
   return [
     {
       key: "streamPipelines",
       label: t("function.streamPipeline"),
       icon: "lan",
       to: { name: "pipelines", query: q },
-      visible: !hideStreamPipelines,
+      visible: !hideStreamPipelines && pipelines !== "hidden",
+      licenseLocked: pipelines === "locked",
     },
     {
       key: "functions",

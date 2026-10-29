@@ -29,6 +29,7 @@ import { b64EncodeUnicode } from "@/utils/formatters";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
@@ -474,6 +475,7 @@ const {
   noMatch: correlationNoMatch,
   error: serviceCorrelationError,
 } = useServiceCorrelation();
+const { locked: correlationLocked } = useLicenseLock("correlation");
 
 // Fresh correlation per event (mirrors the Logs page reset on row change).
 watch(selectedEvent, () => {
@@ -485,7 +487,7 @@ watch(selectedEvent, () => {
 
 // Lazy correlation fetch — replicated from SearchResult.vue's openCorrelationFromLog.
 async function openCorrelationFromLog(logData: any) {
-  if (correlationFetchInProgress.value) return;
+  if (correlationFetchInProgress.value || correlationLocked.value) return;
   try {
     correlationFetchInProgress.value = true;
     correlationLoading.value = true;

@@ -15,15 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner variant="warning" bar icon="lock" role="status" data-test="feature-lock-banner">
-    <i18n-t v-if="label" keypath="featureLock.bannerMessage" tag="span">
-      <template #feature>
-        <strong data-test="feature-lock-banner-feature">{{ label }}</strong>
-      </template>
-    </i18n-t>
-    <span v-else data-test="feature-lock-banner-generic">{{
-      t("featureLock.bannerMessageGeneric")
-    }}</span>
+  <OBanner
+    v-if="feature || deniedMessage"
+    variant="warning"
+    bar
+    icon="lock"
+    role="status"
+    data-test="feature-lock-banner"
+  >
+    <template v-if="feature">
+      <i18n-t v-if="label" keypath="featureLock.bannerMessage" tag="span">
+        <template #feature>
+          <strong data-test="feature-lock-banner-feature">{{ label }}</strong>
+        </template>
+      </i18n-t>
+      <span v-else data-test="feature-lock-banner-generic">{{
+        t("featureLock.bannerMessageGeneric")
+      }}</span>
+    </template>
+    <span v-if="deniedMessage" data-test="feature-lock-banner-denied">{{ deniedMessage }}</span>
     <template #actions>
       <OButton
         variant="primary"
@@ -33,22 +43,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("featureLock.contactSales") }}
       </OButton>
+      <OButton
+        v-if="!feature"
+        variant="ghost"
+        size="icon-sm"
+        icon-left="close"
+        :aria-label="t('common.dismiss')"
+        data-test="feature-lock-banner-dismiss"
+        @click="dismiss"
+      />
     </template>
   </OBanner>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useFeatureLockActions, useFeatureNames } from "@/composables/useFeatureLock";
+import { useLicenseDenials } from "@/composables/useUnauthorizedErrorGrouper";
 
-const props = defineProps<{ feature: string }>();
+const props = defineProps<{ feature: string | null }>();
 
 const { t } = useI18nTyped();
 const { openContactSales } = useFeatureLockActions();
-const { featureName } = useFeatureNames();
+const { featureName, featureNames } = useFeatureNames();
+const { features: denied, dismiss } = useLicenseDenials();
 
-const label = computed(() => featureName(props.feature) ?? null);
+const label = computed(() => (props.feature ? (featureName(props.feature) ?? null) : null));
+
+const deniedMessage = computed(() => {
+  if (props.feature || !denied.value) return null;
+  return denied.value.length
+    ? t("featureLock.toastMessage", { features: raw(featureNames(denied.value)) })
+    : t("featureLock.toastMessageGeneric");
+});
 </script>

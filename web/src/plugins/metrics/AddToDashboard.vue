@@ -1,6 +1,6 @@
 <template>
   <ODialog
-    :open="open"
+    :open="open && !dashboardsLocked"
     size="md"
     :title="t('dashboard.addDashboard')"
     :secondary-button-label="t('metrics.addToDashboardPage.cancel')"
@@ -69,6 +69,7 @@ import { useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import {
   makeAddToDashboardSchema,
   addToDashboardDefaults,
@@ -132,6 +133,7 @@ export default defineComponent({
     const activeFolderId = ref("default");
     const activeTabId: any = ref(null);
     const { t } = useI18nTyped();
+    const { locked: dashboardsLocked } = useLicenseLock("dashboards");
     const addToDashboardSchema = makeAddToDashboardSchema(t);
 
     const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
@@ -145,7 +147,7 @@ export default defineComponent({
     watch(
       () => props.open,
       async (isOpen) => {
-        if (isOpen) {
+        if (isOpen && !dashboardsLocked.value) {
           await getFoldersList(store);
         } else {
           activeFolderId.value = "default";
@@ -278,6 +280,7 @@ export default defineComponent({
       activeFolderId,
       activeTabId,
       updateSelectedDashboard,
+      dashboardsLocked,
     };
   },
 });

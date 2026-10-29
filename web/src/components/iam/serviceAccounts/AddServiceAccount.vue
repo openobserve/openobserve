@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              Both pickers are optional; assignments are applied after the
              account is created, and failures surface in the token-reveal
              screen without blocking it. -->
-        <template v-if="!beingUpdated">
+        <template v-if="!beingUpdated && rbacLicensed">
           <!-- RBAC not allowed: the select would write to form state and the
                button would open AddRole on click, so a locked click is caught
                on this wrapper BEFORE it reaches either — removing `disabled`
@@ -148,6 +148,7 @@ import service_accounts from "@/services/service_accounts";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { updateRole, updateGroup } from "@/services/iam";
+import { featureState } from "@/utils/featureGate";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -227,6 +228,10 @@ export default defineComponent({
     // rail items — reused here so the pickers lock instead of vanish in OSS.
     const rbacAccess = useLockedAffordance("rbac");
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    // Every role/group list and assignment API needs the rbac license; without it the pickers go.
+    const rbacLicensed = computed(
+      () => featureState(store.state.zoConfig?.features, "rbac") === "enabled",
+    );
 
     function onLockedRbacClick(event: MouseEvent) {
       event.preventDefault();
@@ -241,7 +246,7 @@ export default defineComponent({
     // Both list APIs return plain string arrays. A load failure leaves the
     // pickers empty but never blocks account creation.
     const loadAccessOptions = async () => {
-      if (!rbacAccess.value.allowed) return;
+      if (!rbacAccess.value.allowed || !rbacLicensed.value) return;
       try {
         const [rolesRes, groupsRes] = await Promise.all([
           queryClient.fetchQuery(rolesQuery(orgId.value)),
@@ -278,6 +283,7 @@ export default defineComponent({
       addServiceAccountSchema,
       addServiceAccountDefaults,
       rbacAccess,
+      rbacLicensed,
       onLockedRbacClick,
       roleOptions,
       groupOptions,

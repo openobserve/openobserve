@@ -20,21 +20,22 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import {
-  isLockedFeatureDenial,
-  isPageFeatureLocked,
-  markLockedDenial,
+  isPageLocked,
+  markLicenseDenial,
   provideFeatureLock,
   useFeatureLock,
+  useLicenseLock,
   useLockedDisabled,
   type FeatureLock,
 } from "./useFeatureLock";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import FeatureLockBanner from "@/components/common/FeatureLockBanner.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { toast, toastRecords, dismissAll } from "@/lib/feedback/Toast/useToast";
 import {
   addLicenseDeniedError,
-  useLicenseDeniedDialog,
+  useLicenseDenials,
 } from "@/composables/useUnauthorizedErrorGrouper";
 
 let wrapper: VueWrapper | undefined;
@@ -63,7 +64,7 @@ afterEach(() => {
   wrapper?.unmount();
   wrapper = undefined;
   dismissAll();
-  useLicenseDeniedDialog().close();
+  useLicenseDenials().dismiss();
 });
 
 describe("useFeatureLock", () => {
@@ -72,7 +73,7 @@ describe("useFeatureLock", () => {
     expect(lock().locked.value).toBe(false);
     expect(lock().feature.value).toBeNull();
     expect(disabled()).toBe(false);
-    expect(isPageFeatureLocked()).toBe(false);
+    expect(isPageLocked()).toBe(false);
   });
 
   it("locks descendants while the provider names a feature, and follows it", async () => {
@@ -81,51 +82,65 @@ describe("useFeatureLock", () => {
     expect(lock().locked.value).toBe(true);
     expect(lock().feature.value).toBe("workflows");
     expect(disabled()).toBe(true);
-    expect(isPageFeatureLocked()).toBe(true);
+    expect(isPageLocked()).toBe(true);
 
     feature.value = null;
     await nextTick();
     expect(lock().locked.value).toBe(false);
     expect(disabled()).toBe(false);
-    expect(isPageFeatureLocked()).toBe(false);
+    expect(isPageLocked()).toBe(false);
   });
 
   it("releases the page lock when the provider unmounts", () => {
     mountWithLock(ref("oncall"));
-    expect(isPageFeatureLocked()).toBe(true);
+    expect(isPageLocked()).toBe(true);
     wrapper!.unmount();
     wrapper = undefined;
-    expect(isPageFeatureLocked()).toBe(false);
+    expect(isPageLocked()).toBe(false);
   });
 
-  it("matches a denial only when every missing key is the locked feature", () => {
+  it("ignores every denial while the page is locked, and records them once it is free", () => {
     const feature = ref<string | null>("workflows");
     mountWithLock(feature);
-    expect(isLockedFeatureDenial(["workflows"])).toBe(true);
-    expect(isLockedFeatureDenial(["workflows", "oncall"])).toBe(false);
-    expect(isLockedFeatureDenial([])).toBe(false);
     addLicenseDeniedError(["workflows"]);
-    expect(useLicenseDeniedDialog().features.value).toBeNull();
+    addLicenseDeniedError(["alerts"]);
+    addLicenseDeniedError([]);
+    expect(useLicenseDenials().features.value).toBeNull();
 
     feature.value = null;
-    expect(isLockedFeatureDenial(["workflows"])).toBe(false);
     addLicenseDeniedError(["workflows"]);
-    expect(useLicenseDeniedDialog().features.value).toEqual(["workflows"]);
+    expect(useLicenseDenials().features.value).toEqual(["workflows"]);
   });
 
-  it("drops only error toasts that repeat a tagged denial's message", () => {
-    mountWithLock(ref("workflows"));
-    const error: any = { response: { data: { message: "Workflows is not licensed" } } };
-    markLockedDenial(error);
-    expect(error.licenseLocked).toBe(true);
+  it("drops error toasts just after a denial, then only those repeating its message", () => {
+    // Fake time far in the past, so the marked denial cannot reach later tests run on real time.
+    vi.useFakeTimers({ now: 0 });
+    markLicenseDenial({ response: { data: { message: "Workflows is not licensed" } } });
+    toast({ variant: "error", message: "Request failed with status code 403" as never });
+    toast({ variant: "success", message: "Saved" as never });
+    toast({ variant: "info", message: "Heads up" as never });
+    expect(toastRecords.map((r) => r.message)).toEqual(["Saved", "Heads up"]);
+
+    vi.advanceTimersByTime(2000);
     toast({ variant: "error", message: "Workflows is not licensed" as never });
     toast({ variant: "error", message: "Something else failed" as never });
-    expect(toastRecords.map((r) => r.message)).toEqual(["Something else failed"]);
+    expect(toastRecords.map((r) => r.message)).toEqual([
+      "Saved",
+      "Heads up",
+      "Something else failed",
+    ]);
+    vi.useRealTimers();
+  });
+
+  it("shows an error toast on a locked page when no denial preceded it", () => {
+    mountWithLock(ref("workflows"));
+    toast({ variant: "error", message: "A new version is available, refresh" as never });
+    expect(toastRecords.map((r) => r.message)).toEqual(["A new version is available, refresh"]);
   });
 });
 
 describe("FeatureLockBanner", () => {
-  const mountBanner = async (withLicensePage: boolean, feature = "workflows") => {
+  const mountBanner = async (withLicensePage: boolean, feature: string | null = "workflows") => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -176,6 +191,42 @@ describe("FeatureLockBanner", () => {
     await wrapper!.get('[data-test="feature-lock-banner-contact-sales"]').trigger("click");
     expect(open).toHaveBeenCalledWith(expect.any(String), "_blank", "noopener");
     open.mockRestore();
+  });
+
+  it("renders nothing with no page lock and no denial", async () => {
+    await mountBanner(true, null);
+    expect(wrapper!.find('[data-test="feature-lock-banner"]').exists()).toBe(false);
+  });
+
+  it("names on-the-fly denials by display name, dismissibly, when no page is locked", async () => {
+    await mountBanner(true, null);
+    addLicenseDeniedError(["ai_assistant", "new_key"]);
+    await nextTick();
+    expect(wrapper!.get('[data-test="feature-lock-banner-denied"]').text()).toBe(
+      "Your license does not include: AI Assistant, new_key. Ask your administrator to update the license.",
+    );
+    expect(wrapper!.find('[data-test="feature-lock-banner-contact-sales"]').exists()).toBe(true);
+    await wrapper!.get('[data-test="feature-lock-banner-dismiss"]').trigger("click");
+    expect(useLicenseDenials().features.value).toBeNull();
+    expect(wrapper!.find('[data-test="feature-lock-banner"]').exists()).toBe(false);
+  });
+
+  it("says a generic sentence for a denial that named no feature", async () => {
+    await mountBanner(true, null);
+    addLicenseDeniedError([]);
+    await nextTick();
+    expect(wrapper!.get('[data-test="feature-lock-banner-denied"]').text()).toBe(
+      "Your license does not include this feature. Ask your administrator to update the license.",
+    );
+  });
+
+  it("shows only the page sentence on a locked page, undismissable, whatever was denied", async () => {
+    await mountBanner(true);
+    addLicenseDeniedError(["workflows", "ai_assistant"]);
+    await nextTick();
+    expect(wrapper!.get('[data-test="feature-lock-banner-feature"]').text()).toBe("Workflows");
+    expect(wrapper!.find('[data-test="feature-lock-banner-denied"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="feature-lock-banner-dismiss"]').exists()).toBe(false);
   });
 });
 
@@ -242,11 +293,78 @@ describe("FeatureLockBoundary", () => {
     expect(key({ key: " " })).toBe(true);
   });
 
+  it("leaves navigation inside FeatureLockExempt live while the page stays locked", async () => {
+    let clicks = 0;
+    let seen: FeatureLock | undefined;
+    const Probe = defineComponent({
+      setup() {
+        seen = useFeatureLock();
+        return () => h("button", { "data-test": "nav", onClick: () => clicks++ }, "Users");
+      },
+    });
+    wrapper = mount(FeatureLockBoundary, {
+      props: { feature: "rbac" },
+      slots: { default: () => h(FeatureLockExempt, () => h(Probe)) },
+    });
+    expect(seen!.locked.value).toBe(false);
+    await wrapper.get('[data-test="nav"]').trigger("click");
+    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    wrapper.get('[data-test="nav"]').element.dispatchEvent(enter);
+    expect(clicks).toBe(1);
+    expect(enter.defaultPrevented).toBe(false);
+    expect(isPageLocked()).toBe(true);
+  });
+
   it("is a plain wrapper when nothing is locked", async () => {
     let clicks = 0;
     const boundary = mountBoundary(null, () => clicks++);
     expect(boundary.classes()).not.toContain("feature-locked-content");
     await boundary.get('[data-test="raw"]').trigger("click");
     expect(clicks).toBe(1);
+  });
+});
+
+describe("useLicenseLock", () => {
+  const licenseLockOf = (key: string, zoConfig: Record<string, unknown>) => {
+    let result: ReturnType<typeof useLicenseLock> | undefined;
+    const Probe = defineComponent({
+      setup() {
+        result = useLicenseLock(key);
+        return () => null;
+      },
+    });
+    const store = createStore({ state: () => ({ zoConfig }) });
+    wrapper = mount(Probe, { global: { plugins: [i18n, store] } });
+    return result!;
+  };
+
+  it("is locked when the license marks the feature locked, with the display name in the reason", () => {
+    const { locked, lockedReason } = licenseLockOf("dashboards", {
+      features: { dashboards: "locked" },
+      feature_names: { dashboards: "Dashboards Pro" },
+    });
+    expect(locked.value).toBe(true);
+    expect(lockedReason.value).toContain("Dashboards Pro");
+  });
+
+  it("falls back to the key in the reason when the display name is missing", () => {
+    const { lockedReason } = licenseLockOf("reports", { features: { reports: "locked" } });
+    expect(lockedReason.value).toContain("reports");
+  });
+
+  it("is not locked when the feature is enabled", () => {
+    const { locked } = licenseLockOf("dashboards", { features: { dashboards: "enabled" } });
+    expect(locked.value).toBe(false);
+  });
+
+  it("is not locked when the feature is hidden: hiding is the caller's own state", () => {
+    const { locked } = licenseLockOf("dashboards", { features: { dashboards: "hidden" } });
+    expect(locked.value).toBe(false);
+  });
+
+  it("is not locked when the backend sends no key for the feature", () => {
+    expect(licenseLockOf("dashboards", { features: {} }).locked.value).toBe(false);
+    wrapper?.unmount();
+    expect(licenseLockOf("dashboards", {}).locked.value).toBe(false);
   });
 });

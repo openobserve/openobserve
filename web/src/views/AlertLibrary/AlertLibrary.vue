@@ -326,6 +326,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :ready="entryReady(entry)"
                       :selected="selectedIds.has(entry.id)"
                       :locked="isLocked(entry)"
+                      :license-locked-reason="
+                        isLocked(entry) && anomalyAccess === 'licenseLocked'
+                          ? anomalyLockedReason
+                          : undefined
+                      "
                       @open="openEntry(entry)"
                       @update:selected="onCardSelected(entry, $event)"
                     />
@@ -391,6 +396,7 @@ import {
 import type { AlertLibraryErrorCode } from "@/composables/alerts/useAlertLibrary";
 import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -417,7 +423,12 @@ const router = useRouter();
 
 const { manifest, isLoading, error, loadManifest, isReady } = useAlertLibrary();
 const anomalyAccess = useAnomalyLibraryAccess();
-const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+const { open: openEditionUpgradeDialog } = useEnterpriseUpgradeDialog();
+const { lockedReason: anomalyLockedReason } = useLicenseLock("anomaly_detection");
+// A license lock explains itself on the card and never opens the edition upsell.
+const openUpgradeDialog = () => {
+  if (anomalyAccess.value !== "licenseLocked") openEditionUpgradeDialog();
+};
 const { getStreams } = useStreams(t);
 
 /** Empty = every category. The rail narrows, it does not gate. */
