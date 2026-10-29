@@ -156,7 +156,9 @@ describe("UnpricedModelsTable", () => {
     wrapper = mountTab([row]);
     const shown = await waitForRow(wrapper, row.model!);
     expect(shown.text()).toContain("Priced for new spans");
-    expect(shown.find('[data-test="model-pricing-unpriced-priced-since"]').exists()).toBe(true);
+    expect(shown.find('[data-test="model-pricing-unpriced-priced-since"]').text()).toBe(
+      "No action needed",
+    );
     expect(shown.find('[data-test="model-pricing-unpriced-create-btn"]').exists()).toBe(false);
     expect(shown.find('[data-test="model-pricing-unpriced-keep-btn"]').exists()).toBe(false);
     expect(shown.find('[data-test="model-pricing-unpriced-mute-btn"]').exists()).toBe(false);
