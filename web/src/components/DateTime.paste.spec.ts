@@ -94,6 +94,23 @@ describe("DateTime paste", () => {
     expect(lastToast()).toMatchObject({ variant: "success", message: "Date range pasted" });
   });
 
+  it("keeps the pasted range when a day was clicked before the paste", async () => {
+    createWrapper();
+    await openMenu();
+    wrapper!.vm.selectedType = "absolute";
+    wrapper!.vm.pendingDay = "2026/10/03";
+    await flushPromises();
+
+    firePaste(document.querySelector("#date-time-menu")!, PAYLOAD);
+    await flushPromises();
+    wrapper!.vm.onMenuOpenChange(false);
+    wrapper!.vm.menuOpen = false;
+    await flushPromises();
+
+    expect(wrapper!.vm.selectedDate).toMatchObject({ from: "2026/10/27", to: "2026/10/27" });
+    expect(lastEmit()).toMatchObject({ startTime: START_US, endTime: END_US });
+  });
+
   it("leaves a paste into one of the picker's own fields alone", async () => {
     createWrapper();
     await openMenu();

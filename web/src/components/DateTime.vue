@@ -1455,6 +1455,8 @@ export default defineComponent({
     const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
       selectedType.value = "absolute";
       calendarToken.value = null;
+      // A day clicked before the paste would otherwise overwrite the pasted range when the panel closes.
+      pendingDay.value = null;
       // Saved once below, so the auto-apply date watcher must not save it a second time.
       isSeedingAbsolute = true;
       setAbsoluteTime(startMicros, endMicros);
