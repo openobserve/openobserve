@@ -1522,8 +1522,7 @@ fn range_changed(link: &PublicDashboard, policy: &TimeRangePolicy) -> bool {
     stored.ranges != policy.ranges || stored.default.key() != policy.default.key()
 }
 
-/// Enterprise: the editor must read every stream a changed frozen value makes a panel read,
-/// and every stream the link reads when its time range changes.
+/// Enterprise: the editor must read what a changed frozen value or range makes the link read.
 #[cfg(feature = "enterprise")]
 async fn authorize_variable_edit(
     link: &PublicDashboard,
@@ -1543,8 +1542,7 @@ async fn authorize_variable_edit(
         })
 }
 
-/// The values queries a changed frozen value reaches and the queries of every panel reading one;
-/// with a changed range, every panel query and every values query the link runs.
+/// Queries a changed frozen value reaches, or every query the link runs when its range changes.
 #[cfg(feature = "enterprise")]
 fn variable_edit_sources(
     link: &PublicDashboard,
@@ -1604,8 +1602,10 @@ fn variable_edit_sources(
             for (qi, q) in panel.queries.iter().enumerate() {
                 let lang = if promql { "promql" } else { "sql" };
                 // A sent PromQL query is checked as the build sends it, a formula as its expansion.
-                let text = match planned.as_ref().and_then(|p| p[qi].clone()) {
-                    Some(expr) => expr,
+                let text = match planned.as_ref().map(|p| p[qi].clone()) {
+                    Some(Some(expr)) => expr,
+                    // A hidden or empty query is never sent; formulas carry their inputs.
+                    Some(None) => continue,
                     None => {
                         let Some(text) = query_text(q) else {
                             continue;
