@@ -14,13 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Adds the nullable `write_version` to `llm_dataset_items`: the Dataset version a row's write
-//! request was shown as. Indexes are untouched; NULL marks a row written before this column or
-//! by an older node.
+//! request was shown as. NULL marks a row written before this column or by an older node.
+//! The existing row-version indexes are untouched; one new index lets a write find the Dataset's
+//! highest label (and the highest legacy row version) without scanning its history.
 
 use sea_orm_migration::prelude::*;
 
 const LLM_DATASET_ITEMS: &str = "llm_dataset_items";
 const WRITE_VERSION: &str = "write_version";
+const WRITE_VERSION_IDX: &str = "idx_llm_dataset_items_write_version";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -28,24 +30,53 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        if manager.has_column(LLM_DATASET_ITEMS, WRITE_VERSION).await? {
-            return Ok(());
+        if !manager.has_column(LLM_DATASET_ITEMS, WRITE_VERSION).await? {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(LlmDatasetItems::Table)
+                        .add_column(
+                            ColumnDef::new(LlmDatasetItems::WriteVersion)
+                                .big_integer()
+                                .null(),
+                        )
+                        .to_owned(),
+                )
+                .await?;
         }
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(LlmDatasetItems::Table)
-                    .add_column(
-                        ColumnDef::new(LlmDatasetItems::WriteVersion)
-                            .big_integer()
-                            .null(),
-                    )
-                    .to_owned(),
-            )
-            .await
+        if !manager
+            .has_index(LLM_DATASET_ITEMS, WRITE_VERSION_IDX)
+            .await?
+        {
+            manager
+                .create_index(
+                    Index::create()
+                        .name(WRITE_VERSION_IDX)
+                        .table(LlmDatasetItems::Table)
+                        .col(LlmDatasetItems::DatasetId)
+                        .col(LlmDatasetItems::WriteVersion)
+                        .col(LlmDatasetItems::GlobalVersion)
+                        .to_owned(),
+                )
+                .await?;
+        }
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager
+            .has_index(LLM_DATASET_ITEMS, WRITE_VERSION_IDX)
+            .await?
+        {
+            manager
+                .drop_index(
+                    Index::drop()
+                        .name(WRITE_VERSION_IDX)
+                        .table(LlmDatasetItems::Table)
+                        .to_owned(),
+                )
+                .await?;
+        }
         if !manager.has_column(LLM_DATASET_ITEMS, WRITE_VERSION).await? {
             return Ok(());
         }
@@ -63,7 +94,9 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum LlmDatasetItems {
     Table,
+    DatasetId,
     WriteVersion,
+    GlobalVersion,
 }
 
 #[cfg(test)]
@@ -123,10 +156,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn up_adds_a_nullable_column_and_keeps_the_version_indexes() {
+    async fn up_adds_a_nullable_column_and_one_head_index_keeping_the_version_indexes() {
         let db = items_db().await;
         let manager = SchemaManager::new(&db);
-        let indexes = index_names(&db).await;
+        let mut indexes = index_names(&db).await;
 
         Migration.up(&manager).await.unwrap();
         Migration.up(&manager).await.unwrap();
@@ -137,6 +170,8 @@ mod tests {
                 .await
                 .unwrap()
         );
+        indexes.push(WRITE_VERSION_IDX.to_string());
+        indexes.sort();
         assert_eq!(index_names(&db).await, indexes);
         // The pre-existing row reads as NULL: a legacy write.
         let legacy = db
@@ -158,7 +193,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn down_drops_only_the_column() {
+    async fn down_drops_the_column_and_its_index() {
         let db = items_db().await;
         let manager = SchemaManager::new(&db);
         let indexes = index_names(&db).await;

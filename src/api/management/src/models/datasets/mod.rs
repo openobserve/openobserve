@@ -118,7 +118,8 @@ impl From<ListDatasetItemsQuery> for ListDatasetItems {
 #[into_params(parameter_in = Query)]
 #[serde(deny_unknown_fields)]
 pub struct DatasetSnapshotRowsQuery {
-    /// Row-level Snapshot/pin key. Defaults to the Dataset's current row version.
+    /// Row-level Snapshot/pin key. When both this and `write_version` are
+    /// omitted, reads the Dataset's current row version.
     pub version: Option<i64>,
     /// Displayed write version W to pin. Resolves to the highest row version
     /// among rows whose write version is at or below W (labels and row versions
