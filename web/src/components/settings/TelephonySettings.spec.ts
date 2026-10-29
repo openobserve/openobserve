@@ -232,6 +232,7 @@ describe("TelephonySettings", () => {
       expect(cardText("status")).toBe("Couldn't check");
       expect(cardText("unchecked")).toBe("Twilio could not be reached just now.");
       expect(card("problem")).toBeNull();
+      expect(q("press4")).toBeNull();
     });
 
     it("a failed status read reads Couldn't check", async () => {
