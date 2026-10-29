@@ -196,6 +196,8 @@ pub async fn preflight_streams(
         if let Some(reason) = stream_rejection(stream, user) {
             return Err(Error::IngestionError(reason));
         }
+        schema::check_stream_key_len(org_id, StreamType::Logs, stream)
+            .map_err(|e| Error::IngestionError(e.to_string()))?;
         check_ingestion_allowed(org_id, StreamType::Logs, Some(stream)).await?;
     }
     // Every group at once, so a collector batch is refused before its first group is written.
@@ -937,6 +939,27 @@ mod tests {
         let user = IngestUser::User("hec-abc@hec.local".to_string());
         assert!(stream_rejection("default", &user).is_none());
         assert!(stream_rejection("app_logs", &user).is_none());
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn preflight_rejects_the_whole_batch_when_an_index_is_too_long() {
+        let user = IngestUser::User("hec-abc@hec.local".to_string());
+        let long_index = "h".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation("test-org", StreamType::Logs, &long_index)
+                .is_some();
+        let streams = vec![
+            ("good".to_string(), vec![json::json!({"log": "a"})]),
+            (long_index, vec![json::json!({"log": "b"})]),
+        ];
+        let result = preflight_streams("test-org", &streams, &user).await;
+        let rejected = matches!(
+            &result,
+            Err(Error::IngestionError(msg)) if msg.starts_with("Stream name too long")
+        );
+        assert_eq!(rejected, bounded);
     }
 
     #[tokio::test]
