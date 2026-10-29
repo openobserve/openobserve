@@ -244,7 +244,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="view-span-logs hidden"
                       :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                     >
+                      <span v-if="logsLocked" class="inline-flex">
+                        <OButton
+                          variant="outline"
+                          size="icon"
+                          disabled
+                          :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                        >
+                          <OIcon name="lock" size="sm" />
+                        </OButton>
+                        <OTooltip :content="logsLockedReason" />
+                      </span>
                       <OButton
+                        v-else
                         variant="outline"
                         size="icon"
                         :title="t('traces.viewLogs')"
@@ -382,6 +394,8 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -465,6 +479,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();
+    const { locked: logsLocked, lockedReason: logsLockedReason } = useLicenseLock("logs");
     const store = useStore();
     const { isDark } = useTheme();
 
@@ -898,6 +913,8 @@ export default defineComponent({
       highlightedSpanId,
       store,
       viewSpanLogs,
+      logsLocked,
+      logsLockedReason,
       t,
       searchResults,
       getVirtualRowKey,
@@ -932,7 +949,7 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge, OBadge, OButton, OIcon, OTruncatedText },
+  components: { SpanBlock, SpanKindBadge, OBadge, OButton, OIcon, OTruncatedText, OTooltip },
 });
 </script>
 

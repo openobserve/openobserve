@@ -15,10 +15,27 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { gt } from "@/types/i18n";
-import { nextTick } from "vue";
+import { defineComponent, nextTick } from "vue";
+import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import { usePanelDrilldown } from "./usePanelDrilldown";
 
 const resultSchemaMock = vi.fn();
+
+// The license lock reads the injected store, so the composable runs inside a mounted component.
+const withLicense = <T>(features: Record<string, string>, run: () => T): T => {
+  let result!: T;
+  mount(
+    defineComponent({
+      setup() {
+        result = run();
+        return () => null;
+      },
+    }),
+    { global: { plugins: [createStore({ state: { zoConfig: { features } } })] } },
+  );
+  return result;
+};
 
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -276,6 +293,113 @@ describe("usePanelDrilldown", () => {
     expect(deps.drilldownPopUpRef.value.style.display).toBe("block");
     expect(deps.drilldownPopUpRef.value.style.top).toContain("px");
     expect(deps.drilldownPopUpRef.value.style.left).toContain("px");
+  });
+
+  describe("license lock of the logs drilldown target", () => {
+    const logsDrilldownDeps = (streamType: string) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.queries[0].fields.stream_type = streamType;
+      deps.panelSchema.value.config.drilldown = [
+        { name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } } as any,
+        { name: "Url", type: "byUrl", data: { url: "https://example.com" } } as any,
+      ];
+      return deps;
+    };
+
+    it.each(["logs", "metrics", "traces"])(
+      "%s locked: that panel's logs drilldown is locked and opens nothing",
+      async (streamType) => {
+        const deps = logsDrilldownDeps(streamType);
+        const api = withLicense({ [streamType]: "locked" }, () => usePanelDrilldown(deps as any));
+        const [logsItem, urlItem] = deps.panelSchema.value.config.drilldown;
+
+        expect(api.drilldownLockedReason(logsItem)).toBeTruthy();
+        expect(api.drilldownLockedReason(urlItem)).toBeNull();
+        api.drilldownArray.value = deps.panelSchema.value.config.drilldown;
+        await api.openDrilldown(0);
+        await nextTick();
+        expect(deps.router.push).not.toHaveBeenCalled();
+        expect(deps.store.dispatch).not.toHaveBeenCalled();
+      },
+    );
+
+    it("another signal locked or a free stream type: the logs drilldown stays live", () => {
+      const logsItem = logsDrilldownDeps("logs").panelSchema.value.config.drilldown[0];
+      const live = (features: Record<string, string>, streamType: string) =>
+        withLicense(features, () =>
+          usePanelDrilldown(logsDrilldownDeps(streamType) as any),
+        ).drilldownLockedReason(logsItem);
+      expect(live({ traces: "locked" }, "logs")).toBeNull();
+      expect(live({ logs: "locked" }, "enrichment_tables")).toBeNull();
+    });
+
+    const byUrl = (url: string) => ({ name: "Go", type: "byUrl", data: { url } });
+    const urlReason = (features: Record<string, string>, url: string) =>
+      withLicense(features, () => usePanelDrilldown(makeDeps() as any)).drilldownLockedReason(
+        byUrl(url),
+      );
+
+    it.each([
+      ["metrics", "/metrics?query_type=promql&stream_name=cpu"],
+      ["traces", "/web/traces?stream=default"],
+      ["logs", "/logs?stream=app"],
+      ["logs", `${window.location.origin}/web/logs?stream_type=logs`],
+      ["metrics", "/logs?stream_type=metrics"],
+    ])("%s locked: a by-URL drilldown to %s is locked and opens nothing", async (key, url) => {
+      expect(urlReason({ [key]: "locked" }, url)).toBeTruthy();
+      const deps = makeDeps();
+      deps.panelSchema.value.config.drilldown = [byUrl(url) as any];
+      const api = withLicense({ [key]: "locked" }, () => usePanelDrilldown(deps as any));
+      api.drilldownArray.value = deps.panelSchema.value.config.drilldown;
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      try {
+        await api.openDrilldown(0);
+        expect(open).not.toHaveBeenCalled();
+      } finally {
+        open.mockRestore();
+      }
+    });
+
+    it("a same-origin cross-link to a locked signal page is locked; external and other cross-links stay live", async () => {
+      const crossLink = (url: string) => ({
+        name: "X",
+        type: "byUrl",
+        _isCrossLink: true,
+        data: { url, _rawUrl: url, _fields: [] },
+      });
+      const reason = (features: Record<string, string>, url: string) =>
+        withLicense(features, () => usePanelDrilldown(makeDeps() as any)).drilldownLockedReason(
+          crossLink(url),
+        );
+      expect(
+        reason({ traces: "locked" }, "/web/traces/trace-details?trace_id=${field.__value}"),
+      ).toBeTruthy();
+      expect(reason({ logs: "locked" }, "/logs?stream=app")).toBeTruthy();
+      expect(reason({}, "/web/traces?trace_id=1")).toBeNull();
+      expect(
+        reason({ traces: "locked" }, "https://traces.example.com/${field.__value}"),
+      ).toBeNull();
+      expect(reason({ traces: "locked" }, "/dashboards/view")).toBeNull();
+
+      const deps = makeDeps();
+      const api = withLicense({ traces: "locked" }, () => usePanelDrilldown(deps as any));
+      api.drilldownArray.value = [crossLink("/web/traces?trace_id=1")];
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      try {
+        await api.openDrilldown(0);
+        expect(open).not.toHaveBeenCalled();
+      } finally {
+        open.mockRestore();
+      }
+    });
+
+    it("by-URL drilldowns stay live when enabled, for a free logs type, or to an external URL", () => {
+      expect(urlReason({}, "/metrics?q=1")).toBeNull();
+      expect(urlReason({ traces: "locked" }, "/metrics?q=1")).toBeNull();
+      expect(urlReason({ logs: "locked" }, "/logs?stream_type=enrichment_tables")).toBeNull();
+      expect(urlReason({ metrics: "locked" }, "https://example.com/metrics")).toBeNull();
+      expect(urlReason({ logs: "locked" }, "/dashboards/view?dashboard=1")).toBeNull();
+    });
   });
 
   it("resolves variables sharing a name prefix in a custom Logs drilldown query", async () => {

@@ -374,10 +374,17 @@
             show-index
             width="100%"
             class="w-full"
-            @row-click="openEvaluationRun"
+            v-on="rowClickListeners"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
+              <span class="inline-flex items-center">
+                <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                  <span class="me-1.5 inline-flex">
+                    <OIcon name="lock" size="sm" data-test="eval-job-detail-run-lock" />
+                  </span>
+                </OTooltip>
+                <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
+              </span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
@@ -422,10 +429,17 @@
             show-index
             width="100%"
             class="w-full"
-            @row-click="openEvaluationRun"
+            v-on="rowClickListeners"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
+              <span class="inline-flex items-center">
+                <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                  <span class="me-1.5 inline-flex">
+                    <OIcon name="lock" size="sm" data-test="eval-job-detail-run-lock" />
+                  </span>
+                </OTooltip>
+                <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
+              </span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
@@ -474,6 +488,7 @@ import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import type {
   EvalJob,
   EvalTargetScope,
@@ -516,6 +531,11 @@ function handleOpenChange(value: boolean) {
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
+// Without a row-click listener OTable drops the pointer cursor, so locked rows stop looking clickable.
+const rowClickListeners = computed(() =>
+  tracesLock.locked.value ? {} : { rowClick: openEvaluationRun },
+);
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
@@ -813,7 +833,7 @@ const {
 } = useEvalJobRuns(jobIdRef, dateWindow, tableEnabled, selectedAgent);
 
 function openEvaluationRun(run: JobRunRow) {
-  if (!run.evaluatorTraceId) return;
+  if (!run.evaluatorTraceId || tracesLock.locked.value) return;
   const timestampUs = run.timestampMs > 0 ? run.timestampMs * 1000 : 0;
   router
     .push({

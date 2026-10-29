@@ -39,10 +39,12 @@ vi.mock("vue-router", () => ({
 
 import DashboardLogDrawer from "@/components/dashboards/DashboardLogDrawer.vue";
 
-const mountDrawer = (features: Record<string, string>) =>
+const mountDrawer = (features: Record<string, string>, streamType?: string) =>
   shallowMount(DashboardLogDrawer, {
-    props: { stream: "app", field: "level", value: "error", startTime: 1, endTime: 2 },
+    props: { stream: "app", field: "level", value: "error", startTime: 1, endTime: 2, streamType },
     global: {
+      renderStubDefaultSlot: true,
+      stubs: { OButton: false },
       plugins: [
         i18n,
         createStore({
@@ -52,6 +54,9 @@ const mountDrawer = (features: Record<string, string>) =>
     },
   });
 
+const openInLogsDisabled = (wrapper: ReturnType<typeof mountDrawer>) =>
+  wrapper.find('[data-test="log-explorer-open-in-logs"]').attributes("aria-disabled") === "true";
+
 describe("DashboardLogDrawer related telemetry", () => {
   beforeEach(() => findRelatedTelemetry.mockClear());
 
@@ -60,6 +65,22 @@ describe("DashboardLogDrawer related telemetry", () => {
     await flushPromises();
     await (wrapper.vm as any).$.setupState.openCorrelationFromLog({ _timestamp: 1 });
     expect(findRelatedTelemetry).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [undefined, "logs"],
+    ["metrics", "metrics"],
+    ["traces", "traces"],
+  ])("stream type %s with %s locked: Open in Logs is disabled with a lock", (streamType, key) => {
+    const wrapper = mountDrawer({ [key]: "locked" }, streamType);
+    expect(openInLogsDisabled(wrapper)).toBe(true);
+    expect(wrapper.find('[data-test="log-explorer-open-in-logs-lock"]').exists()).toBe(true);
+  });
+
+  it("Open in Logs stays live while another signal is locked", () => {
+    const wrapper = mountDrawer({ traces: "locked" });
+    expect(openInLogsDisabled(wrapper)).toBe(false);
+    expect(wrapper.find('[data-test="log-explorer-open-in-logs-lock"]').exists()).toBe(false);
   });
 
   it("looks up related telemetry while correlation is enabled", async () => {

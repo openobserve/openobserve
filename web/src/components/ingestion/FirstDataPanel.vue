@@ -26,6 +26,9 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import { streamNameListQuery } from "@/services/stream.queries";
@@ -289,6 +292,9 @@ const arrivedOpenLabel = computed((): I18nText => {
   if (type === "traces") return t("ingestion.firstEvent.openInTraces");
   return t("ingestion.firstEvent.openInLogs");
 });
+const { isLocked, lockedReason } = useLicenseLocks();
+const arrivedFeature = computed(() => streamTypeFeature(props.arrived?.streamType));
+const arrivedLocked = computed(() => isLocked(arrivedFeature.value));
 
 const status = ref<InstanceType<typeof FirstEventStatus> | null>(null);
 
@@ -394,16 +400,24 @@ const StatusLine = defineComponent({
       >
         {{ t("common.close") }}
       </OButton>
-      <OButton
+      <OTooltip
         v-if="variant === 'compact'"
-        variant="primary"
-        size="sm-action"
-        icon-left="open-in-new"
-        data-test="first-data-panel-arrived-open-btn"
-        @click="emit('open')"
+        :content="lockedReason(arrivedFeature ?? '')"
+        :disabled="!arrivedLocked"
       >
-        {{ arrivedOpenLabel }}
-      </OButton>
+        <span class="inline-flex">
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :icon-left="arrivedLocked ? 'lock' : 'open-in-new'"
+            :disabled="arrivedLocked"
+            data-test="first-data-panel-arrived-open-btn"
+            @click="emit('open')"
+          >
+            {{ arrivedOpenLabel }}
+          </OButton>
+        </span>
+      </OTooltip>
     </template>
   </OBanner>
 

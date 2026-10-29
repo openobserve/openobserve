@@ -37,8 +37,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-calibration-digest-page"
   >
     <template #actions>
+      <OTooltip v-if="run && logsLock.locked.value" :content="logsLock.lockedReason.value">
+        <span class="inline-flex">
+          <OButton
+            variant="outline"
+            size="sm"
+            disabled
+            data-test="alert-calibration-digest-view-in-logs"
+          >
+            <template #icon-left>
+              <OIcon name="lock" size="sm" data-test="alert-calibration-digest-view-in-logs-lock" />
+            </template>
+            {{ t("alertCalibration.detail.viewInLogs") }}
+          </OButton>
+        </span>
+      </OTooltip>
       <OButton
-        v-if="run"
+        v-else-if="run"
         variant="outline"
         size="sm"
         icon-left="open-in-new"
@@ -174,6 +189,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -202,6 +219,7 @@ const props = defineProps<{ windowStart: string | number; windowEnd: string | nu
 const { t } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
+const logsLock = useLicenseLock("logs");
 const route = useRoute();
 const { search, orgId } = useDigestSearch();
 

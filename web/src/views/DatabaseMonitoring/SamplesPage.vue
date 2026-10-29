@@ -202,8 +202,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-actions="{ row }">
+          <OTooltip
+            v-if="sampleTraceFilter(row) && tracesLock.locked.value"
+            side="left"
+            :content="tracesLock.lockedReason.value"
+          >
+            <span class="inline-flex">
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                disabled
+                :aria-label="t('dbm.samples.viewTrace')"
+                :data-test="`dbm-samples-trace-${row.rowKey}`"
+              >
+                <template #icon-left>
+                  <OIcon
+                    name="lock"
+                    size="sm"
+                    :data-test="`dbm-samples-trace-lock-${row.rowKey}`"
+                  />
+                </template>
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
-            v-if="sampleTraceFilter(row)"
+            v-else-if="sampleTraceFilter(row)"
             variant="ghost"
             size="icon-sm"
             icon-left="open-in-new"
@@ -372,6 +395,8 @@ import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnTogg
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import dbMonitoringService, { type ServerSampleRow } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
@@ -407,6 +432,7 @@ const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-s
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
 
 // The shared list-page spine: scope from the URL, the request-sequence guard,
 // the shell's badge snapshot, refresh/date-change handlers and the load
@@ -911,7 +937,7 @@ const countLine = computed<I18nText | null>(() => {
 /** The traces route hydrates from `stream`/`filter`/`from`/`to` query params. */
 const openSampleTrace = (row: DbmSampleRow) => {
   const filter = sampleTraceFilter(row);
-  if (!filter) return;
+  if (!filter || tracesLock.locked.value) return;
   router
     .push({
       name: "traces",

@@ -251,13 +251,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdownItem
                     v-for="item in drilldownMenu[signal]"
                     :key="item.name"
-                    :disabled="!item.openable"
+                    :disabled="!item.openable || isSignalLocked(signal)"
+                    :icon-left="isSignalLocked(signal) ? 'lock' : undefined"
                     :data-test="`metrics-detail-drilldown-${signal}-${item.name}`"
                     @select="drilldown.openStream(signal, item)"
                   >
                     <span class="flex min-w-0 flex-col">
                       <span class="truncate">{{ raw(item.name) }}</span>
-                      <span v-if="!item.openable" class="text-text-secondary text-xs">{{
+                      <span
+                        v-if="isSignalLocked(signal)"
+                        class="text-text-secondary text-xs"
+                        :data-test="`metrics-detail-drilldown-${signal}-locked`"
+                        >{{ signalLockedReason(signal) }}</span
+                      >
+                      <span v-else-if="!item.openable" class="text-text-secondary text-xs">{{
                         t("metrics.explorer.detail.drilldown.noServiceField")
                       }}</span>
                     </span>
@@ -647,7 +654,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useMetricDrilldown } from "@/composables/metrics/useMetricDrilldown";
-import { useLicenseLock } from "@/composables/useFeatureLock";
+import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
@@ -907,6 +915,10 @@ export default defineComponent({
 
     const router = useRouter();
     const correlationLock = useLicenseLock("correlation");
+    const signalLocks = useLicenseLocks();
+    const isSignalLocked = (signal: string) => signalLocks.isLocked(streamTypeFeature(signal));
+    const signalLockedReason = (signal: string) =>
+      signalLocks.lockedReason(streamTypeFeature(signal) ?? signal);
     const drilldown = useMetricDrilldown({
       org: () => store.state.selectedOrganization?.identifier ?? "",
       metric: () => (props.card ? { name: props.card.name, labels: props.card.labels } : null),
@@ -1234,6 +1246,8 @@ export default defineComponent({
       drilldown,
       drilldownMenu,
       drilldownBlockedReason,
+      isSignalLocked,
+      signalLockedReason,
       onDrilldownOpen,
       onDrilldownPick,
       onDrilldownRetry,

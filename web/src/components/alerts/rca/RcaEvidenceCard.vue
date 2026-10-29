@@ -92,8 +92,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ entry.result_summary }}
         <span v-if="source" class="text-text-secondary">· {{ source }}</span>
       </span>
+      <OTooltip v-if="link && linkLocked" :content="lockedReason(link.page)">
+        <span class="inline-flex">
+          <OButton data-test="rca-evidence-open" variant="ghost-primary" size="sm" disabled>
+            <template #icon-left>
+              <OIcon name="lock" size="sm" data-test="rca-evidence-open-lock" />
+            </template>
+            {{ openLabel }}
+          </OButton>
+        </span>
+      </OTooltip>
       <OButton
-        v-if="link"
+        v-else-if="link"
         data-test="rca-evidence-open"
         variant="ghost-primary"
         size="sm"
@@ -134,6 +144,9 @@ import { rcaEvidenceLink, rcaEvidenceQuery } from "@/utils/incidents/rcaEvidence
 import { rcaEvidenceKindIcon, rcaEvidenceTitle, rcaUtcRange } from "@/utils/incidents/rcaSummary";
 import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 
 const props = withDefaults(
   defineProps<{
@@ -158,6 +171,9 @@ const router = useRouter();
 
 const link = computed(() => rcaEvidenceLink(props.entry.link, props.org));
 const query = computed(() => rcaEvidenceQuery(props.entry.link));
+
+const { isLocked, lockedReason } = useLicenseLocks();
+const linkLocked = computed(() => !!link.value && isLocked(streamTypeFeature(link.value.page)));
 
 /** "Logs · checkout_api": the target and its streams. */
 const title = computed<I18nText>(() => rcaEvidenceTitle(props.entry));

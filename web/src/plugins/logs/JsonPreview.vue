@@ -60,28 +60,44 @@
            with the toolbar buttons above rather than towering over them. -->
       <div
         v-if="
-          !hideViewTrace && showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
+          !hideViewTrace &&
+          showViewTraceBtn &&
+          (tracesLocked || tracesStreams.length || isTracesStreamsLoading)
         "
         class="mb-1.5 flex items-center gap-2"
       >
-        <OSelect
-          :aria-label="t('search.selectStream')"
-          data-test="log-search-index-list-select-stream"
-          v-model="searchObj.meta.selectedTraceStream"
-          :options="tracesStreams"
-          class="w-auto shrink-0"
-          :loading="isTracesStreamsLoading"
-          :disabled="isTracesStreamsLoading"
-          size="sm"
-        />
-        <OButton
-          data-test="trace-view-logs-btn"
-          size="xs"
-          variant="outline"
-          icon-left="account-tree"
-          @click="redirectToTraces"
-          >{{ t("search.viewTrace") }}</OButton
-        >
+        <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+          <span class="inline-flex">
+            <OButton
+              data-test="trace-view-logs-btn"
+              size="xs"
+              variant="outline"
+              icon-left="lock"
+              disabled
+              >{{ t("search.viewTrace") }}</OButton
+            >
+          </span>
+        </OTooltip>
+        <template v-else>
+          <OSelect
+            :aria-label="t('search.selectStream')"
+            data-test="log-search-index-list-select-stream"
+            v-model="searchObj.meta.selectedTraceStream"
+            :options="tracesStreams"
+            class="w-auto shrink-0"
+            :loading="isTracesStreamsLoading"
+            :disabled="isTracesStreamsLoading"
+            size="sm"
+          />
+          <OButton
+            data-test="trace-view-logs-btn"
+            size="xs"
+            variant="outline"
+            icon-left="account-tree"
+            @click="redirectToTraces"
+            >{{ t("search.viewTrace") }}</OButton
+          >
+        </template>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="ps-3">
@@ -452,6 +468,8 @@ export default {
       filteredTracesStreamOptions,
       isTracesStreamsLoading,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       getTracesStreams,
       setViewTraceBtn: setViewTraceBtnFor,
       filterStreamFn,
@@ -945,6 +963,8 @@ export default {
       streamSearchValue,
       activeTab,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       showViewRelatedBtn,
       correlationLicense,
       correlationAccess,

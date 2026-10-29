@@ -18,6 +18,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type {
   FirstEventDiagnosis,
   FirstEventResult,
@@ -336,6 +337,30 @@ describe("FirstEventStatus — received", () => {
       from: String(result.rangeStart),
       to: String(result.rangeEnd),
     });
+  });
+
+  it("disables Open in Traces with a lock while the traces license is locked", async () => {
+    mountBar({}, { zoConfig: { features: { traces: "locked" } } });
+    fake.result.value = { ...result, streamType: "traces" };
+    fake.state.value = "received";
+    await nextTick();
+    const btn = q("first-event-status-open-btn");
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(btn.findAllComponents(OIcon).map((i) => i.props("name"))).toContain("lock");
+    await btn.trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).not.toBe("traces");
+  });
+
+  it("keeps Open in Logs live when only traces is locked", async () => {
+    mountBar({}, { zoConfig: { features: { traces: "locked" } } });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-open-btn").attributes("disabled")).toBeUndefined();
+    await q("first-event-status-open-btn").trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("logs");
   });
 
   it("reads Test event received with Connect your real source primary on a test guide", async () => {

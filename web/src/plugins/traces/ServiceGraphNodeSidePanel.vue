@@ -54,15 +54,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            :disabled="correlationLocked"
-            :focusable-unavailable="correlationLocked"
-            :icon-left="correlationLocked ? 'lock' : undefined"
-            :description="correlationLocked ? correlationLockedReason : null"
+            :disabled="logsLocked || correlationLocked"
+            :focusable-unavailable="logsLocked || correlationLocked"
+            :icon-left="logsLocked || correlationLocked ? 'lock' : undefined"
+            :description="
+              logsLocked ? logsLockedReason : correlationLocked ? correlationLockedReason : null
+            "
             @select="viewRelatedLogs"
             data-test="service-graph-node-panel-view-related-logs-btn"
             >{{ t("traces.serviceGraphNodeSidePanel.logs") }}</ODropdownItem
           >
           <ODropdownItem
+            :disabled="tracesLocked"
+            :focusable-unavailable="tracesLocked"
+            :icon-left="tracesLocked ? 'lock' : undefined"
+            :description="tracesLocked ? tracesLockedReason : null"
             @select="viewRelatedTraces"
             data-test="service-graph-node-panel-view-related-traces-btn"
             >{{ t("traces.serviceGraphNodeSidePanel.traces") }}</ODropdownItem
@@ -144,7 +150,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex-1" />
 
           <!-- View in Traces button -->
+          <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+            <span class="inline-flex">
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                disabled
+                data-test="service-graph-side-panel-view-in-traces-btn"
+              >
+                <template #icon-left>
+                  <OIcon name="lock" size="sm" />
+                </template>
+                {{ t("traces.serviceGraphNodeSidePanel.viewTraces") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
+            v-else
             variant="ghost-primary"
             size="sm"
             data-test="service-graph-side-panel-view-in-traces-btn"
@@ -349,8 +371,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <template #cell-hover-actions="{ row, column, active }">
+                  <span v-if="active && tracesLocked" class="inline-flex" @click.stop>
+                    <OButton
+                      variant="ghost"
+                      size="icon"
+                      disabled
+                      data-test="service-graph-side-panel-view-traces-btn"
+                    >
+                      <OIcon name="lock" size="sm" />
+                    </OButton>
+                    <OTooltip :content="tracesLockedReason" />
+                  </span>
                   <OButton
-                    v-if="active"
+                    v-else-if="active"
                     variant="ghost"
                     size="icon"
                     data-test="service-graph-side-panel-view-traces-btn"
@@ -442,8 +475,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <template #cell-hover-actions="{ row, column, active }">
+                  <span v-if="active && tracesLocked" class="inline-flex" @click.stop>
+                    <OButton
+                      variant="ghost"
+                      size="icon"
+                      disabled
+                      :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
+                    >
+                      <OIcon name="lock" size="sm" />
+                    </OButton>
+                    <OTooltip :content="tracesLockedReason" />
+                  </span>
                   <OButton
-                    v-if="active"
+                    v-else-if="active"
                     variant="ghost"
                     size="icon"
                     :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
@@ -1291,6 +1335,8 @@ export default defineComponent({
     const { locked: correlationLocked, lockedReason: correlationLockedReason } =
       useLicenseLock("correlation");
     const { locked: dbmLocked, lockedReason: dbmLockedReason } = useLicenseLock("db_monitoring");
+    const { locked: logsLocked, lockedReason: logsLockedReason } = useLicenseLock("logs");
+    const { locked: tracesLocked, lockedReason: tracesLockedReason } = useLicenseLock("traces");
 
     // Metrics Correlation State
     const showTelemetryDialog = ref(false);
@@ -2405,6 +2451,8 @@ export default defineComponent({
       maxDurationMicros?: number;
       mode?: "spans" | "traces";
     }) => {
+      // Row clicks route here too, and a table row has no disabled state.
+      if (tracesLocked.value) return;
       emit("view-traces", {
         stream: props.streamFilter,
         serviceName:
@@ -2464,7 +2512,7 @@ export default defineComponent({
 
     const viewRelatedLogs = async () => {
       const serviceName = buildServiceName();
-      if (!serviceName || correlationLocked.value) return;
+      if (!serviceName || logsLocked.value || correlationLocked.value) return;
 
       const org = store.state.selectedOrganization.identifier;
 
@@ -2610,6 +2658,10 @@ export default defineComponent({
       dbmEnabled,
       dbmLocked,
       dbmLockedReason,
+      logsLocked,
+      logsLockedReason,
+      tracesLocked,
+      tracesLockedReason,
       correlationLocked,
       correlationLockedReason,
       viewRelatedDatabases,

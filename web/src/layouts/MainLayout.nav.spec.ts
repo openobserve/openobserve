@@ -200,6 +200,48 @@ describe("MainLayout — Product Analytics menu entry", () => {
       router.removeRoute("lockedProbe");
     });
 
+    it("locks a stream-typed page by its stream_type query, and re-evaluates on a query-only change", async () => {
+      router.addRoute({
+        path: "/stream-probe",
+        name: "streamProbe",
+        component: StubDiv,
+        meta: { licenseFeatureFromStreamType: true },
+      });
+      store.state.zoConfig.features = { logs: "locked", metrics: "enabled" };
+      store.state.zoConfig.feature_names = { logs: "Logs" };
+      await router.push("/stream-probe");
+      await railItems();
+      (wrapper!.vm as any).isLoading = true;
+      await flushPromises();
+      const lockedFeature = () => (wrapper!.vm as any).lockedFeature;
+      expect(lockedFeature()).toBe("logs");
+      expect(wrapper!.find('[data-test="feature-lock-banner-feature"]').text()).toBe("Logs");
+      await router.push({ path: "/stream-probe", query: { stream_type: "enrichment_tables" } });
+      expect(lockedFeature()).toBeNull();
+      await router.push({ path: "/stream-probe", query: { stream_type: "metrics" } });
+      expect(lockedFeature()).toBeNull();
+      await router.push({ path: "/stream-probe", query: { stream_type: "logs" } });
+      expect(lockedFeature()).toBe("logs");
+      delete store.state.zoConfig.feature_names;
+      await router.push("/");
+      router.removeRoute("streamProbe");
+    });
+
+    it("leaves a stream-typed page free while its stream type is enabled", async () => {
+      router.addRoute({
+        path: "/stream-free",
+        name: "streamFree",
+        component: StubDiv,
+        meta: { licenseFeatureFromStreamType: true },
+      });
+      store.state.zoConfig.features = { logs: "enabled" };
+      await router.push("/stream-free");
+      await railItems();
+      expect((wrapper!.vm as any).lockedFeature).toBeNull();
+      await router.push("/");
+      router.removeRoute("streamFree");
+    });
+
     it("clears license denials on a path change, ignores the old page's late ones, keeps the access toast", async () => {
       router.addRoute({ path: "/denial-a", name: "denialA", component: StubDiv });
       router.addRoute({ path: "/denial-b", name: "denialB", component: StubDiv });
@@ -256,6 +298,9 @@ describe("MainLayout — Product Analytics menu entry", () => {
     });
 
     it.each([
+      ["logs", "logs", "/logs"],
+      ["metrics", "metrics", "/metrics"],
+      ["traces", "traces", "/traces"],
       ["rum", "rum", "/rum"],
       ["productAnalytics", "product_analytics", "/product-analytics"],
       ["dashboards", "dashboards", "/dashboards"],

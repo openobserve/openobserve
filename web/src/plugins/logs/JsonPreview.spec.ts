@@ -1357,6 +1357,51 @@ describe("JsonPreview Component", () => {
         expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
         expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
         expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).attributes("disabled")).not.toBe("true");
+      });
+
+      it("disables the button with a lock and hides the picker while traces is locked", async () => {
+        store.state.zoConfig.features = { traces: "locked" };
+        try {
+          traceWrapper = mount(JsonPreview, {
+            props: { value: recordWithTraceId, mode: "sidebar" },
+            global: {
+              plugins: [i18n],
+              provide: { store },
+              stubs: {
+                AppTabs: true,
+                CodeQueryEditor: true,
+                ODialog: ODialogStub,
+                OButton: {
+                  props: { disabled: Boolean, iconLeft: String },
+                  template:
+                    '<button :disabled="disabled" :data-icon="iconLeft" @click="$emit(\'click\')"><slot /></button>',
+                },
+                OTooltip: { template: "<div><slot /></div>" },
+                ODropdown: true,
+                ODropdownItem: true,
+                ODropdownSeparator: true,
+                OSelect: true,
+                OIcon: true,
+                OInput: true,
+                OSpinner: true,
+                LogsHighLighting: true,
+                ChunkedContent: true,
+                EqualIcon: true,
+                NotEqualIcon: true,
+              },
+            },
+          });
+          await flushPromises();
+          const btn = traceWrapper.find(viewTraceBtnSelector);
+          expect(btn.attributes("disabled")).toBeDefined();
+          expect(btn.attributes("data-icon")).toBe("lock");
+          expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+          await btn.trigger("click");
+          expect(traceWrapper.emitted("view-trace")).toBeUndefined();
+        } finally {
+          delete store.state.zoConfig.features;
+        }
       });
 
       it("should hide the stream picker and the button when hideViewTrace is true", async () => {

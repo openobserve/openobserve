@@ -34,6 +34,7 @@ const router = createRouter({
   ],
 });
 import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { saveLogsStreamType } from "@/utils/streamPersist";
 
 initializeLogsIndexDom();
 
@@ -156,6 +157,15 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
     await vi.waitFor(() =>
       expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(true),
     );
+  });
+
+  it.each([
+    ["licensed", {}, "traces"],
+    ["locked", { traces: "locked" }, "logs"],
+  ])("restores a remembered traces type only while traces is %s", async (_s, features, type) => {
+    saveLogsStreamType(org, "traces");
+    await land({}, { auto_query_enabled: true, query_on_stream_selection: true, features });
+    expect(wrapper.vm.searchObj.data.stream.streamType).toBe(type);
   });
 
   it("AQE=false: no restore and no preselect, as today", async () => {

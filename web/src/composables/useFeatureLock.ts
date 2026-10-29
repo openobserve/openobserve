@@ -110,16 +110,23 @@ export const useFeatureNames = () => {
   return { featureName, featureNames };
 };
 
-/** License lock of one feature, for its controls on a page the license leaves open. */
-export const useLicenseLock = (key: string) => {
+/** License locks of keys known only at runtime, such as a panel's stream type; a null key is never locked. */
+export const useLicenseLocks = () => {
   const store = useStore();
   const { featureName } = useFeatureNames();
   // Global `$t`, not a vue-i18n import: toast and http load this module, which would defeat specs' vue-i18n mocks.
   const translate = getCurrentInstance()?.proxy?.$t;
-  const locked = computed(() => featureState(store?.state.zoConfig?.features, key) === "locked");
-  const lockedReason = computed(() => {
+  const isLocked = (key: string | null | undefined): boolean =>
+    !!key && featureState(store?.state.zoConfig?.features, key) === "locked";
+  const lockedReason = (key: string): I18nText => {
     const feature = featureName(key) ?? key;
     return (translate ? translate("featureLock.headerLocked", { feature }) : feature) as I18nText;
-  });
-  return { locked, lockedReason };
+  };
+  return { isLocked, lockedReason };
+};
+
+/** License lock of one feature, for its controls on a page the license leaves open. */
+export const useLicenseLock = (key: string) => {
+  const { isLocked, lockedReason } = useLicenseLocks();
+  return { locked: computed(() => isLocked(key)), lockedReason: computed(() => lockedReason(key)) };
 };

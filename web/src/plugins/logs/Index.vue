@@ -656,7 +656,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
-import { featureState } from "@/utils/featureGate";
+import { featureState, streamTypeFeature } from "@/utils/featureGate";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import useLogs from "@/composables/useLogs";
@@ -898,6 +899,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const signalLocks = useLicenseLocks();
     const {
       searchObj,
       resetSearchObj,
@@ -1547,7 +1549,8 @@ export default defineComponent({
             const persistedType = restoreLogsStreamType(
               store.state.selectedOrganization.identifier,
             );
-            if (persistedType) {
+            // The page lock reads the URL type, so a remembered locked type would run unlocked.
+            if (persistedType && !signalLocks.isLocked(streamTypeFeature(persistedType))) {
               searchObj.data.stream.streamType = persistedType;
             }
           }

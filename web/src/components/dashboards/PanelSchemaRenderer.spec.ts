@@ -150,6 +150,15 @@ vi.mock("@/components/common/LoadingProgress.vue", () => ({
   },
 }));
 
+const exemplarLookup = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/dashboard/useExemplarTraceLookup", () => ({
+  useExemplarTraceLookup: () => ({
+    peek: () => undefined,
+    lookup: exemplarLookup,
+    dispose: () => {},
+  }),
+}));
+
 // Mock console methods
 global.console = {
   ...console,
@@ -2840,6 +2849,89 @@ describe("PanelSchemaRenderer", () => {
         wrapper = createWrapper({ allowAlertCreation: true });
         wrapper.vm.onChartDomContextMenu({ x: 150, y: 250, value: 75 });
         expect(wrapper.vm.contextMenuVisible).toBe(false);
+      } finally {
+        zoConfig.features = previous;
+      }
+    });
+
+    it.each([
+      ["logs", "logs"],
+      ["metrics", "metrics"],
+      ["traces", "traces"],
+    ])(
+      "a logs drilldown on a %s panel is locked with a lock while %s is license-locked",
+      async (streamType, key) => {
+        const zoConfig = store.state.zoConfig as any;
+        const previous = zoConfig.features;
+        zoConfig.features = { [key]: "locked" };
+        try {
+          const drilldown = [
+            { name: "ToLogs", type: "logs", data: { logsMode: "auto" } },
+            { name: "ToUrl", type: "byUrl", data: { url: "https://example.com" } },
+          ];
+          wrapper = createWrapper({
+            panelSchema: {
+              ...defaultProps.panelSchema,
+              queries: [
+                { ...defaultProps.panelSchema.queries[0], fields: { stream_type: streamType } },
+              ],
+              config: { drilldown },
+            },
+          });
+          wrapper.vm.drilldownArray = drilldown;
+          await nextTick();
+          expect(wrapper.find('[data-test="drilldown-menu-item-ToLogs-lock"]').exists()).toBe(true);
+          expect(wrapper.find('[data-test="drilldown-menu-item-ToUrl-lock"]').exists()).toBe(false);
+        } finally {
+          zoConfig.features = previous;
+        }
+      },
+    );
+
+    it("a logs drilldown stays live while another signal is locked", async () => {
+      const zoConfig = store.state.zoConfig as any;
+      const previous = zoConfig.features;
+      zoConfig.features = { traces: "locked" };
+      try {
+        const drilldown = [{ name: "ToLogs", type: "logs", data: { logsMode: "auto" } }];
+        wrapper = createWrapper({
+          panelSchema: { ...defaultProps.panelSchema, config: { drilldown } },
+        });
+        wrapper.vm.drilldownArray = drilldown;
+        await nextTick();
+        expect(wrapper.find('[data-test="drilldown-menu-item-ToLogs"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="drilldown-menu-item-ToLogs-lock"]').exists()).toBe(false);
+      } finally {
+        zoConfig.features = previous;
+      }
+    });
+
+    it.each([
+      ["locked", 0],
+      ["enabled", 1],
+    ] as const)("following an exemplar with traces %s navigates %i times", async (state, calls) => {
+      const zoConfig = store.state.zoConfig as any;
+      const previous = zoConfig.features;
+      zoConfig.features = { traces: state };
+      try {
+        const router = createRouter({
+          history: createMemoryHistory(),
+          routes: [
+            { path: "/", component: { template: "<div />" } },
+            { path: "/trace", name: "traceDetails", component: { template: "<div />" } },
+          ],
+        });
+        await router.push("/");
+        const push = vi.spyOn(router, "push");
+        exemplarLookup.mockResolvedValue({
+          state: "found",
+          stream: "default",
+          startUs: 1,
+          endUs: 2,
+        });
+        wrapper = createWrapper({}, { plugins: [router] });
+        await wrapper.vm.exemplarInteraction.follow({ id: "m1", traceId: "abc", tsMs: 1 });
+        expect(push).toHaveBeenCalledTimes(calls);
       } finally {
         zoConfig.features = previous;
       }

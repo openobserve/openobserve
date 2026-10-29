@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import EventDetailDrawerContent from "@/components/rum/EventDetailDrawerContent.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -971,6 +972,40 @@ describe("EventDetailDrawerContent", () => {
       }
 
       windowOpenSpy.mockRestore();
+    });
+
+    it("traces locked: view-trace-btn is disabled with a lock and opens nothing", async () => {
+      await waitForRelatedResources(wrapper);
+      const zoConfig = store.state.zoConfig as any;
+      zoConfig.features = { traces: "locked" };
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      try {
+        await nextTick();
+        const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+        expect(traceButtons.length).toBeGreaterThan(0);
+        expect(traceButtons[0].attributes("disabled")).toBeDefined();
+        expect(wrapper.find('[data-test="view-trace-btn-lock"]').exists()).toBe(true);
+        await traceButtons[0].trigger("click");
+        await flushPromises();
+        expect(windowOpenSpy).not.toHaveBeenCalled();
+      } finally {
+        delete zoConfig.features;
+        windowOpenSpy.mockRestore();
+      }
+    });
+
+    it("another signal locked: view-trace-btn stays live", async () => {
+      await waitForRelatedResources(wrapper);
+      const zoConfig = store.state.zoConfig as any;
+      zoConfig.features = { logs: "locked" };
+      try {
+        await nextTick();
+        expect(wrapper.find('[data-test="view-trace-btn-lock"]').exists()).toBe(false);
+        const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+        expect(traceButtons[0].attributes("disabled")).toBeUndefined();
+      } finally {
+        delete zoConfig.features;
+      }
     });
   });
 

@@ -22,6 +22,7 @@ import IndexList from "@/plugins/logs/IndexList.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import { defineComponent } from "vue";
+import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
 
 const getStreamsMock = vi.hoisted(() => vi.fn());
 const onStreamChangeMock = vi.hoisted(() => vi.fn());
@@ -127,5 +128,51 @@ describe("IndexList stream type switch with out-of-order list responses (F3)", (
     expect(searchObj.data.stream.selectedStream).toEqual(["log_B"]);
     expect(onStreamChangeMock).toHaveBeenCalledTimes(1);
     expect(onStreamChangeMock).toHaveBeenCalledWith("", { origin: "selector" });
+  });
+
+  it("leaves the URL to the search on an unlocked page", async () => {
+    getStreamsMock.mockResolvedValue(listOf(["log_A"]));
+    await router.replace({ query: { stream_type: "traces", stream: "trace_A" } });
+    await wrapper.vm.onStreamTypeChange("logs");
+    await flushPromises();
+    expect(router.currentRoute.value.query.stream_type).toBe("traces");
+    expect(router.currentRoute.value.query.stream).toBe("trace_A");
+  });
+});
+
+describe("IndexList switch-to-logs on a license-locked page", () => {
+  const { searchObj } = searchState();
+  const BACK_TO_LOGS = '[data-test="log-search-index-list-back-to-logs-btn"]';
+
+  const mountUnderLock = (feature: string | null) =>
+    mount(
+      defineComponent({
+        components: { IndexList, FeatureLockBoundary },
+        setup: () => ({ feature }),
+        template: '<FeatureLockBoundary :feature="feature"><IndexList /></FeatureLockBoundary>',
+      }),
+      { global: { provide: { store }, plugins: [i18n, router] } },
+    );
+
+  beforeEach(() => {
+    getStreamsMock.mockResolvedValue(listOf([]));
+    searchObj.data.stream.streamType = "metrics";
+    searchObj.data.stream.selectedStream = [];
+  });
+
+  it.each([
+    ["locked", "metrics"],
+    ["unlocked", null],
+  ])("switches to logs while the page is %s", async (_state, feature) => {
+    await router.replace({ query: { stream_type: "metrics", stream: "metric_A" } });
+    const wrapper = mountUnderLock(feature);
+    await flushPromises();
+    getStreamsMock.mockClear();
+    await wrapper.find(BACK_TO_LOGS).trigger("click");
+    await flushPromises();
+    expect(searchObj.data.stream.streamType).toBe("logs");
+    expect(getStreamsMock).toHaveBeenCalled();
+    expect(router.currentRoute.value.query.stream_type).toBe(feature ? "logs" : "metrics");
+    wrapper.unmount();
   });
 });

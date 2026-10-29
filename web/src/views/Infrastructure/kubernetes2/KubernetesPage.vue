@@ -38,6 +38,7 @@ import K8sDock from "./K8sDock.vue";
 import { metricsRoute, pickTracesStream, tracesRoute } from "./k8sNavigation";
 import useStreams from "@/composables/useStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import type { K8sAction } from "./k8sActions";
 import {
   closeTab,
@@ -97,6 +98,7 @@ const streamsApi = useStreams(gt);
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18nTyped();
+const { isLocked } = useLicenseLocks();
 
 const state = computed(() => parseUrlState(route.query));
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
@@ -451,6 +453,7 @@ const openTraces = async (ref: DetailsRef) => {
 };
 
 const onAction = (type: K8sAction, ref: DetailsRef) => {
+  if ((type === "metrics" || type === "traces") && isLocked(type)) return;
   if (type === "details") onDrawerLink(ref);
   else if (type === "logs") dock.value = openTab(dock.value, type, ref);
   else if (type === "yaml") dock.value = openTab(dock.value, type, ref, dockRowOf(ref));

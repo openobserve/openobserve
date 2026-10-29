@@ -683,5 +683,23 @@ describe("NamedEventEditor (AC-44)", () => {
       expect(carried).toContain("_rumdata");
       expect(carried).toContain("new_user_login");
     });
+
+    it("logs locked: the Open in Logs link is a disabled button with a lock", async () => {
+      (store.state.zoConfig as Record<string, unknown>).features = { logs: "locked" };
+      try {
+        vi.mocked(searchService.search).mockResolvedValue({
+          data: { hits: [{ e0_sessions: 0 }] },
+        } as never);
+        await withDraft([{ t: "view", op: "param", name: "new_user_login", value: "true" }]);
+        await waitPreview();
+        const link = q<HTMLButtonElement>("rum-analytics-named-events-preview-logs-link")!;
+        expect(link.tagName).toBe("BUTTON");
+        expect(link.disabled).toBe(true);
+        expect(link.getAttribute("href")).toBeNull();
+        expect(q("rum-analytics-named-events-preview-logs-link-lock")).not.toBeNull();
+      } finally {
+        delete (store.state.zoConfig as Record<string, unknown>).features;
+      }
+    });
   });
 });

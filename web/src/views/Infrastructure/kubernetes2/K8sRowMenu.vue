@@ -24,6 +24,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import type { DetailsRef } from "./kubernetesUrlState";
 import { readActionsFor, writeActionsFor, type K8sAction } from "./k8sActions";
 
@@ -44,6 +45,11 @@ const ITEMS: Record<Exclude<K8sAction, "explain">, { label: I18nKey; icon: IconN
   delete: { label: "infra.k8s2.menuDelete", icon: "delete" },
 };
 
+// Logs open in the in-page dock, not the Logs page, so only the two page hand-offs lock.
+const LICENSE_KEYS: Partial<Record<K8sAction, string>> = { traces: "traces", metrics: "metrics" };
+
+const { isLocked, lockedReason } = useLicenseLocks();
+
 const reads = computed(() => readActionsFor(props.target.kind));
 
 const writes = computed(() => writeActionsFor(props.target.kind));
@@ -61,15 +67,33 @@ const writes = computed(() => writeActionsFor(props.target.kind));
         @click.stop
       />
     </template>
-    <ODropdownItem
-      v-for="type in reads"
-      :key="type"
-      :icon-left="ITEMS[type].icon"
-      :data-test="`k8s2-row-menu-${type}`"
-      @select="emit('action', type, target)"
-    >
-      {{ t(ITEMS[type].label) }}
-    </ODropdownItem>
+    <template v-for="type in reads" :key="type">
+      <ODropdownItem
+        v-if="isLocked(LICENSE_KEYS[type])"
+        disabled
+        focusable-unavailable
+        :data-test="`k8s2-row-menu-${type}`"
+      >
+        <template #icon-left>
+          <OIcon :name="ITEMS[type].icon" size="sm" />
+        </template>
+        <span class="min-w-0 flex-1">
+          <OTooltip :content="lockedReason(LICENSE_KEYS[type] ?? '')" side="left" />
+          {{ t(ITEMS[type].label) }}
+        </span>
+        <template #icon-right>
+          <OIcon name="lock" size="sm" :data-test="`k8s2-row-menu-${type}-license-lock`" />
+        </template>
+      </ODropdownItem>
+      <ODropdownItem
+        v-else
+        :icon-left="ITEMS[type].icon"
+        :data-test="`k8s2-row-menu-${type}`"
+        @select="emit('action', type, target)"
+      >
+        {{ t(ITEMS[type].label) }}
+      </ODropdownItem>
+    </template>
     <ODropdownSeparator v-if="writes.length" />
     <ODropdownItem
       v-for="type in writes"

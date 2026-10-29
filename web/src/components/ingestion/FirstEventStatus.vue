@@ -23,6 +23,9 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -292,6 +295,9 @@ const openLabel = computed(() => {
   if (type === "profiles") return t("ingestion.firstEvent.openInProfiles");
   return t("ingestion.firstEvent.openInLogs");
 });
+const { isLocked, lockedReason } = useLicenseLocks();
+const openFeature = computed(() => streamTypeFeature(result.value?.streamType));
+const openLocked = computed(() => isLocked(openFeature.value));
 
 const firstRecordJson = computed(() => {
   const record = result.value?.firstRecord;
@@ -654,15 +660,20 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
             {{ t("ingestion.firstEvent.checkNow") }}
           </OButton>
           <template v-if="state === 'received' && kind === 'test'">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="open-in-new"
-              data-test="first-event-status-open-btn"
-              @click="openData"
-            >
-              {{ openLabel }}
-            </OButton>
+            <OTooltip :content="lockedReason(openFeature ?? '')" :disabled="!openLocked">
+              <span class="inline-flex">
+                <OButton
+                  variant="outline"
+                  size="sm-action"
+                  :icon-left="openLocked ? 'lock' : 'open-in-new'"
+                  :disabled="openLocked"
+                  data-test="first-event-status-open-btn"
+                  @click="openData"
+                >
+                  {{ openLabel }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
               variant="primary"
               size="sm-action"
@@ -681,15 +692,20 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
             >
               {{ t("ingestion.firstEvent.setupAnother") }}
             </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              icon-left="open-in-new"
-              data-test="first-event-status-open-btn"
-              @click="openData"
-            >
-              {{ openLabel }}
-            </OButton>
+            <OTooltip :content="lockedReason(openFeature ?? '')" :disabled="!openLocked">
+              <span class="inline-flex">
+                <OButton
+                  variant="primary"
+                  size="sm-action"
+                  :icon-left="openLocked ? 'lock' : 'open-in-new'"
+                  :disabled="openLocked"
+                  data-test="first-event-status-open-btn"
+                  @click="openData"
+                >
+                  {{ openLabel }}
+                </OButton>
+              </span>
+            </OTooltip>
           </template>
         </div>
       </template>

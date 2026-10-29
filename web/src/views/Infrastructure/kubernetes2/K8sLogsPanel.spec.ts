@@ -50,8 +50,11 @@ const dispatch = vi.fn();
 const POLL_MS = 5000;
 const DAY_US = 24 * 60 * 60 * 1_000_000;
 
-const mountPanel = async (overrides: Record<string, unknown> = {}) => {
-  const store = createStore({ state: { timezone: "UTC" } });
+const mountPanel = async (
+  overrides: Record<string, unknown> = {},
+  features: Record<string, string> = {},
+) => {
+  const store = createStore({ state: { timezone: "UTC", zoConfig: { features } } });
   store.dispatch = dispatch;
   const wrapper = mount(K8sLogsPanel, {
     props: {
@@ -111,6 +114,23 @@ describe("K8sLogsPanel", () => {
     const wrapper = await mountPanel();
     await wrapper.find('[data-test="k8s2-logs-open"]').trigger("click");
     expect(dispatch).toHaveBeenCalledWith("logs/setIsInitialized", false);
+    expect(push).toHaveBeenCalledWith(link.route);
+  });
+
+  it("locks the Logs hand-off when the logs license is locked, still tailing in the dock", async () => {
+    const wrapper = await mountPanel({}, { logs: "locked" });
+    const open = wrapper.find('[data-test="k8s2-logs-open"]');
+    expect(open.attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="k8s2-logs-open-lock"]').exists()).toBe(true);
+    await open.trigger("click");
+    expect(push).not.toHaveBeenCalled();
+    expect(wrapper.findAll('[data-test="k8s2-logs-line"]')).toHaveLength(3);
+  });
+
+  it("keeps the Logs hand-off live when the license enables logs", async () => {
+    const wrapper = await mountPanel({}, { logs: "enabled" });
+    expect(wrapper.find('[data-test="k8s2-logs-open-lock"]').exists()).toBe(false);
+    await wrapper.find('[data-test="k8s2-logs-open"]').trigger("click");
     expect(push).toHaveBeenCalledWith(link.route);
   });
 

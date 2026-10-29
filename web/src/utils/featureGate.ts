@@ -50,6 +50,16 @@ export const menuState = (
   return enabledWhen ? "enabled" : "hidden";
 };
 
+const SIGNAL_FEATURES: Partial<Record<string, string>> = {
+  logs: "logs",
+  metrics: "metrics",
+  traces: "traces",
+};
+
+/** License key of a stream type; the backend reads a missing type as logs, other types have no key. */
+export const streamTypeFeature = (streamType?: string | null): string | null =>
+  SIGNAL_FEATURES[streamType || "logs"] ?? null;
+
 /** Path of the shared upsell page, for a locked feature that has no page of its own. */
 export const featureLockedPath = (key: string): string => `/feature-locked/${key}`;
 
