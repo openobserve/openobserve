@@ -669,6 +669,7 @@
     "dateRangeCopied": "日期範圍已複製",
     "dateRangePasted": "日期範圍已貼上",
     "dateRangePasteError": "無法解析日期範圍",
+    "dateRangePasteBlocked": "此瀏覽器封鎖了讀取剪貼簿。請在選擇器開啟時按下 {shortcut} 以貼上。",
     "pastSecond": "過去 {count} 秒 | 過去 {count} 秒",
     "pastMinute": "過去 {count} 分鐘 | 過去 {count} 分鐘",
     "pastHour": "過去 {count} 小時 | 過去 {count} 小時",
@@ -11573,7 +11574,8 @@
         "dailySentence": "每日 · {time}，持續 {duration} · {zone}",
         "weeklySentence": "每週於 {days} · {time}，持續 {duration} · {zone}",
         "fromNoEnd": "{schedule}，自 {start} 起，無結束日期",
-        "fromUntil": "{schedule}，自 {start} 至 {until}"
+        "fromUntil": "{schedule}，自 {start} 至 {until}",
+        "onceFor": "一次，{duration}"
       },
       "validation": {
         "conditionRequired": "請新增條件，或移除條件區塊。",
@@ -11914,8 +11916,8 @@
         "presets": {
           "30m": "30 分鐘",
           "1h": "1 小時",
-          "2h": "2 小時",
           "4h": "4 小時",
+          "24h": "24 小時",
           "custom": "自訂"
         },
         "endsAt": "結束於",
@@ -11929,7 +11931,34 @@
         "mutedTooltip": "由 {name} 靜音至 {end}",
         "exclude": "排除時間範圍…",
         "firingMuted": "觸發中 · 已靜音",
-        "firingMutedTooltip": "仍在觸發。通知已被 {name} 靜音。"
+        "firingMutedTooltip": "仍在觸發。通知已被 {name} 靜音。",
+        "untilClear": "直到解除",
+        "untilClearHint": "警示恢復時結束，或最晚於 24 小時後結束。",
+        "confirmUntilClear": "靜音直到解除",
+        "titleOne": "靜音 {name}",
+        "subtitleOne": "警示會持續執行並保留歷史記錄。通知、值班呼叫與工作流程會停止，直到時段結束。",
+        "untilTime": "直到 {time}。",
+        "groups": "群組",
+        "groupsThis": "此群組",
+        "groupsAll": "此警示的所有群組",
+        "addGroup": "新增觸發中群組",
+        "groupsHint": "僅這些群組會靜音；其他群組仍會通知",
+        "confirm24h": {
+          "title": "靜音 24 小時？",
+          "message": "「直到解除」會在警示恢復後立即結束靜音。",
+          "useUntilClear": "使用直到解除",
+          "ok": "靜音 24 小時"
+        },
+        "muteGroup": "靜音此群組",
+        "endNow": "立即結束靜音",
+        "endMute": "結束靜音",
+        "mutedUntilClear": "已靜音直到解除 · 最多 24 小時",
+        "mutedUntilClearGroups": "已靜音直到解除 · {count} 個群組 | 已靜音直到解除 · {count} 個群組",
+        "mutedGroups": "已靜音 · {count} 個群組 · {duration} 後結束 | 已靜音 · {count} 個群組 · {duration} 後結束",
+        "mutedUntilClearTooltip": "由 {name} 靜音，直到警示恢復，最晚 {end}",
+        "mutedGroupsTooltip": "由 {name} 靜音直到 {end}。群組：{labels}",
+        "mutedUntilClearGroupsTooltip": "由 {name} 靜音，直到警示恢復，最晚 {end}。群組：{labels}",
+        "untilTomorrow": "直到明天 {time}。"
       },
       "corrected": "已修正",
       "correctedBy": "分數由 {names} 修正",
@@ -12015,7 +12044,66 @@
           "sent": "已向 {count} 個目標傳送測試 | 已向 {count} 個目標傳送測試",
           "failed": "測試未送達 {names}。"
         }
+      },
+      "untilClear": {
+        "schedule": "直到解除",
+        "atMost": "最多 24 小時",
+        "endsWhenClears": "解除時結束",
+        "byTime": "最晚 {time}",
+        "whenCleared": "解除時",
+        "endedBy": "由 {product} 結束",
+        "createdFrom": "來自 {source}"
+      },
+      "groupTarget": "群組：{labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "從警示快速靜音",
+      "endedLabel": "已結束"
+    },
+    "ack": {
+      "acknowledge": "確認",
+      "acknowledgeGroups": "確認 {count} 個觸發中群組 | 確認 {count} 個觸發中群組",
+      "unacknowledge": "取消確認",
+      "takeOver": "接手",
+      "chip": "已由 {who} 透過 {source} 確認 · {time}",
+      "chipTooltip": "由 {who} 於 {time} 透過 {source} 確認",
+      "firingAcknowledged": "觸發中 · 已確認",
+      "tile": "已確認",
+      "groupsAcknowledged": "已確認 {count} 個",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "值班",
+        "incident": "事件"
+      },
+      "history": {
+        "dedupSuppressed": "因確認而抑制（{who}）",
+        "acked": "已由 {who} 從 {source} 確認",
+        "ackedViaPage": "已由 {who} 透過值班通知 {page} 確認",
+        "ackedViaIncident": "已由 {who} 透過事件 {incident} 確認",
+        "unacked": "已由 {who} 從 {source} 取消確認",
+        "unackedResume": "已由 {who} 從 {source} 取消確認 · 重複通知將於 {time} 恢復",
+        "takenOver": "已由 {who} 從 {previous} 接手（{source}）"
+      },
+      "refused": {
+        "ack": "您無法確認此警示。確認與靜音需要 Admin 或 Editor 角色，或需為此警示的值班回應者。",
+        "mute": "您無法將此警示靜音。確認與靜音需要 Admin 或 Editor 角色，或需為此警示的值班回應者。",
+        "onCall": "值班：{people}",
+        "canAct": "可處理：{people}",
+        "people": "值班：{onCall}。可處理：{canAct}"
+      },
+      "errors": {
+        "notFiring": "此警示目前未觸發，因此沒有需要確認的項目。",
+        "firingChanged": "此頁面載入後警示再次觸發。請重新整理並再試一次。"
       }
+    },
+    "groupActions": {
+      "menu": "群組操作",
+      "viewHistory": "檢視此群組的歷史記錄"
+    },
+    "firingState": {
+      "level": "層級",
+      "firingSince": "觸發時間",
+      "firingFor": "已觸發 {duration}",
+      "incident": "事件"
     }
   },
   "alert_dependencies": {
@@ -12544,13 +12632,14 @@
       "openSlackSettings": "在管理 › Slack 中進行設定"
     },
     "prebuilt": {
-      "slackDescription": "傳送通知到 Slack 頻道",
+      "slackDescription": "使用您的 Webhook 與範本張貼新訊息。可用於值班通知或自訂 Slack 版面。",
       "discordDescription": "傳送通知到 Discord 頻道",
       "msteamsDescription": "傳送通知到 Teams 頻道",
       "emailDescription": "傳送 HTML 格式的電子郵件通知",
       "pagerdutyDescription": "在 PagerDuty 中建立事件",
       "opsgenieDescription": "在 Opsgenie 中建立警示",
-      "servicenowDescription": "在 ServiceNow 中建立事件"
+      "servicenowDescription": "在 ServiceNow 中建立事件",
+      "slackAppDescription": "就地更新排程警示。可從 Slack 確認、靜音及調查。需要已連結的工作區。"
     },
     "import": {
       "title": "匯入目標",
@@ -12592,7 +12681,8 @@
     "severityCriticalDescription": "最高優先級事件",
     "severityErrorDescription": "標準錯誤事件",
     "severityWarningDescription": "警告等級事件",
-    "severityInfoDescription": "資訊事件"
+    "severityInfoDescription": "資訊事件",
+    "urlRecipientsChannel": "URL / 收件者 / 頻道"
   },
   "pipeline_destinations": {
     "header": "管線目標",
@@ -13115,7 +13205,7 @@
     "groupIntegrations": "整合",
     "groupAccount": "帳戶",
     "slackApp": "Slack",
-    "slackAppDesc": "從 Slack 向 OpenObserve 提問",
+    "slackAppDesc": "在 Slack 中向 OpenObserve 提問並處理警示",
     "generalDesc": "主題、查詢預設值與核心偏好設定",
     "orgDesc": "組織參數與識別碼",
     "cipherKeysDesc": "用於敏感欄位的加密金鑰",
@@ -20613,7 +20703,9 @@
         "succeeded": "成功",
         "failed": "失敗",
         "skipped": "已跳過",
-        "pending": "待處理"
+        "pending": "待處理",
+        "acknowledged": "已確認",
+        "ackevent": "確認事件"
       },
       "alertLevel": {
         "ok": "確定",
@@ -20916,7 +21008,16 @@
       "alertSavedSuccessfully": "警示已成功儲存。",
       "alertUpdatedSuccessfully": "警示已成功更新。",
       "openingDedupConfig": "正在開啟 {name} 的重複資料排除設定",
-      "editingAlert": "正在編輯警示：{name}"
+      "editingAlert": "正在編輯警示：{name}",
+      "ack": {
+        "acked": "已確認 {name}",
+        "ackedGroups": "已確認 {name} 的 {count} 個群組 | 已確認 {name} 的 {count} 個群組",
+        "alreadyAcked": "已由 {who} 確認",
+        "unacked": "已取消確認 {name}",
+        "takenOver": "您已接手 {name} 的確認",
+        "failed": "無法確認 {name}",
+        "unackFailed": "無法取消確認 {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "加密金鑰更新成功",
@@ -21228,7 +21329,14 @@
       "muted": "已將 {count} 個項目靜音至 {time}。歸檔於 {folder}。 | 已將 {count} 個項目靜音至 {time}。歸檔於 {folder}。",
       "muteFailed": "無法建立靜音",
       "viewDowntime": "檢視停機時間",
-      "itemsDropped": "有 {count} 個選取的項目不在選取的分類中，已被移除。 | 有 {count} 個選取的項目不在選取的分類中，已被移除。"
+      "itemsDropped": "有 {count} 個選取的項目不在選取的分類中，已被移除。 | 有 {count} 個選取的項目不在選取的分類中，已被移除。",
+      "mutedUntilClear": "已將 {name} 靜音直到其解除，最晚至 {time}",
+      "alreadyMuted": "{name} 已靜音至 {time}",
+      "muteChanged": "此靜音設定在頁面載入後已變更。現在將於 {time} 結束。",
+      "muteEnded": "靜音已結束。通知將恢復。",
+      "mutedOne": "已將 {name} 靜音至 {time}",
+      "timeTomorrow": "明天 {time}",
+      "notQuickMute": "此靜音是在停機時段頁面設定的。請在該頁面變更。"
     }
   },
   "cipherKeys": {
@@ -24008,7 +24116,7 @@
     "deliveriesTitle": "傳送記錄",
     "deliveriesNone": "尚未傳送任何項目。",
     "deliveriesRun": "階梯執行 {run} — 因交接，接收團隊重新開始逐層通知。",
-    "deliveryLanded": "已送達",
+    "deliveryLanded": "已送出",
     "deliveryFailed": "失敗",
     "deliveriesTruncated": "顯示 {shown} / {total} 次傳送。",
     "teamChannelTitle": "團隊頻道",
@@ -24601,7 +24709,7 @@
     "myDeliveriesPage": "警示",
     "myDeliveriesLandedColumn": "送達",
     "myDeliveriesSent": "已傳送",
-    "myDeliveriesLanded": "已透過 {channel} 送達",
+    "myDeliveriesLanded": "由 {channel} 傳送給您",
     "myDeliveriesFailed": "{channel} 未能送達給你",
     "myDeliveriesNone": "尚未有任何警示傳送給你。",
     "myDeliveriesNoUnread": "沒有未讀的警示。",
@@ -25225,7 +25333,7 @@
     "reachAlarmNoRetry": "沒有安排重試 — 升級階梯已結束。",
     "reachAlarmNoTransport": "可能原因：此部署未設定任何通知管道。",
     "reachAlarmCheckTransports": "檢查可聯絡的人員",
-    "reachLanded": "已聯絡",
+    "reachLanded": "已傳送",
     "reachUnreached": "未聯絡",
     "onCallDetails": "值班詳情",
     "shiftHandover": "交接",
@@ -25310,7 +25418,8 @@
     "scopeClaimServiceEverywhere": "{service} 在每個叢集和命名空間中都會呼叫此團隊，無論周圍的擁有者是誰。",
     "scopeClaimServiceHere": "{service} 只會在 {scope} 中呼叫此團隊。其他地方則由該範圍的擁有者接管。",
     "scopeNothingDiscovered": "目前尚未探索到任何內容，因此沒有可選擇的資產。使用進階模式依欄位編寫規則，或先傳送一些遙測資料。",
-    "scopeAdvancedHint": "可依任何欄位與值進行比對，包括上方層級未涵蓋的項目。"
+    "scopeAdvancedHint": "可依任何欄位與值進行比對，包括上方層級未涵蓋的項目。",
+    "simulatorSendsNothing": "此優先順序不會傳送他們能接收的任何內容"
   },
   "paidUsage": {
     "consentTitle": "要開啟付費 AI 使用嗎？",
@@ -26422,17 +26531,14 @@
     "saveFailed": "無法儲存此帳戶。請再試一次。",
     "disconnectFailed": "無法中斷此帳戶的連線。請重試。",
     "connected": "已連線",
-    "active": "作用中",
-    "account": "帳戶",
     "fromNumber": "來源號碼",
-    "press4": "通話按鍵：4 確認，6 解決，8 升級",
+    "press4": "通話按鍵 (4 確認、6 解決、8 升級)",
     "press4Available": "可用",
     "press4NotAvailable": "無法使用",
     "press4NotAvailableHint": "通話會請人員透過簡訊中的連結進行確認。",
     "update": "更新",
     "disconnect": "中斷連線",
     "deploymentTitle": "此部署的 {provider} 帳戶",
-    "deploymentNote": "簡訊與通話已可運作。由操作人員設定；此處無需任何操作。",
     "useOwn": "改用您自己的 {provider} 帳戶",
     "connectTitle": "連接 {provider}",
     "updateTitle": "更新 {provider}",
@@ -26440,7 +26546,7 @@
     "accountSid": "帳戶 SID",
     "authToken": "驗證權杖",
     "tokenKeep": "留空以保留目前的權杖",
-    "fromHelp": "可傳送簡訊及撥打電話的 {provider} 號碼，需包含國碼。",
+    "fromHelp": "此 {provider} 帳戶中的號碼，需包含國碼。",
     "connect": "連接",
     "checking": "正在與 {provider} 確認…",
     "disconnectTitle": "中斷 {provider} 連線？",
@@ -26453,8 +26559,21 @@
       "tokenRequired": "連接時必須提供驗證權杖。",
       "noMasterKey": "請要求操作人員設定 {variable}。",
       "accountRejected": "{provider} 未接受此帳戶。請檢查帳戶 SID 與驗證權杖，並確認帳戶處於作用中狀態。",
-      "unreadable": "無法讀取此組織的電話供應商帳戶。"
-    }
+      "unreadable": "無法讀取此組織的電話供應商帳戶。",
+      "fromNotOnAccount": "此號碼不屬於此 {provider} 帳戶。請使用 {provider} 中 Phone Numbers → Active numbers 下的號碼。",
+      "unavailable": "無法連線至 {provider}，請重試。"
+    },
+    "statusChecking": "正在檢查…",
+    "statusBroken": "無法運作",
+    "statusUnchecked": "無法檢查",
+    "cardMeta": "來自 {number} · 帳戶 {account}",
+    "deploymentMeta": "來自 {number}",
+    "uncheckedNow": "暫時無法連線至 {provider}。",
+    "trial": "試用帳戶：簡訊和電話只能送達在 {provider} 中驗證過的號碼。",
+    "cantText": "此號碼無法傳送簡訊",
+    "cantCall": "此號碼無法撥打電話",
+    "deploymentOwner": "由操作員設定，因此這裡無需設定。",
+    "tokenNewAccount": "不同的帳戶需要它自己的驗證權杖"
   },
   "slackApp": {
     "prereq": {
@@ -26694,7 +26813,10 @@
       "managedBy": "由您的執行個體管理員管理",
       "managedTitle": "由您的執行個體管理員管理。",
       "managedDetail": "憑證、連結設定，以及哪些組織可使用 {team}，都在 _meta 中設定。",
-      "managedQuestions": "問題請洽：{contact}"
+      "managedQuestions": "問題請洽：{contact}",
+      "outboundQueue": "警示訊息：{count} 則已排隊，最舊 {age} | 警示訊息：{count} 則已排隊，最舊 {age}",
+      "outboundEmpty": "沒有已排隊的警示訊息",
+      "ageSeconds": "{count} 秒"
     },
     "channels": {
       "title": "頻道預設值",
@@ -26730,7 +26852,8 @@
       "instanceAdminOnly": "僅限執行個體管理員",
       "ownOrgOnlyHint": "在執行個體工作區中，您可以將頻道對應到自己的組織",
       "claimableHint": "未認領的頻道，以及 {org} 擁有的頻道",
-      "servedOrgsHint": "此工作區所服務的任何組織"
+      "servedOrgsHint": "此工作區所服務的任何組織",
+      "alertRoutes": "{count} 個目標 | {count} 個目標"
     },
     "people": {
       "title": "已連結的人員",
@@ -26884,6 +27007,83 @@
       "remove": "移除",
       "saved": "組織已儲存",
       "saveFailed": "無法儲存組織。"
+    },
+    "destination": {
+      "appTile": "{product} 應用程式",
+      "webhookTile": "{product} Webhook",
+      "twoWay": "雙向",
+      "recommendedForAlertResponse": "建議用於警示回應",
+      "choiceHint": "值班通知與超級叢集會使用 Webhook。從 Slack 應用程式目標手動與即時傳送會是各自獨立的貼文。",
+      "unavailableReason": "需要在單一叢集上使用 Enterprise Slack 應用程式",
+      "unavailableFlag": "此伺服器已停用；請洽您的操作員設定 {variable}",
+      "unavailableMasterKey": "此伺服器需要加密金鑰；請洽您的操作員設定 {variable}",
+      "unavailableCloud": "您的 Cloud 區域尚未啟用",
+      "unavailableNoAccess": "請洽組織管理員啟用 Slack 應用程式",
+      "postOnly": "僅張貼",
+      "switchToApp": "切換到 {product} 應用程式",
+      "switchThis": "切換此目標",
+      "switchBack": "切換回來",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "工作區",
+      "channel": "頻道",
+      "mention": "提及",
+      "mentionCritical": "嚴重時使用 {'@'}here，其他情況不提及",
+      "mentionNone": "無",
+      "mentionHelp": "用於重複觸發與等級升級時",
+      "refireReuse": "再次觸發重用（分鐘）",
+      "refireReuseHelp": "在此時間內再次觸發會編輯先前的訊息，而不會張貼新訊息",
+      "buttons": "「確認」、「靜音」與「調查」按鈕",
+      "buttonsHelp": "當觸發中的警示有事件或值班通知時，會加入「解決」",
+      "autoInvestigate": "對嚴重警示自動調查",
+      "autoInvestigateHelp": "以組織的 AI 服務帳戶身分執行，並沿用其存取權；在警示討論串中張貼調查結果",
+      "templateDefault": "預設 {product} 範本（{name}）",
+      "sendTest": "傳送測試",
+      "setsDefault": "將 #{channel} 的預設組織設為 {org}",
+      "answersFor": "#{channel} 會回答組織 {org} 的問題。來自 {thisOrg} 的警示會張貼在此處，其討論串會在 {thisOrg} 中回答；頻道的預設組織維持不變。",
+      "sharedTag": "共用 · {product} Connect",
+      "sharedTitle": "#{channel} 已與 {workspace} 以外的人員共用。",
+      "sharedDetail": "他們會看到警示名稱、值、圖表與連結。他們對按鈕的點擊會被拒絕。",
+      "sharedConfirm": "我了解，請將警示張貼到此共用頻道",
+      "sharedRequired": "請確認警示可張貼至此共用頻道",
+      "versionMismatch": "各節點執行不同版本。請先升級所有節點。",
+      "oncallNotAllowed": "{product} 應用程式目標不能作為值班團隊頻道",
+      "answersForAnother": "#{channel} 會回答另一個組織的問題。來自 {thisOrg} 的警示會張貼在此處，其討論串會在 {thisOrg} 中回答；頻道的預設組織維持不變。",
+      "oncallTag": "值班室",
+      "oncallTitle": "團隊 {team} 的值班通知也會透過 {destination} 張貼到 #{channel}。",
+      "oncallDetail": "此處的警示會另行張貼。",
+      "oncallConfirm": "我了解，請將警示張貼到此值班室",
+      "oncallRequired": "請確認警示可張貼至此值班室",
+      "workspaceRequired": "請選擇工作區",
+      "refireRange": "請輸入 0 到 {max} 之間的整數分鐘",
+      "connectTitle": "連結 {product} 以張貼附有按鈕的警示",
+      "connectDetail": "在 {product} 畫面選擇頻道並按「允許」。OpenObserve 會為該頻道建立此目標。",
+      "connected": "已為 #{channel} 建立 {name}。請檢查其設定並儲存。",
+      "saveFailed": "無法儲存此目標。",
+      "switched": "{name} 現在會透過 {product} 應用程式張貼",
+      "switchedBack": "{name} 已改回透過其 Webhook 張貼",
+      "switchFailed": "無法切換 {name}：{reason}",
+      "switchedAll": "已切換 {count} 個目標 | 已切換 {count} 個目標",
+      "switchThisDetail": "將其切換到 {product} 應用程式，以使用「確認」、「靜音」與「調查」按鈕。其名稱、範本與警示維持不變；切換回來會還原 Webhook。"
+    },
+    "switchAll": {
+      "title": "有 {count} 個 Webhook 目標會張貼到此工作區。 | 有 {count} 個 Webhook 目標會張貼到此工作區。",
+      "detail": "將其切換至 {product} 應用程式，以使用「認領」、「靜音」和「調查」按鈕。其名稱、範本和警示維持不變；切換回來會還原 Webhook。 | 將它們切換至 {product} 應用程式，以使用「認領」、「靜音」和「調查」按鈕。名稱、範本和警示維持不變；切換回來會還原 Webhook。",
+      "review": "檢視",
+      "action": "全部切換",
+      "summary": "已切換 {switched} 個 · {count} 個無法切換"
+    },
+    "oncallUnlinked": {
+      "title": "未連結至 {product} 的值班成員",
+      "description": "值班通知無法私訊他們，且他們點擊警示與值班通知按鈕的操作，會等到完成連結後才處理",
+      "remind": "提醒他們",
+      "columnPerson": "人員",
+      "columnTeam": "團隊",
+      "columnNextShift": "下一個班次",
+      "columnReminder": "提醒",
+      "dmSent": "已傳送私訊 {time}",
+      "notSent": "未傳送",
+      "reminded": "已向 {count} 人傳送提醒 | 已向 {count} 人傳送提醒",
+      "remindFailed": "無法傳送提醒。"
     }
   },
   "fleet": {

@@ -101,7 +101,6 @@ impl From<AlertError> for Response {
             | AlertError::RecoveryOnRealtimeAlert
             | AlertError::RecoveryDestinationsWithoutRecovery
             | AlertError::RecoveryDestinationIsPlatform { .. }
-            | AlertError::RecoveryOnMultiAlert
             | AlertError::RecoveryWithNotificationGrouping
             | AlertError::RecoveryNeedsJsonPayload { .. }
             | AlertError::RecoveryNeedsRoutingKey { .. }

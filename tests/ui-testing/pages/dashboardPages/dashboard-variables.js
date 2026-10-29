@@ -22,6 +22,9 @@ export default class DashboardVariables {
     this.variableLoadingSpinner = (name) => page.locator(`[data-test="variable-selector-${name}"] [role="status"]`);
     // HTML panel editor (Monaco) locators
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
+    // "Add Variable" button in the panel editor's variable bar, and the drawer's name input it opens
+    this.addVariableBtn = page.locator('[data-test="dashboard-add-variable-btn"]');
+    this.variableNameField = page.locator('[data-test="dashboard-variable-name-field"]');
     // Ad-hoc (dynamic) filter variable selector controls
     this.adhocAddSelector = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
     this.adhocNameSelectorField = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
@@ -41,6 +44,10 @@ export default class DashboardVariables {
     await this.adhocNameSelectorInput.fill(name);
     await this.adhocValueSelectorInput.click();
     await this.adhocValueSelectorInput.fill(value);
+  }
+
+  async clickAddVariableBtn() {
+    await this.addVariableBtn.click();
   }
 
   /**

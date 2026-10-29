@@ -669,6 +669,7 @@
     "dateRangeCopied": "Datumsbereich kopiert",
     "dateRangePasted": "Datumsbereich eingefügt",
     "dateRangePasteError": "Datumsbereich konnte nicht geparst werden",
+    "dateRangePasteBlocked": "Dieser Browser hat das Lesen der Zwischenablage blockiert. Drücken Sie {shortcut} bei geöffnetem Auswahlfeld, um einzufügen.",
     "pastSecond": "Letzte {count} Sekunde | Letzte {count} Sekunden",
     "pastMinute": "Letzte {count} Minute | Letzte {count} Minuten",
     "pastHour": "Letzte {count} Stunde | Letzte {count} Stunden",
@@ -11578,7 +11579,8 @@
         "dailySentence": "Täglich · {time} für {duration} · {zone}",
         "weeklySentence": "Wöchentlich am {days} · {time} für {duration} · {zone}",
         "fromNoEnd": "{schedule}, ab {start} ohne Enddatum",
-        "fromUntil": "{schedule}, von {start} bis {until}"
+        "fromUntil": "{schedule}, von {start} bis {until}",
+        "onceFor": "Einmalig, {duration}"
       },
       "validation": {
         "conditionRequired": "Fügen Sie eine Bedingung hinzu oder entfernen Sie den Bedingungsblock.",
@@ -11919,8 +11921,8 @@
         "presets": {
           "30m": "30 Min.",
           "1h": "1 h",
-          "2h": "2 h",
           "4h": "4 h",
+          "24h": "24 h",
           "custom": "Benutzerdefiniert"
         },
         "endsAt": "Endet am",
@@ -11934,7 +11936,34 @@
         "mutedTooltip": "Stummgeschaltet von {name} bis {end}",
         "exclude": "Zeitfenster ausschließen…",
         "firingMuted": "Ausgelöst · stummgeschaltet",
-        "firingMutedTooltip": "Löst weiterhin aus. Benachrichtigungen sind durch {name} stummgeschaltet."
+        "firingMutedTooltip": "Löst weiterhin aus. Benachrichtigungen sind durch {name} stummgeschaltet.",
+        "untilClear": "Bis zur Entwarnung",
+        "untilClearHint": "Endet, sobald der Alarm abklingt, spätestens nach 24 h.",
+        "confirmUntilClear": "Bis zur Entwarnung stummschalten",
+        "titleOne": "{name} stummschalten",
+        "subtitleOne": "Er läuft weiter und behält seinen Verlauf. Benachrichtigungen, Alarmierungen und Workflows werden bis zum Ende des Zeitfensters ausgesetzt.",
+        "untilTime": "Bis {time}.",
+        "groups": "Gruppen",
+        "groupsThis": "Diese Gruppe",
+        "groupsAll": "Alle Gruppen dieses Alarms",
+        "addGroup": "Ausgelöste Gruppe hinzufügen",
+        "groupsHint": "Nur diese Gruppen werden stummgeschaltet; andere Gruppen benachrichtigen weiter",
+        "confirm24h": {
+          "title": "Für 24 Stunden stummschalten?",
+          "message": "„Bis zur Entwarnung“ beendet die Stummschaltung, sobald der Alarm abklingt.",
+          "useUntilClear": "Bis zur Entwarnung verwenden",
+          "ok": "24 h stummschalten"
+        },
+        "muteGroup": "Diese Gruppe stummschalten",
+        "endNow": "Stummschaltung jetzt beenden",
+        "endMute": "Stummschaltung beenden",
+        "mutedUntilClear": "Stummgeschaltet bis zur Entwarnung · max. 24 h",
+        "mutedUntilClearGroups": "Stummgeschaltet bis zur Entwarnung · {count} Gruppe | Stummgeschaltet bis zur Entwarnung · {count} Gruppen",
+        "mutedGroups": "Stummgeschaltet · {count} Gruppe · endet in {duration} | Stummgeschaltet · {count} Gruppen · endet in {duration}",
+        "mutedUntilClearTooltip": "Von {name} stummgeschaltet bis zur Entwarnung, spätestens {end}",
+        "mutedGroupsTooltip": "Von {name} stummgeschaltet bis {end}. Gruppen: {labels}",
+        "mutedUntilClearGroupsTooltip": "Von {name} stummgeschaltet bis zur Entwarnung, spätestens {end}. Gruppen: {labels}",
+        "untilTomorrow": "Bis morgen {time}."
       },
       "corrected": "Korrigiert",
       "correctedBy": "Bewertung korrigiert durch {names}",
@@ -12020,7 +12049,66 @@
           "sent": "Test an {count} Ziel gesendet | Test an {count} Ziele gesendet",
           "failed": "Der Test hat {names} nicht erreicht."
         }
+      },
+      "untilClear": {
+        "schedule": "Bis zur Entwarnung",
+        "atMost": "max. 24 h",
+        "endsWhenClears": "endet mit der Entwarnung",
+        "byTime": "bis {time}",
+        "whenCleared": "bei Entwarnung",
+        "endedBy": "beendet durch {product}",
+        "createdFrom": "aus {source}"
+      },
+      "groupTarget": "Gruppe: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Schnelles Stummschalten aus einem Alarm",
+      "endedLabel": "beendet"
+    },
+    "ack": {
+      "acknowledge": "Quittieren",
+      "acknowledgeGroups": "{count} ausgelöste Gruppe quittieren | {count} ausgelöste Gruppen quittieren",
+      "unacknowledge": "Quittierung aufheben",
+      "takeOver": "Übernehmen",
+      "chip": "Quittiert von {who} über {source} · {time}",
+      "chipTooltip": "Quittiert von {who} am {time} aus {source}",
+      "firingAcknowledged": "Ausgelöst · quittiert",
+      "tile": "Quittiert",
+      "groupsAcknowledged": "{count} quittiert",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "On-Call",
+        "incident": "Vorfall"
+      },
+      "history": {
+        "dedupSuppressed": "durch Bestätigung unterdrückt ({who})",
+        "acked": "Bestätigt von {who} über {source}",
+        "ackedViaPage": "Bestätigt von {who} über Alarmierung {page}",
+        "ackedViaIncident": "Bestätigt von {who} über Vorfall {incident}",
+        "unacked": "Bestätigung aufgehoben von {who} über {source}",
+        "unackedResume": "Bestätigung aufgehoben von {who} über {source} · Wiederholungen werden um {time} fortgesetzt",
+        "takenOver": "Übernommen von {who} (zuvor {previous}, {source})"
+      },
+      "refused": {
+        "ack": "Sie können diesen Alarm nicht bestätigen. Bestätigen und Stummschalten erfordern die Rolle Admin oder Editor oder dass Sie als On-Call-Responder für diesen Alarm eingetragen sind.",
+        "mute": "Sie können diesen Alarm nicht stummschalten. Bestätigen und Stummschalten erfordern die Rolle Admin oder Editor oder dass Sie als On-Call-Responder für diesen Alarm eingetragen sind.",
+        "onCall": "On-Call: {people}",
+        "canAct": "Kann handeln: {people}",
+        "people": "On-Call: {onCall}. Kann handeln: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Dieser Alarm ist nicht ausgelöst, es gibt daher nichts zu bestätigen.",
+        "firingChanged": "Der Alarm wurde seit dem Laden dieser Seite erneut ausgelöst. Aktualisieren Sie die Seite und versuchen Sie es erneut."
       }
+    },
+    "groupActions": {
+      "menu": "Gruppenaktionen",
+      "viewHistory": "Verlauf dieser Gruppe anzeigen"
+    },
+    "firingState": {
+      "level": "Stufe",
+      "firingSince": "Ausgelöst seit",
+      "firingFor": "ausgelöst seit {duration}",
+      "incident": "Vorfall"
     }
   },
   "alert_dependencies": {
@@ -12549,13 +12637,14 @@
       "openSlackSettings": "In Einstellungen › Slack einrichten"
     },
     "prebuilt": {
-      "slackDescription": "Benachrichtigungen an Slack-Kanäle senden",
+      "slackDescription": "Veröffentlicht eine neue Nachricht mit Ihrem Webhook und Ihrer Vorlage. Ideal für Alarmierungen oder eigene Slack-Layouts.",
       "discordDescription": "Benachrichtigungen an Discord-Kanäle senden",
       "msteamsDescription": "Benachrichtigungen an Teams-Kanäle senden",
       "emailDescription": "HTML-formatierte E-Mail-Benachrichtigungen senden",
       "pagerdutyDescription": "Vorfälle in PagerDuty erstellen",
       "opsgenieDescription": "Alerts in Opsgenie erstellen",
-      "servicenowDescription": "Vorfälle in ServiceNow erstellen"
+      "servicenowDescription": "Vorfälle in ServiceNow erstellen",
+      "slackAppDescription": "Aktualisiert geplante Alarme direkt. Bestätigen, stummschalten und untersuchen Sie direkt aus Slack. Erfordert einen verbundenen Workspace."
     },
     "import": {
       "title": "Ziel importieren",
@@ -12597,7 +12686,8 @@
     "severityCriticalDescription": "Vorfälle mit höchster Priorität",
     "severityErrorDescription": "Standardfehler-Vorfälle",
     "severityWarningDescription": "Vorfälle auf Warnstufe",
-    "severityInfoDescription": "Informationelle Vorfälle"
+    "severityInfoDescription": "Informationelle Vorfälle",
+    "urlRecipientsChannel": "URL / Empfänger / Kanal"
   },
   "pipeline_destinations": {
     "header": "Pipeline-Ziele",
@@ -13120,7 +13210,7 @@
     "groupIntegrations": "Integrationen",
     "groupAccount": "Konto",
     "slackApp": "Slack",
-    "slackAppDesc": "OpenObserve-Fragen aus Slack stellen",
+    "slackAppDesc": "Stellen Sie OpenObserve Fragen und bearbeiten Sie Alarme aus Slack",
     "generalDesc": "Design, Standardabfragen und zentrale Einstellungen",
     "orgDesc": "Organisationsparameter und Kennungen",
     "cipherKeysDesc": "Verschlüsselungsschlüssel für sensible Felder",
@@ -20618,7 +20708,9 @@
         "succeeded": "Erfolgreich",
         "failed": "Fehlgeschlagen",
         "skipped": "Übersprungen",
-        "pending": "Ausstehend"
+        "pending": "Ausstehend",
+        "acknowledged": "Bestätigt",
+        "ackevent": "Bestätigungsereignis"
       },
       "alertLevel": {
         "ok": "OK",
@@ -20921,7 +21013,16 @@
       "alertSavedSuccessfully": "Alarm erfolgreich gespeichert.",
       "alertUpdatedSuccessfully": "Alarm erfolgreich aktualisiert.",
       "openingDedupConfig": "Dedup-Konfiguration für {name} wird geöffnet",
-      "editingAlert": "Alarm bearbeiten: {name}"
+      "editingAlert": "Alarm bearbeiten: {name}",
+      "ack": {
+        "acked": "{name} bestätigt",
+        "ackedGroups": "{count} Gruppe von {name} bestätigt | {count} Gruppen von {name} bestätigt",
+        "alreadyAcked": "Bereits bestätigt von {who}",
+        "unacked": "Bestätigung für {name} aufgehoben",
+        "takenOver": "Sie haben die Bestätigung von {name} übernommen",
+        "failed": "{name} konnte nicht bestätigt werden",
+        "unackFailed": "Bestätigung für {name} konnte nicht aufgehoben werden"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Cipher-Schlüssel erfolgreich aktualisiert",
@@ -21233,7 +21334,14 @@
       "muted": "{count} Element bis {time} stummgeschaltet. Abgelegt in {folder}. | {count} Elemente bis {time} stummgeschaltet. Abgelegt in {folder}.",
       "muteFailed": "Die Stummschaltung konnte nicht erstellt werden",
       "viewDowntime": "Wartungsfenster anzeigen",
-      "itemsDropped": "{count} ausgewähltes Element liegt außerhalb der ausgewählten Ordner und wurde entfernt. | {count} ausgewählte Elemente liegen außerhalb der ausgewählten Ordner und wurden entfernt."
+      "itemsDropped": "{count} ausgewähltes Element liegt außerhalb der ausgewählten Ordner und wurde entfernt. | {count} ausgewählte Elemente liegen außerhalb der ausgewählten Ordner und wurden entfernt.",
+      "mutedUntilClear": "{name} stummgeschaltet, bis der Alarm endet, spätestens {time}",
+      "alreadyMuted": "{name} ist bereits bis {time} stummgeschaltet",
+      "muteChanged": "Diese Stummschaltung wurde seit dem Laden der Seite geändert. Sie endet jetzt {time}.",
+      "muteEnded": "Stummschaltung beendet. Benachrichtigungen werden wieder zugestellt.",
+      "mutedOne": "{name} bis {time} stummgeschaltet",
+      "timeTomorrow": "morgen um {time}",
+      "notQuickMute": "Diese Stummschaltung wurde auf der Seite Wartungsfenster eingerichtet. Ändern Sie sie dort."
     }
   },
   "cipherKeys": {
@@ -24013,7 +24121,7 @@
     "deliveriesTitle": "Zustellungen",
     "deliveriesNone": "Noch wurde nichts gesendet.",
     "deliveriesRun": "Leiterlauf {run} — eine Übergabe startete den Aufstieg beim empfangenden Team neu.",
-    "deliveryLanded": "Zugestellt",
+    "deliveryLanded": "Gesendet",
     "deliveryFailed": "Fehlgeschlagen",
     "deliveriesTruncated": "{shown} von {total} Zustellungen werden angezeigt.",
     "teamChannelTitle": "Teamkanal",
@@ -24606,7 +24714,7 @@
     "myDeliveriesPage": "Alarmierung",
     "myDeliveriesLandedColumn": "Zustellung",
     "myDeliveriesSent": "Gesendet",
-    "myDeliveriesLanded": "Hat Sie über {channel} erreicht",
+    "myDeliveriesLanded": "An Sie gesendet über {channel}",
     "myDeliveriesFailed": "{channel} hat Sie nicht erreicht",
     "myDeliveriesNone": "Es wurde Ihnen noch nichts gesendet.",
     "myDeliveriesNoUnread": "Nichts Ungelesenes.",
@@ -25230,7 +25338,7 @@
     "reachAlarmNoRetry": "Kein weiterer Versuch geplant — die Eskalationsleiter ist beendet.",
     "reachAlarmNoTransport": "Wahrscheinliche Ursache: Für diese Instanz ist kein Zustellkanal konfiguriert.",
     "reachAlarmCheckTransports": "Prüfen, wer erreichbar ist",
-    "reachLanded": "erreicht",
+    "reachLanded": "gesendet",
     "reachUnreached": "nicht erreicht",
     "onCallDetails": "On-Call-Details",
     "shiftHandover": "Schichtübergabe",
@@ -25315,7 +25423,8 @@
     "scopeClaimServiceEverywhere": "{service} alarmiert dieses Team in jedem Cluster und jedem Namespace, unabhängig davon, wem die umliegenden Cluster oder Namespaces gehören.",
     "scopeClaimServiceHere": "{service} alarmiert dieses Team nur in {scope}. Andernorts geht es an den Verantwortlichen des umgebenden Bereichs.",
     "scopeNothingDiscovered": "Es wurde noch nichts entdeckt, daher gibt es keine Ressourcen zur Auswahl. Verwenden Sie „Erweitert“, um die Regel nach Feld zu schreiben, oder senden Sie zuerst Telemetriedaten.",
-    "scopeAdvancedHint": "Gilt für jedes Feld und jeden Wert, auch für solche, die die obigen Ebenen nicht abdecken."
+    "scopeAdvancedHint": "Gilt für jedes Feld und jeden Wert, auch für solche, die die obigen Ebenen nicht abdecken.",
+    "simulatorSendsNothing": "Diese Priorität sendet nichts, was sie empfangen können"
   },
   "paidUsage": {
     "consentTitle": "Kostenpflichtige KI-Nutzung aktivieren?",
@@ -26427,17 +26536,14 @@
     "saveFailed": "Das Konto konnte nicht gespeichert werden. Versuchen Sie es erneut.",
     "disconnectFailed": "Das Konto konnte nicht getrennt werden. Versuchen Sie es erneut.",
     "connected": "Verbunden",
-    "active": "Aktiv",
-    "account": "Konto",
     "fromNumber": "Absendernummer",
-    "press4": "Anruftasten: 4 Bestätigen, 6 Lösen, 8 Eskalieren",
+    "press4": "Anruftasten (4 bestätigen, 6 lösen, 8 eskalieren)",
     "press4Available": "Verfügbar",
     "press4NotAvailable": "Nicht verfügbar",
     "press4NotAvailableHint": "Anrufe bitten Personen, über den Link in ihrer SMS zu bestätigen.",
     "update": "Aktualisieren",
     "disconnect": "Trennen",
     "deploymentTitle": "Das {provider}-Konto dieser Bereitstellung",
-    "deploymentNote": "SMS und Anrufe funktionieren bereits. Vom Betreiber festgelegt; hier ist nichts zu tun.",
     "useOwn": "Stattdessen ein eigenes {provider}-Konto verwenden",
     "connectTitle": "{provider} verbinden",
     "updateTitle": "{provider} aktualisieren",
@@ -26445,7 +26551,7 @@
     "accountSid": "Konto-SID",
     "authToken": "Authentifizierungs-Token",
     "tokenKeep": "Leer lassen, um das aktuelle Token beizubehalten",
-    "fromHelp": "Eine {provider}-Nummer, die SMS senden und Anrufe tätigen kann, mit Ländervorwahl.",
+    "fromHelp": "Eine Nummer aus diesem {provider}-Konto, mit Ländervorwahl.",
     "connect": "Verbinden",
     "checking": "Prüfung mit {provider}…",
     "disconnectTitle": "{provider} trennen?",
@@ -26458,8 +26564,21 @@
       "tokenRequired": "Zum Verbinden ist ein Authentifizierungs-Token erforderlich.",
       "noMasterKey": "Bitten Sie Ihren Betreiber, {variable} festzulegen.",
       "accountRejected": "{provider} hat dieses Konto nicht akzeptiert. Prüfen Sie die Konto-SID und das Authentifizierungs-Token und ob das Konto aktiv ist.",
-      "unreadable": "Das Telefonanbieter-Konto dieser Organisation konnte nicht gelesen werden."
-    }
+      "unreadable": "Das Telefonanbieter-Konto dieser Organisation konnte nicht gelesen werden.",
+      "fromNotOnAccount": "Diese Nummer gehört nicht zu diesem {provider}-Konto. Verwenden Sie eine aus Phone Numbers → Active numbers in {provider}.",
+      "unavailable": "{provider} war nicht erreichbar. Versuchen Sie es erneut."
+    },
+    "statusChecking": "Wird geprüft…",
+    "statusBroken": "Funktioniert nicht",
+    "statusUnchecked": "Prüfung nicht möglich",
+    "cardMeta": "Von {number} · Konto {account}",
+    "deploymentMeta": "Von {number}",
+    "uncheckedNow": "{provider} war gerade nicht erreichbar.",
+    "trial": "Testkonto: SMS und Anrufe erreichen nur in {provider} verifizierte Nummern.",
+    "cantText": "Diese Nummer kann keine SMS senden",
+    "cantCall": "Diese Nummer kann keine Anrufe tätigen",
+    "deploymentOwner": "Vom Betreiber festgelegt, daher gibt es hier nichts zu konfigurieren.",
+    "tokenNewAccount": "Ein anderes Konto braucht sein eigenes Authentifizierungs-Token"
   },
   "slackApp": {
     "prereq": {
@@ -26699,7 +26818,10 @@
       "managedBy": "von Ihrem Instanz-Administrator verwaltet",
       "managedTitle": "Von Ihrem Instanz-Administrator verwaltet.",
       "managedDetail": "Anmeldedaten, Verknüpfung und die Frage, welche Organisationen {team} verwenden, werden in _meta festgelegt.",
-      "managedQuestions": "Fragen: {contact}"
+      "managedQuestions": "Fragen: {contact}",
+      "outboundQueue": "Alarmnachrichten: {count} in der Warteschlange, älteste {age} | Alarmnachrichten: {count} in der Warteschlange, älteste {age}",
+      "outboundEmpty": "Keine Alarmnachrichten in der Warteschlange",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Kanalstandards",
@@ -26735,7 +26857,8 @@
       "instanceAdminOnly": "Nur für Instanz-Administratoren",
       "ownOrgOnlyHint": "In einem Instanz-Workspace ordnen Sie Kanäle Ihrer eigenen Organisation zu",
       "claimableHint": "Nicht übernommene Kanäle und Kanäle im Besitz von {org}",
-      "servedOrgsHint": "Jede Organisation, die dieser Workspace bedient"
+      "servedOrgsHint": "Jede Organisation, die dieser Workspace bedient",
+      "alertRoutes": "{count} Ziel | {count} Ziele"
     },
     "people": {
       "title": "Verknüpfte Personen",
@@ -26889,6 +27012,83 @@
       "remove": "Entfernen",
       "saved": "Organisationen gespeichert",
       "saveFailed": "Die Organisationen konnten nicht gespeichert werden."
+    },
+    "destination": {
+      "appTile": "{product}-App",
+      "webhookTile": "{product}-Webhook",
+      "twoWay": "Bidirektional",
+      "recommendedForAlertResponse": "Empfohlen für die Alarmreaktion",
+      "choiceHint": "Alarmierungen und Supercluster verwenden den Webhook. Manuelle und Echtzeit-Sendungen von einem Slack-App-Ziel sind separate Beiträge.",
+      "unavailableReason": "Erfordert die Enterprise-Slack-App auf einem einzelnen Cluster",
+      "unavailableFlag": "Auf diesem Server deaktiviert; bitten Sie Ihren Betreiber, {variable} festzulegen",
+      "unavailableMasterKey": "Erfordert einen Verschlüsselungsschlüssel auf diesem Server; bitten Sie Ihren Betreiber, {variable} festzulegen",
+      "unavailableCloud": "Für Ihre Cloud-Region noch nicht aktiviert",
+      "unavailableNoAccess": "Bitten Sie einen Organisationsadministrator, die Slack-App zu aktivieren",
+      "postOnly": "Nur posten",
+      "switchToApp": "Zur {product}-App wechseln",
+      "switchThis": "Dieses Ziel wechseln",
+      "switchBack": "Zurückwechseln",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Workspace",
+      "channel": "Kanal",
+      "mention": "Erwähnung",
+      "mentionCritical": "{'@'}here bei kritischen, sonst keine",
+      "mentionNone": "Keine",
+      "mentionHelp": "Wird bei Wiederholungen und Hochstufungen verwendet",
+      "refireReuse": "Wiederverwendung bei erneutem Auslösen (Minuten)",
+      "refireReuseHelp": "Ein erneutes Auslösen innerhalb dieser Zeit bearbeitet die frühere Nachricht, statt eine neue zu posten",
+      "buttons": "Schaltflächen zum Bestätigen, Stummschalten und Untersuchen",
+      "buttonsHelp": "„Lösen“ wird hinzugefügt, wenn die Auslösung einen Vorfall oder eine Alarmierung hat",
+      "autoInvestigate": "Bei kritischen Alarmen automatisch untersuchen",
+      "autoInvestigateHelp": "Wird als KI-Dienstkonto der Organisation mit dessen Zugriff ausgeführt; veröffentlicht Ergebnisse im Alarm-Thread",
+      "templateDefault": "Standardvorlage von {product} ({name})",
+      "sendTest": "Test senden",
+      "setsDefault": "Legt {org} als Standardorganisation von #{channel} fest",
+      "answersFor": "#{channel} beantwortet Fragen für die Organisation {org}. Alarme von {thisOrg} werden hier gepostet und ihre Threads antworten in {thisOrg}; der Kanalstandard bleibt unverändert.",
+      "sharedTag": "Geteilt · {product} Connect",
+      "sharedTitle": "#{channel} ist für Personen außerhalb von {workspace} freigegeben.",
+      "sharedDetail": "Sie sehen Alarmnamen, Werte, Diagramme und Links. Ihre Klicks auf die Schaltflächen werden abgelehnt.",
+      "sharedConfirm": "Ich verstehe, Alarme in diesem geteilten Kanal posten",
+      "sharedRequired": "Bestätigen Sie, dass Alarme in diesem geteilten Kanal gepostet werden dürfen",
+      "versionMismatch": "Die Nodes haben unterschiedliche Versionen. Aktualisieren Sie zuerst jeden Node.",
+      "oncallNotAllowed": "Ein Ziel der {product}-App kann kein On-Call-Teamkanal sein",
+      "answersForAnother": "#{channel} beantwortet Fragen für eine andere Organisation. Alarme von {thisOrg} werden hier gepostet und ihre Threads antworten in {thisOrg}; der Kanalstandard bleibt unverändert.",
+      "oncallTag": "On-Call-Raum",
+      "oncallTitle": "Alarmierungen für das Team {team} werden ebenfalls über {destination} in #{channel} gepostet.",
+      "oncallDetail": "Alarme hier werden separat gepostet.",
+      "oncallConfirm": "Ich verstehe, Alarme in diesem On-Call-Raum posten",
+      "oncallRequired": "Bestätigen Sie, dass Alarme in diesem On-Call-Raum gepostet werden dürfen",
+      "workspaceRequired": "Wählen Sie einen Workspace",
+      "refireRange": "Geben Sie ganze Minuten von 0 bis {max} ein",
+      "connectTitle": "{product} verbinden, um Alarme mit Schaltflächen zu posten",
+      "connectDetail": "Wählen Sie einen Kanal auf dem {product}-Bildschirm und klicken Sie auf „Zulassen“. OpenObserve erstellt dieses Ziel für diesen Kanal.",
+      "connected": "{name} wurde für #{channel} erstellt. Prüfen Sie die Einstellungen und speichern Sie.",
+      "saveFailed": "Das Ziel konnte nicht gespeichert werden.",
+      "switched": "{name} postet jetzt über die {product}-App",
+      "switchedBack": "{name} postet wieder über seinen Webhook",
+      "switchFailed": "{name} konnte nicht gewechselt werden: {reason}",
+      "switchedAll": "{count} Ziel gewechselt | {count} Ziele gewechselt",
+      "switchThisDetail": "Wechseln Sie es zur {product}-App, um Schaltflächen zum Bestätigen, Stummschalten und Untersuchen zu erhalten. Name, Vorlage und Alarme bleiben gleich; Zurückwechseln stellt den Webhook wieder her."
+    },
+    "switchAll": {
+      "title": "{count} Webhook-Ziel postet in diesen Workspace. | {count} Webhook-Ziele posten in diesen Workspace.",
+      "detail": "Stellen Sie es für die Schaltflächen „Bestätigen“, „Stummschalten“ und „Untersuchen“ auf die {product}-App um. Name, Vorlage und Alarme bleiben gleich; „Zurückwechseln“ stellt den Webhook wieder her. | Stellen Sie sie für die Schaltflächen „Bestätigen“, „Stummschalten“ und „Untersuchen“ auf die {product}-App um. Namen, Vorlagen und Alarme bleiben gleich; „Zurückwechseln“ stellt den Webhook wieder her.",
+      "review": "Prüfen",
+      "action": "Alle umstellen",
+      "summary": "{switched} umgestellt · {count} nicht umstellbar"
+    },
+    "oncallUnlinked": {
+      "title": "On-Call-Mitglieder nicht mit {product} verknüpft",
+      "description": "Über Alarmierungen können ihnen keine DMs gesendet werden, und ihre Klicks auf Schaltflächen in Alarmen und Alarmierungen werden erst verarbeitet, wenn sie verknüpft sind.",
+      "remind": "Erinnern",
+      "columnPerson": "Person",
+      "columnTeam": "Team",
+      "columnNextShift": "Nächste Schicht",
+      "columnReminder": "Erinnerung",
+      "dmSent": "DM gesendet {time}",
+      "notSent": "Nicht gesendet",
+      "reminded": "Erinnerung an {count} Person gesendet | Erinnerung an {count} Personen gesendet",
+      "remindFailed": "Die Erinnerungen konnten nicht gesendet werden."
     }
   },
   "fleet": {
