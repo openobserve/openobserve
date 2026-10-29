@@ -7,6 +7,7 @@ const fetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 import { openNavFlyoutChild } from '../commonActions.js';
 import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
+const { FilterBuilderDriver, operatorId } = require('../generalPages/filterBuilderPage.js');
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
@@ -176,38 +177,16 @@ export class PipelinesPage {
         // `streamSelectionError` as an alias of that for backwards-compat
         // with existing PO callers.
         this.streamSelectionError = this.selectStreamError;
-        // FilterGroup selectors for new condition UI.
-        // Post-OSelect migration the inner OSelect/OInput emits its OWN data-test
-        // (forwarded from the wrapper) so auto-derived `-trigger`, `-popover`,
-        // `-search`, `-option`, and `-field` data-tests exist alongside the wrapper.
-        this.columnSelect = page.locator('[data-test="alert-conditions-select-column"]');
-        this.columnSelectTrigger = page.locator('[data-test="alert-conditions-select-column-trigger"]');
-        this.columnSelectPopover = page.locator('[data-test="alert-conditions-select-column-popover"]');
-        this.columnSelectSearch = page.locator('[data-test="alert-conditions-select-column-search"]');
-        this.columnSelectFirstOption = page.locator('[data-test="alert-conditions-select-column-option"]').first();
-        this.operatorSelect = page.locator('[data-test="alert-conditions-operator-select"]');
-        this.operatorSelectTrigger = page.locator('[data-test="alert-conditions-operator-select-trigger"]');
-        this.operatorSelectPopover = page.locator('[data-test="alert-conditions-operator-select-popover"]');
-        this.valueInput = page.locator('[data-test="alert-conditions-value-input"]');
-        // OInput inner native input (-field) — must `.fill()` the field variant per §4.
-        this.valueInputField = page.locator('[data-test="alert-conditions-value-input-field"]');
-        this.addConditionButton = page.locator('[data-test="alert-conditions-add-condition-btn"]');
-        // Per-name OSelect option (works across both FilterCondition.vue and FieldsInput.vue
-        // because the inner OSelect now emits the parent data-test, so options stamp
-        // `alert-conditions-select-column-option` with `data-test-value="<col>"`).
-        this.columnOptionByName = (name) => page.locator(
-            `[data-test="alert-conditions-select-column-option"][data-test-value="${name}"]`,
-        ).first();
-        this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
+        // The shared vertical condition builder (FilterBuilder) in the condition drawer.
+        this.conditions = new FilterBuilderDriver(page, 'condition-builder');
+        this.valueInput = page.locator('[data-test^="condition-builder-chip-"][data-test$="-value"]');
         // OSelect renders its `:error-message` inside a `<span>` with
         // `data-test="${parent}-error"` (auto-derived from the wrapper data-test).
         this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input-error"]');
-        // Condition node's "Please add at least one condition" validation error.
-        // The OForm migration replaced the old imperative toast with inline schema
-        // validation (Condition.schema.ts superRefine), rendered as a form-level
-        // error div `data-test="add-condition-error"` in Condition.vue.
+        // The condition drawer's save errors: "add at least one filter" (builder issues)
+        // and "fill in all condition fields" (an unfinished chip).
         this.conditionRequiredToast = page.locator(
-          '[data-test="add-condition-error"]'
+          '[data-test="add-condition-error"], [data-test="condition-builder-issues"]'
         );
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
@@ -273,16 +252,12 @@ export class PipelinesPage {
 
         // Condition-specific locators for comprehensive testing
         this.addConditionSection = page.locator('[data-test="add-condition-section"]');
-        this.addConditionGroupBtn = page.locator('[data-test="alert-conditions-add-condition-group-btn"]');
-        this.toggleOperatorBtn = page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
-        this.deleteConditionBtn = page.locator('[data-test="alert-conditions-delete-condition-btn"]');
-        this.reorderBtn = page.locator('[data-test="alert-conditions-reorder-btn"]');
+        this.deleteConditionBtn = page.locator('[data-test^="condition-builder-chip-"][data-test$="-remove"]');
         this.addConditionCancelBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-secondary-btn"]');
         this.addConditionDeleteBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-neutral-btn"]');
         this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
-        this.nestedGroups = page.locator('.el-border');
-        this.operatorLabels = page.locator('[data-test="alert-conditions-operator-label"]');
-        this.firstConditionLabel = page.locator('[data-test="add-condition-section"]').getByText('if', { exact: true }).first();
+        this.nestedGroups = page.locator('[data-test^="condition-builder-group-"]');
+        this.firstConditionLabel = page.locator('[data-test="condition-builder-root"]').getByText('Where', { exact: true }).first();
         this.noteContainer = page.locator('[data-test="add-condition-note-container"]');
         this.noteHeading = page.locator('[data-test="add-condition-note-heading"]');
         this.noteInfo = page.locator('[data-test="add-condition-note-info"]');
@@ -1033,11 +1008,10 @@ export class PipelinesPage {
         await this.dragStreamToTarget(this.conditionButton, { x: 250, y: 250 });
     }
     async fillColumnAndSelectOption(columnName) {
-        // Click the column select in FilterCondition
-        await this.columnSelect.locator('input').click();
-        await this.columnSelect.locator('input').fill(columnName);
-        await this.columnOption.click();
+        await this.conditions.openNewCondition();
+        await this.conditions.chooseField(columnName);
     }
+
     async saveCondition() {
         await this.addConditionSaveButton.click();
     }
@@ -1336,33 +1310,7 @@ export class PipelinesPage {
         await this.selectAndDragCondition();
         await this.page.waitForTimeout(1000);
 
-        // FilterGroup UI: open the column OSelect via its `-trigger`, type into the
-        // `-search` filter, and pick the auto-derived `-option` with data-test-value.
-        if (await this.columnSelectTrigger.count() > 0) {
-            await this.columnSelectTrigger.first().click();
-        } else {
-            await this.columnSelect.first().click();
-        }
-        await this.columnSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        if (await this.columnSelectSearch.count() > 0) {
-            await this.columnSelectSearch.first().fill('container_name');
-        }
-        await this.columnOptionByName('kubernetes_container_name').waitFor({ state: 'visible', timeout: 10000 });
-        await this.columnOptionByName('kubernetes_container_name').click();
-
-        // Click operator select via its trigger and choose Contains via option locator.
-        if (await this.operatorSelectTrigger.count() > 0) {
-            await this.operatorSelectTrigger.first().click();
-        } else {
-            await this.operatorSelect.first().click();
-        }
-        await this.operatorSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        await this.page.locator('[data-test="alert-conditions-operator-select-option"][data-test-value="Contains"]')
-            .first().click();
-
-        // Fill value via OInput `-field` inner native input (the wrapper is a div).
-        await this.valueInputField.first().click();
-        await this.valueInputField.first().fill('ziox');
+        await this.conditions.addCondition('kubernetes_container_name', 'Contains', 'ziox');
 
         await this.saveCondition();
         await this.page.waitForTimeout(2000);
@@ -1600,90 +1548,31 @@ export class PipelinesPage {
     }
 
     // ========== Condition-specific methods ==========
-
+    // The builder adds a condition through its picker (field, then operator, then value),
+    // so `index` only documents which row the new condition becomes.
     async fillCondition(columnName, operator, value, index = 0) {
-        // Post-OSelect migration: open the column OSelect via its `-trigger` (the
-        // PopoverTrigger button), narrow the virtualised list via the `-search`
-        // input, and pick the `-option` whose `data-test-value` matches columnName.
-        const triggers = this.columnSelectTrigger;
-        const wrappers = this.columnSelect;
-        const trigCount = await triggers.count();
-        if (trigCount > 0) {
-            await triggers.nth(index).click();
-        } else {
-            await wrappers.nth(index).click();
-        }
-        await this.columnSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        const searchCount = await this.columnSelectSearch.count();
-        if (searchCount > 0) {
-            await this.columnSelectSearch.first().fill(columnName);
-        }
-        await this.columnOptionByName(columnName).waitFor({ state: 'visible', timeout: 10000 });
-        await this.columnOptionByName(columnName).click();
-        await this.page.waitForTimeout(300);
-
-        // Operator OSelect — same pattern.
-        const opTriggers = this.operatorSelectTrigger;
-        const opTrigCount = await opTriggers.count();
-        if (opTrigCount > 0) {
-            await opTriggers.nth(index).click();
-        } else {
-            await this.operatorSelect.nth(index).click();
-        }
-        await this.operatorSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        await this.page.locator(
-            `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
-        ).first().click();
-        await this.page.waitForTimeout(300);
-
-        // Fill value via OInput `-field` inner native input.
-        await this.valueInputField.nth(index).click();
-        await this.valueInputField.nth(index).fill(value);
-        await this.page.waitForTimeout(300);
+        await this.conditions.addCondition(columnName, operator, value);
     }
 
     async fillUnaryCondition(columnName, operator, index = 0) {
-        // Select the column (mirror fillCondition's column step) then the unary
-        // operator. Unary operators (is_null / is_not_null / is_empty /
-        // is_not_empty) render no value input, so never fill a value here.
-        const triggers = this.columnSelectTrigger;
-        const wrappers = this.columnSelect;
-        const trigCount = await triggers.count();
-        if (trigCount > 0) {
-            await triggers.nth(index).click();
-        } else {
-            await wrappers.nth(index).click();
-        }
-        await this.columnSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        const searchCount = await this.columnSelectSearch.count();
-        if (searchCount > 0) {
-            await this.columnSelectSearch.first().fill(columnName);
-        }
-        await this.columnOptionByName(columnName).waitFor({ state: 'visible', timeout: 10000 });
-        await this.columnOptionByName(columnName).click();
-        await this.page.waitForTimeout(300);
-
-        await this.selectOperatorFromMenu(operator);
+        await this.conditions.addCondition(columnName, operator);
     }
 
     async addNewCondition() {
-        await this.addConditionButton.first().click();
-        await this.page.waitForTimeout(500);
+        await this.conditions.openNewCondition();
     }
 
     async addConditionGroup() {
-        await this.addConditionGroupBtn.first().click();
-        await this.page.waitForTimeout(500);
+        await this.conditions.addGroup();
     }
 
+    // `index` counts the joins: 0 is the AND/OR in front of the second row.
     async toggleConditionOperator(index = 0) {
-        await this.toggleOperatorBtn.nth(index).click();
-        await this.page.waitForTimeout(300);
+        await this.conditions.toggleConnector(String(index + 1));
     }
 
     async deleteConditionByIndex(index) {
-        await this.deleteConditionBtn.nth(index).click();
-        await this.page.waitForTimeout(300);
+        await this.conditions.removeChipAt(index);
     }
 
     async createPipelineWithCondition(streamName) {
@@ -1871,7 +1760,7 @@ export class PipelinesPage {
     }
 
     async verifyConditionCount(count) {
-        await expect(this.valueInput).toHaveCount(count);
+        await this.conditions.expectChipCount(count);
     }
 
     async verifyNestedGroupsExist() {
@@ -1884,7 +1773,7 @@ export class PipelinesPage {
     }
 
     async verifyOperatorLabel(text, index = 0) {
-        await expect(this.operatorLabels.nth(index)).toContainText(text);
+        await this.conditions.expectConnector(String(index + 1), text);
     }
 
     async verifyNoteContainer() {
@@ -1893,20 +1782,9 @@ export class PipelinesPage {
     }
 
     async captureConditionValues() {
-        const valueInputs = this.valueInput.locator('input');
-        const values = [];
-        const count = await valueInputs.count();
-        for (let i = 0; i < count; i++) {
-            const value = await valueInputs.nth(i).inputValue();
-            values.push(value);
-        }
-        return values;
+        return this.valueInput.allTextContents();
     }
 
-    async clickReorderButton(index = 1) {
-        await this.reorderBtn.nth(index).click();
-        await this.page.waitForTimeout(500);
-    }
 
     async captureConditionScreenshot() {
         return await this.addConditionSection.screenshot();
@@ -1928,20 +1806,20 @@ export class PipelinesPage {
     }
 
     async verifyConditionValueInputValue(value, index = 0) {
-        await expect(this.valueInput.nth(index).locator('input')).toHaveValue(value);
+        await this.conditions.expectValue(index, value === '' ? 'Choose a value' : value);
     }
 
     async clearAndFillConditionValue(value, index = 0) {
-        await this.valueInput.nth(index).locator('input').clear();
-        await this.valueInput.nth(index).locator('input').fill(value);
+        await this.conditions.changeValue(index, value);
     }
 
     /**
-     * Fill the first condition value input field (OInner `-field` native input).
+     * Types the value of the condition being built and commits it.
      * @param {string} value - The value to fill
      */
     async fillFirstConditionValue(value) {
-        await this.valueInputField.first().fill(value);
+        await this.conditions.typeInPicker(value);
+        await this.conditions.pickTyped(value);
     }
 
     async verifyDeleteButtonCount(expectedCount) {
@@ -1969,65 +1847,45 @@ export class PipelinesPage {
     }
 
     async verifyValueInputCount(expectedCount) {
-        // Count value inputs (v-if-removed for unary operators, present for binary).
+        // Unary chips (is_null / is_empty ...) carry no value part.
         await expect(this.valueInput).toHaveCount(expectedCount);
     }
 
+    async verifyDraftOperator(operator) {
+        await expect(this.conditions.root.locator(this.conditions.id('draft'))).toContainText(operator);
+    }
+
+    async verifyValuePromptEmpty() {
+        await expect(this.conditions.suggestList).toBeVisible();
+        await expect(this.conditions.popover('search')).toHaveValue('');
+    }
+
     async verifyOperatorSelected(operator, index = 0) {
-        // The operator OFormSelect renders in reka-Select mode (non-listbox), so
-        // its trigger carries no `data-test-selected-value`; it shows the selected
-        // label as text. Unary operators map wire value -> display label.
-        const labelByOperator = {
-            is_null: 'Is Null',
-            is_not_null: 'Is Not Null',
-            is_empty: 'Is Empty',
-            is_not_empty: 'Is Not Empty',
-        };
-        const expectedLabel = labelByOperator[operator] ?? operator;
-        await expect(this.operatorSelectTrigger.nth(index)).toContainText(expectedLabel);
+        await this.conditions.expectOperator(index, operator);
     }
 
     async verifyUnaryOperatorsOffered() {
-        // Open the operator menu and assert each unary option is offered by its
-        // snake_case `data-test-value` (the OSelect option value, not the label).
-        await this.operatorSelectTrigger.first().waitFor({ state: 'visible', timeout: 15000 });
-        await this.operatorSelectTrigger.first().click();
+        // The picker is on its operator step after fillPartialCondition.
         for (const operator of ["is_null", "is_not_null", "is_empty", "is_not_empty"]) {
-            const option = this.page.locator(
-                `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
-            ).first();
-            await expect(option).toBeVisible();
+            await expect(this.conditions.popover(`suggest-item-${operator}`).first()).toBeVisible();
         }
     }
 
     async fillPartialCondition(columnName) {
-        // OSelect: click trigger to open, then type in the search input
-        await this.columnSelectTrigger.first().click();
-        await this.columnSelectSearch.waitFor({ state: 'visible' });
-        await this.columnSelectSearch.fill(columnName);
-        await this.columnSelectFirstOption.waitFor({ state: 'visible' });
-        await this.columnSelectFirstOption.click();
-        // Wait specifically for the column popover to detach (named popover only —
-        // do NOT press Escape, which would close the topmost dismissable layer
-        // (the conditions dialog itself, making the operator trigger disappear).
-        await this.page.locator('[data-test="alert-conditions-select-column-popover"]')
-            .waitFor({ state: 'hidden', timeout: 5000 })
-            .catch(() => {});
+        await this.conditions.openNewCondition();
+        await this.conditions.chooseField(columnName);
     }
 
+    // On the picker's operator step this picks the operator of the condition being built;
+    // otherwise it changes the first chip's operator.
     async selectOperatorFromMenu(operator) {
-        // Defensive: wait for the operator trigger to be in the DOM (the conditions
-        // form may still be settling after the column was filled).
-        await this.operatorSelectTrigger.first().waitFor({ state: 'visible', timeout: 15000 });
-        await this.operatorSelectTrigger.first().click();
-        const option = this.page.locator(`[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`).first();
-        await option.waitFor({ state: 'visible' });
-        await option.click();
-        // Wait for the operator popover specifically (not via Escape, which would
-        // close the conditions dialog).
-        await this.page.locator('[data-test="alert-conditions-operator-select-popover"]')
-            .waitFor({ state: 'hidden', timeout: 5000 })
-            .catch(() => {});
+        const option = this.conditions.popover(`suggest-item-${operatorId(operator)}`).first();
+        if (await option.isVisible().catch(() => false)) {
+            await option.click();
+            await this.page.waitForTimeout(250);
+            return;
+        }
+        await this.conditions.changeOperator(0, operator);
     }
 
     async verifyConfirmationDialog() {
@@ -2590,42 +2448,14 @@ export class PipelinesPage {
     }
 
     /**
-     * Fill condition fields for FilterGroup UI
-     * @param {string} columnName - Column name to search for
-     * @param {string} columnOption - The option text to select
-     * @param {string} operator - Operator text (e.g., "Contains")
+     * Builds one condition through the condition builder.
+     * @param {string} columnName - Text typed to find the column
+     * @param {string} columnOption - The column to pick
+     * @param {string} operator - Operator (e.g., "Contains")
      * @param {string} value - Value to filter by
      */
     async fillConditionFields(columnName, columnOption, operator, value) {
-        // Open column OSelect via its `-trigger` and pick the option whose
-        // `data-test-value` matches `columnOption`. Filter the virtualised list
-        // by typing into the `-search` input first when present.
-        if (await this.columnSelectTrigger.count() > 0) {
-            await this.columnSelectTrigger.first().click();
-        } else {
-            await this.columnSelect.first().click();
-        }
-        await this.columnSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        if (await this.columnSelectSearch.count() > 0) {
-            await this.columnSelectSearch.first().fill(columnName);
-        }
-        await this.columnOptionByName(columnOption).waitFor({ state: 'visible', timeout: 10000 });
-        await this.columnOptionByName(columnOption).click();
-
-        // Operator OSelect — open via `-trigger`, pick by `-option` data-test-value.
-        if (await this.operatorSelectTrigger.count() > 0) {
-            await this.operatorSelectTrigger.first().click();
-        } else {
-            await this.operatorSelect.first().click();
-        }
-        await this.operatorSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        await this.page.locator(
-            `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
-        ).first().click();
-
-        // Fill value via OInput `-field` inner native input.
-        await this.valueInputField.first().click();
-        await this.valueInputField.first().fill(value);
+        await this.conditions.addCondition(columnOption, operator, value);
     }
 
     /**

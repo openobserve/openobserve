@@ -3,6 +3,7 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 /**
  * AlertSaveQueryModePage — the "Choose Query Mode" dialog Save opens when more
@@ -29,9 +30,6 @@ export class AlertSaveQueryModePage {
       nameInput: '[data-test="add-alert-name-input-input"]',
       streamTrigger: '[data-test="add-alert-stream-name-select-dropdown-trigger"]',
       destinationTrigger: '[data-test="alert-destinations-select-trigger"]',
-      addCondition: '[data-test="alert-conditions-add-condition-btn"]',
-      conditionColumn: '[data-test="alert-conditions-select-column-trigger"]',
-      conditionValue: '[data-test="alert-conditions-value-input-field"]',
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',
@@ -100,9 +98,7 @@ export class AlertSaveQueryModePage {
   }
 
   async addBuilderCondition(column, value) {
-    await this.page.locator(this.locators.addCondition).click();
-    await this.#pickFromDropdown(this.locators.conditionColumn, column);
-    await this.page.locator(this.locators.conditionValue).fill(value);
+    await new FilterBuilderDriver(this.page, 'alert-conditions').addCondition(column, '=', value);
   }
 
   /** The name field is an inline edit: open it, then type. Enter submits the form. */

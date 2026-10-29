@@ -4,6 +4,7 @@
 import { expect } from "@playwright/test";
 import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import { FilterBuilderDriver } from "../generalPages/filterBuilderPage.js";
 
 export default class DashboardVariables {
   constructor(page) {
@@ -28,6 +29,22 @@ export default class DashboardVariables {
     this.adhocValueSelectorField = page.locator('[data-test="dashboard-variable-adhoc-value-selector-field"]');
     this.adhocNameSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-name-selector"] input');
     this.adhocValueSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-value-selector"] input');
+    // A variable's query filters are the shared FilterBuilder.
+    this.variableFilterBuilder = new FilterBuilderDriver(page, "dashboard-variable-filter-builder");
+  }
+
+  /**
+   * Add a filter row to the open variable's query filters
+   * @param {{filterName: string, operator: string, value: string}} filterConfig
+   */
+  async addVariableQueryFilter(filterConfig) {
+    await this.variableFilterBuilder.root.waitFor({ state: "visible", timeout: 10000 });
+    await this.variableFilterBuilder.addCondition({
+      field: filterConfig.filterName,
+      operator: filterConfig.operator,
+      value: filterConfig.value,
+    });
+    await this.variableFilterBuilder.close();
   }
 
   /**
@@ -123,50 +140,7 @@ export default class DashboardVariables {
 
     // Add Filter Configuration if provided
     if (filterConfig) {
-
-      const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-      await addFilterBtn.waitFor({ state: "visible", timeout: 5000 });
-      await addFilterBtn.click();
-      
-      // Wait for and interact with Filter Name selector
-      const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
-      await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
-      await filterNameSelector.click();
-      const filterNameSearch = this.page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]');
-      await filterNameSearch.waitFor({ state: "visible", timeout: 5000 });
-      await filterNameSearch.fill(filterConfig.filterName);
-
-      // Wait for and select the filter name option
-      const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterConfig.filterName}"]`);
-      await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
-      await filterNameOption.click();
-
-      // Wait for and interact with Operator selector
-      const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
-      await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
-      await operatorSelector.click();
-
-      // Wait for and select the operator option
-      const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${filterConfig.operator}"]`);
-      await operatorOption.waitFor({ state: "visible", timeout: 10000 });
-      await operatorOption.click();
-
-      // Wait for and interact with value input (OCombobox).
-      // OCombobox debounces update:modelValue by 1000ms — typing via fill() and
-      // saving immediately leaves the model empty. Instead, type to filter the
-      // dropdown and click the matching option, which uses onSelect() and emits
-      // immediately (no debounce).
-      const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
-      await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
-      await filterValueInput.fill(filterConfig.value);
-
-      // Wait for the dropdown option and click it so the value is committed instantly.
-      // Options have data-test-value="${value}" (e.g. "$variablename").
-      const filterValueOption = this.page.locator(
-        `[data-test*="filter-value-selector"][data-test$="-option"][data-test-value="${filterConfig.value}"]`
-      );
-      await filterValueOption.waitFor({ state: "visible", timeout: 5000 });
-      await filterValueOption.click();
+      await this.addVariableQueryFilter(filterConfig);
     }
 
     // Toggle show multiple values based on parameter

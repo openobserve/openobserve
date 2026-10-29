@@ -2,6 +2,7 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { FilterBuilderDriver, OPERATOR_LABELS, operatorId } = require('../generalPages/filterBuilderPage.js');
 
 const ORG = () => process.env.ORGNAME || 'default';
 
@@ -43,10 +44,8 @@ export class DowntimesPage {
     this.previewIncomplete = '[data-test="add-downtime-preview-incomplete"]';
     this.conditionSection = '[data-test="downtime-condition"]';
     this.conditionAdd = '[data-test="downtime-condition-add"]';
-    this.conditionColumn = 'alert-conditions-select-column';
-    this.conditionOperator = 'alert-conditions-operator-select';
-    this.conditionValueCombobox = '[data-test="alert-conditions-value-combobox-input"]';
-    this.conditionValueInput = '[data-test="alert-conditions-value-input-field"]';
+    // The shared condition builder (FilterBuilder, prefix "downtime-condition-builder").
+    this.conditions = new FilterBuilderDriver(page, 'downtime-condition-builder', page.locator(this.conditionSection));
     this.resourceDimension = '[data-test="downtime-resource-picker-dimension-trigger"]';
     this.resourceLoad = '[data-test="downtime-resource-picker-load"]';
     this.resourceTable = '[data-test="downtime-resource-picker-table"]';
@@ -468,42 +467,29 @@ export class DowntimesPage {
 
   async openCondition() {
     await this.page.locator(this.conditionAdd).click();
-    await expect(this.page.locator(this.conditionSection).locator(`[data-test="${this.conditionColumn}-trigger"]`).first()).toBeVisible();
+    await this.conditions.waitReady();
   }
 
-  /** A falsy key leaves the dimension of row `index` (0-based) unset. */
+  /**
+   * Row `index` (0-based) as `key operator value`. A new index builds the condition through
+   * the picker; an existing chip gets its operator and value changed in place.
+   */
   async fillConditionRow(index, { key, operator = '=', value }) {
-    const section = this.page.locator(this.conditionSection);
-    if (key) {
-      const trigger = section.locator(`[data-test="${this.conditionColumn}-trigger"]`).nth(index);
-      await trigger.click();
-      const option = this.page.locator(`[data-test="${this.conditionColumn}-option"][data-test-value="${key}"]`).first();
-      await expect(option).toBeVisible({ timeout: 15000 });
-      await option.click();
-      await expect(trigger).toHaveAttribute('data-test-selected-value', key);
+    if ((await this.conditions.chips.count()) <= index) {
+      await this.conditions.addCondition(key, operator, value);
+      return;
     }
-    if (operator && operator !== '=') {
-      const opTrigger = section.locator(`[data-test="${this.conditionOperator}-trigger"]`).nth(index);
-      await opTrigger.click();
-      await this.page.locator(`[data-test="${this.conditionOperator}-option"][data-test-value="${operator}"]`).first().click();
-      // The operator select is a non-listbox OSelect, which renders no data-test-selected-value.
-      await expect(opTrigger).toHaveText(operator);
+    const shown = (await (await this.conditions.partAt(index, 'operator')).textContent())?.trim();
+    if (shown !== OPERATOR_LABELS[operatorId(operator)]) {
+      await this.conditions.changeOperator(index, operator);
     }
-    if (value !== undefined) {
-      const combo = section.locator(this.conditionValueCombobox).nth(index);
-      const input = (await combo.count()) > 0 ? combo : section.locator(this.conditionValueInput).nth(index);
-      await input.fill(value);
-      await input.press('Escape');
-    }
+    if (value !== undefined) await this.conditions.changeValue(index, value);
   }
 
   async expectConditionRow(index, { key, operator, value }) {
-    const section = this.page.locator(this.conditionSection);
-    await expect(section.locator(`[data-test="${this.conditionColumn}-trigger"]`).nth(index)).toHaveAttribute('data-test-selected-value', key);
-    await expect(section.locator(`[data-test="${this.conditionOperator}-trigger"]`).nth(index)).toHaveText(operator);
-    const combo = section.locator(this.conditionValueCombobox).nth(index);
-    const input = (await combo.count()) > 0 ? combo : section.locator(this.conditionValueInput).nth(index);
-    await expect(input).toHaveValue(value);
+    await expect(this.conditions.chipAt(index)).toHaveAttribute('data-test', `downtime-condition-builder-chip-${key}`);
+    await this.conditions.expectOperator(index, operator);
+    await this.conditions.expectValue(index, value);
   }
 
   async expectPreviewIncomplete(text) {

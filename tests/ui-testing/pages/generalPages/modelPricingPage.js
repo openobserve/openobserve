@@ -6,20 +6,7 @@
 
 import { expect } from '@playwright/test';
 const modelPricingStrings = require('../../../../web/src/locales/languages/en-US.json').modelPricing;
-
-// en-US trigger labels for each rule operator. The rule-op select renders a
-// Reka SelectTrigger (not the listbox PopoverTrigger), so the selected value is
-// shown as its display label rather than a `data-test-selected-value` attribute.
-const RULE_OP_LABELS = {
-    in: 'is one of',
-    not_in: 'is not one of',
-    exists: 'is set',
-    not_exists: 'is not set',
-    gt: '>',
-    gte: '>=',
-    lt: '<',
-    lte: '<=',
-};
+const { FilterBuilderDriver } = require('./filterBuilderPage.js');
 
 export class ModelPricingPage {
     constructor(page) {
@@ -465,129 +452,41 @@ export class ModelPricingPage {
         await this.addTierBtn.click();
     }
 
-    async clickAddRule(tierIndex) {
-        const btn = this.page.locator(`[data-test="model-pricing-tier-add-rule-btn-${tierIndex}"]`);
-        await btn.click();
+    /** A tier's usage condition and attribute rules are one shared FilterBuilder per non-default tier. */
+    tierFilter(tierIndex) {
+        return new FilterBuilderDriver(this.page, `model-pricing-tier-filter-builder-${tierIndex}`);
     }
 
-    async clickRemoveRule(tierIndex, ruleIndex) {
-        const btn = this.page.locator(
-            `[data-test="model-pricing-tier-rule-remove-btn-${tierIndex}-${ruleIndex}"]`
-        );
-        await btn.click();
+    /** Adds a rule or the usage condition; `field` is the key list (`a, b`) or a usage key, `operator` a builder id (in, gt, is_not_null, eq, ...). */
+    async addTierCondition(tierIndex, { field, operator, values = [], search }) {
+        await this.tierFilter(tierIndex).addCondition({ field, operator, values, search });
     }
 
-    async fillRuleKeys(tierIndex, ruleIndex, value) {
-        const input = this.ruleKeysInput(tierIndex, ruleIndex);
-        await input.waitFor({ state: 'visible', timeout: 5000 });
-        await input.fill(value);
+    async removeTierCondition(tierIndex, field, nth = 0) {
+        await this.tierFilter(tierIndex).removeChip(field, nth);
     }
 
-    async fillRuleValues(tierIndex, ruleIndex, value) {
-        const input = this.ruleValuesInput(tierIndex, ruleIndex);
-        await input.waitFor({ state: 'visible', timeout: 5000 });
-        await input.fill(value);
+    async expectTierCondition(tierIndex, field, text) {
+        await this.tierFilter(tierIndex).expectChip(field, text);
     }
 
-    async fillRuleValue(tierIndex, ruleIndex, value) {
-        const input = this.ruleValueInput(tierIndex, ruleIndex);
-        await input.waitFor({ state: 'visible', timeout: 5000 });
-        await input.fill(String(value));
+    async expectTierConditionCount(tierIndex, count) {
+        await this.tierFilter(tierIndex).expectChipCount(count);
     }
 
-    async selectRuleOp(tierIndex, ruleIndex, opValue) {
-        const trigger = this.page.locator(
-            `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-trigger"]`
-        );
-        await trigger.waitFor({ state: 'visible', timeout: 5000 });
-        // OSelect closes on any ancestor scroll, so the click itself must not scroll the editor.
-        await trigger.scrollIntoViewIfNeeded();
-        await trigger.click();
-        const option = this.page.locator(
-            `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-option"][data-test-value="${opValue}"]`
-        );
-        await option.waitFor({ state: 'visible', timeout: 5000 });
-        await option.click();
+    async expectTierAddConditionDisabled(tierIndex) {
+        await this.tierFilter(tierIndex).expectAddDisabled();
     }
 
-    // ----------------------------------------------------------------
-    // Attribute rules locators + assertions
-    // ----------------------------------------------------------------
-
-    ruleKeysInput(tierIndex, ruleIndex) {
-        return this.page.locator(
-            `[data-test="model-pricing-tier-rule-keys-input-${tierIndex}-${ruleIndex}-field"]`
-        );
-    }
-
-    ruleValuesInput(tierIndex, ruleIndex) {
-        return this.page.locator(
-            `[data-test="model-pricing-tier-rule-values-input-${tierIndex}-${ruleIndex}-field"]`
-        );
-    }
-
-    ruleValueInput(tierIndex, ruleIndex) {
-        return this.page.locator(
-            `[data-test="model-pricing-tier-rule-value-input-${tierIndex}-${ruleIndex}-field"]`
-        );
-    }
-
-    async expectRuleKeysError(tierIndex, ruleIndex) {
-        await expect(
-            this.page.locator(
-                `[data-test="model-pricing-tier-rule-keys-input-${tierIndex}-${ruleIndex}-error"]`
-            )
-        ).toBeVisible({ timeout: 5000 });
-    }
-
-    async expectRuleOpError(tierIndex, ruleIndex) {
-        await expect(
-            this.page.locator(
-                `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-error"]`
-            )
-        ).toBeVisible({ timeout: 5000 });
-    }
-
-    async expectRuleOpValue(tierIndex, ruleIndex, opValue) {
-        // The rule-op select renders a Reka SelectTrigger whose selected value is
-        // displayed as its label text (e.g. "is one of" for "in") — it has no
-        // `data-test-selected-value` attribute in this build.
-        const label = RULE_OP_LABELS[opValue] ?? opValue;
-        await expect(
-            this.page.locator(
-                `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-trigger"]`
-            )
-        ).toContainText(label, { timeout: 5000 });
-    }
-
-    async expectRuleValueInputVisible(tierIndex, ruleIndex) {
-        await expect(this.ruleValueInput(tierIndex, ruleIndex)).toBeVisible({ timeout: 5000 });
-    }
-
-    async expectRuleValuesInputHidden(tierIndex, ruleIndex) {
-        await expect(this.ruleValuesInput(tierIndex, ruleIndex)).toHaveCount(0, { timeout: 5000 });
+    /** The schema's errors for the tier's condition and rules, listed under its builder. */
+    async expectTierFilterError(tierIndex, text) {
+        const errors = this.page.locator(`[data-test="model-pricing-tier-filter-errors-${tierIndex}"]`);
+        await expect(errors).toBeVisible({ timeout: 5000 });
+        if (text) await expect(errors).toContainText(text);
     }
 
     async expectTieWarningVisible() {
         await expect(this.tieWarning).toBeVisible({ timeout: 10000 });
-    }
-
-    async expectAddRuleDisabled(tierIndex) {
-        await expect(
-            this.page.locator(`[data-test="model-pricing-tier-add-rule-btn-${tierIndex}"]`)
-        ).toBeDisabled({ timeout: 5000 });
-    }
-
-    async expectRuleCount(tierIndex, count) {
-        await expect
-            .poll(
-                () =>
-                    this.page
-                        .locator(`[data-test^="model-pricing-tier-rule-remove-btn-${tierIndex}-"]`)
-                        .count(),
-                { timeout: 5000, message: `expected tier ${tierIndex} to hold ${count} rules` }
-            )
-            .toBe(count);
     }
 
     /** Open the "+N more" pricing drawer for a model row and assert it is visible. */

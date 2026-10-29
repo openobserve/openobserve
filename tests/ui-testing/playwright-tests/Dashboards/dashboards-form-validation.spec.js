@@ -554,8 +554,7 @@ test.describe("Dashboard AddCondition form validation", () => {
         // Enter panel edit mode
         await pm.dashboardPanelActions.selectPanelAction(panelName, 'Edit');
 
-        // Add a condition row. The "+" is an ODropdown trigger, so this picks
-        // "Add Condition" from the menu it opens and waits for the row.
+        // Add a complete condition through the filter bar's field, operator and value lists.
         await pm.dashboardsFormValidation.addConditionRow();
 
         testLogger.info('Condition row added in panel editor');
@@ -573,10 +572,8 @@ test.describe("Dashboard AddCondition form validation", () => {
         await expect(pm.dashboardsFormValidation.getConditionColumn0Locator()).toBeVisible();
         await expect(pm.dashboardsFormValidation.getConditionCondition0Locator()).toBeVisible();
 
-        // The value control lives in the Condition tab panel; the popup opens on
-        // the List tab, where it is not rendered at all. Switch tabs first.
-        await pm.dashboardsFormValidation.openConditionTab(0);
         await expect(pm.dashboardsFormValidation.getConditionValueLocator()).toBeVisible();
+        await pm.dashboardsFormValidation.openConditionTab(0);
 
         testLogger.info('Condition row elements rendered correctly');
     });
@@ -893,34 +890,24 @@ test.describe("Dashboard AddCondition form validation", () => {
         testLogger.info('Condition row rendered with column and condition selectors');
     });
 
-    test("should clear the selected column but keep the row when remove-column is clicked", {
+    test("should keep the condition when its field is changed", {
         tag: ['@domainFormValidation', '@P1']
     }, async ({ page }) => {
-        // This used to assert the ROW disappeared. It does not: the handler is
-        //   const removeColumnName = () => { conditionModel.value.column = {}; };
-        // which clears the chosen COLUMN and leaves the row in place. Deleting the
-        // row is `dashboard-add-condition-remove`, covered by the sibling test.
-        testLogger.info('TC-AC-003: Remove-column clears the column, row survives');
+        testLogger.info('TC-AC-003: Changing the field keeps the condition and its operator');
 
         await pm.dashboardsFormValidation.addConditionRow();
-
         const conditionColumn = pm.dashboardsFormValidation.getConditionColumnLocator();
-        await expect(conditionColumn).toBeVisible({ timeout: 5000 });
+        const before = (await conditionColumn.innerText()).trim();
 
-        await pm.dashboardsFormValidation.getConditionRemoveColumnLocator().click();
+        await conditionColumn.click();
+        const suggest = page.locator('[data-test="dashboard-filter-builder-suggest"]');
+        await suggest.waitFor({ state: 'visible', timeout: 10000 });
+        await suggest.getByRole('option').nth(1).click();
 
-        // Row still present, and its label chip carries no column name (the
-        // data-test is `dashboard-add-condition-label-<i>-<computedLabel>`, so an
-        // empty selection leaves the trailing segment blank).
-        await expect(conditionColumn).toBeVisible({ timeout: 5000 });
-        // Match the label chip by PREFIX. Its data-test embeds computedLabel(),
-        // which falls back to `condition.column.field` — and that is `undefined`
-        // for a cleared column, so the attribute ends up "…-label-0-undefined",
-        // never a bare "…-label-0-".
-        await expect(
-            pm.dashboardsFormValidation.getConditionLabelLocator()
-        ).toBeVisible({ timeout: 5000 });
-        testLogger.info('Column cleared, condition row retained');
+        await expect(conditionColumn).not.toHaveText(before, { timeout: 5000 });
+        await expect(pm.dashboardsFormValidation.getConditionConditionLocator()).toHaveText('=');
+        await expect(page.locator(pm.dashboardsFormValidation.filterChips)).toHaveCount(1);
+        testLogger.info('Field changed, condition retained');
     });
 });
 
