@@ -920,7 +920,7 @@ pub async fn process_domain_org_mapping(
         }
 
         for org in orgs_to_remove {
-            if let Err(e) = users::remove_user_from_org(
+            match users::remove_user_from_org(
                 &org,
                 &user_email,
                 &get_config().auth.root_user_email,
@@ -928,9 +928,19 @@ pub async fn process_domain_org_mapping(
             )
             .await
             {
-                log::error!(
-                    "error user {user_email} was blocked from org {org_id}, but failed to remove from org {org} : {e}"
-                );
+                Ok(v) => {
+                    if !v.status().is_success() {
+                        log::error!(
+                            "error user {user_email} was blocked from org {org_id}, but failed to remove from org {org} with status : {}",
+                            v.status().as_str()
+                        );
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "error user {user_email} was blocked from org {org_id}, but failed to remove from org {org} : {e}"
+                    );
+                }
             }
         }
 
