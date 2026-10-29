@@ -93,11 +93,12 @@ const modelPricing = {
   delete: (org_identifier: string, model_id: string) => {
     return http().delete(`/api/${org_identifier}/llm/models/${model_id}`);
   },
-  getBuiltIn: (org_identifier: string, search?: string) => {
-    const params = search ? `?search=${encodeURIComponent(search)}` : "";
-    return http().get<BuiltInPricingResponse>(
-      `/api/${org_identifier}/llm/models/built-in${params}`,
-    );
+  getBuiltIn: (org_identifier: string, search?: string, metadataOnly = false) => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (metadataOnly) params.set("metadata_only", "true");
+    const query = params.size ? `?${params}` : "";
+    return http().get<BuiltInPricingResponse>(`/api/${org_identifier}/llm/models/built-in${query}`);
   },
   /** Models in `stream_name` spans between the µs bounds that have no price or an approximate one. */
   listUnpriced: (

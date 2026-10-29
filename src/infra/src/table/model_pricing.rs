@@ -21,8 +21,8 @@ use config::{
     utils::json,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, ModelTrait,
+    QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel, sea_query::OnConflict,
 };
 
 use crate::{
@@ -134,6 +134,49 @@ pub async fn put(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
             model.try_into()
         }
     }
+}
+
+/// Fill missing built-ins atomically without replacing synced or disabled prices.
+pub async fn insert_missing_built_ins(items: Vec<ModelPricingDefinition>) -> Result<u64, Error> {
+    insert_missing_built_ins_with_db(get_orm_client_rw().await, items).await
+}
+
+async fn insert_missing_built_ins_with_db<C: ConnectionTrait>(
+    db: &C,
+    items: Vec<ModelPricingDefinition>,
+) -> Result<u64, Error> {
+    if items.is_empty() {
+        return Ok(0);
+    }
+    let now = chrono::Utc::now().timestamp_micros();
+    let rows = items
+        .into_iter()
+        .map(|item| {
+            Ok(ActiveModel {
+                id: Set(ider::uuid()),
+                org: Set(config::meta::model_pricing::BUILT_IN_ORG.to_string()),
+                name: Set(item.name),
+                match_pattern: Set(item.match_pattern),
+                enabled: Set(item.enabled),
+                tiers: Set(json::to_value(&item.tiers)?),
+                valid_from: Set(item.valid_from),
+                sort_order: Set(item.sort_order),
+                source: Set(PricingSource::BuiltIn.as_str().to_string()),
+                provider: Set((!item.provider.is_empty()).then_some(item.provider)),
+                description: Set((!item.description.is_empty()).then_some(item.description)),
+                created_at: Set(now),
+                updated_at: Set(now),
+            })
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    Ok(Entity::insert_many(rows)
+        .on_conflict(
+            OnConflict::columns([Column::Org, Column::Name])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(db)
+        .await?)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<ModelPricingDefinition>, Error> {
@@ -265,6 +308,53 @@ mod tests {
             created_at: 1000,
             updated_at: 2000,
         }
+    }
+
+    #[tokio::test]
+    async fn seed_retries_missing_names_without_overwriting_synced_prices() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = sea_orm::Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+        db.execute_unprepared("CREATE UNIQUE INDEX seed_model_names ON model_pricing (org, name)")
+            .await
+            .unwrap();
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut stored: ModelPricingDefinition = make_model(&id).try_into().unwrap();
+        stored.enabled = false;
+        stored.match_pattern = "^newer-synced-pattern$".to_string();
+        assert_eq!(
+            insert_missing_built_ins_with_db(&db, vec![stored.clone()])
+                .await
+                .unwrap(),
+            1
+        );
+        let mut old_seed = stored.clone();
+        old_seed.enabled = true;
+        old_seed.match_pattern = "^old-seed-pattern$".to_string();
+        let mut missing = old_seed.clone();
+        missing.name = "missing-model".to_string();
+        assert_eq!(
+            insert_missing_built_ins_with_db(&db, vec![old_seed.clone(), missing.clone()])
+                .await
+                .unwrap(),
+            1
+        );
+        let saved =
+            get_by_org_and_name(&db, config::meta::model_pricing::BUILT_IN_ORG, &stored.name)
+                .await
+                .unwrap()
+                .unwrap();
+        assert!(!saved.enabled);
+        assert_eq!(saved.match_pattern, "^newer-synced-pattern$");
+        assert_eq!(
+            insert_missing_built_ins_with_db(&db, vec![old_seed, missing])
+                .await
+                .unwrap(),
+            0
+        );
     }
 
     #[test]

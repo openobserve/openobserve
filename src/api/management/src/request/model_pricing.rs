@@ -429,6 +429,8 @@ pub async fn delete(
 pub struct BuiltInQuery {
     #[serde(default)]
     pub search: String,
+    #[serde(default)]
+    pub metadata_only: bool,
 }
 
 /// A model pricing entry from the community/built-in source.
@@ -469,6 +471,7 @@ pub struct BuiltInModelPricingResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("search" = Option<String>, Query, description = "Filter by name"),
+        ("metadata_only" = Option<bool>, Query, description = "Return seed/sync metadata without loading the catalogue"),
     ),
     responses(
         (status = 200, description = "Success"),
@@ -498,6 +501,14 @@ pub async fn get_built_in(
     }
 
     let source_url = config::get_config().common.model_pricing_source_url.clone();
+    if query.metadata_only {
+        return MetaHttpResponse::json(BuiltInModelPricingResponse {
+            models: Vec::new(),
+            source_url,
+            last_updated: openobserve_builtins::model_pricing::last_sync_timestamp(),
+            seed_date: openobserve_builtins::model_pricing::SEED_DATE,
+        });
+    }
 
     // Read from DB (synced by background job) instead of making a live HTTP call.
     let all_built_in = match model_pricing::list(BUILT_IN_ORG).await {

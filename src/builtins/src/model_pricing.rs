@@ -59,17 +59,22 @@ pub fn seed_entries() -> Result<Vec<BuiltInModelPricingEntry>, anyhow::Error> {
     Ok(parse_entries(raw))
 }
 
-/// Stores the seed list as the built-in prices when none are stored yet, so a fresh or
-/// offline install prices spans before (or without) a GitHub sync. A later sync overwrites
-/// these rows and disables the ones upstream dropped. Returns how many rows were written.
-pub async fn load_seed_if_empty() -> Result<usize, anyhow::Error> {
-    if !table::model_pricing::list_built_in_names()
-        .await?
-        .is_empty()
-    {
-        return Ok(0);
+/// Fill missing compiled-in prices, retrying incomplete seeds without overwriting synced rows.
+pub async fn load_seed() -> Result<usize, anyhow::Error> {
+    let names = table::model_pricing::list_built_in_names().await?;
+    let existing: std::collections::HashSet<&str> = names.iter().map(String::as_str).collect();
+    let mut missing = Vec::new();
+    for entry in seed_entries()? {
+        if existing.contains(entry.name.as_str()) {
+            continue;
+        }
+        let definition = entry.into_definition();
+        definition.validate_tiers(true).map_err(|error| {
+            anyhow::anyhow!("Invalid seed price '{}': {error}", definition.name)
+        })?;
+        missing.push(definition);
     }
-    let (created, _) = upsert_entries(seed_entries()?, &Default::default()).await;
+    let created = usize::try_from(table::model_pricing::insert_missing_built_ins(missing).await?)?;
     if created > 0 {
         emit_sync_event().await;
     }
