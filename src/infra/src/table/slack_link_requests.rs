@@ -199,6 +199,7 @@ async fn mark_discarded_columns<C: ConnectionTrait>(
     let update = Entity::update_many()
         .col_expr(Column::DiscardedAt, Expr::value(at))
         .col_expr(Column::QuestionEnc, Expr::value(Option::<String>::None))
+        .col_expr(Column::HeldAction, Expr::value(Option::<String>::None))
         .col_expr(Column::UpdatedAt, Expr::value(at));
     with_region(update, Column::OriginRegion, origin_region)
         .filter(Column::Id.eq(id))
@@ -258,12 +259,20 @@ fn to_active(row: &SlackLinkRequest, key: Option<&[u8]>) -> Result<ActiveModel, 
         updated_at: Set(row.updated_at),
         origin_region: Set(row.origin_region.clone()),
         deleted_at: Set(row.deleted_at),
+        held_action: Set(row
+            .held_action
+            .as_ref()
+            .and_then(|h| serde_json::to_string(h).ok())),
     })
 }
 
 /// An undecryptable question reads as none: the request still redeems, only the replay is lost.
 fn from_model(model: Model, key: Option<&[u8]>) -> Result<SlackLinkRequest, Error> {
     let (question, _) = open(key, model.question_enc.as_deref());
+    let held_action = model
+        .held_action
+        .as_deref()
+        .and_then(|raw| serde_json::from_str(raw).ok());
     Ok(SlackLinkRequest {
         id: model.id,
         installation_id: model.installation_id,
@@ -274,6 +283,7 @@ fn from_model(model: Model, key: Option<&[u8]>) -> Result<SlackLinkRequest, Erro
         message_ts: model.message_ts,
         question,
         oidc_nonce: model.oidc_nonce,
+        held_action,
         created_at: model.created_at,
         expires_at: model.expires_at,
         redeemed_at: model.redeemed_at,
@@ -286,7 +296,7 @@ fn from_model(model: Model, key: Option<&[u8]>) -> Result<SlackLinkRequest, Erro
 
 #[cfg(test)]
 mod tests {
-    use config::utils::encryption::decrypt_secret_value;
+    use config::{meta::slack::HeldAction, utils::encryption::decrypt_secret_value};
     use sea_orm::{Database, DatabaseConnection, DbBackend, Statement};
 
     use super::*;
@@ -311,6 +321,12 @@ mod tests {
             message_ts: Some("1700000000.000200".to_string()),
             question: Some("why is checkout slow?".to_string()),
             oidc_nonce: Some("nonce-1".to_string()),
+            held_action: Some(HeldAction {
+                action: "o2_alert_ack".to_string(),
+                ref_key: "0193a8f0000070008000000000000000".to_string(),
+                value: "0193a8f0000070008000000000000000".to_string(),
+                firing_started_at: 1_700_000_000_000_000,
+            }),
             created_at,
             expires_at: created_at + 1_800,
             redeemed_at: None,
@@ -369,6 +385,22 @@ mod tests {
                 ..row
             }
         );
+    }
+
+    #[tokio::test]
+    async fn held_action_is_plain_json_and_not_now_drops_it_with_the_question() {
+        let db = db().await;
+        put_keyed(&db, &request("r1", "U1", 100), Some(&KEY))
+            .await
+            .unwrap();
+        let raw = stored_model(&db, "r1").await.held_action.unwrap();
+        let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(json["action"], "o2_alert_ack");
+        assert_eq!(json["firing_started_at"], 1_700_000_000_000_000_i64);
+        mark_discarded_with(&db, "r1", 110).await.unwrap();
+        let read = get_with(&db, "r1").await.unwrap().unwrap();
+        assert!(read.held_action.is_none() && read.question.is_none());
+        assert_eq!(read.discarded_at, Some(110));
     }
 
     #[tokio::test]
@@ -440,6 +472,7 @@ mod tests {
             r2 == SlackLinkRequest {
                 discarded_at: Some(500),
                 question: None,
+                held_action: None,
                 updated_at: 500,
                 ..request("r2", "U1", 100)
             }
@@ -482,6 +515,7 @@ mod tests {
                 == SlackLinkRequest {
                     discarded_at: Some(500),
                     question: None,
+                    held_action: None,
                     updated_at: 500,
                     origin_region: "eu-west".to_string(),
                     ..request("r2", "U1", 100)

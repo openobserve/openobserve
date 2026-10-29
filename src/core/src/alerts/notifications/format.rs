@@ -60,7 +60,7 @@ impl ChannelFormat {
 /// Derive the channel format for a destination type.
 ///
 /// Priority order (§4.3):
-/// 1. `DestinationType::Email` → `Email`; `Sns` → `Sns`
+/// 1. `DestinationType::Email` → `Email`; `Sns` → `Sns`; `SlackApp` → `Slack`
 /// 2. `endpoint.metadata["render_format"]` when present and not `"auto"`.
 /// 3. `endpoint.destination_type` match.
 /// 4. Everything else → `Webhook`.
@@ -68,6 +68,7 @@ pub fn derive_channel_format(dest_type: &DestinationType) -> ChannelFormat {
     match dest_type {
         DestinationType::Email(_) => ChannelFormat::Email,
         DestinationType::Sns(_) => ChannelFormat::Sns,
+        DestinationType::SlackApp(_) => ChannelFormat::Slack,
         DestinationType::Http(endpoint) => {
             // Rule 2: render_format metadata override
             if let Some(render_format) = endpoint.metadata.get("render_format") {
@@ -370,5 +371,12 @@ mod tests {
             derive_channel_format(&dest),
             ChannelFormat::TeamsAdaptiveCard
         );
+    }
+
+    #[test]
+    fn a_slack_app_destination_renders_as_slack_and_has_no_platform() {
+        let dest = DestinationType::SlackApp(config::meta::destinations::SlackAppTarget::default());
+        assert_eq!(derive_channel_format(&dest), ChannelFormat::Slack);
+        assert!(super::super::platform::platform_of(&dest).is_none());
     }
 }

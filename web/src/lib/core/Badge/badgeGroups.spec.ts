@@ -233,6 +233,20 @@ describe("badgeGroups", () => {
     expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
   });
 
+  it("alert 'acknowledged' is blue with a person, apart from firing red and muted amber", () => {
+    const r = resolveBadge("alertState", "acknowledged");
+    expect(r.variant).toBe("blue-soft");
+    expect(r.icon).toBe("person");
+    expect(r.labelKey).toBe("components.badge.alertState.acknowledged");
+  });
+
+  it("an ack event history row is a quiet person badge", () => {
+    const r = resolveBadge("alertState", "ack_event");
+    expect(r.variant).toBe("default-soft");
+    expect(r.icon).toBe("person");
+    expect(r.labelKey).toBe("components.badge.alertState.ackevent");
+  });
+
   it("alert 'firing' and 'normal' resolve to opposite tones", () => {
     expect(resolveBadge("alertState", "firing").variant).toBe("error-soft");
     expect(resolveBadge("alertState", "normal").variant).toBe("success-soft");
