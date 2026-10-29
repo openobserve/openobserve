@@ -113,6 +113,15 @@ impl<'a> Defaults<'a> {
         self.values
     }
 
+    /// Every values query the link runs, with the values known before any of them runs.
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    pub fn pending_queries(&self) -> Vec<ValuesQuery> {
+        self.pending
+            .iter()
+            .map(|&idx| self.values_query(idx))
+            .collect()
+    }
+
     /// The values queries `from` reaches through their stream, field and filter references.
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
     pub fn reachable_queries(

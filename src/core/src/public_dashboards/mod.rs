@@ -808,7 +808,14 @@ pub async fn update_link(
     let now = now_micros();
     validate_dashboard(&dash, &cfg.frozen_variables, now).map_err(Invalid)?;
     #[cfg(feature = "enterprise")]
-    authorize_variable_edit(&link, &dash, &cfg.frozen_variables, user_id).await?;
+    authorize_variable_edit(
+        &link,
+        &dash,
+        &cfg.frozen_variables,
+        range_changed(&link, &cfg.time_range),
+        user_id,
+    )
+    .await?;
     let ranges = serde_json::to_string(&cfg.time_range.ranges)?;
     let frozen = serde_json::to_string(&cfg.frozen_variables)?;
     edit(&link.org_id, &link.id, |l| {
@@ -1508,15 +1515,24 @@ where
     paused
 }
 
-/// Enterprise: the editor must read every stream a changed frozen value makes a panel read.
+/// Whether an edit changes the ranges a link serves or its default range.
+#[cfg(feature = "enterprise")]
+fn range_changed(link: &PublicDashboard, policy: &TimeRangePolicy) -> bool {
+    let stored = time_ranges(link);
+    stored.ranges != policy.ranges || stored.default.key() != policy.default.key()
+}
+
+/// Enterprise: the editor must read every stream a changed frozen value makes a panel read,
+/// and every stream the link reads when its time range changes.
 #[cfg(feature = "enterprise")]
 async fn authorize_variable_edit(
     link: &PublicDashboard,
     dash: &Dashboard,
     frozen: &BTreeMap<String, serde_json::Value>,
+    range_changed: bool,
     user_id: &str,
 ) -> Result<(), anyhow::Error> {
-    let sources = variable_edit_sources(link, dash, frozen);
+    let sources = variable_edit_sources(link, dash, frozen, range_changed);
     if sources.is_empty() {
         return Ok(());
     }
@@ -1527,12 +1543,14 @@ async fn authorize_variable_edit(
         })
 }
 
-/// The values queries a changed frozen value reaches and the queries of every panel reading one.
+/// The values queries a changed frozen value reaches and the queries of every panel reading one;
+/// with a changed range, every panel query and every values query the link runs.
 #[cfg(feature = "enterprise")]
 fn variable_edit_sources(
     link: &PublicDashboard,
     dash: &Dashboard,
     frozen: &BTreeMap<String, serde_json::Value>,
+    range_changed: bool,
 ) -> Vec<crate::authz::QuerySource> {
     use crate::authz::QuerySource;
 
@@ -1544,10 +1562,19 @@ fn variable_edit_sources(
         .filter(|key| old.get(*key) != frozen.get(*key))
         .cloned()
         .collect();
-    let Some(v8) = dash.v8.as_ref().filter(|_| !changed.is_empty()) else {
+    let Some(v8) = dash
+        .v8
+        .as_ref()
+        .filter(|_| range_changed || !changed.is_empty())
+    else {
         return vec![];
     };
-    let (reached, values_queries) = Defaults::new(dash, frozen.clone()).reachable_queries(&changed);
+    let defaults = Defaults::new(dash, frozen.clone());
+    let (reached, values_queries) = if range_changed {
+        (BTreeSet::new(), defaults.pending_queries())
+    } else {
+        defaults.reachable_queries(&changed)
+    };
     let mut sources: Vec<QuerySource> = values_queries
         .into_iter()
         .map(|q| QuerySource::Sql {
@@ -1567,7 +1594,7 @@ fn variable_edit_sources(
                 .referenced(&tab.tab_id, &panel.id, &texts)
                 .iter()
                 .any(|(_, key)| reached.contains(key));
-            if !reads_changed {
+            if !range_changed && !reads_changed {
                 continue;
             }
             let promql = panel.query_type == "promql";
@@ -1608,7 +1635,13 @@ fn variable_edit_sources(
             }
         }
     }
-    sources
+    let mut unique = Vec::with_capacity(sources.len());
+    for source in sources {
+        if !unique.contains(&source) {
+            unique.push(source);
+        }
+    }
+    unique
 }
 
 /// The outermost explicit LIMIT of a SQL query; None without one or when it does not parse.
@@ -4189,22 +4222,65 @@ mod tests {
                 .collect()
         };
         let same = frozen(json!({ "src.p.c": "safe", "env": "prod" }));
-        assert!(variable_edit_sources(&link, &dash, &same).is_empty());
+        assert!(variable_edit_sources(&link, &dash, &same, false).is_empty());
         let scoped = frozen(json!({ "src.p.c": "secret", "env": "prod" }));
         assert_eq!(
-            sql(variable_edit_sources(&link, &dash, &scoped)),
+            sql(variable_edit_sources(&link, &dash, &scoped, false)),
             ["SELECT * FROM secret"]
         );
         let global = frozen(json!({ "src.p.c": "safe", "env": "staging" }));
         assert_eq!(
-            sql(variable_edit_sources(&link, &dash, &global)),
+            sql(variable_edit_sources(&link, &dash, &global, false)),
             ["SELECT * FROM fixed WHERE env = 'staging'"]
         );
         // Removing a frozen value falls back to the dashboard default, which is checked too.
         let removed = frozen(json!({ "env": "prod" }));
         assert_eq!(
-            sql(variable_edit_sources(&link, &dash, &removed)),
+            sql(variable_edit_sources(&link, &dash, &removed, false)),
             ["SELECT * FROM safe"]
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_range_edit_checks_every_panel_and_an_unchanged_range_checks_none() {
+        let (mut link, ..) = ctx_parts();
+        link.frozen_variables = Some(json!({ "src.p.c": "safe", "env": "prod" }).to_string());
+        link.time_ranges = Some(json!([{ "type": "relative", "secs": 3600 }]).to_string());
+        let dash = templated_dashboard();
+        let same: BTreeMap<String, serde_json::Value> =
+            serde_json::from_value(json!({ "src.p.c": "safe", "env": "prod" })).unwrap();
+        let policy = |ranges: serde_json::Value| -> TimeRangePolicy {
+            let ranges: Vec<TimeRange> = serde_json::from_value(ranges).unwrap();
+            TimeRangePolicy {
+                default: ranges[0],
+                ranges,
+            }
+        };
+        assert!(!range_changed(
+            &link,
+            &policy(json!([{ "type": "relative", "secs": 3600 }]))
+        ));
+        assert!(range_changed(
+            &link,
+            &policy(json!([{ "type": "relative", "secs": 2592000 }]))
+        ));
+        assert!(variable_edit_sources(&link, &dash, &same, false).is_empty());
+        let mut sql: Vec<String> = variable_edit_sources(&link, &dash, &same, true)
+            .into_iter()
+            .map(|s| match s {
+                crate::authz::QuerySource::Sql { sql, .. } => sql,
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        sql.sort();
+        assert_eq!(
+            sql,
+            [
+                "SELECT * FROM $src",
+                "SELECT * FROM fixed WHERE env = 'prod'",
+                "SELECT * FROM safe"
+            ]
         );
     }
 
@@ -4226,7 +4302,7 @@ mod tests {
         let to = |value: &str| -> BTreeMap<String, serde_json::Value> {
             BTreeMap::from([("src.p.c".to_string(), json!(value))])
         };
-        let err = authorize_variable_edit(&link, &dash, &to("secret"), &editor)
+        let err = authorize_variable_edit(&link, &dash, &to("secret"), false, &editor)
             .await
             .unwrap_err();
         assert!(err.downcast_ref::<Forbidden>().is_some());
@@ -4235,7 +4311,7 @@ mod tests {
             "Unauthorized Access: no read permission on logs/secret"
         );
         assert!(
-            authorize_variable_edit(&link, &dash, &to("safe"), &editor)
+            authorize_variable_edit(&link, &dash, &to("safe"), false, &editor)
                 .await
                 .is_ok()
         );
@@ -5116,7 +5192,7 @@ mod tests {
         );
         link.frozen_variables = Some(json!({ "env": "old" }).to_string());
         let after = BTreeMap::from([("env".to_string(), json!("new"))]);
-        let sources = variable_edit_sources(&link, &dash, &after);
+        let sources = variable_edit_sources(&link, &dash, &after, false);
         assert!(
             sources.contains(&crate::authz::QuerySource::Vrl {
                 org_id: "o1".into(),
@@ -5244,7 +5320,7 @@ mod tests {
         link.frozen_variables = Some(json!({"a":"all-tenants"}).to_string());
         let after = BTreeMap::from([("a".to_string(), json!("one-tenant"))]);
         assert!(
-            !variable_edit_sources(&link, &dash, &after).is_empty(),
+            !variable_edit_sources(&link, &dash, &after, false).is_empty(),
             "upstream frozen edit influences a public panel and must reach the authorization guard"
         );
     }
@@ -5282,7 +5358,7 @@ mod tests {
         );
         link.frozen_variables = Some(json!({ "m": "old" }).to_string());
         let after = BTreeMap::from([("m".to_string(), json!("new"))]);
-        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after));
+        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after, false));
         assert!(
             texts.iter().any(|t| t == "(up) / sum(new_total)"),
             "only the formula reads m, and the build sends its expansion: {texts:?}"
@@ -5303,7 +5379,7 @@ mod tests {
         );
         link.frozen_variables = Some(json!({ "a": "old" }).to_string());
         let after = BTreeMap::from([("a".to_string(), json!("new"))]);
-        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after));
+        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after, false));
         assert!(
             texts.iter().any(|t| t.contains(r#"FROM "s_new""#)),
             "no panel reads b, but its values query reads the stream a selects: {texts:?}"
