@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": "Fichiers .json uniquement",
     "fileUploadJsonTab": "Import de fichier / JSON",
     "urlImportTab": "Import par URL",
-    "relativeTimeAgo": "Il y a {value} {unit}",
-    "relativeTimePast": "Passé {value} {unit}",
     "metrics": "Métriques",
     "traces": "Traces",
     "browserTime": "Heure du navigateur",

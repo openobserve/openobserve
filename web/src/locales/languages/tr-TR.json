@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": "Yalnızca .json dosyaları",
     "fileUploadJsonTab": "Dosya Yükleme / JSON",
     "urlImportTab": "URL İçe Aktarma",
-    "relativeTimeAgo": "{value} {unit} önce",
-    "relativeTimePast": "Son {value} {unit}",
     "metrics": "Metrikler",
     "traces": "İzler",
     "browserTime": "Tarayıcı Saati",

@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": ".json الملفات فقط",
     "fileUploadJsonTab": "رفع الملف / JSON",
     "urlImportTab": "استيراد الرابط",
-    "relativeTimeAgo": "{value} {unit} قبل",
-    "relativeTimePast": "{value} {unit} السابق",
     "metrics": "المقاييس",
     "traces": "التتبعات",
     "browserTime": "وقت المتصفح",

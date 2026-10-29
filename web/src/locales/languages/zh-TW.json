@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": "僅限 .json 檔案",
     "fileUploadJsonTab": "檔案上傳 / JSON",
     "urlImportTab": "URL 匯入",
-    "relativeTimeAgo": "{value} {unit}前",
-    "relativeTimePast": "過去 {value} {unit}",
     "metrics": "指標",
     "traces": "追蹤",
     "browserTime": "瀏覽器時間",

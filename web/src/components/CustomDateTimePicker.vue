@@ -168,7 +168,7 @@ const relativeDates: Record<PeriodKey, number[]> = {
   M: [1, 2, 3, 4, 5, 6],
 };
 
-// Per-period plural keys, shared with the comparison legend so both read the same.
+// Same plural keys the comparison legend uses (dateTimeUtils), so both read the same.
 const agoKeys: Record<PeriodKey, I18nKey> = {
   s: "dashboard.utils.secondsAgo",
   m: "dashboard.utils.minutesAgo",

@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": "Alleen .json-bestanden",
     "fileUploadJsonTab": "Bestandsupload / JSON",
     "urlImportTab": "URL-import",
-    "relativeTimeAgo": "{value} {unit} geleden",
-    "relativeTimePast": "Laatste {value} {unit}",
     "metrics": "Metrieken",
     "traces": "Traces",
     "browserTime": "Browsertijd",

@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": "только файлы .json",
     "fileUploadJsonTab": "Загрузка файла / JSON",
     "urlImportTab": "Импорт по URL",
-    "relativeTimeAgo": "{value} {unit} назад",
-    "relativeTimePast": "Последние {value} {unit}",
     "metrics": "Метрики",
     "traces": "Трейсы",
     "browserTime": "Время браузера",
