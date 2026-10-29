@@ -714,6 +714,94 @@ describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline an
   });
 });
 
+describe("validatePanel on distribution", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (type: string, fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts y fields and a breakdown", () => {
+    expect(run("distribution", { y: [field("a"), field("b")], breakdown: [field("s")] })).toEqual(
+      [],
+    );
+  });
+
+  it("rejects a missing y and any x field", () => {
+    expect(run("distribution", { y: [] })).toHaveLength(1);
+    expect(run("distribution", { x: [field("ts")], y: [field("v")] })[0]).toMatch(
+      /not allowed for the distribution chart/,
+    );
+  });
+
+  it("is not allowed on PromQL", () => {
+    const unsupported = gt("dashboard.utils.promqlChartTypeUnsupported");
+    expect(run("distribution", {}, {}, "promql")).toContain(unsupported);
+  });
+
+  it("checks the allowed values and ranges of the bucket keys", () => {
+    const y = { y: [field("v")] };
+    expect(
+      run("distribution", y, {
+        distribution_bucket_count: 20,
+        distribution_bucket_size: 0.5,
+        distribution_bucket_offset: -1,
+      }),
+    ).toEqual([]);
+    expect(run("distribution", y, { distribution_bucket_count: 0 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_count: 5000 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_size: 0 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_offset: "x" })).toHaveLength(1);
+  });
+
+  it("lists distribution as an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            { type: "distribution", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } },
+          ],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+
 describe("validatePanel on a gauge range", () => {
   const run = (configs: any[]) => {
     const errors: string[] = [];

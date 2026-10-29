@@ -388,8 +388,9 @@ describe("panelEditor types and utilities", () => {
       });
 
       it("all chart types should be accounted for", () => {
+        // Distribution summarises raw values, so it does not require aggregation.
         const regularChartTypes = ALL_CHART_TYPES.filter(
-          (type) => !["html", "markdown", "custom_chart"].includes(type),
+          (type) => !["html", "markdown", "custom_chart", "distribution"].includes(type),
         );
 
         regularChartTypes.forEach((type) => {

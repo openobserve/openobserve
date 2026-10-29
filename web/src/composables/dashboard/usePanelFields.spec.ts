@@ -600,4 +600,28 @@ describe("usePanelFields", () => {
       expect(addMany("y", 3)).toBe(1);
     });
   });
+  describe("distribution slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes no x, up to 3 y fields and one breakdown", () => {
+      panelData.data.type = "distribution";
+      expect(addMany("x", 3)).toBe(0);
+      expect(addMany("y", 3)).toBe(3);
+      expect(addMany("breakdown", 3)).toBe(1);
+    });
+
+    it("a distribution y field keeps raw values", () => {
+      panelData.data.type = "distribution";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+    });
+  });
 });

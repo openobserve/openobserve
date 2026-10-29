@@ -1585,6 +1585,30 @@ describe("configUtils", () => {
       expect(shouldShowNoValueReplacement(panel, true)).toBe(true);
     });
   });
+  describe("distribution", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("keeps the legend toggle and gridlines but not legend placement or axis width", () => {
+      const distribution = panel("distribution");
+      expect(shouldShowGridlines(distribution)).toBe(true);
+      expect(shouldShowLegendsToggle(distribution)).toBe(true);
+      expect(shouldShowLegendPosition(distribution)).toBe(false);
+      expect(shouldShowLegendType(distribution)).toBe(false);
+      expect(shouldShowLegendWidth(distribution)).toBe(false);
+      expect(shouldShowAxisConfig(distribution)).toBe(false);
+    });
+  });
 });
 
 describe("pruneDependentOptions", () => {

@@ -231,6 +231,63 @@ describe("ConfigPanel chart type settings", { timeout: 30_000 }, () => {
     expect(isShown("dashboard-config-bar_gauge_mode")).toBe(false);
     expect(isShown("dashboard-config-bar_gauge_show_unfilled")).toBe(false);
   });
+  it("distribution: mounting writes none of the new keys", async () => {
+    const panel = mountPanel("distribution");
+    const before = JSON.stringify(panel.data.config);
+    await flushPromises();
+    expect(JSON.stringify(panel.data.config)).toBe(before);
+  });
+
+  it("distribution: writes the bucket keys, deletes a cleared one and locks the count while a size is set", async () => {
+    const panel = mountPanel("distribution");
+    await flushPromises();
+    await type("dashboard-config-distribution_bucket_count", "12");
+    await type("dashboard-config-distribution_bucket_offset", "0.5");
+    expect(panel.data.config).toMatchObject({
+      distribution_bucket_count: 12,
+      distribution_bucket_offset: 0.5,
+    });
+    await type("dashboard-config-distribution_bucket_size", "50");
+    expect(panel.data.config.distribution_bucket_size).toBe(50);
+    expect(
+      wrapper!.find('[data-test="dashboard-config-distribution_bucket_count-field"]').attributes(),
+    ).toHaveProperty("disabled");
+    await type("dashboard-config-distribution_bucket_size", "");
+    expect("distribution_bucket_size" in panel.data.config).toBe(false);
+  });
+
+  it("distribution: names each bucket default in its placeholder", async () => {
+    mountPanel("distribution");
+    await flushPromises();
+    const placeholder = (test: string) =>
+      wrapper!.find(`[data-test="${test}-field"]`).attributes("placeholder");
+    expect(placeholder("dashboard-config-distribution_bucket_count")).toBe("Default: 30");
+    expect(placeholder("dashboard-config-distribution_bucket_size")).toBe("Default: Auto");
+    expect(placeholder("dashboard-config-distribution_bucket_offset")).toBe("Default: 0");
+  });
+
+  it("distribution: shows the raw-row cap as the query limit placeholder, and other charts keep 0", async () => {
+    mountPanel("distribution");
+    await flushPromises();
+    const limit = () =>
+      wrapper!.find('[data-test="dashboard-config-limit-field"]').attributes("placeholder");
+    expect(limit()).toBe("10000");
+    const help = "At 0, the chart reads at most 10,000 raw rows";
+    await type("dashboard-config-limit", "0");
+    expect(wrapper!.text()).toContain(help);
+    await type("dashboard-config-limit", "500");
+    expect(wrapper!.text()).not.toContain(help);
+    wrapper!.unmount();
+    mountPanel("state-timeline");
+    await flushPromises();
+    expect(limit()).toBe("0");
+  });
+
+  it("state timeline: hides the distribution buckets", async () => {
+    mountPanel("state-timeline");
+    await flushPromises();
+    expect(has("dashboard-config-distribution_bucket_count")).toBe(false);
+  });
 
   it("state timeline: keeps its own controls and writes the value alignment", async () => {
     const panel = mountPanel("state-timeline");

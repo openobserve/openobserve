@@ -772,6 +772,15 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     bar_gauge_show_unfilled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    distribution_bucket_count: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    distribution_bucket_size: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    distribution_bucket_offset: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_group_by: Option<Vec<String>>,
@@ -2965,7 +2974,11 @@ mod tests {
             "bar_gauge_orientation": "vertical",
             "bar_gauge_show_unfilled": false
         });
-        let rest3 = serde_json::json!({});
+        let rest3 = serde_json::json!({
+            "distribution_bucket_count": 30.0,
+            "distribution_bucket_size": 0.25,
+            "distribution_bucket_offset": -1.0
+        });
         for part in [rest, rest2, rest3] {
             fields
                 .as_object_mut()
