@@ -50,6 +50,8 @@ const MAX_SAMPLES: usize = 3;
 const SAMPLE_SCAN_ROWS: usize = 100;
 const MAX_MODELS: usize = 20;
 const MAX_UNPRICED_ROWS: usize = 100;
+/// Agent names listed per unpriced model row; `agent_count` keeps the full distinct count.
+pub const MAX_AGENT_NAMES: usize = 10;
 
 const LLM_SPAN_COLUMN: &str = "gen_ai_operation_name";
 const AGENT_NAME_COLUMN: &str = "gen_ai_agent_name";
@@ -898,7 +900,10 @@ pub struct UnpricedModelRow {
     pub tokens: i64,
     /// Cost recorded at ingest (0 for unpriced spans).
     pub cost: f64,
+    /// Up to [`MAX_AGENT_NAMES`] agent names that sent the model.
     pub agents: Vec<String>,
+    /// Distinct agent names behind the row, including those past the cap.
+    pub agent_count: i64,
 }
 
 /// The spans the Unpriced tab lists: marked unpriced or approximate. `free` spans have a price.
@@ -924,15 +929,20 @@ fn unpriced_list_sql(stream: &str, cols: &Columns) -> Option<String> {
     } else {
         "0"
     };
-    let agents = if cols.has(AGENT_NAME_COLUMN) {
-        "array_agg(DISTINCT gen_ai_agent_name) FILTER (WHERE gen_ai_agent_name IS NOT NULL \
-         AND gen_ai_agent_name != '')"
+    let (agents, agent_count) = if cols.has(AGENT_NAME_COLUMN) {
+        (
+            format!(
+                "array_slice(array_agg(DISTINCT gen_ai_agent_name) FILTER (WHERE \
+                 gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != ''), 1, {MAX_AGENT_NAMES})"
+            ),
+            "COUNT(DISTINCT NULLIF(gen_ai_agent_name, ''))",
+        )
     } else {
-        "NULL"
+        ("NULL".to_string(), "0")
     };
     Some(format!(
         "SELECT {select}{COST_STATUS_COLUMN} AS status, COUNT(*) AS spans, {} AS tokens, \
-         {cost} AS cost, {agents} AS agents FROM {} WHERE {} \
+         {cost} AS cost, {agents} AS agents, {agent_count} AS agent_count FROM {} WHERE {} \
          GROUP BY {group} ORDER BY tokens DESC LIMIT {MAX_UNPRICED_ROWS}",
         cols.tokens_expr(),
         quote_ident(stream),
@@ -946,7 +956,7 @@ fn parse_unpriced_row(hit: &json::Value) -> Option<UnpricedModelRow> {
         "approximate" => CostStatus::Approximate,
         _ => return None,
     };
-    let agents = match hit.get("agents") {
+    let mut agents: Vec<String> = match hit.get("agents") {
         Some(json::Value::Array(items)) => items
             .iter()
             .filter_map(|v| v.as_str().map(str::to_string))
@@ -955,6 +965,11 @@ fn parse_unpriced_row(hit: &json::Value) -> Option<UnpricedModelRow> {
         Some(json::Value::String(s)) => json::from_str::<Vec<String>>(s).unwrap_or_default(),
         _ => vec![],
     };
+    agents.truncate(MAX_AGENT_NAMES);
+    let agent_count = hit
+        .get("agent_count")
+        .map_or(0, json::get_int_value)
+        .max(agents.len() as i64);
     Some(UnpricedModelRow {
         model: model_from(hit),
         status,
@@ -962,6 +977,7 @@ fn parse_unpriced_row(hit: &json::Value) -> Option<UnpricedModelRow> {
         tokens: hit.get("tokens").map_or(0, json::get_int_value),
         cost: hit.get("cost").map_or(0.0, json::get_float_value),
         agents,
+        agent_count,
     })
 }
 

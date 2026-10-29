@@ -13,7 +13,8 @@ the process environment); the script prints variable names, never values.
 Exit codes:
   0  GenAI spans arrived and no health check is in error
   1  GenAI spans arrived but at least one health check is in error
-  2  configuration problem, or no GenAI span arrived before the timeout
+  2  configuration problem, no GenAI span arrived before the timeout, or the server
+     has no data health API (upgrade OpenObserve)
 """
 
 import argparse
@@ -243,8 +244,8 @@ def run_health(client, ui_url, org, stream, start_us, end_us, agent):
         result = client.request("GET", "gen_ai/data_health", query)
     except urllib.error.HTTPError as err:
         if err.code == 404:
-            print("  This OpenObserve server has no AI data health API yet; upgrade it to run the checks.")
-            return 0
+            print("✗ This OpenObserve server has no AI data health API yet; upgrade it to run the checks.")
+            return 2
         print(f"✗ Data health request failed (HTTP {err.code}).")
         return 2
     except urllib.error.URLError as err:

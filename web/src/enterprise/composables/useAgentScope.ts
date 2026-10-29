@@ -535,8 +535,15 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   // flight join it, so the several callers on page entry (date replay, mode
   // resolution) cost one request. A forced refresh waits for any request for
   // the same key, then invalidates and fetches again rather than reusing it.
+  // Joiners wait for the latest request for their key, so a forced refresh
+  // started after they joined settles before they resume.
   let inFlight: { key: string; promise: Promise<void> } | null = null;
   let requestSequence = 0;
+  async function joinLatest(key: string): Promise<void> {
+    for (let current = inFlight; current?.key === key; current = inFlight) {
+      await current.promise;
+    }
+  }
   async function loadAgents(start?: number, end?: number, force = false): Promise<void> {
     const org = opts.orgId();
     const win = opts.getWindow();
@@ -546,7 +553,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     const bucket = quantizeRange(startTime, endTime);
     const key = `${org}::${bucket.start}-${bucket.end}`;
     const previous = inFlight?.key === key ? inFlight.promise : null;
-    if (!force && previous) return previous;
+    if (!force && previous) return joinLatest(key);
     const sequence = ++requestSequence;
     // Only the latest window/org request owns the visible list and load state.
     const superseded = () => sequence !== requestSequence || opts.orgId() !== org;
