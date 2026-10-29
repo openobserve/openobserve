@@ -20,6 +20,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { reactive } from "vue";
 import type { ExperimentDetail } from "@/services/llm-experiments.service";
 import { makeExperiment, makeExperimentDetail } from "./experimentTestFixtures";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 const push = vi.fn();
 const replace = vi.fn();
@@ -54,6 +55,8 @@ vi.mock("vuex", () => ({
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
+    // The draft dot formats its saved time in the active locale.
+    locale: { value: "en-US" },
     t: (key: string, params?: Record<string, unknown>) => {
       const template =
         key === "aiObservability.experiments.scoreEvidence"
@@ -185,5 +188,39 @@ describe("ExperimentsPage loading", () => {
     await flushPromises();
 
     expect((service.list as any).mock.calls.length).toBe(callsBefore + 1);
+  });
+});
+
+describe("ExperimentsPage drafts", () => {
+  const mountPage = () =>
+    mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
+          ExperimentBrowser: true,
+          OEmptyState: true,
+        },
+      },
+    });
+
+  it("marks New experiment while a new-experiment draft exists, and names it", async () => {
+    localStorage.clear();
+    route.query = {};
+    const wrapper = mountPage();
+    await flushPromises();
+    const button = () => wrapper.get('[data-test="ai-experiments-new-btn"]');
+    expect(wrapper.find('[data-test="ai-experiments-new-draft-dot"]').exists()).toBe(false);
+    expect(button().attributes("aria-label")).toBeUndefined();
+
+    writeEditorDraft(
+      { kind: "experiment", org: "acme", entityId: null, userEmail: "" },
+      { data: { name: "half done" } },
+    );
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="ai-experiments-new-draft-dot"]').exists()).toBe(true);
+    expect(button().attributes("aria-label")).toBe("common.editorDraft.newDot");
+    wrapper.unmount();
+    localStorage.clear();
   });
 });
