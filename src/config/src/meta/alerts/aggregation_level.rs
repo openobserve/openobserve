@@ -271,6 +271,7 @@ mod tests {
             operator: op,
             value,
             ignore_case: false,
+            case_insensitive: None,
         }
     }
 

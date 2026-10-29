@@ -1825,6 +1825,7 @@ mod tests {
                     operator: Operator::GreaterThanEquals,
                     value: serde_json::json!(1),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
                 warning_value: None,
                 multi_alert,
