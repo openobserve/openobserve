@@ -337,10 +337,6 @@ pub enum AlertError {
         platform: String,
     },
     #[error(
-        "Multi-alerts keep per-group state and open no recovery episode, so notify_on_recovery would never fire"
-    )]
-    RecoveryOnMultiAlert,
-    #[error(
         "destination '{destination}' is {platform}, which is resolved by updating the alert the firing opened. That needs the firing payload to be a JSON object, and template '{template}' does not render one"
     )]
     RecoveryNeedsJsonPayload {
@@ -519,12 +515,6 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
         }
     }
 
-    // It keeps the alert out of the single-row path that owns the episode, so recovery would be
-    // stored and then silently never sent.
-    if alert.query_condition.multi_alert_enabled() {
-        return Err(AlertError::RecoveryOnMultiAlert);
-    }
-
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
         Some(name) => db::alerts::templates::get(org_id, name).await.ok(),
         None => None,
@@ -598,9 +588,17 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     let firing = infra::table::alert_states::firing_groups(&alert_id, None)
         .await
         .unwrap_or_default();
+    let groups = infra::table::alert_states::list_groups(&alert_id)
+        .await
+        .unwrap_or_default();
     match db::alerts::alert_states::delete_all_groups(&alert_id).await {
         Ok(0) => {}
         Ok(n) => {
+            crate::alerts::recovery::log_orphaned_episodes(
+                &alert_id,
+                &groups,
+                "deleted on opt-out",
+            );
             log::info!(
                 "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
                  without transitions"
@@ -1611,6 +1609,14 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
             let firing = crate::alerts::lifecycle::firing_rows(&alert_id_str).await;
+            let groups = infra::table::alert_states::list_groups(&alert_id_str)
+                .await
+                .unwrap_or_default();
+            crate::alerts::recovery::log_orphaned_episodes(
+                &alert_id_str,
+                &groups,
+                "deleted with its alert",
+            );
             // Alert run state is owned by the alert's lifecycle (Part IV of
             // alerts.md), so it goes when the alert does. Best-effort: a
             // leftover state row must not fail the delete.
@@ -3043,12 +3049,13 @@ pub async fn send_recovery_notification(
         Some(event.opened_at),
         event.recovered_at,
         Some(config::meta::alerts::level::AlertLevel::Ok),
-        None,
-        None,
+        event.value,
+        event.group_label_set.as_ref(),
         Some(event.episode_id.clone()),
         true,
     )
     .await;
+    ctx.recovery_reason = event.reason.as_str().to_string();
 
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
         Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
@@ -4388,6 +4395,7 @@ async fn build_notification_context(
         }
         .to_string(),
         episode_id,
+        recovery_reason: String::new(),
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
         alert_threshold_crit: if alert.query_condition.promql_rule_mode {
@@ -5413,6 +5421,15 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[tokio::test]
+    async fn a_multi_alert_with_recovery_saves() {
+        let mut alert = Alert::default();
+        alert.notify_on_recovery = true;
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        assert!(validate_recovery_templates("default", &alert).await.is_ok());
+    }
 
     #[test]
     fn email_body_is_html_only_without_text() {

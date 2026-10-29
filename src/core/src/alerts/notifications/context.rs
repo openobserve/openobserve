@@ -55,6 +55,8 @@ pub struct NotificationContext {
     /// resolve to pair with, a dedup key would silently change how repeated
     /// firings collapse.
     pub episode_id: Option<String>,
+    /// `cleared` or `disappeared` on a recovery; empty on a firing.
+    pub recovery_reason: String,
     pub alert_priority: String,
     pub alert_tags: String,
     pub alert_threshold_crit: String,

@@ -422,7 +422,7 @@ test.describe('On-call pages list', {
    * reported reaching nobody whatever the ledger said. The badge is the
    * UI-visible form of that bug, so the assertion is agreement: present when
    * the ledger has sends for that address, absent when it has none, and reading
-   * "reached" exactly when one of those sends landed.
+   * "sent" exactly when one of those sends landed (`oncall.reachLanded`).
    *
    * Deliberately NOT asserted: that anything actually lands. Whether email
    * leaves the box is a property of the deployment's transport, and a test that
@@ -480,7 +480,7 @@ test.describe('On-call pages list', {
     expect(
       text.toLowerCase(),
       `the ledger says landed=${landed}; the badge must agree with it`,
-    ).toBe(landed ? 'reached' : 'unreached');
+    ).toBe(landed ? 'sent' : 'unreached');
   });
 
   // -------------------------------------------------------------- P2 surface
