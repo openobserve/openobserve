@@ -5,7 +5,7 @@ import { expect } from "@playwright/test";
 import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
 import { settlePanelLeave } from "./panel-leave-dialog.js";
 
-// Default unit formatting abbreviates large legend values ("2.40K").
+// Default unit formatting abbreviates large legend values ("2.40K"); the empty key is an unscaled value.
 const PIE_VALUE_SUFFIX_MULTIPLIER = { "": 1, K: 1e3, M: 1e6, B: 1e9, T: 1e12 };
 
 export default class DashboardactionPage {
@@ -793,9 +793,10 @@ export default class DashboardactionPage {
 
   _expectLegendValueMatches(entry, valueText, decimals) {
     const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
-    const match = String(valueText).match(new RegExp(`^(-?\\d+${fraction})([KMBT]?)$`));
+    // A metric declared as percent seeds the panel unit, so the value can carry "%" as well as a K/M/B/T scale.
+    const match = String(valueText).match(new RegExp(`^(-?\\d+${fraction})(?:([KMBT])|%)?$`));
     expect(match, `value of ${entry.name} ("${valueText}")`).not.toBeNull();
-    const multiplier = PIE_VALUE_SUFFIX_MULTIPLIER[match[2]];
+    const multiplier = PIE_VALUE_SUFFIX_MULTIPLIER[match[2] ?? ""];
     // Half a unit of the last printed digit, scaled by the abbreviation.
     const tolerance = 0.5 * Math.pow(10, -decimals) * multiplier + 1e-9;
     expect(
