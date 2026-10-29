@@ -2692,6 +2692,7 @@ export default defineComponent({
         incidentDetails.value.status = response.data.status;
         incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
         incidentDetails.value.acknowledged_at = response.data.acknowledged_at;
+        incidentDetails.value.resolved_at = response.data.resolved_at ?? undefined;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
         toast({
