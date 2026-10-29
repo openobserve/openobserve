@@ -143,10 +143,16 @@ pub async fn remote_write(
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
+    // remote write has no partial success: a 4xx drops the whole batch, a 5xx retries it forever
+    let mut stream_key_checks = ingest::StreamKeyChecks::default();
+    let mut too_long_samples: usize = 0;
 
     // parse metadata
     for item in request.metadata {
         let metric_name = format_stream_name(item.metric_family_name.to_string());
+        if stream_key_checks.violation(org_id, &metric_name).is_some() {
+            continue;
+        }
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
             .unwrap_or_else(|_| Schema::empty());
@@ -217,6 +223,8 @@ pub async fn remote_write(
             }
         }
     }
+
+    unique_metrics.retain(|name| stream_key_checks.violation(org_id, name).is_none());
 
     let mut preload_pipeline_time = 0u128;
     let mut preload_uds_time = 0u128;
@@ -379,6 +387,11 @@ pub async fn remote_write(
             continue;
         }
 
+        if stream_key_checks.violation(org_id, &metric_name).is_some() {
+            too_long_samples += event.samples.len() + event.histograms.len();
+            continue;
+        }
+
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
 
@@ -516,6 +529,14 @@ pub async fn remote_write(
         );
     }
 
+    // a native histogram's bucket streams and an exemplar stream are longer than the metric's
+    for (_, _, records) in stream_key_checks.drop_unstorable(org_id, &mut stream_pipeline_inputs) {
+        too_long_samples += records;
+    }
+    for (_, _, records) in stream_key_checks.drop_unstorable(org_id, &mut json_data_by_stream) {
+        too_long_samples += records;
+    }
+
     let parse_timeseries_ms = step_start.elapsed().as_millis();
 
     // Detailed performance logging
@@ -536,7 +557,7 @@ pub async fn remote_write(
         );
     }
 
-    let (pipeline_outputs, _) = ingest::run_pipelines(
+    let (mut pipeline_outputs, _) = ingest::run_pipelines(
         org_id,
         &stream_executable_pipelines,
         stream_pipeline_inputs,
@@ -544,6 +565,14 @@ pub async fn remote_write(
         &mut stream_partitioning_map,
     )
     .await;
+    for (_, _, records) in stream_key_checks.drop_unstorable(org_id, &mut pipeline_outputs) {
+        too_long_samples += records;
+    }
+    if too_long_samples > 0 {
+        log::warn!(
+            "[METRICS:PROM] dropped {too_long_samples} samples of streams whose stream key is too long, org_id: {org_id}"
+        );
+    }
     for (stream_name, records) in pipeline_outputs {
         // a pipeline rewrote the labels, so the series hash is recomputed from its output
         json_data_by_stream.entry(stream_name).or_default().extend(
@@ -2307,6 +2336,56 @@ mod tests {
         let matchers = sel.matchers.find_matchers(NAME_LABEL);
         assert!(!matchers.iter().all(|m| m.is_match("node_cpu")));
         assert!(matchers.iter().all(|m| m.is_match("http_requests")));
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn remote_write_drops_only_the_series_whose_stream_key_is_too_long() {
+        use prost::Message;
+        use proto::prometheus_rpc;
+
+        let series = |name: &str| prometheus_rpc::TimeSeries {
+            labels: vec![prometheus_rpc::Label {
+                name: NAME_LABEL.to_string(),
+                value: name.to_string(),
+            }],
+            samples: vec![prometheus_rpc::Sample {
+                value: 1.0,
+                timestamp: Utc::now().timestamp_millis(),
+            }],
+            ..Default::default()
+        };
+        let long_name = "m".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let request = prometheus_rpc::WriteRequest {
+            timeseries: vec![series("test_prom_key_len_ok"), series(&long_name)],
+            metadata: vec![prometheus_rpc::MetricMetadata {
+                r#type: prometheus_rpc::metric_metadata::MetricType::Gauge as i32,
+                metric_family_name: long_name.clone(),
+                ..Default::default()
+            }],
+        };
+        let body = snap::raw::Encoder::new()
+            .compress_vec(&request.encode_to_vec())
+            .unwrap();
+        remote_write(
+            "test_org_id",
+            Bytes::from(body),
+            IngestUser::User("root@example.com".to_string()),
+        )
+        .await
+        .unwrap();
+
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Metrics, &long_name)
+                .is_some();
+        assert!(
+            infra::schema::exists("test_org_id", StreamType::Metrics, "test_prom_key_len_ok").await
+        );
+        assert_eq!(
+            infra::schema::exists("test_org_id", StreamType::Metrics, &long_name).await,
+            !bounded
+        );
     }
 
     #[tokio::test]
