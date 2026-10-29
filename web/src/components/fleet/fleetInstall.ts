@@ -107,10 +107,10 @@ function windowsCommand(t: InstallTarget): string {
   ].join("\n");
 }
 
-// --set-string keeps a numeric name a string; Helm splits --set values on unescaped commas.
+// --set-string keeps a numeric name a string; Helm reads a backslash as an escape and splits on commas.
 function clusterNameSet(name?: string): string[] {
-  const value = name?.trim();
-  return value ? [`--set-string clusterName=${q(value.replace(/,/g, "\\,"))}`] : [];
+  const value = name?.trim().replace(/\\/g, "\\\\").replace(/,/g, "\\,");
+  return value ? [`--set-string clusterName=${q(value)}`] : [];
 }
 
 // One release runs one role: its token enrols every pod into one fleet, and a fleet shares one configuration.

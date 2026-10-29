@@ -134,9 +134,12 @@ describe("installCommand", () => {
     }
   });
 
-  it("escapes the commas Helm would split a cluster name on", () => {
+  it("escapes the backslashes and commas Helm would read in a cluster name", () => {
     expect(installCommand("kubernetes", { ...target, clusterName: "eu,west" })).toContain(
       "--set-string clusterName='eu\\,west'",
+    );
+    expect(installCommand("kubernetes", { ...target, clusterName: "a\\,b" })).toContain(
+      "--set-string clusterName='a\\\\\\,b'",
     );
   });
 
