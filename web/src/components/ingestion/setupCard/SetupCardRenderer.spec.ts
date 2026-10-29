@@ -717,7 +717,12 @@ describe("SetupCardRenderer — Kubernetes instrument step (nested toggle)", () 
 helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
   --version '>=0.6.0' --reset-then-reuse-values \\
   --set ebpf.enabled=true`;
-  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code") as string);
+  // Scoped to the instrument step: the network flows step below also runs `upgrade o2c`.
+  const codes = () =>
+    wrapper
+      .find('[data-test="ai-step-instrument"]')
+      .findAllComponents(OCodeBlock)
+      .map((b) => b.props("code") as string);
   const instrumentCode = () =>
     codes().find((c) => c.includes("kubectl annotate") || c.includes("upgrade o2c"));
   const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
