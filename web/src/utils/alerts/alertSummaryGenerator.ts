@@ -266,12 +266,13 @@ function getPeriodText(period: number, t: SummaryTranslate): string {
 
   const minutes = period;
 
-  if (minutes < 60) return t("alerts.summary.theLastMinute", { count: minutes });
+  if (minutes < 60) return t("alerts.summary.theLastMinute", { count: minutes }, minutes);
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return t("alerts.summary.theLastHour", { count: hours });
+  if (hours < 24) return t("alerts.summary.theLastHour", { count: hours }, hours);
 
-  return t("alerts.theLastDay", { count: Math.floor(hours / 24) });
+  const days = Math.floor(hours / 24);
+  return t("alerts.theLastDay", { count: days }, days);
 }
 
 /**
