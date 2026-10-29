@@ -535,6 +535,17 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(4, 5));
     });
 
+    it("E (m1): with no thread, the run's stored Resume count wins over m - 1", async () => {
+      answers.thread = null;
+      answers.threadStatus = "expired";
+      const props = cancelledProps(5);
+      props.rca.summary.reusable_steps = 2;
+      wrapper = mountPanel(props);
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(2, 5));
+    });
+
     it("E (m1): with no thread and no steps, 0 of 0", async () => {
       answers.thread = null;
       answers.threadStatus = "expired";
@@ -731,19 +742,23 @@ describe("IncidentRCAAnalysis", () => {
       expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
-    it("Download as Markdown writes a .md file with the same text", async () => {
+    it("Download as Markdown writes a .md file with the same text, named for its run", async () => {
       const createObjectURL = vi.mocked(URL.createObjectURL);
       createObjectURL.mockClear().mockReturnValueOnce("blob:rca");
       vi.mocked(URL.revokeObjectURL).mockClear();
       const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-      wrapper = mountPanel(completedProps());
+      // The shown run-1 is Run 2: run-0 came before it.
+      wrapper = mountPanel({
+        ...completedProps(),
+        history: [rcaRunItem(), rcaRunItem({ run_id: "run-0" })],
+      });
       await flushPromises();
 
       await byTest(wrapper, "rca-download-btn").trigger("click");
 
       expect(click).toHaveBeenCalledTimes(1);
       const anchor = click.mock.contexts[0] as HTMLAnchorElement;
-      expect(anchor.download).toBe("incident-inc-1-rca.md");
+      expect(anchor.download).toBe("incident-inc-1-rca-run-2.md");
       const blob = createObjectURL.mock.calls[0][0] as Blob;
       expect(blob.type).toBe("text/markdown;charset=utf-8");
       // jsdom's Blob has no text(); FileReader reads it.
@@ -1556,6 +1571,18 @@ describe("IncidentRCAAnalysis", () => {
         await flushPromises();
 
         expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
+      });
+
+      it("the thread of a run Resume can continue is not called final; a picked earlier run's is", async () => {
+        wrapper = mountPanel(failedProps({ resumeRunId: "run-2" }));
+        await flushPromises();
+        expect(byTest(wrapper, "rca-thread-final-note").text()).toBe(
+          "This run stopped before it finished. Resume run continues from the last finished step.",
+        );
+
+        await wrapper.setProps({ viewedRun: rcaRunItem(), threadRunId: "run-1" });
+        await flushPromises();
+        expect(byTest(wrapper, "rca-thread-final-note").text()).toContain("This report is final");
       });
 
       it("the resume_run blind spot of the latest run emits resume-rca", async () => {

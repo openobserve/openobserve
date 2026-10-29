@@ -251,7 +251,9 @@ describe("Profiles page", () => {
     await flushPromises();
     await nextTick();
 
-    expect(mocks.meta).toHaveBeenCalledTimes(1);
+    // Once to learn the services, once more for the picked service's profile types.
+    expect(mocks.meta).toHaveBeenCalledTimes(2);
+    expect(mocks.meta.mock.calls[1][2]).toMatchObject({ service_name: "service-a" });
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
   });
@@ -265,7 +267,7 @@ describe("Profiles page", () => {
     await flushPromises();
 
     expect(wrapper.findComponent({ name: "DateTime" }).exists()).toBe(true);
-    expect(mocks.meta).toHaveBeenCalledTimes(1);
+    expect(mocks.meta).toHaveBeenCalledTimes(2);
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
   });
@@ -511,7 +513,7 @@ describe("Profiles page", () => {
     expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-b" }]);
   });
 
-  it("steps the bytes axis on round binary values with the shared short labels", async () => {
+  it("steps the bytes axis on round binary values in the table's binary units", async () => {
     const gib = 1024 ** 3;
     mocks.meta.mockResolvedValue({
       data: {
@@ -539,9 +541,197 @@ describe("Profiles page", () => {
     const chart = wrapper.findComponent({ name: "ChartRendererStub" });
     const yAxis = chart.props("data").options.yAxis;
     expect(yAxis.interval).toBe(2.5 * gib);
-    expect(yAxis.axisLabel.formatter(5 * gib)).toBe("5.00GB");
+    expect(yAxis.axisLabel.formatter(5 * gib)).toBe("5 GiB");
     expect(yAxis.name).toBeUndefined();
     expect(chart.props("data").options.tooltip.textStyle.fontSize).toBe(12);
+  });
+
+  it("shows memory in the same binary units on the chart axis, its tooltip and the table", async () => {
+    const mib = 1024 ** 2;
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "inuse_space", unit: "bytes" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        series: [{ timestamp: 1_000_000, value: 3 * mib }],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: {
+        ...mergeResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        total: 3 * mib,
+        merged_total: 3 * mib,
+        top: [{ name: "fn-a", self: 3 * mib, total: 3 * mib }],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(options.yAxis.axisLabel.formatter(3 * mib)).toBe("3 MiB");
+    expect(options.tooltip.valueFormatter(3 * mib)).toBe("3 MiB");
+    expect(wrapper.find('[data-test="profiles-top-table"]').text()).toContain("3 MiB");
+  });
+
+  it("draws straight lines that drop to zero across empty buckets, on a transparent background", async () => {
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        step_secs: 60,
+        series: [
+          { timestamp: 60_000_000, value: 60e9 },
+          { timestamp: 120_000_000, value: 120e9 },
+          { timestamp: 360_000_000, value: 60e9 },
+        ],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(options.backgroundColor).toBe("transparent");
+    expect(options.series[0].smooth).toBe(false);
+    expect(options.series[0].data).toEqual([
+      [60_000, 1],
+      [120_000, 2],
+      [180_000, 0],
+      [300_000, 0],
+      [360_000, 1],
+    ]);
+  });
+
+  it("leaves in-use memory gaps unfilled, since a missing snapshot is not 0 B", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "inuse_space", unit: "bytes" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        step_secs: 60,
+        series: [
+          { timestamp: 60_000_000, value: 100 },
+          { timestamp: 120_000_000, value: 200 },
+          { timestamp: 360_000_000, value: 300 },
+        ],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, unit: "bytes", profile_type: "inuse_space" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0];
+    expect(series.data).toEqual([
+      [60_000, 100],
+      [120_000, 200],
+      [180_000, null],
+      [360_000, 300],
+    ]);
+    expect(series.showSymbol).toBe(true);
+    expect(
+      series.data.map((datum: unknown, dataIndex: number) => series.symbol(datum, { dataIndex })),
+    ).toEqual(["none", "none", "none", "emptyCircle"]);
+    const { tooltip } = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(tooltip.valueFormatter(null)).toBe("—");
+    expect(tooltip.valueFormatter(200)).toBe("200 B");
+  });
+
+  it("keeps symbols off for an in-use line whose gap leaves no point on its own", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "inuse_space", unit: "bytes" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        step_secs: 60,
+        series: [
+          { timestamp: 60_000_000, value: 100 },
+          { timestamp: 120_000_000, value: 200 },
+          { timestamp: 360_000_000, value: 300 },
+          { timestamp: 420_000_000, value: 400 },
+        ],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, unit: "bytes", profile_type: "inuse_space" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0];
+    expect(series.data).toContainEqual([180_000, null]);
+    expect(series.showSymbol).toBe(false);
+    expect(series.symbol).toBeUndefined();
+  });
+
+  it("leaves the series unfilled when the response has no step", async () => {
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        step_secs: undefined,
+        series: [
+          { timestamp: 60_000_000, value: 6e9, rate: 1e9 },
+          { timestamp: 120_000_000, value: 6e9, rate: 1e9 },
+        ],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const data = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0].data;
+    expect(data).toEqual([
+      [60_000, 1],
+      [120_000, 1],
+    ]);
+  });
+
+  it("shows a seeded profile type by its label, not its raw id, while meta is loading", async () => {
+    route.query = { stream: "profiles-a", profile_type: "inuse_space", profile_unit: "bytes" };
+    mocks.meta.mockReturnValue(new Promise(() => {}));
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    const select = wrapper.find('[data-test="profiles-type-select"] select');
+    expect((select.element as HTMLSelectElement).value).toBe("inuse_space\u0000bytes");
+    const labels = select.findAll("option").map((option) => option.text());
+    expect(labels).toEqual(["inuse_space (bytes)"]);
+  });
+
+  it("uses sentence case like Logs and Traces, with no dot before Label filters", async () => {
+    const wrapper = mountPage();
+    await settle();
+
+    const filters = wrapper.get('[data-test="profiles-label-filters"]');
+    expect(filters.text()).toContain("Label filters");
+    expect(filters.find(".bg-badge-orange-ol-text").exists()).toBe(false);
+    const t = i18n.global.t;
+    expect(t("emptyState.noProfiles.title")).toBe("No profiles found");
+    expect(t("profiles.noSeries")).toBe("No data");
+    expect(t("profiles.rootAtBottom")).toBe("Root at bottom");
+    expect(t("profiles.runOptions")).toBe("Run options");
   });
 
   it("draws CPU as cores per second of profiled time when the server sends a rate", async () => {
@@ -606,6 +796,67 @@ describe("Profiles page", () => {
     );
   });
 
+  it("re-reads the series and Others colours when the theme switches", async () => {
+    const html = document.documentElement;
+    const startTheme = store.state.theme;
+    html.style.setProperty("--color-chart-series-1", "rgb(1, 2, 3)");
+    html.style.setProperty("--color-border-strong", "rgb(4, 5, 6)");
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        groups: [
+          { value: "pod-a", total: 9, others: false, series: [{ timestamp: 1_000_000, value: 9 }] },
+          { value: "", total: 1, others: true, series: [{ timestamp: 1_000_000, value: 1 }] },
+        ],
+      },
+    });
+    try {
+      const wrapper = mountPage();
+      await settle();
+      await wrapper.find('[data-test="profiles-breakdown-select"] select').setValue("k8s_pod_name");
+      await flushPromises();
+      await nextTick();
+      const colorsOf = () =>
+        wrapper
+          .findComponent({ name: "ChartRendererStub" })
+          .props("data")
+          .options.series.map((line: { color?: string }) => line.color);
+      expect(colorsOf()).toEqual(["rgb(1, 2, 3)", "rgb(4, 5, 6)"]);
+
+      html.style.setProperty("--color-chart-series-1", "rgb(7, 8, 9)");
+      html.style.setProperty("--color-border-strong", "rgb(10, 11, 12)");
+      store.state.theme = startTheme === "dark" ? "light" : "dark";
+      await nextTick();
+      expect(colorsOf()).toEqual(["rgb(7, 8, 9)", "rgb(10, 11, 12)"]);
+    } finally {
+      store.state.theme = startTheme;
+      html.style.removeProperty("--color-chart-series-1");
+      html.style.removeProperty("--color-border-strong");
+    }
+  });
+
+  it("re-reads the series colours when a theme colour preset is applied", async () => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-chart-series-1", "rgb(1, 2, 3)");
+    mocks.series.mockResolvedValue({
+      data: { ...seriesResponse.data, series: [{ timestamp: 1_000_000, value: 9 }] },
+    });
+    try {
+      const wrapper = mountPage();
+      await settle();
+      const colorOf = () =>
+        wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options.series[0].color;
+      expect(colorOf()).toBe("rgb(1, 2, 3)");
+
+      html.style.setProperty("--color-chart-series-1", "rgb(7, 8, 9)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+      expect(colorOf()).toBe("rgb(7, 8, 9)");
+    } finally {
+      html.style.removeProperty("--color-chart-series-1");
+    }
+  });
+
   it("says how much of the samples the views show when the result is cut", async () => {
     mocks.merge.mockResolvedValue({
       data: { ...mergeResponse.data, truncated: true, total: 50, merged_total: 45 },
@@ -613,7 +864,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    expect(wrapper.find('[data-test="profiles-partial-result"]').text()).toContain("90.0%");
+    expect(wrapper.find('[data-test="profiles-partial-result"]').text()).toContain("90.00%");
   });
 
   it("marks the page as beta in the title line, as Workflows does", async () => {
@@ -799,10 +1050,10 @@ describe("Profiles page", () => {
       children: [{ name: "fn-c", total: 10 }],
     });
     // fn-b has 30 samples in the Top list, but only 15 sit in the drawn tree.
-    expect(wrapper.find('[data-test="profiles-sandwich-coverage"]').text()).toContain("50.0%");
+    expect(wrapper.find('[data-test="profiles-sandwich-coverage"]').text()).toContain("50.00%");
   });
 
-  it("shows Function Details for a row and closes them", async () => {
+  it("shows Function details for a row and closes them", async () => {
     mocks.merge.mockResolvedValue({
       data: {
         ...mergeResponse.data,
@@ -833,10 +1084,17 @@ describe("Profiles page", () => {
 
     const panel = wrapper.find('[data-test="profiles-function-details"]');
     expect(panel.text()).toContain("fn-b");
-    expect(panel.find('[data-test="profiles-function-details-self"]').text()).toBe("5 ns · 16.7%");
+    expect(panel.find('[data-test="profiles-function-details-self"]').text()).toBe("5 ns · 16.67%");
     expect(panel.find('[data-test="profiles-function-details-total"]').text()).toBe(
-      "30 ns · 100.0%",
+      "30 ns · 100.00%",
     );
+    // The table's Self % cell for the same function uses the same precision.
+    const tableRow = wrapper
+      .findAll("tbody tr")
+      .find((row) => row.find("td").text().includes("fn-b"))!;
+    expect(tableRow.text()).toContain("16.67%");
+    // fn-b has no package separator, so there is no Package row repeating its name.
+    expect(panel.find('[data-test="profiles-function-details-package"]').exists()).toBe(false);
     expect(panel.find('[data-test="profiles-function-details-called-by"]').text()).toContain(
       "main",
     );
@@ -905,7 +1163,7 @@ describe("Profiles page", () => {
     await nextTick();
     // The recursive main.hash counts once: 40 of 100.
     expect(wrapper.find('[data-test="profiles-search-summary"]').text()).toBe(
-      "1 function · 40.0% of samples",
+      "1 function · 40.00% of samples",
     );
 
     await wrapper.find('[data-test="profiles-search-functions"]').setValue("nothing");
@@ -945,7 +1203,8 @@ describe("Profiles page", () => {
       valueType: "relative",
     });
     await flushPromises();
-    expect(mocks.meta).toHaveBeenCalledTimes(2);
+    // Two on open, one for the new service's profile types, one for the new window.
+    expect(mocks.meta).toHaveBeenCalledTimes(4);
     expect(mocks.merge).toHaveBeenCalledTimes(4);
   });
 
@@ -965,6 +1224,110 @@ describe("Profiles page", () => {
 
     expect(wrapper.find('[data-test="profiles-search-cancelled"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="profiles-no-results"]').exists()).toBe(false);
+  });
+
+  it("lists only the profile types of the selected service", async () => {
+    const typesByService: Record<string, Array<{ type: string; unit: string }>> = {
+      "service-a": [
+        { type: "cpu", unit: "nanoseconds" },
+        { type: "heap", unit: "bytes" },
+      ],
+      checkout: [{ type: "cpu", unit: "nanoseconds" }],
+    };
+    mocks.meta.mockImplementation(async (_org, _stream, payload) => ({
+      data: {
+        ...profileMetaResponse.data,
+        services: ["service-a", "checkout"],
+        profile_types: payload.service_name
+          ? typesByService[payload.service_name]
+          : Object.values(typesByService).flat(),
+      },
+    }));
+    const wrapper = mountPage();
+    await settle();
+    const typeOptions = () =>
+      wrapper
+        .findAll('[data-test="profiles-type-select"] option')
+        .map((option) => option.attributes("value"));
+    expect(typeOptions()).toEqual(["cpu\u0000nanoseconds", "heap\u0000bytes"]);
+
+    await wrapper.find('[data-test="profiles-service-select"] select').setValue("checkout");
+    await flushPromises();
+
+    expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ service_name: "checkout" });
+    expect(typeOptions()).toEqual(["cpu\u0000nanoseconds"]);
+    expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({
+      service_name: "checkout",
+      profile_type: "cpu",
+    });
+  });
+
+  it("keeps the chosen service through an empty window and says why Run query is off", async () => {
+    let empty = false;
+    mocks.meta.mockImplementation(async () => ({
+      data: empty
+        ? { ...profileMetaResponse.data, services: [], profile_types: [], label_names: [] }
+        : { ...profileMetaResponse.data, services: ["service-a", "payments"] },
+    }));
+    const wrapper = mountPage();
+    await settle();
+    await wrapper.find('[data-test="profiles-service-select"] select').setValue("payments");
+    await flushPromises();
+    const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
+    const pickWindow = async (relativeTimePeriod: string) => {
+      picker.vm.$emit("update:modelValue", {
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod,
+        valueType: "relative",
+      });
+      await flushPromises();
+    };
+
+    empty = true;
+    await pickWindow("5m");
+    const run = wrapper.find('[data-test="profiles-run-query"]');
+    expect(run.attributes("disabled")).toBeDefined();
+    expect(run.find("span[content]").attributes("content")).toBe(
+      "Pick a stream and a profile type with data in this time range",
+    );
+
+    empty = false;
+    await pickWindow("1h");
+    expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ service_name: "payments" });
+    expect(
+      (wrapper.find('[data-test="profiles-service-select"] select').element as HTMLSelectElement)
+        .value,
+    ).toBe("payments");
+    expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({ service_name: "payments" });
+  });
+
+  it("draws a lone point as a dot on an axis that spans the run's window", async () => {
+    const startMs = mocks.nowMs - 15 * 60 * 1000;
+    mocks.series.mockResolvedValue({
+      data: { ...seriesResponse.data, series: [{ timestamp: startMs * 1000, value: 6e9 }] },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const options = () =>
+      wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(options().series[0].showSymbol).toBe(true);
+    expect(options().xAxis.min).toBe(startMs);
+    expect(options().xAxis.max).toBe(mocks.nowMs);
+
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        series: [0, 1, 2].map((step) => ({
+          timestamp: (startMs + step * 60_000) * 1000,
+          value: 6e9,
+        })),
+      },
+    });
+    await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+    await settle();
+    expect(options().series[0].showSymbol).toBe(false);
   });
 
   describe("URL and share link", () => {
@@ -1054,6 +1417,60 @@ describe("Profiles page", () => {
       await nextTick();
       await nextTick();
       expect(focusCalls).toHaveBeenCalledWith("root/0");
+    });
+
+    it("drops the flame graph focus when a new run returns another tree", async () => {
+      mocks.merge.mockResolvedValue(mergeResponse);
+      route.query = {
+        org_identifier: orgIdentifier,
+        stream: "profiles-a",
+        period: "15m",
+        view: "flame",
+        focus: "root/0",
+      };
+      focusCalls.mockClear();
+      const wrapper = mountWithFlame();
+      await settle();
+      expect(focusCalls).toHaveBeenCalledWith("root/0");
+      wrapper.findComponent({ name: "FlameGraphStub" }).vm.$emit("focus", "root/0/2");
+      await flushPromises();
+      expect(router.replace.mock.lastCall?.[0].query.focus).toBe("root/0/2");
+      focusCalls.mockClear();
+
+      await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+      await settle();
+
+      expect(wrapper.findComponent({ name: "FlameGraphStub" }).exists()).toBe(true);
+      expect(focusCalls).not.toHaveBeenCalled();
+      expect(router.replace.mock.lastCall?.[0].query).not.toHaveProperty("focus");
+      expect(Object.fromEntries(shareUrl(wrapper).searchParams)).not.toHaveProperty("focus");
+    });
+
+    it("drops a link's focus when metadata replaces the linked service and runs again", async () => {
+      mocks.merge.mockResolvedValue(mergeResponse);
+      route.query = {
+        org_identifier: orgIdentifier,
+        stream: "profiles-a",
+        period: "15m",
+        service_name: "service-gone",
+        profile_type: "cpu",
+        profile_unit: "nanoseconds",
+        view: "flame",
+        focus: "root/0",
+      };
+      // The linked run answers only after the second run started, so it is superseded.
+      let answerLinkedRun!: (value: typeof mergeResponse) => void;
+      mocks.merge.mockReturnValueOnce(new Promise((resolve) => (answerLinkedRun = resolve)));
+      focusCalls.mockClear();
+      mountWithFlame();
+      await settle();
+      answerLinkedRun(mergeResponse);
+      await settle();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(2);
+      expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({ service_name: "service-a" });
+      expect(focusCalls).not.toHaveBeenCalled();
+      expect(router.replace.mock.lastCall?.[0].query).not.toHaveProperty("focus");
     });
 
     it("shares the window of the last run, not of the first one", async () => {
@@ -1469,6 +1886,7 @@ describe("Profiles page", () => {
       expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-b", {
         start_time: FROM,
         end_time: TO,
+        service_name: "service-b",
       });
     });
 
@@ -1593,8 +2011,12 @@ describe("Profiles page", () => {
         (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
           .value,
       ).toBe("profiles-a");
-      expect(mocks.meta).toHaveBeenCalledTimes(1);
-      expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-a", window);
+      expect(mocks.meta).toHaveBeenCalledTimes(2);
+      expect(mocks.meta).toHaveBeenNthCalledWith(1, orgIdentifier, "profiles-a", window);
+      expect(mocks.meta).toHaveBeenNthCalledWith(2, orgIdentifier, "profiles-a", {
+        ...window,
+        service_name: "service-a",
+      });
       expect(mocks.merge).toHaveBeenCalledTimes(1);
       expect(mocks.merge).toHaveBeenCalledWith(
         orgIdentifier,

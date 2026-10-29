@@ -316,6 +316,7 @@ import {
   type OrgStreamList,
 } from "@/composables/firstEvent/useFirstDataNotice";
 import { openobserveRum } from "@openobserve/browser-rum";
+import { initBrowserRum } from "@/utils/rum/initBrowserRum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import PaidOverageConsentDialog from "@/components/PaidOverageConsentDialog.vue";
@@ -789,7 +790,7 @@ export default defineComponent({
       },
     );
 
-    // main.ts mounts before the bootstrap config resolves, so rum.enabled can arrive after the org.
+    // rum.enabled arrives only with the full config, which is fetched after the org is known.
     watch(
       [
         () => store.state.selectedOrganization?.identifier,
@@ -1486,6 +1487,8 @@ export default defineComponent({
             linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
           }
 
+          // Before setConfig, so watchers that react to rum.enabled find the SDK running.
+          initBrowserRum(res.data.rum, store.state.API_ENDPOINT);
           store.dispatch("setConfig", res.data);
           fullConfigOrg = orgIdentifier;
           await nextTick();
@@ -1512,11 +1515,6 @@ export default defineComponent({
           }
           // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
-          // Session replay must not be lost to a failed config fetch — the rum
-          // settings already arrived with the unauthenticated bootstrap.
-          if (store.state.zoConfig?.rum?.enabled) {
-            setRumUser();
-          }
           // A transient failure (expired session being refreshed, rolling
           // deploy) would otherwise strand the session on the bootstrap subset.
           if (attempt < FULL_CONFIG_RETRY_DELAYS_MS.length) {
