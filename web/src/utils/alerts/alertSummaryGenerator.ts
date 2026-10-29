@@ -261,10 +261,10 @@ function getOperatorSymbol(operator: string, t: SummaryTranslate): string {
 /**
  * Get period text (e.g., "the last 30 minutes", "the last 1 hour")
  */
-function getPeriodText(period: number, t: SummaryTranslate): string {
-  if (!period) return t("alerts.recentData");
-
-  const minutes = period;
+function getPeriodText(period: number | string, t: SummaryTranslate): string {
+  // Form inputs emit strings, and vue-i18n only pluralises a numeric count.
+  const minutes = Number(period);
+  if (!minutes) return t("alerts.recentData");
 
   if (minutes < 60) return t("alerts.summary.theLastMinute", { count: minutes }, minutes);
 
@@ -419,7 +419,7 @@ function generatePlainEnglishSummary(
     // Get threshold and operator
     const threshold = formData.trigger_condition?.threshold;
     const operator = formData.trigger_condition?.operator;
-    const period = formData.trigger_condition?.period;
+    const period = Number(formData.trigger_condition?.period);
     const forecast = formData._ui?.forecast ?? null;
     const forecastSentence = forecast ? forecastPhrase(forecast, "summary", t) : "";
 

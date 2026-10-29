@@ -141,7 +141,7 @@ describe("generateAlertSummary: where it sends", () => {
 });
 
 describe("generateAlertSummary: look-back period", () => {
-  const withPeriod = (period: number) =>
+  const withPeriod = (period: number | string) =>
     summary({
       stream_name: "default",
       stream_type: "logs",
@@ -157,7 +157,9 @@ describe("generateAlertSummary: look-back period", () => {
     [60, "the last hour"],
     [120, "the last 2 hours"],
     [2880, "the last 2 days"],
-  ])("describes %i minutes as %s", (period, expected) => {
+    ["30", "the last 30 minutes"],
+    ["1", "the last minute"],
+  ])("describes %s minutes as %s", (period, expected) => {
     expect(withPeriod(period)).toContain(expected);
   });
 });

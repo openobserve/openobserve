@@ -2812,7 +2812,11 @@ export default defineComponent({
     const formatPeriod = (periodInMinutes: number | undefined) =>
       formatSeconds(periodInMinutes ? periodInMinutes * 60 : undefined);
 
-    const formatFrequency = (triggerCondition: any) => {
+    const formatFrequency = (triggerCondition?: {
+      frequency?: number;
+      frequency_type?: string;
+      cron?: string;
+    }) => {
       if (triggerCondition?.frequency_type === "cron") {
         return triggerCondition?.cron || raw("N/A");
       }
