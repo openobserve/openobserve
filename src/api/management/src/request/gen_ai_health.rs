@@ -58,7 +58,6 @@ const AGENT_NAME_COLUMN: &str = "gen_ai_agent_name";
 const AGENT_ID_COLUMN: &str = "gen_ai_agent_id";
 const AGENT_ENV_COLUMN: &str = "gen_ai_agent_env";
 const AGENT_VERSION_COLUMN: &str = "gen_ai_agent_version";
-const SESSION_COLUMN: &str = "gen_ai_conversation_id";
 const TOKENS_COLUMN: &str = "gen_ai_usage_total_tokens";
 const COST_COLUMN: &str = "gen_ai_usage_cost";
 
@@ -249,8 +248,19 @@ fn check_pred(id: CheckId, cols: &Columns, pricing_enabled: bool) -> Pred {
         }
         CheckId::ZeroDurationSpans if cols.has("duration") => Pred::Sql("duration = 0".into()),
         CheckId::ZeroDurationSpans => Pred::Never,
-        CheckId::MissingSessionId if cols.has(SESSION_COLUMN) => Pred::Sql(blank(SESSION_COLUMN)),
-        CheckId::MissingSessionId => Pred::Always,
+        CheckId::MissingSessionId => {
+            // A span has a session when any of the stream's session columns is set.
+            let present: Vec<String> = config::meta::traces::session::SESSION_ID_COLUMNS
+                .iter()
+                .filter(|c| cols.has(c))
+                .map(|c| blank(&quote_ident(c)))
+                .collect();
+            if present.is_empty() {
+                Pred::Always
+            } else {
+                Pred::Sql(present.join(" AND "))
+            }
+        }
     }
 }
 
@@ -1168,6 +1178,26 @@ mod tests {
         assert_eq!(
             check_pred(CheckId::MissingAgentIdentity, &c, true),
             Pred::Sql("(gen_ai_agent_name IS NULL OR gen_ai_agent_name = '')".into())
+        );
+    }
+
+    #[test]
+    fn missing_session_check_reads_every_session_column() {
+        // A stream that keeps sessions in `session_id` alone must not flag every span.
+        let c = cols(&["gen_ai_operation_name", "session_id"]);
+        assert_eq!(
+            check_pred(CheckId::MissingSessionId, &c, true),
+            Pred::Sql("(\"session_id\" IS NULL OR \"session_id\" = '')".into())
+        );
+        // A span is missing a session only when every present session column is blank.
+        let c = cols(&["gen_ai_operation_name", "session_id", "llm_session_id"]);
+        assert_eq!(
+            check_pred(CheckId::MissingSessionId, &c, true),
+            Pred::Sql(
+                "(\"session_id\" IS NULL OR \"session_id\" = '') AND (\"llm_session_id\" IS NULL \
+                 OR \"llm_session_id\" = '')"
+                    .into()
+            )
         );
     }
 

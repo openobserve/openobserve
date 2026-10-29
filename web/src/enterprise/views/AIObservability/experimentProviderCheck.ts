@@ -76,18 +76,22 @@ export function providerTestPayload(provider: Provider): ProviderPayload {
 }
 
 /** Tests every provider in `ids` in parallel and returns the first failure in
- *  `ids` order, or null when all answered. A provider missing from `providers`
- *  fails the check: the run could not call it either. */
+ *  `ids` order, or null when all answered. With a fresh list (`listLoaded`), a
+ *  provider missing from `providers` fails the check: the run could not call it
+ *  either. When the list could not be loaded, a provider absent from the
+ *  fallback list is unknown rather than missing, so it is neither tested nor
+ *  failed; the server still checks it when the run starts. */
 export async function checkRunProviders(
   ids: string[],
   providers: Provider[],
   test: (payload: ProviderPayload, providerId: string) => Promise<unknown>,
   taskProviderId?: string | null,
+  listLoaded = true,
 ): Promise<ProviderCheckFailure | null> {
   const results = await Promise.allSettled(
     ids.map((id) => {
       const provider = providers.find((candidate) => candidate.id === id);
-      if (!provider) return Promise.reject(new Error(""));
+      if (!provider) return listLoaded ? Promise.reject(new Error("")) : Promise.resolve();
       return test(providerTestPayload(provider), id);
     }),
   );

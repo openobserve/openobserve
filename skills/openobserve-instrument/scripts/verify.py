@@ -196,7 +196,7 @@ def fix_link(check_id, ui_url, org, stream):
         stream_q = urllib.parse.quote(stream, safe="")
         return (
             "Fix in LLM Model Pricing",
-            f"{ui_url}/web/settings/model_pricing?tab=unpriced&stream={stream_q}&org_identifier={org_q}",
+            f"{ui_url}/web/settings/model_pricing/gaps?stream={stream_q}&org_identifier={org_q}",
         )
     if check_id == "missing_agent_identity":
         return (
