@@ -58,7 +58,7 @@ export interface UnpricedModel {
 
 /** GET /llm/models/unpriced: the listed models and the uncapped totals behind them. */
 export interface UnpricedModelsResponse {
-  /** The models with the most tokens, minus those an exact price covers today. */
+  /** Models with historical pricing gaps; priced_now marks an exact price for new spans. */
   models: UnpricedModel[];
   /** Distinct models ingest marked in the window, before today's prices apply. */
   model_count: number;

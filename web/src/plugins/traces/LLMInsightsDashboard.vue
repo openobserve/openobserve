@@ -1165,7 +1165,10 @@ async function loadInsights(
     resolvingScope++;
     try {
       if (genAiAgentMappingAccess.allowed && availableStreams.value.length > 0) {
-        await loadAgents(start, end, force);
+        const agentsLoad = loadAgents(start, end, force);
+        // Explicit Stream queries need no agent identity. Counts and the
+        // instrumentation banner can settle after the panels start loading.
+        if (!modeExplicit.value || filterMode.value === "agent") await agentsLoad;
       }
     } finally {
       resolvingScope--;

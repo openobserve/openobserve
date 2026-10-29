@@ -255,8 +255,11 @@ def run_health(client, ui_url, org, stream, start_us, end_us, agent):
     if not any(int(c.get("total", 0)) for c in checks.values()):
         scope = f" for agent '{agent}'" if agent else ""
         print(f"✗ No GenAI spans on stream '{stream}'{scope} in this window: every check covered 0 spans.")
-        print("  No span carries gen_ai.operation.name, so the LLM client is not instrumented.")
-        print(f"  Install the OpenAI/Anthropic instrumentor: {DOCS_URL}")
+        if agent:
+            print("  Check the agent name and time window, or omit --agent to inspect the whole stream.")
+        else:
+            print("  No span carries gen_ai.operation.name, so the LLM client is not instrumented.")
+            print(f"  Install the OpenAI/Anthropic instrumentor: {DOCS_URL}")
         return 2
     ordered = [checks[i] for i in CHECK_ORDER if i in checks]
     ordered += [c for i, c in checks.items() if i not in CHECK_ORDER]
