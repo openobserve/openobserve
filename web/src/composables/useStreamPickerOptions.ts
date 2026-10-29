@@ -154,9 +154,18 @@ export function useStreamPickerOptions(sources: StreamPickerSources) {
     { immediate: true },
   );
 
-  // A new options array resets OSelect's highlight, so an unchanged kept set keeps its instance.
+  // A new options array resets OSelect's highlight, so only internal names (the ones that change the list) are kept and an unchanged set keeps its instance.
   const keep = computed<ReadonlySet<string>>((previous) => {
-    const next = new Set([...selectedAtOpen.value, ...toValue(sources.selected)]);
+    const internalNames = new Set(
+      toValue(sources.streams)
+        .filter((stream) => stream.is_internal)
+        .map((stream) => stream.name),
+    );
+    const next = new Set(
+      [...selectedAtOpen.value, ...toValue(sources.selected)].filter((name) =>
+        internalNames.has(name),
+      ),
+    );
     const unchanged =
       previous !== undefined &&
       previous.size === next.size &&
