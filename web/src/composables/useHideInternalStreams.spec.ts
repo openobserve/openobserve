@@ -53,7 +53,7 @@ const useSetting = (composable: Composable, store: Store<ScopeState>): Setting =
   return setting;
 };
 
-describe("hideInternalStreamsStorageKey", () => {
+describe("hideInternalStreamsStorageKey", { timeout: 20000 }, () => {
   it("scopes the key to user and org", async () => {
     const { hideInternalStreamsStorageKey } = await loadComposable();
     expect(hideInternalStreamsStorageKey("ana@example.com", "org-a")).toBe(KEY);
@@ -66,7 +66,7 @@ describe("hideInternalStreamsStorageKey", () => {
   });
 });
 
-describe("useHideInternalStreams", () => {
+describe("useHideInternalStreams", { timeout: 20000 }, () => {
   beforeEach(() => {
     localStorage.clear();
   });

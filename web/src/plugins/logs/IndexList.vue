@@ -535,11 +535,11 @@ export default defineComponent({
     };
 
     // First few streams surfaced as one-click picks in the no-stream empty
-    // state. Ordered by most recently ingested data (stats.doc_time_max desc)
-    // so the streams most likely worth exploring sit at the top. Capped so a
-    // narrow panel stays scannable; the rest stay reachable through the
-    // dropdown's search. Falls back to the plain stream-list order when
-    // ingestion stats aren't available.
+    // state. User streams come first, internal ones last, each ordered by most
+    // recently ingested data (stats.doc_time_max desc). Capped so a narrow
+    // panel stays scannable; the rest stay reachable through the dropdown's
+    // search. Falls back to the plain stream-list order when ingestion stats
+    // aren't available.
     const QUICK_PICK_LIMIT = 8;
     const quickPickOrdered = computed(() => {
       const detailed = searchObj.data.streamResults?.list;
