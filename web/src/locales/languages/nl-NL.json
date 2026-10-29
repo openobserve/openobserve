@@ -11578,7 +11578,8 @@
         "dailySentence": "Dagelijks · {time} gedurende {duration} · {zone}",
         "weeklySentence": "Wekelijks op {days} · {time} gedurende {duration} · {zone}",
         "fromNoEnd": "{schedule}, vanaf {start} zonder einddatum",
-        "fromUntil": "{schedule}, van {start} tot en met {until}"
+        "fromUntil": "{schedule}, van {start} tot en met {until}",
+        "onceFor": "Eenmalig, {duration}"
       },
       "validation": {
         "conditionRequired": "Voeg een voorwaarde toe of verwijder het voorwaardeblok.",
@@ -11919,8 +11920,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 u",
-          "2h": "2 u",
           "4h": "4 u",
+          "24h": "24 u",
           "custom": "Aangepast"
         },
         "endsAt": "Eindigt op",
@@ -11934,7 +11935,34 @@
         "mutedTooltip": "Gedempt door {name} tot {end}",
         "exclude": "Een venster uitsluiten…",
         "firingMuted": "Actief · gedempt",
-        "firingMutedTooltip": "Nog steeds actief. Meldingen worden gedempt door {name}."
+        "firingMutedTooltip": "Nog steeds actief. Meldingen worden gedempt door {name}.",
+        "untilClear": "Tot het herstelt",
+        "untilClearHint": "Eindigt wanneer het alarm herstelt, of uiterlijk na 24 u.",
+        "confirmUntilClear": "Dempen tot het herstelt",
+        "titleOne": "Dempen: {name}",
+        "subtitleOne": "Het blijft draaien en behoudt zijn geschiedenis. Meldingen, oproepen en workflows stoppen tot de onderhoudsperiode eindigt.",
+        "untilTime": "Tot {time}.",
+        "groups": "Groepen",
+        "groupsThis": "Deze groep",
+        "groupsAll": "Alle groepen van dit alarm",
+        "addGroup": "Een afgaande groep toevoegen",
+        "groupsHint": "Alleen deze groepen worden gedempt; andere groepen blijven meldingen sturen",
+        "confirm24h": {
+          "title": "24 uur dempen?",
+          "message": "‘Tot het herstelt’ beëindigt het dempen zodra het alarm herstelt.",
+          "useUntilClear": "Tot het herstelt gebruiken",
+          "ok": "24 u dempen"
+        },
+        "muteGroup": "Deze groep dempen",
+        "endNow": "Dempen nu beëindigen",
+        "endMute": "Dempen beëindigen",
+        "mutedUntilClear": "Gedempt tot het herstelt · maximaal 24 u",
+        "mutedUntilClearGroups": "Gedempt tot het herstelt · {count} groep | Gedempt tot het herstelt · {count} groepen",
+        "mutedGroups": "Gedempt · {count} groep · eindigt over {duration} | Gedempt · {count} groepen · eindigt over {duration}",
+        "mutedUntilClearTooltip": "Gedempt door {name} tot het alarm herstelt, uiterlijk {end}",
+        "mutedGroupsTooltip": "Gedempt door {name} tot {end}. Groepen: {labels}",
+        "mutedUntilClearGroupsTooltip": "Gedempt door {name} tot het alarm herstelt, uiterlijk {end}. Groepen: {labels}",
+        "untilTomorrow": "Tot morgen {time}."
       },
       "corrected": "Gecorrigeerd",
       "correctedBy": "Score gecorrigeerd door {names}",
@@ -12020,7 +12048,66 @@
           "sent": "Test verstuurd naar {count} bestemming | Test verstuurd naar {count} bestemmingen",
           "failed": "De test heeft {names} niet bereikt."
         }
+      },
+      "untilClear": {
+        "schedule": "Tot het herstelt",
+        "atMost": "Maximaal 24 u",
+        "endsWhenClears": "eindigt wanneer het herstelt",
+        "byTime": "uiterlijk {time}",
+        "whenCleared": "toen het herstelde",
+        "endedBy": "beëindigd door {product}",
+        "createdFrom": "vanuit {source}"
+      },
+      "groupTarget": "Groep: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Snel dempen vanuit een alarm",
+      "endedLabel": "beëindigd"
+    },
+    "ack": {
+      "acknowledge": "Bevestigen",
+      "acknowledgeGroups": "Bevestig {count} afgaande groep | Bevestig {count} afgaande groepen",
+      "unacknowledge": "Bevestiging intrekken",
+      "takeOver": "Overnemen",
+      "chip": "Bevestigd door {who} via {source} · {time}",
+      "chipTooltip": "Bevestigd door {who} op {time} vanuit {source}",
+      "firingAcknowledged": "Afgaand · bevestigd",
+      "tile": "Bevestigd",
+      "groupsAcknowledged": "{count} bevestigd",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "piket",
+        "incident": "incident"
+      },
+      "history": {
+        "dedupSuppressed": "onderdrukt door bevestiging ({who})",
+        "acked": "Bevestigd door {who} vanuit {source}",
+        "ackedViaPage": "Bevestigd door {who} via oproep {page}",
+        "ackedViaIncident": "Bevestigd door {who} via incident {incident}",
+        "unacked": "Bevestiging ingetrokken door {who} vanuit {source}",
+        "unackedResume": "Bevestiging ingetrokken door {who} vanuit {source} · herhalingen hervatten om {time}",
+        "takenOver": "Overgenomen door {who} van {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Je kunt dit alarm niet bevestigen. Bevestigen en dempen vereisen de rol Admin of Editor, of dat je de piket-responder van het alarm bent.",
+        "mute": "Je kunt dit alarm niet dempen. Bevestigen en dempen vereisen de rol Admin of Editor, of dat je de piket-responder van het alarm bent.",
+        "onCall": "Piket: {people}",
+        "canAct": "Kan handelen: {people}",
+        "people": "Piket: {onCall}. Kan handelen: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Dit alarm gaat niet af, dus er valt niets te bevestigen.",
+        "firingChanged": "Het alarm is opnieuw afgegaan sinds deze pagina is geladen. Vernieuw en probeer het opnieuw."
       }
+    },
+    "groupActions": {
+      "menu": "Groepsacties",
+      "viewHistory": "Geschiedenis van deze groep bekijken"
+    },
+    "firingState": {
+      "level": "Niveau",
+      "firingSince": "Gaat af sinds",
+      "firingFor": "gaat al {duration} af",
+      "incident": "Incident"
     }
   },
   "alert_dependencies": {
@@ -12549,13 +12636,14 @@
       "openSlackSettings": "Stel het in bij Instellingen › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Stuur meldingen naar Slack-kanalen",
+      "slackDescription": "Plaatst een nieuw bericht met je webhook en sjabloon. Gebruik het voor oproepen of aangepaste Slack-indelingen.",
       "discordDescription": "Stuur meldingen naar Discord-kanalen",
       "msteamsDescription": "Stuur meldingen naar Teams-kanalen",
       "emailDescription": "Stuur HTML-geformatteerde e-mailmeldingen",
       "pagerdutyDescription": "Maak incidenten aan in PagerDuty",
       "opsgenieDescription": "Maak alarmen aan in Opsgenie",
-      "servicenowDescription": "Maak incidenten aan in ServiceNow"
+      "servicenowDescription": "Maak incidenten aan in ServiceNow",
+      "slackAppDescription": "Werkt geplande alarmen ter plaatse bij. Bevestig, demp en onderzoek vanuit Slack. Vereist een gekoppelde workspace."
     },
     "import": {
       "title": "Bestemming importeren",
@@ -12597,7 +12685,8 @@
     "severityCriticalDescription": "Incidenten met hoogste prioriteit",
     "severityErrorDescription": "Standaard foutincidenten",
     "severityWarningDescription": "Incidenten op waarschuwingsniveau",
-    "severityInfoDescription": "Informatieve incidenten"
+    "severityInfoDescription": "Informatieve incidenten",
+    "urlRecipientsChannel": "URL / ontvangers / kanaal"
   },
   "pipeline_destinations": {
     "header": "Pipelinebestemmingen",
@@ -13120,7 +13209,7 @@
     "groupIntegrations": "Integraties",
     "groupAccount": "Account",
     "slackApp": "Slack",
-    "slackAppDesc": "Stel OpenObserve-vragen vanuit Slack",
+    "slackAppDesc": "Stel OpenObserve vragen en handel op alarmen vanuit Slack",
     "generalDesc": "Thema, standaardwaarden voor query's en kernvoorkeuren",
     "orgDesc": "Organisatieparameters en -identificaties",
     "cipherKeysDesc": "Versleutelingssleutels voor gevoelige velden",
@@ -20618,7 +20707,9 @@
         "succeeded": "Geslaagd",
         "failed": "Mislukt",
         "skipped": "Overgeslagen",
-        "pending": "Wachtend"
+        "pending": "Wachtend",
+        "acknowledged": "Bevestigd",
+        "ackevent": "Bevestigingsgebeurtenis"
       },
       "alertLevel": {
         "ok": "Ok",
@@ -20921,7 +21012,16 @@
       "alertSavedSuccessfully": "Alarm succesvol opgeslagen.",
       "alertUpdatedSuccessfully": "Alarm succesvol bijgewerkt.",
       "openingDedupConfig": "Deduplicatieconfiguratie openen voor: {name}",
-      "editingAlert": "Alarm bewerken: {name}"
+      "editingAlert": "Alarm bewerken: {name}",
+      "ack": {
+        "acked": "{name} bevestigd",
+        "ackedGroups": "{count} groep van {name} bevestigd | {count} groepen van {name} bevestigd",
+        "alreadyAcked": "Al bevestigd door {who}",
+        "unacked": "Bevestiging van {name} ingetrokken",
+        "takenOver": "Je hebt de bevestiging van {name} overgenomen",
+        "failed": "Kon {name} niet bevestigen",
+        "unackFailed": "Kon de bevestiging van {name} niet intrekken"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Cipher key succesvol bijgewerkt",
@@ -21233,7 +21333,14 @@
       "muted": "{count} item gedempt tot {time}. Opgeslagen in {folder}. | {count} items gedempt tot {time}. Opgeslagen in {folder}.",
       "muteFailed": "Kon de demping niet aanmaken",
       "viewDowntime": "Onderhoudsperiode bekijken",
-      "itemsDropped": "{count} gekozen item valt buiten de gekozen mappen en is verwijderd. | {count} gekozen items vallen buiten de gekozen mappen en zijn verwijderd."
+      "itemsDropped": "{count} gekozen item valt buiten de gekozen mappen en is verwijderd. | {count} gekozen items vallen buiten de gekozen mappen en zijn verwijderd.",
+      "mutedUntilClear": "{name} gedempt tot het opgelost is, uiterlijk om {time}",
+      "alreadyMuted": "{name} is al gedempt tot {time}",
+      "muteChanged": "Deze demping is gewijzigd sinds de pagina is geladen. Deze eindigt nu om {time}.",
+      "muteEnded": "Demping beëindigd. Meldingen worden hervat.",
+      "mutedOne": "{name} gedempt tot {time}",
+      "timeTomorrow": "morgen {time}",
+      "notQuickMute": "Deze demping is ingesteld op de pagina Onderhoudsperiodes. Wijzig deze daar."
     }
   },
   "cipherKeys": {
@@ -26710,7 +26817,10 @@
       "managedBy": "beheerd door je instantiebeheerder",
       "managedTitle": "Beheerd door je instantiebeheerder.",
       "managedDetail": "Inloggegevens, koppeling en welke organisaties {team} gebruiken, worden ingesteld in _meta.",
-      "managedQuestions": "Vragen: {contact}"
+      "managedQuestions": "Vragen: {contact}",
+      "outboundQueue": "Alarmberichten: {count} in de wachtrij, oudste {age} | Alarmberichten: {count} in de wachtrij, oudste {age}",
+      "outboundEmpty": "Geen alarmberichten in de wachtrij",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Standaardwaarden voor kanalen",
@@ -26746,7 +26856,8 @@
       "instanceAdminOnly": "Alleen voor instantiebeheerders",
       "ownOrgOnlyHint": "Op een instantiewerkruimte koppel je kanalen aan je eigen organisatie",
       "claimableHint": "Niet-geclaimde kanalen en kanalen die {org} bezit",
-      "servedOrgsHint": "Elke organisatie die deze werkruimte bedient"
+      "servedOrgsHint": "Elke organisatie die deze werkruimte bedient",
+      "alertRoutes": "{count} bestemming | {count} bestemmingen"
     },
     "people": {
       "title": "Gekoppelde personen",
@@ -26900,6 +27011,83 @@
       "remove": "Verwijderen",
       "saved": "Organisaties opgeslagen",
       "saveFailed": "De organisaties konden niet worden opgeslagen."
+    },
+    "destination": {
+      "appTile": "{product}-app",
+      "webhookTile": "{product}-webhook",
+      "twoWay": "Tweerichtingsverkeer",
+      "recommendedForAlertResponse": "Aanbevolen voor alarmrespons",
+      "choiceHint": "Oproepen en superclusters gebruiken de webhook. Handmatige en realtime verzendingen vanaf een Slack-app-bestemming zijn afzonderlijke berichten.",
+      "unavailableReason": "Vereist de Enterprise Slack-app op één cluster",
+      "unavailableFlag": "Uitgeschakeld op deze server; vraag je beheerder om {variable} in te stellen",
+      "unavailableMasterKey": "Vereist een versleutelingssleutel op deze server; vraag je beheerder om {variable} in te stellen",
+      "unavailableCloud": "Nog niet ingeschakeld voor je Cloud-regio",
+      "unavailableNoAccess": "Vraag een organisatiebeheerder om de Slack-app in te schakelen",
+      "postOnly": "Alleen posten",
+      "switchToApp": "Overschakelen naar {product}-app",
+      "switchThis": "Deze bestemming overschakelen",
+      "switchBack": "Terugschakelen",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Werkruimte",
+      "channel": "Kanaal",
+      "mention": "Vermelding",
+      "mentionCritical": "{'@'}here bij kritieke alarmen, geen bij overige",
+      "mentionNone": "Geen",
+      "mentionHelp": "Wordt gebruikt bij herhalingen en niveauverhogingen",
+      "refireReuse": "Hergebruik bij opnieuw afgaan (minuten)",
+      "refireReuseHelp": "Als een alarm binnen deze tijd opnieuw afgaat, wordt het eerdere bericht bewerkt in plaats van een nieuw bericht geplaatst",
+      "buttons": "Knoppen Bevestigen, Dempen en Onderzoeken",
+      "buttonsHelp": "Oplossen wordt toegevoegd wanneer er bij het afgaan een incident of oproep is",
+      "autoInvestigate": "Automatisch onderzoeken voor kritieke alarmen",
+      "autoInvestigateHelp": "Draait als het AI-serviceaccount van de organisatie, met de bijbehorende toegang; plaatst bevindingen in de alarmthread",
+      "templateDefault": "Standaardsjabloon van {product} ({name})",
+      "sendTest": "Test verzenden",
+      "setsDefault": "Stelt de standaardorganisatie van #{channel} in op {org}",
+      "answersFor": "#{channel} beantwoordt vragen voor organisatie {org}. Alarmen van {thisOrg} worden hier geplaatst en hun threads antwoorden in {thisOrg}; de standaardorganisatie van het kanaal blijft ongewijzigd.",
+      "sharedTag": "Gedeeld · {product} Connect",
+      "sharedTitle": "#{channel} is gedeeld met mensen buiten {workspace}.",
+      "sharedDetail": "Zij zien alarmnamen, waarden, grafieken en links. Hun klikken op de knoppen worden geweigerd.",
+      "sharedConfirm": "Ik begrijp het, plaats alarmen in dit gedeelde kanaal",
+      "sharedRequired": "Bevestig dat alarmen in dit gedeelde kanaal mogen worden geplaatst",
+      "versionMismatch": "Nodes draaien verschillende versies. Werk eerst elke node bij.",
+      "oncallNotAllowed": "Een {product}-appbestemming kan geen piketkanaal van een team zijn",
+      "answersForAnother": "#{channel} beantwoordt vragen voor een andere organisatie. Alarmen van {thisOrg} worden hier geplaatst en hun threads antwoorden in {thisOrg}; de standaardorganisatie van het kanaal blijft ongewijzigd.",
+      "oncallTag": "Piketruimte",
+      "oncallTitle": "Oproepen voor team {team} worden ook via {destination} in #{channel} geplaatst.",
+      "oncallDetail": "Alarmen hier worden apart geplaatst.",
+      "oncallConfirm": "Ik begrijp het, plaats alarmen in deze piketruimte",
+      "oncallRequired": "Bevestig dat alarmen in deze piketruimte mogen worden geplaatst",
+      "workspaceRequired": "Kies een werkruimte",
+      "refireRange": "Voer hele minuten in van 0 tot {max}",
+      "connectTitle": "Verbind {product} om alarmen met knoppen te plaatsen",
+      "connectDetail": "Kies een kanaal op het scherm van {product} en kies Toestaan. OpenObserve maakt deze bestemming voor dat kanaal.",
+      "connected": "{name} is gemaakt voor #{channel}. Controleer de instellingen en sla op.",
+      "saveFailed": "De bestemming kon niet worden opgeslagen.",
+      "switched": "{name} plaatst nu via de {product}-app",
+      "switchedBack": "{name} plaatst weer via zijn webhook",
+      "switchFailed": "Overschakelen van {name} is mislukt: {reason}",
+      "switchedAll": "{count} bestemming overgeschakeld | {count} bestemmingen overgeschakeld",
+      "switchThisDetail": "Schakel het over naar de {product}-app voor de knoppen Bevestigen, Dempen en Onderzoeken. De naam, het sjabloon en de alarmen blijven hetzelfde; Terugschakelen herstelt de webhook."
+    },
+    "switchAll": {
+      "title": "{count} webhookbestemming plaatst in deze werkruimte. | {count} webhookbestemmingen plaatsen in deze werkruimte.",
+      "detail": "Schakel deze over naar de {product}-app voor de knoppen Bevestigen, Dempen en Onderzoeken. De naam, het sjabloon en de alarmen blijven hetzelfde; terugschakelen herstelt de webhook. | Schakel ze over naar de {product}-app voor de knoppen Bevestigen, Dempen en Onderzoeken. De namen, sjablonen en alarmen blijven hetzelfde; terugschakelen herstelt de webhook.",
+      "review": "Controleren",
+      "action": "Alles overschakelen",
+      "summary": "{switched} overgeschakeld · {count} niet overgeschakeld"
+    },
+    "oncallUnlinked": {
+      "title": "Piketleden niet gekoppeld aan {product}",
+      "description": "Piketoproepen kunnen geen DM naar hen sturen, en hun klikken op knoppen voor alarmen en oproepen wachten totdat ze koppelen.",
+      "remind": "Herinner hen",
+      "columnPerson": "Persoon",
+      "columnTeam": "Team",
+      "columnNextShift": "Volgende dienst",
+      "columnReminder": "Herinnering",
+      "dmSent": "DM verzonden {time}",
+      "notSent": "Niet verzonden",
+      "reminded": "Herinnering verzonden naar {count} persoon | Herinnering verzonden naar {count} personen",
+      "remindFailed": "De herinneringen konden niet worden verzonden."
     }
   },
   "fleet": {

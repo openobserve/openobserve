@@ -11578,7 +11578,8 @@
         "dailySentence": "Codziennie · {time} przez {duration} · {zone}",
         "weeklySentence": "Co tydzień w {days} · {time} przez {duration} · {zone}",
         "fromNoEnd": "{schedule}, od {start} bez daty końcowej",
-        "fromUntil": "{schedule}, od {start} do {until}"
+        "fromUntil": "{schedule}, od {start} do {until}",
+        "onceFor": "Jednorazowo, {duration}"
       },
       "validation": {
         "conditionRequired": "Dodaj warunek lub usuń blok warunku.",
@@ -11919,8 +11920,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 godz.",
-          "2h": "2 godz.",
           "4h": "4 godz.",
+          "24h": "24 godz.",
           "custom": "Niestandardowy"
         },
         "endsAt": "Kończy się",
@@ -11934,7 +11935,34 @@
         "mutedTooltip": "Wyciszone przez {name} do {end}",
         "exclude": "Wyklucz okno…",
         "firingMuted": "Wyzwolony · wyciszony",
-        "firingMutedTooltip": "Nadal się wyzwala. Powiadomienia wycisza {name}."
+        "firingMutedTooltip": "Nadal się wyzwala. Powiadomienia wycisza {name}.",
+        "untilClear": "Do ustąpienia",
+        "untilClearHint": "Kończy się, gdy alert ustąpi, lub najpóźniej po 24 godz.",
+        "confirmUntilClear": "Wycisz do ustąpienia",
+        "titleOne": "Wycisz {name}",
+        "subtitleOne": "Nadal działa i zachowuje historię. Powiadomienia, wezwania i przepływy pracy są wstrzymane do końca okna serwisowego.",
+        "untilTime": "Do {time}.",
+        "groups": "Grupy",
+        "groupsThis": "Ta grupa",
+        "groupsAll": "Wszystkie grupy tego alertu",
+        "addGroup": "Dodaj wyzwoloną grupę",
+        "groupsHint": "Wyciszone są tylko te grupy; pozostałe nadal wysyłają powiadomienia",
+        "confirm24h": {
+          "title": "Wyciszyć na 24 godziny?",
+          "message": "Opcja „Do ustąpienia” kończy wyciszenie, gdy tylko alert ustąpi.",
+          "useUntilClear": "Użyj opcji „Do ustąpienia”",
+          "ok": "Wycisz na 24 godz."
+        },
+        "muteGroup": "Wycisz tę grupę",
+        "endNow": "Zakończ wyciszenie teraz",
+        "endMute": "Zakończ wyciszenie",
+        "mutedUntilClear": "Wyciszono do ustąpienia · maks. 24 godz.",
+        "mutedUntilClearGroups": "Wyciszono do ustąpienia · {count} grupa | Wyciszono do ustąpienia · {count} grupy",
+        "mutedGroups": "Wyciszono · {count} grupa · kończy się za {duration} | Wyciszono · {count} grupy · kończy się za {duration}",
+        "mutedUntilClearTooltip": "Wyciszone przez {name} do ustąpienia alertu, najpóźniej {end}",
+        "mutedGroupsTooltip": "Wyciszone przez {name} do {end}. Grupy: {labels}",
+        "mutedUntilClearGroupsTooltip": "Wyciszone przez {name} do ustąpienia alertu, najpóźniej {end}. Grupy: {labels}",
+        "untilTomorrow": "Do {time} jutro."
       },
       "corrected": "Skorygowane",
       "correctedBy": "Ocena skorygowana przez {names}",
@@ -12020,7 +12048,66 @@
           "sent": "Test wysłano do {count} miejsca docelowego | Test wysłano do {count} miejsc docelowych",
           "failed": "Test nie dotarł do {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "Do ustąpienia",
+        "atMost": "maks. 24 godz.",
+        "endsWhenClears": "kończy się, gdy ustąpi",
+        "byTime": "do {time}",
+        "whenCleared": "po ustąpieniu",
+        "endedBy": "zakończone przez {product}",
+        "createdFrom": "z {source}"
+      },
+      "groupTarget": "Grupa: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Szybkie wyciszenie z alertu",
+      "endedLabel": "zakończone"
+    },
+    "ack": {
+      "acknowledge": "Potwierdź",
+      "acknowledgeGroups": "Potwierdź {count} wyzwoloną grupę | Potwierdź {count} wyzwolone grupy",
+      "unacknowledge": "Cofnij potwierdzenie",
+      "takeOver": "Przejmij",
+      "chip": "Potwierdzone przez {who} · źródło: {source} · {time}",
+      "chipTooltip": "Potwierdzone przez {who} o {time} · źródło: {source}",
+      "firingAcknowledged": "Wyzwolony · potwierdzony",
+      "tile": "Potwierdzone",
+      "groupsAcknowledged": "Potwierdzono: {count}",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "dyżur",
+        "incident": "incydent"
+      },
+      "history": {
+        "dedupSuppressed": "wstrzymane przez potwierdzenie ({who})",
+        "acked": "Potwierdzone przez {who} z {source}",
+        "ackedViaPage": "Potwierdzone przez {who} przez wezwanie {page}",
+        "ackedViaIncident": "Potwierdzone przez {who} przez incydent {incident}",
+        "unacked": "Potwierdzenie cofnięte przez {who} z {source}",
+        "unackedResume": "Potwierdzenie cofnięte przez {who} z {source} · powtórzenia wznawiane o {time}",
+        "takenOver": "Przejęte przez {who} od {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Nie możesz potwierdzić tego alertu. Potwierdzenie i wyciszenie wymagają roli Admin lub Editor albo bycia osobą dyżurną tego alertu.",
+        "mute": "Nie możesz wyciszyć tego alertu. Potwierdzenie i wyciszenie wymagają roli Admin lub Editor albo bycia osobą dyżurną tego alertu.",
+        "onCall": "Na dyżurze: {people}",
+        "canAct": "Może działać: {people}",
+        "people": "Na dyżurze: {onCall}. Może działać: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Ten alert nie jest wyzwolony, więc nie ma czego potwierdzać.",
+        "firingChanged": "Alert został ponownie wyzwolony od czasu wczytania tej strony. Odśwież i spróbuj ponownie."
       }
+    },
+    "groupActions": {
+      "menu": "Akcje grupy",
+      "viewHistory": "Pokaż historię tej grupy"
+    },
+    "firingState": {
+      "level": "Poziom",
+      "firingSince": "Wyzwolony od",
+      "firingFor": "wyzwolony od {duration}",
+      "incident": "Incydent"
     }
   },
   "alert_dependencies": {
@@ -12549,13 +12636,14 @@
       "openSlackSettings": "Skonfiguruj to w Ustawienia › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Wyślij powiadomienia na kanały Slack",
+      "slackDescription": "Publikuje nową wiadomość za pomocą Twojego webhooka i szablonu. Używaj do wezwań lub niestandardowych układów Slacka.",
       "discordDescription": "Wyślij powiadomienia na kanały Discord",
       "msteamsDescription": "Wyślij powiadomienia na kanały Teams",
       "emailDescription": "Wyślij powiadomienia e-mail w formacie HTML",
       "pagerdutyDescription": "Twórz incydenty w PagerDuty",
       "opsgenieDescription": "Twórz alerty w Opsgenie",
-      "servicenowDescription": "Twórz incydenty w ServiceNow"
+      "servicenowDescription": "Twórz incydenty w ServiceNow",
+      "slackAppDescription": "Aktualizuje zaplanowane alerty w miejscu. Potwierdzaj, wyciszaj i badaj bezpośrednio w Slacku. Wymaga połączonej przestrzeni roboczej."
     },
     "import": {
       "title": "Importuj miejsce docelowe",
@@ -12597,7 +12685,8 @@
     "severityCriticalDescription": "Incydenty o najwyższym priorytecie",
     "severityErrorDescription": "Incydenty standardowych błędów",
     "severityWarningDescription": "Incydenty poziomu ostrzeżeń",
-    "severityInfoDescription": "Incydenty informacyjne"
+    "severityInfoDescription": "Incydenty informacyjne",
+    "urlRecipientsChannel": "URL / odbiorcy / kanał"
   },
   "pipeline_destinations": {
     "header": "Miejsca docelowe potoków",
@@ -13120,7 +13209,7 @@
     "groupIntegrations": "Integracje",
     "groupAccount": "Konto",
     "slackApp": "Slack",
-    "slackAppDesc": "Zadawaj pytania OpenObserve ze Slacka",
+    "slackAppDesc": "Zadawaj pytania OpenObserve i obsługuj alerty ze Slacka",
     "generalDesc": "Motyw, domyślne zapytania i podstawowe preferencje",
     "orgDesc": "Parametry organizacji i identyfikatory",
     "cipherKeysDesc": "Klucze szyfrowania dla poufnych pól",
@@ -20618,7 +20707,9 @@
         "succeeded": "Sukces",
         "failed": "Nieudane",
         "skipped": "Pominięto",
-        "pending": "Oczekujące"
+        "pending": "Oczekujące",
+        "acknowledged": "Potwierdzony",
+        "ackevent": "Zdarzenie potwierdzenia"
       },
       "alertLevel": {
         "ok": "OK",
@@ -20921,7 +21012,16 @@
       "alertSavedSuccessfully": "Alert został zapisany.",
       "alertUpdatedSuccessfully": "Alert został zaktualizowany.",
       "openingDedupConfig": "Otwieranie konfiguracji deduplikacji dla: {name}",
-      "editingAlert": "Edytowanie alertu: {name}"
+      "editingAlert": "Edytowanie alertu: {name}",
+      "ack": {
+        "acked": "Potwierdzono {name}",
+        "ackedGroups": "Potwierdzono {count} grupę {name} | Potwierdzono {count} grup {name}",
+        "alreadyAcked": "Już potwierdzone przez {who}",
+        "unacked": "Cofnięto potwierdzenie {name}",
+        "takenOver": "Przejąłeś potwierdzenie {name}",
+        "failed": "Nie udało się potwierdzić {name}",
+        "unackFailed": "Nie udało się cofnąć potwierdzenia {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Klucz szyfrowania został zaktualizowany",
@@ -21233,7 +21333,14 @@
       "muted": "Wyciszono {count} element do {time}. Zapisano w {folder}. | Wyciszono elementy: {count} do {time}. Zapisano w {folder}.",
       "muteFailed": "Nie udało się utworzyć wyciszenia",
       "viewDowntime": "Wyświetl okno serwisowe",
-      "itemsDropped": "{count} wybrany element znajduje się poza wybranymi folderami i został usunięty. | Wybrane elementy spoza wybranych folderów zostały usunięte: {count}."
+      "itemsDropped": "{count} wybrany element znajduje się poza wybranymi folderami i został usunięty. | Wybrane elementy spoza wybranych folderów zostały usunięte: {count}.",
+      "mutedUntilClear": "Wyciszono {name} do czasu ustąpienia, najpóźniej do {time}",
+      "alreadyMuted": "{name} jest już wyciszony do {time}",
+      "muteChanged": "To wyciszenie zmieniło się od czasu wczytania strony. Teraz kończy się {time}.",
+      "muteEnded": "Wyciszenie zakończone. Powiadomienia zostają wznowione.",
+      "mutedOne": "Wyciszono {name} do {time}",
+      "timeTomorrow": "{time} jutro",
+      "notQuickMute": "To wyciszenie zostało ustawione na stronie Okien serwisowych. Zmień je tam."
     }
   },
   "cipherKeys": {
@@ -26710,7 +26817,10 @@
       "managedBy": "zarządzane przez administratora twojej instancji",
       "managedTitle": "Zarządzane przez administratora twojej instancji.",
       "managedDetail": "Poświadczenia, łączenie kont oraz informacja, które organizacje używają {team}, są ustawiane w _meta.",
-      "managedQuestions": "Pytania: {contact}"
+      "managedQuestions": "Pytania: {contact}",
+      "outboundQueue": "Wiadomości alertów: {count} w kolejce, najstarsza {age} | Wiadomości alertów: {count} w kolejce, najstarsza {age}",
+      "outboundEmpty": "Brak wiadomości alertów w kolejce",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Domyślne ustawienia kanałów",
@@ -26746,7 +26856,8 @@
       "instanceAdminOnly": "Tylko administrator instancji",
       "ownOrgOnlyHint": "W obszarze roboczym instancji mapujesz kanały na własną organizację",
       "claimableHint": "Nieprzypisane kanały i kanały należące do {org}",
-      "servedOrgsHint": "Każda organizacja obsługiwana przez ten obszar roboczy"
+      "servedOrgsHint": "Każda organizacja obsługiwana przez ten obszar roboczy",
+      "alertRoutes": "{count} miejsce docelowe | {count} miejsc docelowych"
     },
     "people": {
       "title": "Powiązani użytkownicy",
@@ -26900,6 +27011,83 @@
       "remove": "Usuń",
       "saved": "Zapisano organizacje",
       "saveFailed": "Nie udało się zapisać organizacji."
+    },
+    "destination": {
+      "appTile": "Aplikacja {product}",
+      "webhookTile": "Webhook {product}",
+      "twoWay": "Dwukierunkowy",
+      "recommendedForAlertResponse": "Zalecane do reagowania na alerty",
+      "choiceHint": "Wezwania i superklastry używają webhooka. Wysyłki ręczne i w czasie rzeczywistym z miejsca docelowego typu aplikacja Slack to osobne wiadomości.",
+      "unavailableReason": "Wymaga aplikacji Enterprise Slack w pojedynczym klastrze",
+      "unavailableFlag": "Wyłączone na tym serwerze; poproś operatora o ustawienie {variable}",
+      "unavailableMasterKey": "Wymaga klucza szyfrowania na tym serwerze; poproś operatora o ustawienie {variable}",
+      "unavailableCloud": "Nie jest jeszcze włączone dla Twojego regionu Cloud",
+      "unavailableNoAccess": "Poproś administratora organizacji o włączenie aplikacji Slack",
+      "postOnly": "Tylko publikowanie",
+      "switchToApp": "Przełącz na aplikację {product}",
+      "switchThis": "Przełącz to miejsce docelowe",
+      "switchBack": "Przełącz z powrotem",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Obszar roboczy",
+      "channel": "Kanał",
+      "mention": "Wzmianka",
+      "mentionCritical": "{'@'}here dla krytycznych alertów, brak dla pozostałych",
+      "mentionNone": "Brak",
+      "mentionHelp": "Używane przy powtórzeniach i podniesieniach poziomu",
+      "refireReuse": "Ponowne użycie przy kolejnym wyzwoleniu (minuty)",
+      "refireReuseHelp": "Ponowne wyzwolenie w tym czasie edytuje wcześniejszą wiadomość zamiast publikować nową",
+      "buttons": "Przyciski Potwierdź, Wycisz i Zbadaj",
+      "buttonsHelp": "Przycisk Rozwiąż jest dodawany, gdy wyzwolony alert ma incydent lub wezwanie",
+      "autoInvestigate": "Automatycznie badaj alerty krytyczne",
+      "autoInvestigateHelp": "Działa jako konto usługi AI organizacji, z jego uprawnieniami; publikuje ustalenia w wątku alertu",
+      "templateDefault": "Domyślny szablon {product} ({name})",
+      "sendTest": "Wyślij test",
+      "setsDefault": "Ustawia domyślną organizację dla #{channel} na {org}",
+      "answersFor": "#{channel} obsługuje pytania dla organizacji {org}. Alerty z {thisOrg} są tu publikowane, a odpowiedzi w ich wątkach są udzielane w {thisOrg}; domyślna organizacja kanału pozostaje bez zmian.",
+      "sharedTag": "Udostępniony · {product} Connect",
+      "sharedTitle": "#{channel} jest udostępniony osobom spoza obszaru roboczego {workspace}.",
+      "sharedDetail": "Zobaczą nazwy alertów, wartości, wykresy i linki. Ich kliknięcia przycisków będą odrzucane.",
+      "sharedConfirm": "Rozumiem, publikuj alerty w tym udostępnionym kanale",
+      "sharedRequired": "Potwierdź, że alerty mogą być publikowane w tym udostępnionym kanale",
+      "versionMismatch": "Węzły działają na różnych wersjach. Najpierw zaktualizuj każdy węzeł.",
+      "oncallNotAllowed": "Miejsce docelowe aplikacji {product} nie może być kanałem zespołu dyżurnego",
+      "answersForAnother": "#{channel} obsługuje pytania dla innej organizacji. Alerty z {thisOrg} są tu publikowane, a odpowiedzi w ich wątkach są udzielane w {thisOrg}; domyślna organizacja kanału pozostaje bez zmian.",
+      "oncallTag": "Pokój dyżurów",
+      "oncallTitle": "Wezwania dla zespołu {team} są również publikowane na #{channel} przez {destination}.",
+      "oncallDetail": "Alerty tutaj są publikowane osobno.",
+      "oncallConfirm": "Rozumiem, publikuj alerty w tym pokoju dyżurów",
+      "oncallRequired": "Potwierdź, że alerty mogą być publikowane w tym pokoju dyżurów",
+      "workspaceRequired": "Wybierz obszar roboczy",
+      "refireRange": "Wprowadź liczbę całkowitą minut od 0 do {max}",
+      "connectTitle": "Połącz {product}, aby publikować alerty z przyciskami",
+      "connectDetail": "Wybierz kanał na ekranie {product} i kliknij Zezwól. OpenObserve utworzy to miejsce docelowe dla tego kanału.",
+      "connected": "{name} zostało utworzone dla #{channel}. Sprawdź jego ustawienia i zapisz.",
+      "saveFailed": "Nie udało się zapisać miejsca docelowego.",
+      "switched": "{name} publikuje teraz przez aplikację {product}",
+      "switchedBack": "{name} ponownie publikuje przez swój webhook",
+      "switchFailed": "Nie udało się przełączyć {name}: {reason}",
+      "switchedAll": "Przełączono {count} miejsce docelowe | Przełączono {count} miejsc docelowych",
+      "switchThisDetail": "Przełącz je na aplikację {product}, aby uzyskać przyciski Potwierdź, Wycisz i Zbadaj. Jego nazwa, szablon i alerty pozostają bez zmian; opcja Przełącz z powrotem przywraca webhook."
+    },
+    "switchAll": {
+      "title": "{count} miejsce docelowe webhooka publikuje w tym obszarze roboczym. | {count} miejsca docelowe webhooka publikują w tym obszarze roboczym.",
+      "detail": "Przełącz ją na aplikację {product}, aby uzyskać przyciski Potwierdź, Wycisz i Zbadaj. Jej nazwa, szablon i alerty pozostają bez zmian; Przełączenie z powrotem przywraca webhook. | Przełącz je na aplikację {product}, aby uzyskać przyciski Potwierdź, Wycisz i Zbadaj. Ich nazwy, szablony i alerty pozostają bez zmian; Przełączenie z powrotem przywraca webhook.",
+      "review": "Przejrzyj",
+      "action": "Przełącz wszystkie",
+      "summary": "Przełączono: {switched} · nie udało się przełączyć: {count}"
+    },
+    "oncallUnlinked": {
+      "title": "Członkowie dyżuru niepowiązani z {product}",
+      "description": "Wezwania nie mogą wysyłać im wiadomości prywatnych, a ich kliknięcia przycisków alertów i wezwań czekają do czasu połączenia kont",
+      "remind": "Przypomnij im",
+      "columnPerson": "Osoba",
+      "columnTeam": "Zespół",
+      "columnNextShift": "Następna zmiana",
+      "columnReminder": "Przypomnienie",
+      "dmSent": "Wysłano wiadomość prywatną {time}",
+      "notSent": "Nie wysłano",
+      "reminded": "Wysłano przypomnienie do {count} osoby | Wysłano przypomnienie do {count} osób",
+      "remindFailed": "Nie udało się wysłać przypomnień."
     }
   },
   "fleet": {
