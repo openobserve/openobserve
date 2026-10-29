@@ -383,6 +383,10 @@ export function useConfigPanel(
         label: t("dashboard.treemapShowBreadcrumb"),
         visible: dashboardPanelData.data.type === "treemap",
       },
+      "sunburst-labels": {
+        label: t("dashboard.sunburstShowLabels"),
+        visible: dashboardPanelData.data.type === "sunburst",
+      },
       "heatmap-histogram-mode": {
         label: t("dashboard.heatmapHistogramMode"),
         visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",

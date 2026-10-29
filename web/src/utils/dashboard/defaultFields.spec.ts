@@ -308,4 +308,13 @@ describe("defaultFields", () => {
       expect(y[0].functionName).toBe("count");
     });
   });
+  describe("buildDefaultBuilderFields for sunburst", () => {
+    const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+
+    it("seeds a count with no time label", () => {
+      const seeded = buildDefaultBuilderFields("sunburst", "logs", logsSchema, "logs");
+      expect(seeded.x).toEqual([]);
+      expect(seeded.y[0].functionName).toBe("count");
+    });
+  });
 });

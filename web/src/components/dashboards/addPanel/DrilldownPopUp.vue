@@ -643,7 +643,9 @@ export default defineComponent({
           });
         });
       } else if (
-        ["pie", "donut", "gauge", "bar-gauge", "treemap"].includes(dashboardPanelData.data.type)
+        ["pie", "donut", "gauge", "bar-gauge", "treemap", "sunburst"].includes(
+          dashboardPanelData.data.type,
+        )
       ) {
         selectedValues = [
           { label: t("dashboard.seriesName"), value: "${series.__name}" },

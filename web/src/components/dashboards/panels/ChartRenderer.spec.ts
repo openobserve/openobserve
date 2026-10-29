@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import { use as echartsUse } from "echarts/core";
-import { LineChart, PictorialBarChart, TreemapChart } from "echarts/charts";
+import { LineChart, PictorialBarChart, TreemapChart, SunburstChart } from "echarts/charts";
 import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
 import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
@@ -68,6 +68,7 @@ vi.mock("echarts/charts", () => ({
   GraphChart: vi.fn(),
   PictorialBarChart: vi.fn(),
   TreemapChart: vi.fn(),
+  SunburstChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -129,6 +130,9 @@ describe("ChartRenderer series registration", () => {
   });
   it("registers the treemap series", () => {
     expect(registeredAtImport).toContain(TreemapChart);
+  });
+  it("registers the sunburst series", () => {
+    expect(registeredAtImport).toContain(SunburstChart);
   });
 });
 

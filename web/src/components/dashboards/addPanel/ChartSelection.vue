@@ -136,6 +136,11 @@ export default defineComponent({
         id: "treemap",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/sunburst.svg"),
+        title: t("dashboard.chartSelection.sunburst"),
+        id: "sunburst",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.svg"),
         title: t("dashboard.heatmapLabel"),
         id: "heatmap",
