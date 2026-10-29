@@ -571,7 +571,10 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
 }
 
 /// Jira keeps one issue per alert, so it refuses alerts that would send for several at once.
-async fn validate_jira_destinations(org_id: &str, alert: &Alert) -> Result<(), AlertError> {
+pub(crate) async fn validate_jira_destinations(
+    org_id: &str,
+    alert: &Alert,
+) -> Result<(), AlertError> {
     for dest_name in alert
         .destinations
         .iter()
