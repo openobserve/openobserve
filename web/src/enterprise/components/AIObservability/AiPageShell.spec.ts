@@ -14,17 +14,18 @@ const OPageLayout = {
     '<div class="o-page-layout" :data-test="dataTest" :data-title="title" :data-subtitle="subtitle" :data-icon="icon"><slot name="actions" /><slot name="subnav" /><slot /></div>',
 };
 const DateTime = {
-  props: [
-    "autoApply",
-    "menuAlign",
-    "defaultType",
-    "defaultAbsoluteTime",
-    "defaultRelativeTime",
-    "dataTest",
-  ],
+  props: {
+    autoApply: Boolean,
+    menuAlign: String,
+    defaultType: String,
+    defaultAbsoluteTime: Object,
+    defaultRelativeTime: String,
+    dataTest: String,
+    calendarPresets: Boolean,
+  },
   emits: ["on:date-change"],
   template:
-    '<div class="date-time" :data-test="dataTest" @click="$emit(\'on:date-change\', { valueType: \'relative\' })" />',
+    '<div class="date-time" :data-test="dataTest" :data-calendar-presets="calendarPresets" @click="$emit(\'on:date-change\', { valueType: \'relative\' })" />',
 };
 // AiLastRefreshed owns the staleness dot + relative-time ticking on its own —
 // stubbed so this spec asserts only that AiPageShell forwards lastRunAt/loading
@@ -108,6 +109,11 @@ describe("AiPageShell", () => {
     await w.find(".date-time").trigger("click");
     expect(w.emitted("date-change")).toBeTruthy();
     expect(w.emitted("date-change")![0][0]).toEqual({ valueType: "relative" });
+  });
+
+  it("offers the calendar ranges in the picker", () => {
+    const w = mountShell();
+    expect(w.find(".date-time").attributes("data-calendar-presets")).toBe("true");
   });
 
   it("forwards the refresh button click as a refresh event", async () => {
