@@ -47,6 +47,8 @@ const props = defineProps<{
   reportName: string;
   lastRunStatus?: string | null;
   lastRunError?: string | null;
+  /** The report's folder, so "View run" opens a detail page whose Edit keeps it. */
+  folderId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -112,11 +114,11 @@ const warning = computed(() =>
     : undefined,
 );
 
-const openRun = (org: string, run: ReportRunHit) =>
+const openRun = (org: string, run: ReportRunHit, folder: string | undefined) =>
   router.push({
     name: "reportDetail",
     params: { report_id: run.report_id },
-    query: { org_identifier: org, tab: "history", run: runKey(run) },
+    query: { org_identifier: org, tab: "history", run: runKey(run), ...(folder ? { folder } : {}) },
   });
 
 const runNow = async () => {
@@ -125,6 +127,7 @@ const runNow = async () => {
     return;
   }
   const operation = Object.freeze({ org: orgId.value, reportId: props.reportId });
+  const folder = props.folderId;
   const version = viewVersion;
   const isCurrentView = () => version === viewVersion;
   emit("update:open", false);
@@ -141,7 +144,7 @@ const runNow = async () => {
         : t("reports.history.runNowSent", { count }, count),
       action: {
         label: t("reports.history.viewRun"),
-        handler: () => openRun(operation.org, data.run),
+        handler: () => openRun(operation.org, data.run, folder),
       },
     });
   } catch (err: any) {
@@ -155,7 +158,10 @@ const runNow = async () => {
       variant: "error",
       message: raw(body?.message) || t("reports.history.runNowFailed"),
       action: body?.run
-        ? { label: t("reports.history.viewRun"), handler: () => openRun(operation.org, body.run) }
+        ? {
+            label: t("reports.history.viewRun"),
+            handler: () => openRun(operation.org, body.run, folder),
+          }
         : undefined,
     });
   } finally {

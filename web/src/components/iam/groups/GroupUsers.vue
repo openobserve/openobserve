@@ -320,7 +320,7 @@ const updateUserTable = async (value: string) => {
   if (usersDisplay.value === "all") {
     rows.value = users.value;
   } else {
-    rows.value = users.value.filter((user: any) => user.isInGroup);
+    rows.value = users.value.filter(isListedAsSelected);
   }
 };
 
@@ -328,7 +328,7 @@ const updateOrganization = () => {
   if (selectedOrg.value.value === "all") {
     // Show all users when "All" is selected
     rows.value =
-      usersDisplay.value === "all" ? users.value : users.value.filter((user) => user.isInGroup);
+      usersDisplay.value === "all" ? users.value : users.value.filter(isListedAsSelected);
   } else {
     // Filter users based on selected organization or root role
     rows.value = users.value.filter((user) => {
@@ -338,6 +338,14 @@ const updateOrganization = () => {
     });
   }
 };
+
+// Staged picks count too, so a member list mounted over restored changes shows them ticked.
+const isSelected = (email: string) =>
+  props.addedUsers.has(email) || (groupUsersMap.value.has(email) && !props.removedUsers.has(email));
+
+// A member staged for removal stays listed under Selected, so a restored removal can be undone.
+const isListedAsSelected = (user: { email: string; isInGroup: boolean }) =>
+  user.isInGroup || props.removedUsers.has(user.email);
 
 const getchOrgUsers = async () => {
   // fetch group users
@@ -352,7 +360,7 @@ const getchOrgUsers = async () => {
         data.map((user: any) => {
           return {
             email: user.email,
-            isInGroup: groupUsersMap.value.has(user.email),
+            isInGroup: isSelected(user.email),
             org:
               user.orgs?.length > 0
                 ? user.orgs.map((org: { org_name: string }) => org.org_name).join(", ")
@@ -366,7 +374,7 @@ const getchOrgUsers = async () => {
       users.value = cloneDeep(usersState.users).map((user: any) => {
         return {
           email: user.email,
-          isInGroup: groupUsersMap.value.has(user.email),
+          isInGroup: isSelected(user.email),
           org: user.org,
           role: user.role,
           is_external: user.is_external || false,

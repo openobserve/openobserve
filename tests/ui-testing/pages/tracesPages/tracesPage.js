@@ -1,5 +1,6 @@
 // tracesPage.js
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
@@ -652,6 +653,7 @@ export class TracesPage {
   async signOut() {
     await this.profileButton.click();
     await this.signOutButton.click();
+    await confirmDraftSignOut(this.page);
   }
 
   // Query Editor Methods

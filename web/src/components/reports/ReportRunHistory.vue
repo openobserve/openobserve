@@ -303,6 +303,8 @@ const props = withDefaults(
     showCachedTile?: boolean;
     canTrigger?: boolean;
     running?: boolean;
+    /** Folder of each report by id, for the org-wide view; the route's folder is used otherwise. */
+    reportFolders?: Record<string, string>;
   }>(),
   {
     reportId: undefined,
@@ -311,6 +313,7 @@ const props = withDefaults(
     showCachedTile: false,
     canTrigger: true,
     running: false,
+    reportFolders: () => ({}),
   },
 );
 
@@ -690,18 +693,19 @@ const closeRun = () => {
 const editRecipients = () => {
   const run = selectedRun.value;
   if (!run) return;
+  const folder = props.reportFolders[run.report_id] || (route.query.folder as string) || "default";
   router.push({
     name: "createReport",
     query: {
       report_id: run.report_id,
       name: run.report_name,
       org_identifier: orgId.value,
-      folder: (route.query.folder as string) || "default",
+      folder,
       step: "destinations",
       returnTo: router.resolve({
         name: "reportDetail",
         params: { report_id: run.report_id },
-        query: { org_identifier: orgId.value, tab: "history" },
+        query: { org_identifier: orgId.value, tab: "history", folder },
       }).fullPath,
     },
   });
