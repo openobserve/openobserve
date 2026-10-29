@@ -507,6 +507,7 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       icon: "layers",
       name: "traces",
       tab: "spans",
+      feature: "traces",
       defaultForRoute: true,
     },
     {
@@ -514,12 +515,14 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       icon: "account-tree",
       name: "traces",
       tab: "traces",
+      feature: "traces",
     },
     {
       titleKey: "menu.serviceGraph",
       icon: "share",
       name: "traces",
       tab: "service-graph",
+      feature: "traces",
       gate: "enterprise",
     },
     {
@@ -527,6 +530,7 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       icon: "menu-book",
       name: "traces",
       tab: "services-catalog",
+      feature: "traces",
     },
     // Databases is NOT here — it moved to the Infra group (see NAV_GROUPS).
     // It sat on this flyout while Database Monitoring was read as a view over

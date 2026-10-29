@@ -123,8 +123,26 @@
                 {{ statusVariant(activeTrial.taskStatus, "eval").label }}
               </OTag>
               <div class="flex items-center gap-2">
+                <OTooltip
+                  v-if="activeTrial.execution?.traceId && tracesLock.locked.value"
+                  :content="tracesLock.lockedReason.value"
+                >
+                  <span class="inline-flex">
+                    <OButton
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      data-test="ai-experiment-row-trace"
+                    >
+                      <template #icon-left>
+                        <OIcon name="lock" size="sm" data-test="ai-experiment-row-trace-lock" />
+                      </template>
+                      {{ t("aiObservability.experiments.rowDetail.viewTrace") }}
+                    </OButton>
+                  </span>
+                </OTooltip>
                 <OButton
-                  v-if="activeTrial.execution?.traceId"
+                  v-else-if="activeTrial.execution?.traceId"
                   size="sm"
                   variant="outline"
                   data-test="ai-experiment-row-trace"
@@ -251,8 +269,30 @@
                   >
                     {{ raw(score.value) }}
                   </span>
+                  <OTooltip
+                    v-if="score.trace && tracesLock.locked.value"
+                    :content="tracesLock.lockedReason.value"
+                  >
+                    <span class="inline-flex">
+                      <OButton
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        :data-test="`ai-experiment-row-score-trace-${score.key}`"
+                      >
+                        <template #icon-left>
+                          <OIcon
+                            name="lock"
+                            size="sm"
+                            :data-test="`ai-experiment-row-score-trace-lock-${score.key}`"
+                          />
+                        </template>
+                        {{ t("aiObservability.experiments.rowDetail.viewTrace") }}
+                      </OButton>
+                    </span>
+                  </OTooltip>
                   <OButton
-                    v-if="score.trace"
+                    v-else-if="score.trace"
                     size="sm"
                     variant="outline"
                     :data-test="`ai-experiment-row-score-trace-${score.key}`"
@@ -319,6 +359,8 @@ import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import ExperimentRowNav from "./ExperimentRowNav.vue";
 import { durationLabel } from "./experimentRowContent";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import {
   experimentScoreSummaryValue,
   experimentScoreValue,
@@ -346,6 +388,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const tracesLock = useLicenseLock("traces");
 
 const activeTrialIndex = ref(0);
 watch(

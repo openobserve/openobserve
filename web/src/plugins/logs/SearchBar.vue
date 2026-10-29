@@ -1000,7 +1000,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
                   size="sm-toolbar"
-                  class="bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  :class="runButtonTone"
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
@@ -1017,7 +1018,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                          : [
+                              runButtonTone,
+                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                            ],
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1058,7 +1062,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
                   size="sm-toolbar"
-                  class="bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  :class="runButtonTone"
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
@@ -1075,7 +1080,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                          : [
+                              runButtonTone,
+                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                            ],
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1134,7 +1142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   showRunQueryPending
                     ? ''
-                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                    : [
+                        runButtonTone,
+                        'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                      ],
                   showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
                 ]"
                 @click="handleRunQueryFn()"
@@ -1179,7 +1190,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       isRunQueryCancelShown
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !showRunQueryPending
-                          ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
+                          ? [
+                              runButtonTone,
+                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                            ]
                           : showRunQueryPending
                             ? 'border-s-0'
                             : '',
@@ -1842,7 +1856,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
+import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -2094,6 +2108,13 @@ export default defineComponent({
     const regionFilter = ref();
     const { locked: superClusterLocked, lockedReason: superClusterLockedReason } =
       useLicenseLock("super_cluster");
+    const { locked: pageLocked } = useFeatureLock();
+    // The forced primary fill hides the disabled look, so it yields only on a license-locked page.
+    const runButtonTone = computed(() =>
+      pageLocked.value
+        ? "enabled:bg-button-primary! enabled:text-button-primary-foreground!"
+        : "bg-button-primary! text-button-primary-foreground!",
+    );
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
     const { buildPatternsAlertPrefill } = usePatternActions();
@@ -5210,6 +5231,7 @@ export default defineComponent({
       regionFilterRef,
       regionFilter,
       superClusterLocked,
+      runButtonTone,
       superClusterLockedReason,
       resetRegionFilter,
       cancelQuery,

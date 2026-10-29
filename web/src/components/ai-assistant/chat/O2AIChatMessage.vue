@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { ChatMessage, ContentBlock, NavigationAction } from "@/ts/interfaces/chat";
 import {
   formatLogEntryContent,
@@ -16,6 +16,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { navigationFeature } from "@/components/O2AIChat.navigation";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 
 // ContentBlock has no log_entry member, but parseLogEntries puts them into user messages.
 type LogEntryBlock = { type: "log_entry"; preview: string; content: string };
@@ -48,6 +50,11 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { isLocked, lockedReason } = useLicenseLocks();
+const navLock = (action: NavigationAction): I18nText | null => {
+  const key = navigationFeature(action);
+  return key && isLocked(key) ? lockedReason(key) : null;
+};
 
 // Positional key shape must match the shell's toggleLogEntryExpanded.
 const isLogEntryExpanded = (blockIndex: number) =>
@@ -165,8 +172,25 @@ const isStopped = computed(() =>
             >
               {{ t("aiAssistant.errorMayBeTemporary") }}
             </div>
+            <OTooltip
+              v-if="block.navigationAction && navLock(block.navigationAction)"
+              :content="navLock(block.navigationAction) ?? undefined"
+            >
+              <span class="ms-6 mt-2 inline-flex self-start">
+                <OButton
+                  variant="primary"
+                  size="xs"
+                  class="stream-error-action text-compact"
+                  disabled
+                  data-test="o2-ai-chat-error-navigate-locked"
+                >
+                  <template #icon-left><OIcon name="lock" size="sm" /></template>
+                  {{ block.navigationAction.label }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
-              v-if="block.navigationAction"
+              v-else-if="block.navigationAction"
               variant="primary"
               size="xs"
               class="stream-error-action text-compact ms-6 mt-2 self-start"
@@ -215,7 +239,25 @@ const isStopped = computed(() =>
             v-else-if="block.type === 'navigation' && block.navigationAction && !readonly"
             class="navigation-block my-1 [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] dark:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)]"
           >
+            <OTooltip
+              v-if="navLock(block.navigationAction)"
+              :content="navLock(block.navigationAction) ?? undefined"
+            >
+              <span class="inline-flex">
+                <OButton
+                  variant="primary"
+                  size="xs"
+                  class="navigation-block-btn text-compact"
+                  disabled
+                  data-test="o2-ai-chat-navigate-locked"
+                >
+                  <template #icon-left><OIcon name="lock" size="sm" /></template>
+                  {{ block.navigationAction.label }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
+              v-else
               variant="primary"
               size="xs"
               class="navigation-block-btn text-compact"

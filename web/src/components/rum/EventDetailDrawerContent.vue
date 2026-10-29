@@ -317,8 +317,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
 
                     <!-- Clickable Trace Button -->
+                    <OTooltip
+                      v-if="rumField(item, 'trace_id') && tracesLock.locked.value"
+                      :content="tracesLock.lockedReason.value"
+                    >
+                      <span class="ms-2 inline-flex">
+                        <OButton
+                          variant="outline"
+                          size="xs"
+                          data-test="view-trace-btn"
+                          class="h-5! px-1.5"
+                          disabled
+                        >
+                          <OIcon name="lock" size="xs" data-test="view-trace-btn-lock" />
+                          <span>{{ t("common.viewTrace") }}</span>
+                        </OButton>
+                      </span>
+                    </OTooltip>
                     <OButton
-                      v-if="rumField(item, 'trace_id')"
+                      v-else-if="rumField(item, 'trace_id')"
                       variant="outline"
                       size="xs"
                       :title="t('common.viewTraceDetails')"
@@ -465,6 +482,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = defineProps({
@@ -616,6 +635,7 @@ const viewResourceDetails = (resource: any) => {
  * Opens in a new tab
  */
 const isResolvingTraceNav = ref(false);
+const tracesLock = useLicenseLock("traces");
 const navigateToSpecificTrace = async (traceId: string) => {
   // Canonicalize: SDK 0.4.x stored ids zero-stripped, but the traces stream
   // (and therefore the trace-details page) uses the padded 32-char form.

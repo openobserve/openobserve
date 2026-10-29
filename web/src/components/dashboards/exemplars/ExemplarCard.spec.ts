@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
+import { raw } from "@/types/i18n";
 import ExemplarCard from "./ExemplarCard.vue";
 import type { ExemplarMarker, TraceVerdict } from "@/ts/interfaces/exemplars";
 
@@ -171,6 +172,33 @@ describe("ExemplarCard", () => {
     );
     await byTest(wrapper, "dashboard-panel-exemplar-open-trace").trigger("click");
     expect(wrapper.emitted("open-trace")).toHaveLength(1);
+  });
+
+  it.each([
+    { state: "found", stream: "default", startUs: 1, endUs: 2 },
+    { state: "unverified", reason: "timeout" },
+  ] as TraceVerdict[])(
+    "traces locked ($state): Open trace is disabled with a lock and emits nothing",
+    async (verdict) => {
+      const wrapper = mountCard({ verdict, lockedReason: raw("Locked: needs Traces") });
+      const locked = byTest(wrapper, "dashboard-panel-exemplar-open-trace-locked");
+      expect(locked.attributes("disabled")).toBeDefined();
+      expect(byTest(wrapper, "dashboard-panel-exemplar-open-trace-lock").exists()).toBe(true);
+      expect(byTest(wrapper, "dashboard-panel-exemplar-open-trace").exists()).toBe(false);
+      expect(byTest(wrapper, "dashboard-panel-exemplar-open-trace-unverified").exists()).toBe(
+        false,
+      );
+      await locked.trigger("click");
+      expect(wrapper.emitted("open-trace")).toBeUndefined();
+    },
+  );
+
+  it("traces enabled: no locked Open trace", () => {
+    const wrapper = mountCard({
+      verdict: { state: "found", stream: "default", startUs: 1, endUs: 2 },
+    });
+    expect(byTest(wrapper, "dashboard-panel-exemplar-open-trace-locked").exists()).toBe(false);
+    expect(byTest(wrapper, "dashboard-panel-exemplar-open-trace").exists()).toBe(true);
   });
 
   it("shows a not-available trace as a muted line that wraps inside the card", () => {

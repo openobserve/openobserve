@@ -53,8 +53,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`dbm-metric-panel-by-${panelKey}`"
         @update:model-value="emit('update:by', $event as string)"
       />
+      <OTooltip
+        v-if="exploreUrl && metricsLock.locked.value"
+        side="bottom"
+        :content="metricsLock.lockedReason.value"
+      >
+        <span
+          class="text-text-muted ms-auto inline-flex shrink-0"
+          role="link"
+          aria-disabled="true"
+          :aria-label="t('dbm.metrics.explore')"
+          :data-test="`dbm-metric-panel-explore-${panelKey}`"
+        >
+          <OIcon name="lock" size="sm" :data-test="`dbm-metric-panel-explore-lock-${panelKey}`" />
+        </span>
+      </OTooltip>
       <a
-        v-if="exploreUrl"
+        v-else-if="exploreUrl"
         :href="exploreUrl"
         target="_blank"
         rel="noopener"
@@ -121,6 +136,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { panelErrorIsForbidden, panelErrorIsStreamMissing } from "@/utils/dbm/metricsPanels";
 
 // Async: the dashboards engine is heavy and must not ride the DBM shell's
@@ -162,6 +178,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const metricsLock = useLicenseLock("metrics");
 
 const helpText = computed<I18nText | null>(() => (props.help ? raw(props.help) : null));
 

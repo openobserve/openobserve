@@ -205,7 +205,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ itemTitle }}
                   </OTruncatedText>
+                  <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                    <span class="inline-flex shrink-0">
+                      <OButton
+                        variant="outline"
+                        size="sm"
+                        disabled
+                        data-test="ai-queue-workbench-open-trace"
+                      >
+                        <template #icon-left>
+                          <OIcon
+                            name="lock"
+                            size="sm"
+                            data-test="ai-queue-workbench-open-trace-lock"
+                          />
+                        </template>
+                        {{ t("aiObservability.queues.workbench.openTrace") }}
+                      </OButton>
+                    </span>
+                  </OTooltip>
                   <OButton
+                    v-else
                     variant="outline"
                     size="sm"
                     icon-left="open-in-new"
@@ -726,6 +746,7 @@ import {
 import { useMutation } from "@tanstack/vue-query";
 import { toggleFullscreen as domToggleFullscreen } from "@/utils/dom";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 defineOptions({ name: "AIQueueWorkbenchPage" });
 
@@ -737,6 +758,7 @@ const quoted = (comment: string) => raw(`“${comment}”`);
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const queueId = computed<string>(() => String(route.params.id ?? ""));
@@ -1245,7 +1267,7 @@ async function refresh() {
 function openTrace() {
   const item = currentItem.value;
   const detail = currentDetail.value;
-  if (!item || !detail) return;
+  if (!item || !detail || tracesLock.locked.value) return;
   const query = {
     stream: detail.sourceStream,
     from: item.refTraceStartTime,

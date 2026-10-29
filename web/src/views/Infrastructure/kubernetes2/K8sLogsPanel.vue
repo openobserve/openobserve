@@ -26,6 +26,9 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
@@ -53,6 +56,7 @@ const props = defineProps<{
 const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
+const logsLock = useLicenseLock("logs");
 // useStreams injects the store, which only works during setup, never inside a click handler.
 const streamsApi = useStreams(gt);
 
@@ -189,6 +193,7 @@ const stopPolling = () => {
 };
 
 const openInLogs = () => {
+  if (logsLock.locked.value) return;
   if (!link.value) {
     toast({ variant: "warning", message: t("infra.k8s2.logsNoStream") });
     return;
@@ -284,7 +289,18 @@ onBeforeUnmount(stopPolling);
             : t("infra.k8s2.logsLines", { count: visible.length }, visible.length)
         }}
       </OText>
+      <OTooltip v-if="logsLock.locked.value" :content="logsLock.lockedReason.value">
+        <span class="inline-flex">
+          <OButton variant="ghost-primary" size="sm" disabled data-test="k8s2-logs-open">
+            <template #icon-left>
+              <OIcon name="lock" size="sm" data-test="k8s2-logs-open-lock" />
+            </template>
+            {{ t("infra.k8s2.logsOpenIn") }}
+          </OButton>
+        </span>
+      </OTooltip>
       <OButton
+        v-else
         variant="ghost-primary"
         size="sm"
         icon-right="arrow-forward"
