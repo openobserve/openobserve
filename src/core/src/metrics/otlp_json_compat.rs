@@ -209,7 +209,7 @@ fn normalize_summary_data_point(point: &mut json::Value) {
 mod tests {
     use opentelemetry_proto::tonic::{
         collector::metrics::v1::ExportMetricsServiceRequest,
-        common::v1::{KeyValue, any_value},
+        common::v1::any_value,
         metrics::v1::{exemplar, metric::Data, number_data_point},
     };
 
@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn test_empty_any_values_keep_metric_data() {
         let mut body = json::from_str::<json::Value>(
-            r#"{"resourceMetrics":[{"resource":{"attributes":[{"key":"region","value":{}}]},"scopeMetrics":[{"metrics":[{"name":"g","gauge":{"dataPoints":[{
+            r#"{"resourceMetrics":[{"resource":{"attributes":[{"key":"region","value":{}}]},"scopeMetrics":[{"metrics":[{"name":"g","metadata":[{"key":"m","value":{}}],"gauge":{"dataPoints":[{
                 "timeUnixNano":"1700000005000000000","asInt":"3",
                 "attributes":[{"key":"tags","value":{"arrayValue":{}}}],
                 "exemplars":[{"timeUnixNano":"1700000005000000000","asDouble":1.0,"filteredAttributes":[{"key":"e","value":{}}]}]
@@ -480,7 +480,9 @@ mod tests {
             resource_metrics.resource.as_ref().unwrap().attributes[0].value,
             None
         );
-        let Some(Data::Gauge(gauge)) = &resource_metrics.scope_metrics[0].metrics[0].data else {
+        let metric = &resource_metrics.scope_metrics[0].metrics[0];
+        assert_eq!(metric.metadata[0].value, None);
+        let Some(Data::Gauge(gauge)) = &metric.data else {
             panic!("expected gauge");
         };
         let point = &gauge.data_points[0];
@@ -493,42 +495,6 @@ mod tests {
             Some(any_value::Value::ArrayValue(Default::default()))
         );
         assert_eq!(point.exemplars[0].filtered_attributes[0].value, None);
-    }
-
-    #[test]
-    fn test_metrics_keep_empty_array_slots() {
-        let mut body = json::from_str::<json::Value>(
-            r#"{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"g","metadata":[{"key":"m","value":{}},{"key":"l","value":{"arrayValue":{"values":[{},{"intValue":"2"}]}}}],"gauge":{"dataPoints":[{
-                "timeUnixNano":"1700000005000000000","asInt":"3",
-                "attributes":[{"key":"a","value":{"arrayValue":{"values":[{"stringValue":"x"},{}]}}}],
-                "exemplars":[{"timeUnixNano":"1700000005000000000","asDouble":1.0,"filteredAttributes":[{"key":"e","value":{"arrayValue":{"values":[{}]}}}]}]
-            }]}},{"name":"s","summary":{"dataPoints":[{"timeUnixNano":"1700000005000000000","attributes":[{"key":"q","value":{"arrayValue":{"values":[{}]}}}]}]}}]}]}]}"#,
-        )
-        .unwrap();
-        normalize(&mut body);
-        let mut request: ExportMetricsServiceRequest = json::from_value(body).unwrap();
-        crate::ingestion::otlp_json::restore_metrics_empty_slots(&mut request);
-        let metrics = &request.resource_metrics[0].scope_metrics[0].metrics;
-        let value =
-            |kv: &KeyValue| crate::ingestion::grpc::get_val_with_type_retained(&kv.value.as_ref());
-        assert_eq!(metrics[0].metadata[0].value, None);
-        assert_eq!(value(&metrics[0].metadata[1]), json::json!([null, 2]));
-        let Some(Data::Gauge(gauge)) = &metrics[0].data else {
-            panic!("expected gauge");
-        };
-        let point = &gauge.data_points[0];
-        assert_eq!(value(&point.attributes[0]), json::json!(["x", null]));
-        assert_eq!(
-            value(&point.exemplars[0].filtered_attributes[0]),
-            json::json!([null])
-        );
-        let Some(Data::Summary(summary)) = &metrics[1].data else {
-            panic!("expected summary");
-        };
-        assert_eq!(
-            value(&summary.data_points[0].attributes[0]),
-            json::json!([null])
-        );
     }
 
     #[test]

@@ -71,7 +71,6 @@ use crate::{
 pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
-pub mod otlp_json;
 pub mod rejections;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;

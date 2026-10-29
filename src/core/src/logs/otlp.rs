@@ -1872,11 +1872,7 @@ mod tests {
         // arbitrary_precision is enabled workspace-wide, so the plain decode must fail here
         assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
 
-        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(
-            body,
-            crate::ingestion::otlp_json::restore_logs_empty_slots,
-        )
-        .unwrap();
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
         let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
         let resource_logs = &request.resource_logs[0];
         let resource = resource_logs.resource.as_ref().unwrap();
@@ -1903,15 +1899,12 @@ mod tests {
 
     #[test]
     fn test_otlp_json_decodes_empty_any_values() {
-        use crate::ingestion::{
-            grpc::get_val_with_type_retained, otlp_json::restore_logs_empty_slots,
-        };
+        use crate::ingestion::grpc::get_val_with_type_retained;
 
-        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"geo.locality.region","value":{}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{},"attributes":[{"key":"region","value":{}},{"key":"tags","value":{"arrayValue":{}}},{"key":"map","value":{"kvlistValue":{"values":[{"key":"k","value":{}},{"key":"list","value":{"arrayValue":{"values":[{"stringValue":"a"},{}]}}}]}}},{"key":"empty.map","value":{"kvlistValue":{}}},{"key":"r","value":{"doubleValue":1.50}}]},{"timeUnixNano":"1789000000000000002","body":{"stringValue":"valid record in the same batch"}}]}]}]}"#;
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"geo.locality.region","value":{}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{},"attributes":[{"key":"region","value":{}},{"key":"tags","value":{"arrayValue":{}}},{"key":"map","value":{"kvlistValue":{"values":[{"key":"k","value":{}},{"key":"list","value":{"arrayValue":{"values":[{"stringValue":"a"},{"kvlistValue":{}}]}}}]}}},{"key":"empty.map","value":{"kvlistValue":{}}},{"key":"r","value":{"doubleValue":1.50}}]},{"timeUnixNano":"1789000000000000002","body":{"stringValue":"valid record in the same batch"}}]}]}]}"#;
         assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
 
-        let request: ExportLogsServiceRequest =
-            json::from_slice_lenient_otlp(body, restore_logs_empty_slots).unwrap();
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
         let resource_logs = &request.resource_logs[0];
         assert_eq!(
             resource_logs.resource.as_ref().unwrap().attributes[0].value,
@@ -1923,7 +1916,7 @@ mod tests {
         let attr = |i: usize| get_val_with_type_retained(&records[0].attributes[i].value.as_ref());
         assert_eq!(attr(0), json::Value::Null);
         assert_eq!(attr(1), json::json!([]));
-        assert_eq!(attr(2), json::json!({"k": null, "list": ["a", null]}));
+        assert_eq!(attr(2), json::json!({"k": null, "list": ["a", {}]}));
         assert_eq!(attr(3), json::json!({}));
         assert_eq!(
             records[0].attributes[4]
@@ -1944,10 +1937,11 @@ mod tests {
             &br#"{"resourceLogs":[{"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#[..],
             br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":1}}]}]}]}"#,
             br#"{"resourceLogs":["#,
+            br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"arrayValue":{"values":[{"intValue":"1"},{},{"intValue":"3"}]}}}]}]}]}"#,
         ] {
             let strict = json::from_slice::<ExportLogsServiceRequest>(body).map(|_| ());
             let lenient =
-                json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(body, crate::ingestion::otlp_json::restore_logs_empty_slots).map(|_| ());
+                json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(body).map(|_| ());
             assert!(strict.is_err());
             assert_eq!(
                 strict.map_err(|e| e.to_string()),
@@ -1957,11 +1951,8 @@ mod tests {
 
         let float_with_bad_bytes = br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"doubleValue":1.5},"attributes":[{"key":"b","value":{"bytesValue":"!"}}]}]}]}]}"#;
         assert!(
-            json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(
-                float_with_bad_bytes,
-                crate::ingestion::otlp_json::restore_logs_empty_slots
-            )
-            .is_err()
+            json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(float_with_bad_bytes)
+                .is_err()
         );
     }
 
@@ -1969,11 +1960,7 @@ mod tests {
     fn test_otlp_json_without_floats_decodes_exactly_as_before() {
         let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"s","value":{"stringValue":"x"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"stringValue":"x"},"attributes":[{"key":"i","value":{"intValue":"42"}},{"key":"b","value":{"boolValue":true}}]}]}]}]}"#;
         assert_eq!(
-            json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(
-                body,
-                crate::ingestion::otlp_json::restore_logs_empty_slots
-            )
-            .unwrap(),
+            json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(body).unwrap(),
             json::from_slice::<ExportLogsServiceRequest>(body).unwrap()
         );
     }
@@ -1982,11 +1969,7 @@ mod tests {
     fn test_otlp_json_float_rescues_a_body_that_repeats_a_field() {
         // the retry decodes through a Value, which keeps the last of two repeated fields
         let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"r","value":{"doubleValue":1.5}}]},"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#;
-        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(
-            body,
-            crate::ingestion::otlp_json::restore_logs_empty_slots,
-        )
-        .unwrap();
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
         let scope = request.resource_logs[0].scope_logs[0]
             .scope
             .as_ref()

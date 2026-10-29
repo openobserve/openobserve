@@ -36,9 +36,6 @@ const OTLP_RECOVERABLE_ERRORS: [&str; 3] = [
     "missing field `values`",
 ];
 
-/// Stands in for an empty `AnyValue` array slot until `restore_otlp_array_string` reverts it.
-const OTLP_EMPTY_SLOT: &str = "\0";
-
 /// Bytes this value occupies in a JSON document, counted as `estimate_json_bytes` counts it.
 pub trait JsonBytesExt {
     fn json_bytes(&self) -> usize;
@@ -260,7 +257,7 @@ pub fn canonicalize_floats(value: &mut Value) {
     }
 }
 
-/// Rewrites empty OTLP `AnyValue` shapes 0.32 rejects; decoded arrays then need a slot restore.
+/// Rewrites spec-valid empty OTLP `AnyValue` shapes that opentelemetry-proto 0.32 rejects.
 pub fn normalize_otlp_empty_values(value: &mut Value) {
     match value {
         Value::Array(items) => items.iter_mut().for_each(normalize_otlp_empty_values),
@@ -285,22 +282,8 @@ pub fn normalize_otlp_empty_values(value: &mut Value) {
     }
 }
 
-/// Reverts the array-slot escaping of `normalize_otlp_empty_values`; true marks an empty slot.
-pub fn restore_otlp_array_string(value: &mut String) -> bool {
-    if value == OTLP_EMPTY_SLOT {
-        return true;
-    }
-    if value.starts_with(OTLP_EMPTY_SLOT) {
-        value.remove(0);
-    }
-    false
-}
-
-/// Decodes OTLP/JSON, retrying normalized on a known 0.32 gap and then running the slot restore.
-pub fn from_slice_lenient_otlp<T: DeserializeOwned>(
-    body: &[u8],
-    restore_empty_slots: impl FnOnce(&mut T),
-) -> Result<T, Error> {
+/// Decodes OTLP/JSON, retrying with normalized floats and empty values on a known 0.32 gap.
+pub fn from_slice_lenient_otlp<T: DeserializeOwned>(body: &[u8]) -> Result<T, Error> {
     let err = match from_slice::<T>(body) {
         Ok(decoded) => return Ok(decoded),
         Err(err) => err,
@@ -318,9 +301,7 @@ pub fn from_slice_lenient_otlp<T: DeserializeOwned>(
     };
     canonicalize_floats(&mut value);
     normalize_otlp_empty_values(&mut value);
-    let mut decoded = from_value(value).map_err(|_| err)?;
-    restore_empty_slots(&mut decoded);
-    Ok(decoded)
+    from_value(value).map_err(|_| err)
 }
 
 fn normalize_otlp_key_values(key_values: &mut Value) {
@@ -348,7 +329,10 @@ fn normalize_otlp_any_value(any_value: &mut Value) -> bool {
             .entry("values")
             .or_insert_with(|| Value::Array(vec![]))
     {
-        items.iter_mut().for_each(escape_otlp_array_item);
+        // an empty slot stays and fails the decode, since dropping it would shift later indexes
+        items.iter_mut().for_each(|item| {
+            normalize_otlp_any_value(item);
+        });
     }
     if let Some(Value::Object(kvlist)) = map.get_mut("kvlistValue") {
         normalize_otlp_key_values(
@@ -360,17 +344,6 @@ fn normalize_otlp_any_value(any_value: &mut Value) -> bool {
     OTLP_ANY_VALUE_FIELDS
         .iter()
         .any(|field| map.contains_key(*field))
-}
-
-/// Swaps an empty slot for the placeholder and escapes real strings that start like it.
-fn escape_otlp_array_item(item: &mut Value) {
-    if !normalize_otlp_any_value(item) {
-        *item = json!({ "stringValue": OTLP_EMPTY_SLOT });
-    } else if let Some(Value::String(value)) = item.get_mut("stringValue")
-        && value.starts_with(OTLP_EMPTY_SLOT)
-    {
-        value.insert_str(0, OTLP_EMPTY_SLOT);
-    }
 }
 
 fn json_string_bytes(s: &str) -> usize {
@@ -848,39 +821,26 @@ mod tests {
     #[test]
     fn test_normalize_otlp_empty_values() {
         let mut value: Value = from_str(
-            r#"{"resource":{"attributes":[{"key":"a","value":{}},{"key":"b","value":{"futureValue":1}},{"key":"c","value":{"stringValue":"x"}},{"key":"d"}]},"logRecords":[{"body":{"arrayValue":{"values":[{},{"intValue":"1"},{"kvlistValue":{}},{"stringValue":"\u0000x"}]}},"attributes":[{"key":"e","value":{"kvlistValue":{"values":[{"key":"f","value":{}}]}}}]},{"body":{}}],"metadata":[{"key":"g","value":{}}],"name":"body","value":{}}"#,
+            r#"{"resource":{"attributes":[{"key":"a","value":{}},{"key":"b","value":{"futureValue":1}},{"key":"c","value":{"stringValue":"x"}},{"key":"d"}]},"logRecords":[{"body":{"arrayValue":{"values":[{},{"intValue":"1"},{"kvlistValue":{}}]}},"attributes":[{"key":"e","value":{"kvlistValue":{"values":[{"key":"f","value":{}}]}}}]},{"body":{}}],"metadata":[{"key":"g","value":{}}],"name":"body","value":{}}"#,
         )
         .unwrap();
         normalize_otlp_empty_values(&mut value);
         let expected: Value = from_str(
-            r#"{"resource":{"attributes":[{"key":"a"},{"key":"b"},{"key":"c","value":{"stringValue":"x"}},{"key":"d"}]},"logRecords":[{"body":{"arrayValue":{"values":[{"stringValue":"\u0000"},{"intValue":"1"},{"kvlistValue":{"values":[]}},{"stringValue":"\u0000\u0000x"}]}},"attributes":[{"key":"e","value":{"kvlistValue":{"values":[{"key":"f"}]}}}]},{}],"metadata":[{"key":"g"}],"name":"body","value":{}}"#,
+            r#"{"resource":{"attributes":[{"key":"a"},{"key":"b"},{"key":"c","value":{"stringValue":"x"}},{"key":"d"}]},"logRecords":[{"body":{"arrayValue":{"values":[{},{"intValue":"1"},{"kvlistValue":{"values":[]}}]}},"attributes":[{"key":"e","value":{"kvlistValue":{"values":[{"key":"f"}]}}}]},{}],"metadata":[{"key":"g"}],"name":"body","value":{}}"#,
         )
         .unwrap();
         assert_eq!(value, expected);
-    }
-
-    #[test]
-    fn test_restore_otlp_array_string() {
-        for (escaped, restored, empty) in [
-            ("\0", "\0", true),
-            ("\0\0", "\0", false),
-            ("\0\0x", "\0x", false),
-            ("x\0", "x\0", false),
-            ("", "", false),
-        ] {
-            let mut value = escaped.to_string();
-            assert_eq!(restore_otlp_array_string(&mut value), empty);
-            assert_eq!(value, restored);
-        }
+        let once = value.clone();
+        normalize_otlp_empty_values(&mut value);
+        assert_eq!(value, once);
     }
 
     #[test]
     fn test_from_slice_lenient_otlp_keeps_other_errors() {
         for body in [&b"[1,2"[..], br#"{"a":"x"}"#, br#"{"a":1} trailing"#] {
             let strict = from_slice::<std::collections::BTreeMap<String, u64>>(body).map(|_| ());
-            let lenient =
-                from_slice_lenient_otlp::<std::collections::BTreeMap<String, u64>>(body, |_| {})
-                    .map(|_| ());
+            let lenient = from_slice_lenient_otlp::<std::collections::BTreeMap<String, u64>>(body)
+                .map(|_| ());
             assert!(strict.is_err());
             assert_eq!(
                 strict.map_err(|e| e.to_string()),
