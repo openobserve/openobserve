@@ -68,32 +68,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hasTabs() && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
         ]"
       >
-        <OButton
-          v-if="ownsSidebarTrigger"
-          variant="ghost"
-          size="icon-toolbar"
-          data-test="o-page-layout-mobile-sidebar-btn"
-          :aria-label="t('common.sidePanel')"
-          @click="layoutSidebar?.open()"
-        >
-          <OIcon name="menu" size="sm" />
-        </OButton>
+        <FeatureLockExempt v-if="ownsSidebarTrigger" as="span" class="contents">
+          <OButton
+            variant="ghost"
+            size="icon-toolbar"
+            data-test="o-page-layout-mobile-sidebar-btn"
+            :aria-label="t('common.sidePanel')"
+            @click="layoutSidebar?.open()"
+          >
+            <OIcon name="menu" size="sm" />
+          </OButton>
+        </FeatureLockExempt>
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
            footprint, so the title's X never shifts between list and add/edit). -->
         <template v-if="hasBack()">
           <slot name="back">
-            <button
-              type="button"
-              class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
-              :title="backLabel"
-              :aria-label="backLabel"
-              :data-test="props.back?.dataTest ?? 'app-page-header-back'"
-              @click="onBack"
-            >
-              <OIcon name="chevron-left" size="md" />
-            </button>
+            <FeatureLockExempt as="span" class="contents">
+              <button
+                type="button"
+                class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+                :title="backLabel"
+                :aria-label="backLabel"
+                :data-test="props.back?.dataTest ?? 'app-page-header-back'"
+                @click="onBack"
+              >
+                <OIcon name="chevron-left" size="md" />
+              </button>
+            </FeatureLockExempt>
           </slot>
         </template>
 
@@ -244,6 +247,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useFeatureLock, useFeatureNames } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {

@@ -80,6 +80,46 @@ describe("Custom Component", () => {
     }
   });
 
+  describe("continuous profiling license lock", () => {
+    const mountWith = (features: Record<string, string>) => {
+      store.state.zoConfig = { ...store.state.zoConfig, profiling_enabled: true, features };
+      return mount(Custom, {
+        props: { currOrgIdentifier: "test-org" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: { ORouteTab: true, "router-view": true },
+        },
+      });
+    };
+    const profilesTab = (w: any) => w.find('[data-test="ingestion-custom-tab-ingestProfiles"]');
+
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, profiling_enabled: false, features: {} };
+    });
+
+    it("marks the Profiles tab with a lock when profiling is locked", () => {
+      const w = mountWith({ continuous_profiling: "locked" });
+      expect(profilesTab(w).attributes("suffix-icon")).toBe("lock");
+      w.unmount();
+    });
+
+    it("keeps the guide rail live on a locked page", () => {
+      const w = mountWith({ continuous_profiling: "locked" });
+      expect(
+        w.find('[data-feature-lock-exempt] [data-test="ingestion-custom-tab-ingestLogs"]').exists(),
+      ).toBe(true);
+      w.unmount();
+    });
+
+    it("shows the Profiles tab without a lock when profiling is enabled", () => {
+      const w = mountWith({ continuous_profiling: "enabled" });
+      expect(profilesTab(w).exists()).toBe(true);
+      expect(profilesTab(w).attributes("suffix-icon")).toBeUndefined();
+      w.unmount();
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should mount successfully", () => {
       expect(wrapper.exists()).toBe(true);

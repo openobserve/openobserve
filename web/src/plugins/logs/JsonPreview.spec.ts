@@ -1487,4 +1487,58 @@ describe("JsonPreview Component", () => {
       });
     });
   });
+
+  describe("View Related under a license lock", () => {
+    const mountRelated = () =>
+      mount(JsonPreview, {
+        props: { value: mockValue, mode: "sidebar" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            AppTabs: true,
+            CodeQueryEditor: true,
+            ODialog: ODialogStub,
+            OButton: {
+              props: { disabled: Boolean },
+              template:
+                '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+            },
+            OTooltip: { template: "<div><slot /></div>" },
+            ODropdown: true,
+            ODropdownItem: true,
+            ODropdownSeparator: true,
+            OSelect: true,
+            OIcon: { props: ["name"], template: '<i :data-icon="name" />' },
+            OInput: true,
+            OSpinner: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+
+    afterEach(() => {
+      store.state.zoConfig = { ai_enabled: true };
+    });
+
+    it("renders the button disabled with a lock, skips the probe and emits nothing on click", async () => {
+      store.state.zoConfig = {
+        ai_enabled: true,
+        service_streams_enabled: true,
+        features: { correlation: "locked" },
+      };
+      const related = mountRelated();
+      await flushPromises();
+      const btn = related.find('[data-test="log-correlation-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
+      expect(related.find('[data-test="log-correlation-btn-lock"]').exists()).toBe(true);
+      await btn.trigger("click");
+      expect(related.emitted("show-correlation")).toBeUndefined();
+      related.unmount();
+    });
+  });
 });

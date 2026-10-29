@@ -136,6 +136,8 @@ export interface RichCardStepAction {
   variant?: "primary" | "secondary";
   /** Greys the button out — e.g. nothing selected yet. */
   disabled?: boolean;
+  /** Also disables the button: the renderer wraps it so the reason still shows on hover. */
+  disabledReason?: I18nText;
   /** Render the button only once detection connects (default: always visible). */
   showOnDetect?: boolean;
 }

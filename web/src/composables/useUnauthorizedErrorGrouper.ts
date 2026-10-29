@@ -18,7 +18,7 @@ import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast"
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
-import { isLockedFeatureDenial } from "@/composables/useFeatureLock";
+import { isPageLocked } from "@/composables/useFeatureLock";
 
 // Friendly name overrides. Keys, not text — this map is module scope, so it is
 // translated at display time in extractResourceInfo().
@@ -195,23 +195,30 @@ export function addUnauthorizedError(responseUrl: string): void {
   }, 300);
 }
 
-// null while closed; denials arriving while open join the same dialog.
-const licenseDenied = ref<string[] | null>(null);
+// null while there is nothing to show; [] is a denial that named no feature.
+const licenseDenials = ref<string[] | null>(null);
+let pageChangedAt = 0;
 
-/** Open the license-denial dialog (403 + 40001), kept apart from the RBAC access toast. */
-export function addLicenseDeniedError(features: string[]): void {
-  // The locked page's own banner already names its feature; any other missing feature still opens the dialog.
-  if (isLockedFeatureDenial(features)) return;
-  licenseDenied.value = [...new Set([...(licenseDenied.value ?? []), ...features])];
+/** Record a license denial (403 + 40001) for the layout's top bar, kept apart from the RBAC access toast. */
+export function addLicenseDeniedError(features: string[], requestStartedAt = Date.now()): void {
+  // A locked page disables every action, so its denials only come from its own background loads.
+  if (requestStartedAt < pageChangedAt || isPageLocked()) return;
+  licenseDenials.value = [...new Set([...(licenseDenials.value ?? []), ...features])];
 }
 
-export function useLicenseDeniedDialog() {
+export function useLicenseDenials() {
   return {
-    features: readonly(licenseDenied),
-    close: () => {
-      licenseDenied.value = null;
+    features: readonly(licenseDenials),
+    dismiss: () => {
+      licenseDenials.value = null;
     },
   };
+}
+
+/** Clears the top bar's license denials on navigation and ignores those of requests the old page started. */
+export function clearLicenseDenials(): void {
+  pageChangedAt = Date.now();
+  licenseDenials.value = null;
 }
 
 /**

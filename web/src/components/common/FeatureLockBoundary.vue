@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { toRef } from "vue";
-import { provideFeatureLock } from "@/composables/useFeatureLock";
+import { LOCK_EXEMPT_ATTR, provideFeatureLock } from "@/composables/useFeatureLock";
 
 const props = defineProps<{ feature: string | null }>();
 
@@ -58,7 +58,7 @@ const CONTROL =
 const { locked } = provideFeatureLock(toRef(props, "feature"));
 
 const block = (event: Event) => {
-  if (!locked.value) return;
+  if (!locked.value || (event.target as Element | null)?.closest?.(`[${LOCK_EXEMPT_ATTR}]`)) return;
   event.preventDefault();
   event.stopPropagation();
 };

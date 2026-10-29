@@ -18,14 +18,10 @@ import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
 import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
-import {
-  addLicenseDeniedError,
-  addUnauthorizedError,
-} from "@/composables/useUnauthorizedErrorGrouper";
+import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
-import { licenseDeniedFeatures } from "@/utils/featureGate";
-import { isLockedFeatureDenial, markLockedDenial } from "@/composables/useFeatureLock";
+import { receiveLicenseDenial } from "@/services/licenseDenialReceiver";
 
 declare module "axios" {
   interface AxiosRequestConfig {
@@ -33,6 +29,7 @@ declare module "axios" {
     skipAccessToast?: boolean;
     /** Skip the global Unauthorized toast on a 403; the caller handles the refusal itself. */
     silentForbidden?: boolean;
+    startedAt?: number;
   }
 }
 
@@ -118,6 +115,11 @@ const http = ({ headers } = {} as any) => {
     headers,
   });
 
+  instance.interceptors.request.use((requestConfig) => {
+    requestConfig.startedAt = Date.now();
+    return requestConfig;
+  });
+
   instance.interceptors.response.use(
     function (response) {
       return response;
@@ -130,12 +132,7 @@ const http = ({ headers } = {} as any) => {
         return new Promise(() => {});
       }
       // Ahead of the status switch: a license denial must not read as a missing RBAC permission.
-      const deniedFeatures = licenseDeniedFeatures(error);
-      if (deniedFeatures) {
-        if (isLockedFeatureDenial(deniedFeatures)) markLockedDenial(error);
-        addLicenseDeniedError(deniedFeatures);
-        return Promise.reject(error);
-      }
+      if (receiveLicenseDenial(error, error?.config?.startedAt)) return Promise.reject(error);
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:

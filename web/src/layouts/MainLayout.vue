@@ -160,11 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <!-- Outside the lock boundary, so its own actions stay live. -->
-            <FeatureLockBanner
-              v-if="isLoading && lockedFeature"
-              class="shrink-0"
-              :feature="lockedFeature"
-            />
+            <FeatureLockBanner v-if="isLoading" class="shrink-0" :feature="lockedFeature" />
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"
@@ -320,6 +316,7 @@ import { userDataStreams } from "@/utils/internalStreams";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
 import FeatureLockBanner from "@/components/common/FeatureLockBanner.vue";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
+import { clearLicenseDenials } from "@/composables/useUnauthorizedErrorGrouper";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import {
   FIRST_DATA_NOTICE,
@@ -987,58 +984,74 @@ export default defineComponent({
     // ever flips at runtime), keep the menu in sync.
     watch(aiObservabilityMenuState, () => updateAIObservabilityMenu(), { immediate: false });
 
+    // A locked license keeps the entry even with the runtime flag off, so the lock stays discoverable.
+    const syntheticsMenuState = computed<FeatureState>(() =>
+      menuState(features.value, "synthetics", isSyntheticsEnabled.value),
+    );
     const updateSyntheticMenu = () => {
-      const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");
-
-      if (!isSyntheticsEnabled.value) {
-        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
-        return;
-      }
-      if (existingIndex !== -1) return;
-
-      const incidentIndex = linksList.value.findIndex((l: any) => l.name === "incidentList");
-      const alertIndex = linksList.value.findIndex((l: any) => l.name === "alertList");
-      const insertAt =
-        incidentIndex !== -1
-          ? incidentIndex + 1
-          : alertIndex !== -1
-            ? alertIndex + 1
-            : linksList.value.length;
-
-      linksList.value.splice(insertAt, 0, {
-        title: t("menu.synthetic"),
-        icon: "radar",
-        link: "/synthetics",
-        name: "synthetics",
-      });
+      syncFeatureLink(
+        {
+          title: t("menu.synthetic"),
+          icon: "radar",
+          link: "/synthetics",
+          name: "synthetics",
+        },
+        syntheticsMenuState.value,
+        () => {
+          const incidentIndex = linksList.value.findIndex((l) => l.name === "incidentList");
+          const alertIndex = linksList.value.findIndex((l) => l.name === "alertList");
+          if (incidentIndex !== -1) return incidentIndex + 1;
+          return alertIndex !== -1 ? alertIndex + 1 : linksList.value.length;
+        },
+      );
     };
 
     // Keep the menu in sync if /config resolves after mount.
-    watch(isSyntheticsEnabled, () => updateSyntheticMenu(), {
+    watch(syntheticsMenuState, () => updateSyntheticMenu(), {
       immediate: false,
     });
 
+    const profilesMenuState = computed<FeatureState>(() =>
+      menuState(features.value, "continuous_profiling", isProfilingEnabled.value),
+    );
     const updateProfilesMenu = () => {
-      const existingIndex = linksList.value.findIndex((l: any) => l.name === "profiles");
-
-      if (!isProfilingEnabled.value) {
-        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
-        return;
-      }
-      if (existingIndex !== -1) return;
-
-      const tracesIndex = linksList.value.findIndex((l: any) => l.name === "traces");
-      const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
-
-      linksList.value.splice(insertAt, 0, {
-        title: t("menu.profiles"),
-        icon: "memory",
-        link: "/profiles",
-        name: "profiles",
-      });
+      syncFeatureLink(
+        {
+          title: t("menu.profiles"),
+          icon: "memory",
+          link: "/profiles",
+          name: "profiles",
+        },
+        profilesMenuState.value,
+        () => {
+          const tracesIndex = linksList.value.findIndex((l) => l.name === "traces");
+          return tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+        },
+      );
     };
 
-    watch(isProfilingEnabled, () => updateProfilesMenu(), { immediate: false });
+    watch(profilesMenuState, () => updateProfilesMenu(), { immediate: false });
+
+    // Static rail entries owned by a license feature: locked keeps the entry with a lock, hidden drops it.
+    const LICENSED_LINKS: Record<string, string> = {
+      rum: "rum",
+      productAnalytics: "product_analytics",
+      dashboards: "dashboards",
+      reports: "reports",
+      alertList: "alerts",
+      sloList: "anomaly_detection",
+    };
+    const applyLicenseStates = () => {
+      linksList.value = linksList.value.flatMap((link) => {
+        const key = LICENSED_LINKS[link.name];
+        if (!key) return [link];
+        const state = featureState(features.value, key);
+        if (state === "hidden") return [];
+        const { licenseLocked: _, ...rest } = link;
+        return [state === "locked" ? { ...rest, licenseLocked: true } : rest];
+      });
+    };
+    watch(features, () => applyLicenseStates(), { immediate: false });
 
     // On-call's Pages/Teams/Routing entries live entirely inside the
     // `reliability` flyout (navGroups.ts), gated there by `gate: "oncall"`.
@@ -1052,6 +1065,7 @@ export default defineComponent({
       updateSyntheticMenu();
       updateProfilesMenu();
       updateAIObservabilityMenu();
+      applyLicenseStates();
 
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus?.split(",")?.filter((val: string) => val?.trim()) ||
@@ -1701,6 +1715,9 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    // Path, not the full route: a query-only change (time range, filters) stays on the same page.
+    watch(() => router.currentRoute.value.path, clearLicenseDenials);
 
     // Home page has its own inline AI tab (see toggleAIChat's home special-case
     // above), so the sidebar chat panel is redundant there — close it on

@@ -24,7 +24,7 @@ import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-rout
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
-import { featureState } from "@/utils/featureGate";
+import { featureState, withLicenseFeature } from "@/utils/featureGate";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { forgetLinkRequest } from "@/utils/slackLink";
@@ -174,7 +174,10 @@ const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
 
 // `=== false`, as for Downtimes: a cold load with `/config` still in flight must not bounce.
 const profilesRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.profiling_enabled === false) {
+  if (
+    store.state.zoConfig?.profiling_enabled === false &&
+    !isLicenseLocked("continuous_profiling")
+  ) {
     next({ name: "home", query: { org_identifier: to.query.org_identifier } });
     return;
   }
@@ -504,6 +507,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.profiles",
+        licenseFeature: "continuous_profiling",
       },
       beforeEnter: profilesRouteGuard,
     },
@@ -515,11 +519,11 @@ const useRoutes = () => {
       path: "traces/services",
       redirect: redirectToTraceTab("services-catalog"),
     },
-    {
+    withLicenseFeature("db_monitoring", {
       path: "infra/databases",
       component: DbmShell,
       beforeEnter(to: any, from: any, next: any) {
-        if (!dbMonitoringEnabled()) {
+        if (!dbMonitoringEnabled() && !isLicenseLocked("db_monitoring")) {
           next({ name: "traces", query: to.query });
           return;
         }
@@ -618,7 +622,7 @@ const useRoutes = () => {
           },
         },
       ],
-    },
+    }),
     {
       // Database Monitoring moved from `traces/databases` to `infra/databases`.
       // Every old link keeps working: the wildcard carries the tab segment
@@ -636,14 +640,14 @@ const useRoutes = () => {
       path: "infra/hosts",
       name: "infraHosts",
       component: () => import("@/views/Infrastructure/HostsPage.vue"),
-      meta: { titleKey: "menu.hosts" },
+      meta: { titleKey: "menu.hosts", licenseFeature: "host_monitoring" },
       beforeEnter: routeGuard,
     },
     {
       path: "infra/kubernetes",
       name: "infraKubernetes",
       component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
-      meta: { titleKey: "menu.kubernetes" },
+      meta: { titleKey: "menu.kubernetes", licenseFeature: "kubernetes_monitoring" },
       beforeEnter: routeGuard,
     },
     {
@@ -652,7 +656,7 @@ const useRoutes = () => {
       name: "infraKubernetes2",
       component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
       props: { workload: "kubernetes" },
-      meta: { titleKey: "menu.kubernetes2" },
+      meta: { titleKey: "menu.kubernetes2", licenseFeature: "kubernetes_monitoring" },
       beforeEnter: routeGuard,
     },
     {
@@ -735,6 +739,7 @@ const useRoutes = () => {
         keepAlive: false,
         titleKey: "menu.dashboard",
         allowOnEmptyData: true,
+        licenseFeature: "dashboards",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -747,6 +752,7 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "routeTitles.viewDashboard",
+        licenseFeature: "dashboards",
       },
       beforeEnter(to: any, from: any, next: any) {
         // A playlist link to the dashboard view is played by the TV player, except its own page fallback.
@@ -765,6 +771,7 @@ const useRoutes = () => {
       component: TvPlaylist,
       meta: {
         titleKey: "routeTitles.dashboardTvPlaylist",
+        licenseFeature: "dashboards",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -777,6 +784,7 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "dashboard.importDashboard",
+        licenseFeature: "dashboards",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -788,9 +796,10 @@ const useRoutes = () => {
       component: PublicDashboardLinks,
       meta: {
         titleKey: "dashboard.publicLinks.pageTitle",
+        licenseFeature: "dashboards",
       },
       beforeEnter(to: any, from: any, next: any) {
-        if (!publicDashboardsEnabled()) {
+        if (!publicDashboardsEnabled() && !isLicenseLocked("dashboards")) {
           next({ name: "dashboards", query: { org_identifier: to.query.org_identifier } });
           return;
         }
@@ -804,6 +813,7 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "panel.addPanel",
+        licenseFeature: "dashboards",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -860,7 +870,7 @@ const useRoutes = () => {
             routeGuard(to, from, next);
           },
         },
-        {
+        withLicenseFeature("pipelines", {
           path: "pipelines",
           name: "pipelines",
           component: PipelinesList,
@@ -915,7 +925,7 @@ const useRoutes = () => {
               },
             },
           ],
-        },
+        }),
       ],
     },
     {
@@ -924,6 +934,7 @@ const useRoutes = () => {
       component: () => import("@/views/slos/SloList.vue"),
       meta: {
         titleKey: "menu.slos",
+        licenseFeature: "anomaly_detection",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -937,6 +948,7 @@ const useRoutes = () => {
       component: () => import("@/views/slos/AddSlo.vue"),
       meta: {
         titleKey: "slos.newTitle",
+        licenseFeature: "anomaly_detection",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -948,6 +960,7 @@ const useRoutes = () => {
       component: () => import("@/views/slos/AddSlo.vue"),
       meta: {
         titleKey: "slos.editTitle",
+        licenseFeature: "anomaly_detection",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -959,6 +972,7 @@ const useRoutes = () => {
       component: () => import("@/views/slos/SloDetail.vue"),
       meta: {
         titleKey: "routeTitles.sloDetail",
+        licenseFeature: "anomaly_detection",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -970,6 +984,7 @@ const useRoutes = () => {
       component: AlertList,
       meta: {
         titleKey: "menu.alerts",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1019,6 +1034,7 @@ const useRoutes = () => {
       component: AlertLibrary,
       meta: {
         titleKey: "alert_library.header",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1136,6 +1152,7 @@ const useRoutes = () => {
       component: () => import("@/views/alerts/AlertDetail.vue"),
       meta: {
         titleKey: "routeTitles.alertDetail",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1147,6 +1164,7 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         titleKey: "alerts.addAlertMode",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1163,6 +1181,7 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         titleKey: "routeTitles.editAlert",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1174,6 +1193,7 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         titleKey: "alerts.addAnomalyMode",
+        licenseFeature: "anomaly_detection",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -1191,6 +1211,7 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         titleKey: "alerts.editAnomalyMode",
+        licenseFeature: "anomaly_detection",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -1208,6 +1229,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/AlertHistory.vue"),
       meta: {
         titleKey: "alerts.history",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1219,6 +1241,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/AlertInsights.vue"),
       meta: {
         titleKey: "alerts.insights.title",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1231,6 +1254,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
       meta: {
         titleKey: "correlation.importSemanticGroups.title",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -1260,7 +1284,7 @@ const useRoutes = () => {
       },
       props: true,
     },
-    {
+    withLicenseFeature("rum", {
       path: "rum",
       name: "RUM",
       component: RealUserMonitoring,
@@ -1386,8 +1410,8 @@ const useRoutes = () => {
           ],
         },
       ],
-    },
-    {
+    }),
+    withLicenseFeature("product_analytics", {
       path: "product-analytics",
       name: PA_ROUTES.shell,
       component: AppAnalytics,
@@ -1447,7 +1471,7 @@ const useRoutes = () => {
           },
         },
       ],
-    },
+    }),
     // Siblings of the shell, not children, so the editor renders without its sub-tab strip.
     {
       path: "product-analytics/events/new",
@@ -1455,6 +1479,7 @@ const useRoutes = () => {
       component: NamedEventEditor,
       meta: {
         titleKey: "rum.analytics.events.createTitle",
+        licenseFeature: "product_analytics",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1467,6 +1492,7 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "rum.analytics.events.editTitle",
+        licenseFeature: "product_analytics",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1495,6 +1521,7 @@ const useRoutes = () => {
         props: true,
         meta: {
           titleKey: "menu.report",
+          licenseFeature: "reports",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -1507,6 +1534,7 @@ const useRoutes = () => {
         props: true,
         meta: {
           titleKey: "routeTitles.reportDetail",
+          licenseFeature: "reports",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -1519,6 +1547,7 @@ const useRoutes = () => {
         props: true,
         meta: {
           titleKey: "routeTitles.createReport",
+          licenseFeature: "reports",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);

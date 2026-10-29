@@ -395,7 +395,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
+import { featureState, forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -797,7 +797,8 @@ export default defineComponent({
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
       if (
         (config.isEnterprise !== "true" && config.isCloud !== "true") ||
-        !store.state.zoConfig.rbac_enabled
+        !store.state.zoConfig.rbac_enabled ||
+        featureState(store.state.zoConfig.features, "rbac") !== "enabled"
       )
         return;
       try {

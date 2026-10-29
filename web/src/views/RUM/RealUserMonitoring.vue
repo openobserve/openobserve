@@ -36,15 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0"
       >
         <template #tabs>
-          <OTabs v-model="activeTab" align="left" @change="changeTab">
-            <OTab
-              v-for="tab in tabs"
-              :key="tab.value"
-              :name="tab.value"
-              :label="tab.label"
-              :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
-            />
-          </OTabs>
+          <!-- Section navigation stays live on a license-locked page. -->
+          <FeatureLockExempt class="contents">
+            <OTabs v-model="activeTab" align="left" @change="changeTab">
+              <OTab
+                v-for="tab in tabs"
+                :key="tab.value"
+                :name="tab.value"
+                :label="tab.label"
+                :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
+              />
+            </OTabs>
+          </FeatureLockExempt>
         </template>
       </OPageHeader>
       <router-view v-slot="{ Component }">
@@ -84,6 +87,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

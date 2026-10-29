@@ -15,6 +15,7 @@
 
 import {
   computed,
+  getCurrentInstance,
   inject,
   onScopeDispose,
   provide,
@@ -26,6 +27,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { siteURL } from "@/constants/config";
+import { featureState } from "@/utils/featureGate";
+import type { I18nText } from "@/types/i18n";
 
 export interface FeatureLock {
   locked: Readonly<Ref<boolean>>;
@@ -36,7 +39,7 @@ const FEATURE_LOCK: InjectionKey<FeatureLock> = Symbol("featureLock");
 
 const UNLOCKED: FeatureLock = { locked: computed(() => false), feature: ref(null) };
 
-// Module-level so code outside the component tree (toasts, the http interceptor) can see the page lock.
+// Module-level so the license-denial receiver, outside the component tree, can see the page lock.
 const activeLock = shallowRef<FeatureLock | null>(null);
 
 /** Locks every O2 primitive below the caller while `lockedFeature` names a feature. */
@@ -55,35 +58,39 @@ export const provideFeatureLock = (lockedFeature: Readonly<Ref<string | null>>):
 
 export const useFeatureLock = (): FeatureLock => inject(FEATURE_LOCK, UNLOCKED);
 
+/** Marks a container whose controls only navigate, so the page lock leaves them live. */
+export const LOCK_EXEMPT_ATTR = "data-feature-lock-exempt";
+
+/** Unlocks the O2 primitives below the caller without releasing the page lock itself. */
+export const provideFeatureLockExempt = (): void => provide(FEATURE_LOCK, UNLOCKED);
+
 /** A primitive's effective `disabled`: its own prop, or the page lock. */
 export const useLockedDisabled = (disabled: () => boolean | undefined): ComputedRef<boolean> => {
   const { locked } = useFeatureLock();
   return computed(() => Boolean(disabled()) || locked.value);
 };
 
-/** True while a license-locked page is on screen. */
-export const isPageFeatureLocked = (): boolean => activeLock.value?.locked.value === true;
+export const isPageLocked = (): boolean => !!activeLock.value?.feature.value;
 
-/** A license denial whose every missing key is the locked page's own feature. */
-export const isLockedFeatureDenial = (features: string[]): boolean => {
-  const key = activeLock.value?.feature.value;
-  return !!key && features.length > 0 && features.every((feature) => feature === key);
+// Server messages of license denials: catch sites toast `response.data.message`, never the error itself.
+const licenseDenialMessages = new Set<string>();
+
+// ponytail: time window, so an unrelated error toast inside it is dropped too; per-error tagging at catch sites lifts that.
+const DENIAL_TOAST_WINDOW_MS = 2000;
+let lastDenialAt = -Infinity;
+
+/** Remembers a license denial so the catch site's error toast that follows it is dropped. */
+export const markLicenseDenial = (error: unknown): void => {
+  lastDenialAt = Date.now();
+  const message = (error as { response?: { data?: { message?: unknown } } })?.response?.data
+    ?.message;
+  if (typeof message === "string" && message) licenseDenialMessages.add(message);
 };
 
-// Server messages of tagged denials: catch sites toast `response.data.message`, never the error itself.
-const lockedDenialMessages = new Set<string>();
-
-/** Tags a locked-page denial (`error.licenseLocked`) so its toast is dropped and the page keeps its license state. */
-export const markLockedDenial = (error: unknown): void => {
-  const tagged = error as { licenseLocked?: boolean; response?: { data?: { message?: unknown } } };
-  tagged.licenseLocked = true;
-  const message = tagged.response?.data?.message;
-  if (typeof message === "string" && message) lockedDenialMessages.add(message);
-};
-
-/** True for an error toast that only repeats a tagged denial while its page is still locked. */
-export const isLockedDenialToast = (message: unknown): boolean =>
-  isPageFeatureLocked() && typeof message === "string" && lockedDenialMessages.has(message);
+/** True for an error toast the top bar already explains: one repeating a denial, or any fired just after one. */
+export const isLicenseDenialToast = (message: unknown): boolean =>
+  Date.now() - lastDenialAt < DENIAL_TOAST_WINDOW_MS ||
+  (typeof message === "string" && licenseDenialMessages.has(message));
 
 /** The upsell actions shared by the locked page and the locked-page banner. */
 export const useFeatureLockActions = () => {
@@ -101,4 +108,18 @@ export const useFeatureNames = () => {
   const featureNames = (keys: readonly string[]): string =>
     keys.map((key) => featureName(key) ?? key).join(", ");
   return { featureName, featureNames };
+};
+
+/** License lock of one feature, for its controls on a page the license leaves open. */
+export const useLicenseLock = (key: string) => {
+  const store = useStore();
+  const { featureName } = useFeatureNames();
+  // Global `$t`, not a vue-i18n import: toast and http load this module, which would defeat specs' vue-i18n mocks.
+  const translate = getCurrentInstance()?.proxy?.$t;
+  const locked = computed(() => featureState(store?.state.zoConfig?.features, key) === "locked");
+  const lockedReason = computed(() => {
+    const feature = featureName(key) ?? key;
+    return (translate ? translate("featureLock.headerLocked", { feature }) : feature) as I18nText;
+  });
+  return { locked, lockedReason };
 };

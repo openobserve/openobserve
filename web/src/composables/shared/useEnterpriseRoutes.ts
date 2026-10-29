@@ -40,7 +40,7 @@ const isLicenseLocked = (feature: string): boolean =>
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
 // access redirects home when off.
 const syntheticsRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.synthetics_enabled === false) {
+  if (store.state.zoConfig?.synthetics_enabled === false && !isLicenseLocked("synthetics")) {
     next("/");
     return;
   }
@@ -53,7 +53,10 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
 // without await, so redirecting on "not yet known" would bounce a bookmarked
 // link on a cold load.
 const privateLocationRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.synthetics_private_locations_enabled === false) {
+  if (
+    store.state.zoConfig?.synthetics_private_locations_enabled === false &&
+    !isLicenseLocked("synthetics")
+  ) {
     next("/");
     return;
   }
@@ -153,6 +156,7 @@ const useEnterpriseRoutes = () => {
           name: "syntheticsTokens",
           meta: {
             titleKey: "iam.syntheticsTokens",
+            licenseFeature: "synthetics",
           },
           component: () => import("@/components/iam/SyntheticsTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -201,7 +205,7 @@ const useEnterpriseRoutes = () => {
         {
           path: "mcpServer",
           name: "mcpServer",
-          meta: { titleKey: "iam.mcpServerLabel" },
+          meta: { titleKey: "iam.mcpServerLabel", licenseFeature: "mcp" },
           component: () => import("@/components/iam/McpServer.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -221,17 +225,16 @@ const useEnterpriseRoutes = () => {
   // `?section=status-pages`), so it needs no route of its own — it ships
   // with synthetics, no separate toggle. Notices/Custom Domains within it
   // are Enterprise-only, gated in-view on `build_type` instead.
-  routes.push({
-    path: "synthetics",
-    name: "synthetics",
-    component: () => import("@/views/SyntheticMonitoring.vue"),
-    meta: { titleKey: "menu.synthetic", allowOnEmptyData: true },
-    beforeEnter(to: any, from: any, next: any) {
-      syntheticsRouteGuard(to, from, next);
+  const syntheticsRoutes = [
+    {
+      path: "synthetics",
+      name: "synthetics",
+      component: () => import("@/views/SyntheticMonitoring.vue"),
+      meta: { titleKey: "menu.synthetic", allowOnEmptyData: true },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
     },
-  });
-
-  routes.push(
     {
       path: "synthetics/add",
       name: "synthetics-add",
@@ -286,7 +289,8 @@ const useEnterpriseRoutes = () => {
         syntheticsRouteGuard(to, from, next);
       },
     },
-  );
+  ];
+  routes.push(...syntheticsRoutes.map((route) => withLicenseFeature("synthetics", route)));
 
   //the below are the routes that we support for enterprise and cloud
   //the above are the routes that we support for oss including both enterprise and cloud
@@ -502,13 +506,13 @@ const useEnterpriseRoutes = () => {
         component: EditRole,
         beforeEnter: withFeatureGate("rbac", routeGuard),
       },
-      {
-        path: "quota",
-        name: "quota",
-        component: Quota,
-        beforeEnter: withFeatureGate("rbac", routeGuard),
-      },
-    ],
+    ].map((route) => withLicenseFeature("rbac", route)),
+    withLicenseFeature("ratelimit", {
+      path: "quota",
+      name: "quota",
+      component: Quota,
+      beforeEnter: withFeatureGate("rbac", routeGuard),
+    }),
   );
 
   if (config.isCloud == "true") {

@@ -775,7 +775,21 @@ function fireConfetti() {
             <!-- Action button — for steps performed in a cloud console rather
                  than by copying a command. -->
             <div v-if="step.action && (!step.action.showOnDetect || detected)" class="step-action">
+              <OTooltip v-if="step.action.disabledReason" :content="step.action.disabledReason">
+                <span class="inline-flex">
+                  <OButton
+                    :variant="step.action.variant || 'primary'"
+                    size="sm-action"
+                    :icon-left="step.action.icon"
+                    disabled
+                    :data-test="`ai-step-action-${step.action.id}`"
+                  >
+                    {{ step.action.label }}
+                  </OButton>
+                </span>
+              </OTooltip>
               <OButton
+                v-else
                 :variant="step.action.variant || 'primary'"
                 size="sm-action"
                 :icon-left="step.action.icon"

@@ -690,14 +690,42 @@ describe("useEnterpriseRoutes.ts", () => {
       ["onCallTeamDetail", "oncall"],
       ["incidentList", "incidents"],
       ["incidentDetail", "incidents"],
+      ["groups", "rbac"],
+      ["editGroup", "rbac"],
+      ["roles", "rbac"],
+      ["editRole", "rbac"],
+      ["quota", "ratelimit"],
+      ["mcpServer", "mcp"],
+      ["syntheticsTokens", "synthetics"],
+      ["synthetics", "synthetics"],
+      ["synthetics-add", "synthetics"],
+      ["synthetics-edit", "synthetics"],
+      ["synthetics-status-page-edit", "synthetics"],
+      ["synthetic-private-location", "synthetics"],
+      ["synthetic-monitor-results", "synthetics"],
+      ["synthetics-run-detail", "synthetics"],
     ])("tags %s, child routes included, with meta.licenseFeature %s", (name, feature) => {
       expect(find(useEnterpriseRoutes(), name).meta.licenseFeature).toBe(feature);
     });
+
+    it.each(["users", "serviceAccounts", "organizations", "ingestionTokens"])(
+      "leaves %s, which the rbac license does not gate, untagged",
+      (name) => {
+        expect(find(useEnterpriseRoutes(), name).meta?.licenseFeature).toBeUndefined();
+      },
+    );
 
     it.each([
       ["workflows", { workflows_enabled: false }],
       ["onCallTeams", { oncall_enabled: false }],
       ["incidentList", {}],
+      ["roles", { rbac_enabled: true }],
+      ["synthetics", { synthetics_enabled: false }],
+      ["syntheticsTokens", { synthetics_enabled: false }],
+      [
+        "synthetic-private-location",
+        { synthetics_enabled: false, synthetics_private_locations_enabled: false },
+      ],
     ])("lets a locked %s through to its own page", async (name, flags) => {
       const { routeGuard } = await import("@/utils/zincutils");
       const feature = find(useEnterpriseRoutes(), name).meta.licenseFeature;
@@ -712,6 +740,13 @@ describe("useEnterpriseRoutes.ts", () => {
       store.state.zoConfig = { workflows_enabled: false, features: { workflows: "hidden" } };
       const next = vi.fn();
       find(useEnterpriseRoutes(), "workflows").beforeEnter({ query: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith("/");
+    });
+
+    it("still sends hidden synthetics whose flag is off home", () => {
+      store.state.zoConfig = { synthetics_enabled: false, features: { synthetics: "hidden" } };
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "synthetics").beforeEnter({ query: {} }, {}, next);
       expect(next).toHaveBeenCalledWith("/");
     });
   });

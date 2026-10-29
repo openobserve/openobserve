@@ -1088,8 +1088,7 @@ export default defineComponent({
     );
 
     const refreshIncidents = async () => {
-      // Explicit refresh: must reach the server.
-      await loadIncidents(true);
+      if ((await incidentsList.refetch()).isError) return;
       toast({
         variant: "success",
         message: t("toastMessages.alerts.incidentsRefreshed"),

@@ -2534,6 +2534,153 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("license feature tags", () => {
+    const shell = (path: string): any =>
+      useRoutes().homeChildRoutes.find((r: any) => r.path === path);
+
+    const enterShell = (path: string, zoConfig: Record<string, unknown>) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const next = vi.fn();
+        shell(path).beforeEnter({ query: { org_identifier: "acme" } }, {}, next);
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    it.each([
+      ["dashboards", "dashboards"],
+      ["viewDashboard", "dashboards"],
+      ["dashboardTvPlaylist", "dashboards"],
+      ["importDashboard", "dashboards"],
+      ["publicDashboardLinks", "dashboards"],
+      ["addPanel", "dashboards"],
+      ["reports", "reports"],
+      ["reportDetail", "reports"],
+      ["createReport", "reports"],
+      ["alertList", "alerts"],
+      ["alertDetail", "alerts"],
+      ["addAlert", "alerts"],
+      ["editAlert", "alerts"],
+      ["alertHistory", "alerts"],
+      ["alertInsights", "alerts"],
+      ["alertLibrary", "alerts"],
+      ["importSemanticGroups", "alerts"],
+      ["addAnomalyDetection", "anomaly_detection"],
+      ["editAnomalyDetection", "anomaly_detection"],
+      ["sloList", "anomaly_detection"],
+      ["addSlo", "anomaly_detection"],
+      ["editSlo", "anomaly_detection"],
+      ["sloDetail", "anomaly_detection"],
+      ["pipelines", "pipelines"],
+      ["pipelineEditor", "pipelines"],
+      ["createPipeline", "pipelines"],
+      ["importPipeline", "pipelines"],
+      ["pipelineHistory", "pipelines"],
+      ["pipelineBackfill", "pipelines"],
+      ["RUM", "rum"],
+      ["Sessions", "rum"],
+      ["SessionViewer", "rum"],
+      ["ErrorTracking", "rum"],
+      ["SourceMaps", "rum"],
+      ["UploadSourceMaps", "rum"],
+      ["RumPerformance", "rum"],
+      ["rumPerformanceWebVitals", "rum"],
+      [PA_ROUTES.shell, "product_analytics"],
+      [PA_ROUTES.funnels, "product_analytics"],
+      [PA_ROUTES.eventNew, "product_analytics"],
+      [PA_ROUTES.eventEdit, "product_analytics"],
+      ["dbmDatabases", "db_monitoring"],
+      ["dbmDeadlocks", "db_monitoring"],
+      ["dbmQueryDetail", "db_monitoring"],
+      ["profiles", "continuous_profiling"],
+      ["infraKubernetes", "kubernetes_monitoring"],
+      ["infraKubernetes2", "kubernetes_monitoring"],
+      ["infraHosts", "host_monitoring"],
+    ])("tags %s with meta.licenseFeature %s", (name, feature) => {
+      expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe(feature);
+    });
+
+    it("tags the Database Monitoring shell itself", () => {
+      expect(shell("infra/databases").meta.licenseFeature).toBe("db_monitoring");
+    });
+
+    it.each([
+      "alertDestinations",
+      "alertTemplates",
+      "pipeline",
+      "functionList",
+      "importFunction",
+      "enrichmentTables",
+      "logs",
+      "traces",
+    ])("leaves %s untagged", (name) => {
+      expect(findRoute(useRoutes().homeChildRoutes, name).meta?.licenseFeature).toBeUndefined();
+    });
+
+    it("leaves the logged-out public dashboard untagged", () => {
+      const route = useRoutes().parentRoutes.find((r: any) => r.name === "publicDashboard");
+      expect(route.meta.licenseFeature).toBeUndefined();
+    });
+
+    it("opens a locked Database Monitoring section though its flag is off", () => {
+      const next = enterShell("infra/databases", {
+        database_monitoring_enabled: false,
+        features: { db_monitoring: "locked" },
+      });
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("still sends a hidden Database Monitoring section to traces", () => {
+      const next = enterShell("infra/databases", {
+        database_monitoring_enabled: false,
+        features: { db_monitoring: "hidden" },
+      });
+      expect(next).toHaveBeenCalledWith({ name: "traces", query: { org_identifier: "acme" } });
+    });
+
+    it("opens locked profiles though profiling is off, and still bounces hidden ones", () => {
+      expect(
+        enterShell("profiles", {
+          profiling_enabled: false,
+          features: { continuous_profiling: "locked" },
+        }),
+      ).toHaveBeenCalledWith();
+      expect(
+        enterShell("profiles", {
+          profiling_enabled: false,
+          features: { continuous_profiling: "hidden" },
+        }),
+      ).toHaveBeenCalledWith({ name: "home", query: { org_identifier: "acme" } });
+    });
+
+    it("opens locked public-dashboard links though public dashboards are off", () => {
+      const previous = store.state.zoConfig;
+      const run = (zoConfig: Record<string, unknown>) => {
+        store.state.zoConfig = zoConfig;
+        const next = vi.fn();
+        findRoute(useRoutes().homeChildRoutes, "publicDashboardLinks").beforeEnter(
+          { query: { org_identifier: "acme" } },
+          {},
+          next,
+        );
+        return next;
+      };
+      try {
+        expect(
+          run({ public_dashboards_enabled: false, features: { dashboards: "locked" } }),
+        ).toHaveBeenCalledWith();
+        expect(
+          run({ public_dashboards_enabled: false, features: { dashboards: "hidden" } }),
+        ).toHaveBeenCalledWith({ name: "dashboards", query: { org_identifier: "acme" } });
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    });
+  });
+
   // the paywall predicate treats a matched beforeEnter as proof that routeGuard runs there.
   describe("paywall guard proxy (A-27)", () => {
     const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;

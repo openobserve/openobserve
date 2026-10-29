@@ -228,11 +228,22 @@ describe("useManagementRoutes", () => {
       ["modelPricingEditor", "ai_observability"],
       ["llmProviders", "ai_observability"],
       ["genAiAgentMapping", "ai_observability"],
-      ["aiToolsets", "ai_assistant"],
+      ["aiToolsets", "ai_toolsets"],
+      ["query_management", "query_management"],
+      ["storageSettings", "byob"],
+      ["syntheticsLocations", "synthetics"],
     ])("tags %s with license feature %s", (name, key) => {
       const route = routes[0].children.find((child: any) => child.name === name);
       expect(route.meta.licenseFeature).toBe(key);
     });
+
+    it.each(["pipelineDestinations", "correlationSettings", "nodes"])(
+      "leaves %s untagged",
+      (name) => {
+        const route = routes[0].children.find((child: any) => child.name === name);
+        expect(route.meta?.licenseFeature).toBeUndefined();
+      },
+    );
 
     it("AC-1.10 registers slack in OSS builds and sends it to General, never the locked page", () => {
       const slackRoute = routes[0].children.find((child: any) => child.name === "slack");
@@ -430,6 +441,7 @@ describe("useManagementRoutes", () => {
       expect(queryMgmtRoute.meta).toEqual({
         keepAlive: true,
         titleKey: "settings.queryManagement",
+        licenseFeature: "query_management",
       });
     });
 
@@ -492,6 +504,7 @@ describe("useManagementRoutes", () => {
         keepAlive: true,
         titleKey: "routeTitles.syntheticsLocations",
         allowOnEmptyData: true,
+        licenseFeature: "synthetics",
       });
     });
 

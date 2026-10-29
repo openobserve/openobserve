@@ -399,6 +399,32 @@ describe("SetupCardRenderer — first-event bar, detected emit & showOnDetect ac
     expect(wrapper.find('[data-test="ai-step-action-launch-console"]').exists()).toBe(true);
   });
 
+  it("renders an action with a disabledReason disabled and emits nothing on click", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        {
+          ...CONTENT.steps[0],
+          action: {
+            id: "launch-console",
+            label: "Launch",
+            icon: "lock",
+            disabled: true,
+            disabledReason: "Locked" as never,
+          },
+        },
+        CONTENT.steps[1],
+      ],
+    };
+    wrapper = mountCard(content);
+    const btn = wrapper
+      .findAllComponents({ name: "OButton" })
+      .find((b) => b.attributes("data-test") === "ai-step-action-launch-console")!;
+    expect(btn.props("disabled")).toBe(true);
+    await btn.trigger("click");
+    expect(wrapper.emitted("step-action")).toBeUndefined();
+  });
+
   it("shows the most-likely-fix box only once the bar has a diagnosis, and rechecks through the bar", async () => {
     const content: RichCardContent = {
       ...CONTENT,

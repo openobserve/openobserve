@@ -61,6 +61,16 @@ describe("SloAlertPreview", () => {
     alertPreviewSpy.mockResolvedValue({ data: preview() });
   });
 
+  it("makes no preview call while anomaly_detection is license-locked", async () => {
+    store.state.zoConfig.features = { anomaly_detection: "locked" };
+    try {
+      await mountPreview();
+      expect(alertPreviewSpy).not.toHaveBeenCalled();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
   it("asks the API for this alert over the SLO's window and slice", async () => {
     await mountPreview({ windowSecs: 30 * 86400, sliceIntervalSecs: 60 });
     expect(alertPreviewSpy).toHaveBeenCalledTimes(1);

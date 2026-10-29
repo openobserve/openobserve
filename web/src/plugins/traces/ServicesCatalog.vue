@@ -538,6 +538,7 @@ import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import config from "@/aws-exports";
 import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { useListViewState } from "@/composables/useListViewState";
 
@@ -695,9 +696,11 @@ const insights = ref<RedInsight[]>([]);
 let insightsRequest = 0;
 let catalogLoad = 0;
 // The RED insights job is enterprise-only, so OSS never fetches the _anomalies schema for it.
+const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
 const redInsightsEnabled = computed(
   () =>
     config.isEnterprise == "true" &&
+    !anomalyLocked.value &&
     store.state.organizationData?.organizationSettings?.red_insights_enabled === true,
 );
 

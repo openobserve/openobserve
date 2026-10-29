@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODropdownItem
     v-if="variant === 'menu-item'"
-    :disabled="!!disabledReason"
+    :disabled="!!blockedReason"
     focusable-unavailable
-    :description="disabledReason || note"
+    :description="blockedReason || note"
     :data-test="dataTest"
     @select="onActivate"
   >
@@ -41,28 +41,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the dashboards panel menu does not — so the presentation is the host's
          call while the icon NAME stays the registry's. -->
     <template #icon-left>
-      <slot name="icon-left" :icon="source_.icon">
-        <OIcon :name="source_.icon" size="sm" />
+      <slot name="icon-left" :icon="icon">
+        <OIcon :name="icon" size="sm" />
       </slot>
     </template>
     <span>{{ label }}</span>
   </ODropdownItem>
 
+  <!-- A disabled button fires no pointer events, so the span is the tooltip's hover target. -->
+  <OTooltip v-else-if="locked" :content="lockedReason">
+    <span class="inline-flex">
+      <OButton
+        :variant="lockedButton.variant"
+        :size="lockedButton.size"
+        disabled
+        icon-left="lock"
+        :aria-label="label"
+        :data-test="dataTest"
+      >
+        <span v-if="variant !== 'icon'" :class="{ 'max-md:hidden': variant === 'toolbar' }">{{
+          label
+        }}</span>
+      </OButton>
+    </span>
+  </OTooltip>
+
   <OButton
     v-else-if="variant === 'button'"
     :variant="buttonVariant"
     size="sm-action"
-    :disabled="!!disabledReason"
+    :disabled="!!blockedReason"
     focusable-unavailable
-    :icon-left="source_.icon"
+    :icon-left="icon"
     :data-test="dataTest"
     @click="onActivate"
   >
-    <template #unavailable-reason>{{ disabledReason }}</template>
+    <template #unavailable-reason>{{ blockedReason }}</template>
     {{ label }}
     <OTooltip
-      v-if="disabledReason || note"
-      :content="disabledReason || note || undefined"
+      v-if="blockedReason || note"
+      :content="blockedReason || note || undefined"
       side="top"
     />
   </OButton>
@@ -71,31 +89,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-else-if="variant === 'toolbar'"
     variant="outline"
     size="sm-toolbar"
-    :disabled="!!disabledReason"
+    :disabled="!!blockedReason"
     focusable-unavailable
-    :icon-left="source_.icon"
+    :icon-left="icon"
     :aria-label="label"
     :data-test="dataTest"
     @click="onActivate"
   >
-    <template #unavailable-reason>{{ disabledReason }}</template>
+    <template #unavailable-reason>{{ blockedReason }}</template>
     <span class="max-md:hidden">{{ label }}</span>
-    <OTooltip v-if="disabledReason || isMobile" :content="disabledReason || label" />
+    <OTooltip v-if="blockedReason || isMobile" :content="blockedReason || label" />
   </OButton>
 
   <OButton
     v-else
     variant="ghost"
     size="sm"
-    :disabled="!!disabledReason"
+    :disabled="!!blockedReason"
     focusable-unavailable
-    :icon-left="source_.icon"
+    :icon-left="icon"
     :aria-label="label"
     :data-test="dataTest"
     @click="onActivate"
   >
-    <template #unavailable-reason>{{ disabledReason }}</template>
-    <OTooltip :content="disabledReason || label" side="top" />
+    <template #unavailable-reason>{{ blockedReason }}</template>
+    <OTooltip :content="blockedReason || label" side="top" />
   </OButton>
 </template>
 
@@ -111,6 +129,7 @@ import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const props = withDefaults(
   defineProps<{
@@ -147,8 +166,17 @@ const { isMobile } = useBreakpoint();
 const source_ = computed(() => getAlertSource(props.source));
 const label = computed(() => t(source_.value.labelKey));
 
+const { locked, lockedReason } = useLicenseLock("alerts");
+const blockedReason = computed(() => (locked.value ? lockedReason.value : props.disabledReason));
+const icon = computed(() => (locked.value ? "lock" : source_.value.icon));
+const lockedButton = computed(() => {
+  if (props.variant === "toolbar") return { variant: "outline", size: "sm-toolbar" } as const;
+  if (props.variant === "icon") return { variant: "ghost", size: "sm" } as const;
+  return { variant: props.buttonVariant, size: "sm-action" } as const;
+});
+
 const onActivate = () => {
-  if (props.disabledReason) return;
+  if (blockedReason.value) return;
 
   const prefill = normalizePrefill(props.build());
 

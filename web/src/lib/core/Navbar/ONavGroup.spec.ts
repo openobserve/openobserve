@@ -369,8 +369,18 @@ describe("ONavGroup", () => {
     // Exposes the resolved tile link so the anchor-child rule is assertable.
     const linkedTileStub = {
       template:
-        '<a data-test="tile" href="#" :data-link="link" @click.prevent="$emit(\'click\')">{{ title }}</a>',
-      props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
+        '<a data-test="tile" href="#" :data-link="link" :data-license-locked="licenseLocked || undefined" @click.prevent="$emit(\'click\')">{{ title }}</a>',
+      props: [
+        "submenu",
+        "asTrigger",
+        "title",
+        "icon",
+        "link",
+        "active",
+        "expanded",
+        "mini",
+        "licenseLocked",
+      ],
       emits: ["click", "keydown"],
     };
 
@@ -409,13 +419,14 @@ describe("ONavGroup", () => {
       });
     }
 
-    function infraStore(dbmEnabled: boolean, hiddenMenus = "") {
+    function infraStore(dbmEnabled: boolean, hiddenMenus = "", features = {}) {
       return createStore({
         state: () => ({
           theme: "light",
           zoConfig: {
             database_monitoring_enabled: dbmEnabled,
             custom_hide_menus: hiddenMenus,
+            features,
           },
           organizationData: {},
           selectedOrganization: { identifier: "default" },
@@ -425,7 +436,12 @@ describe("ONavGroup", () => {
 
     function mountInfraTile(
       dbmEnabled: boolean,
-      { hiddenMenus = "", children = infraChildren(), parentLink = "/infra/databases" } = {},
+      {
+        hiddenMenus = "",
+        children = infraChildren(),
+        parentLink = "/infra/databases",
+        features = {},
+      } = {},
     ) {
       return mount(ONavGroup, {
         props: {
@@ -436,7 +452,7 @@ describe("ONavGroup", () => {
           parentItem: { link: parentLink, title: "Infra", icon: "dns", name: "infra" },
         },
         global: {
-          plugins: [infraRouter(), infraStore(dbmEnabled, hiddenMenus), i18n],
+          plugins: [infraRouter(), infraStore(dbmEnabled, hiddenMenus, features), i18n],
           stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
         },
       });
@@ -465,6 +481,78 @@ describe("ONavGroup", () => {
     it("lands the tile on /infra/hosts when the anchor child gates out (DBM off)", () => {
       // The static parentLink would bounce off the DBM route guard onto Traces.
       wrapper = mountInfraTile(false);
+      expect(tileLink()).toBe("/infra/hosts");
+    });
+
+    it("keeps a license-locked Databases child and its tile link while the DBM flag is off", async () => {
+      const children = infraChildren().map((c) =>
+        c.name === "dbmDatabases" ? { ...c, feature: "db_monitoring" } : c,
+      );
+      wrapper = mountInfraTile(false, { children, features: { db_monitoring: "locked" } });
+      expect(tileLink()).toBe("/infra/databases");
+      await hoverOpenInfra();
+      const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+      expect(fly.find('[data-test="nav-group-item-dbmDatabases-locked"]').exists()).toBe(true);
+    });
+
+    const licensedInfra = (): SubnavChild[] => [
+      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts", feature: "host_monitoring" },
+      {
+        titleKey: "menu.databases",
+        icon: "database",
+        name: "dbmDatabases",
+        gate: "databaseMonitoring",
+        feature: "db_monitoring",
+      },
+      {
+        titleKey: "menu.kubernetes",
+        icon: "hub",
+        name: "infraKubernetes",
+        feature: "kubernetes_monitoring",
+      },
+    ];
+    const tileLocked = () =>
+      wrapper.find('[data-test="tile"]').attributes("data-license-locked") === "true";
+    const allLocked = {
+      host_monitoring: "locked",
+      db_monitoring: "locked",
+      kubernetes_monitoring: "locked",
+    };
+
+    it("puts the lock on the tile when every visible child is license-locked", () => {
+      wrapper = mountInfraTile(true, { children: licensedInfra(), features: allLocked });
+      expect(tileLocked()).toBe(true);
+    });
+
+    it("ignores a hidden child when deciding the tile lock", () => {
+      wrapper = mountInfraTile(true, {
+        children: licensedInfra(),
+        features: { ...allLocked, kubernetes_monitoring: "hidden" },
+      });
+      expect(tileLocked()).toBe(true);
+    });
+
+    it("keeps the tile unlocked while any visible child is free", () => {
+      wrapper = mountInfraTile(true, {
+        children: [
+          ...licensedInfra(),
+          { titleKey: "menu.kubernetes2", icon: "hub", name: "infraKubernetes2" },
+        ],
+        features: allLocked,
+      });
+      expect(tileLocked()).toBe(false);
+    });
+
+    it("keeps the tile unlocked when the license enables its children", () => {
+      wrapper = mountInfraTile(true, { children: licensedInfra() });
+      expect(tileLocked()).toBe(false);
+    });
+
+    it("drops a license-hidden Databases child and retargets the tile", () => {
+      const children = infraChildren().map((c) =>
+        c.name === "dbmDatabases" ? { ...c, feature: "db_monitoring" } : c,
+      );
+      wrapper = mountInfraTile(true, { children, features: { db_monitoring: "hidden" } });
       expect(tileLink()).toBe("/infra/hosts");
     });
 

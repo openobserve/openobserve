@@ -63,28 +63,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs
-        :model-value="activeSection"
-        align="left"
-        @change="activeSection = $event as SyntheticsSection"
-      >
-        <OTab name="checks">
-          <OIcon name="radar" size="sm" />
-          <span>{{ t("synthetics.tabs.checks") }}</span>
-        </OTab>
-        <OTab v-if="privateLocationsEnabled" name="private">
-          <OIcon name="location-on" size="sm" />
-          <span>{{ t("synthetics.tabs.private") }}</span>
-        </OTab>
-        <OTab name="status-pages">
-          <OIcon name="monitor-heart" size="sm" />
-          <span>{{ t("statusPages.tabTitle") }}</span>
-        </OTab>
-        <OTab name="variables">
-          <OIcon name="data-object" size="sm" />
-          <span>{{ t("synthetics.tabs.variables") }}</span>
-        </OTab>
-      </OTabs>
+      <!-- Section navigation stays live on a license-locked page; the actions inside each section stay locked. -->
+      <FeatureLockExempt class="contents">
+        <OTabs
+          :model-value="activeSection"
+          align="left"
+          @change="activeSection = $event as SyntheticsSection"
+        >
+          <OTab name="checks">
+            <OIcon name="radar" size="sm" />
+            <span>{{ t("synthetics.tabs.checks") }}</span>
+          </OTab>
+          <OTab v-if="privateLocationsEnabled" name="private">
+            <OIcon name="location-on" size="sm" />
+            <span>{{ t("synthetics.tabs.private") }}</span>
+          </OTab>
+          <OTab name="status-pages">
+            <OIcon name="monitor-heart" size="sm" />
+            <span>{{ t("statusPages.tabTitle") }}</span>
+          </OTab>
+          <OTab name="variables">
+            <OIcon name="data-object" size="sm" />
+            <span>{{ t("synthetics.tabs.variables") }}</span>
+          </OTab>
+        </OTabs>
+      </FeatureLockExempt>
     </template>
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden max-md:flex-col">
@@ -500,6 +503,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

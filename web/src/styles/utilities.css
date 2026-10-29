@@ -81,7 +81,7 @@
   box-shadow: var(--shadow-lg) !important;
 }
 
-/* License-locked page: controls, drag handles and splitters lose pointer input and look disabled, while scroll containers keep scrolling. Consumer: components/common/FeatureLockBoundary.vue. */
+/* License-locked page: controls, drag handles and splitters lose pointer input and look disabled, while scroll containers and FeatureLockExempt navigation stay live. Consumer: components/common/FeatureLockBoundary.vue. */
 @utility feature-locked-content {
   &
     :is(
@@ -115,14 +115,15 @@
       .q-radio,
       .q-tab,
       .q-item--clickable
-    ) {
+    ):not([data-feature-lock-exempt] *) {
     pointer-events: none;
   }
   &
     :is(a[href], button, .q-btn, .q-field, .q-toggle, .q-checkbox, .q-radio, .q-tab):not(
       :disabled,
       [aria-disabled="true"],
-      [data-o2-btn]
+      [data-o2-btn],
+      [data-feature-lock-exempt] *
     ) {
     color: var(--color-text-disabled);
     opacity: 0.6;

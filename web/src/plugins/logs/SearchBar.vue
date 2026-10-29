@@ -954,9 +954,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="search-time order-2">
           <div class="flex">
+            <OTooltip
+              v-if="
+                config.isEnterprise == 'true' &&
+                store.state.zoConfig.super_cluster_enabled &&
+                superClusterLocked
+              "
+              :content="superClusterLockedReason"
+            >
+              <span class="me-1 inline-flex">
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  class="region-dropdown-btn px-1"
+                  disabled
+                  data-test="logs-search-bar-region-btn"
+                >
+                  <template #icon-left>
+                    <OIcon name="lock" size="sm" data-test="logs-search-bar-region-lock" />
+                  </template>
+                  {{ t("search.region") }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButtonGroup
               class="element-box-shadow border-card-glass-border me-1 border p-0"
-              v-if="
+              v-else-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
                 store.state.zoConfig.super_cluster_enabled
@@ -1822,6 +1845,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -2085,6 +2109,8 @@ export default defineComponent({
     const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
     const regionFilter = ref();
+    const { locked: superClusterLocked, lockedReason: superClusterLockedReason } =
+      useLicenseLock("super_cluster");
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
     const { buildPatternsAlertPrefill } = usePatternActions();
@@ -5060,6 +5086,8 @@ export default defineComponent({
       regionFilterMethod,
       regionFilterRef,
       regionFilter,
+      superClusterLocked,
+      superClusterLockedReason,
       resetRegionFilter,
       cancelQuery,
       onLogsVisualizeToggleUpdate,

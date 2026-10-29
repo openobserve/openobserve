@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ── Body (mobile): sidebar collapses into an off-canvas drawer ── -->
     <template v-if="!!slots.sidebar && isMobile">
-      <div
+      <FeatureLockExempt
         v-if="!sidebarTriggerOwner"
         class="border-border-default px-page-edge flex shrink-0 items-center border-b py-1"
         data-drawer-anchor="page-layout-sidebar"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left><OIcon name="menu" size="sm" /></template>
           {{ t("common.sidePanel") }}
         </OButton>
-      </div>
+      </FeatureLockExempt>
       <OContent
         :bleed="bleed"
         :y="padY"
@@ -202,6 +202,7 @@ import { ref, computed, watch, useSlots, provide } from "vue";
 import { useRouter } from "vue-router";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

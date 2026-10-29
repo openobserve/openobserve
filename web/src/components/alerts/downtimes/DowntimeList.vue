@@ -506,6 +506,7 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useOrgId } from "@/composables/query";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { queryClient } from "@/composables/query/queryClient";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import { folderKeys } from "@/services/common.querykeys";
@@ -590,8 +591,11 @@ const listQuery = useQuery(() =>
 const alertFoldersList = useQuery(() =>
   Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
+const { locked: syntheticsLocked } = useLicenseLock("synthetics");
 const syntheticFoldersList = useQuery(() =>
-  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), {
+    enabled: !!orgId.value && !syntheticsLocked.value,
+  }),
 );
 const downtimeFoldersList = useQuery(() =>
   Object.assign(foldersQuery(orgId.value, "downtimes"), { enabled: !!orgId.value }),
@@ -1084,7 +1088,7 @@ const refreshAll = async () => {
   void getFoldersListByType(store, "downtimes");
   void listQuery.refetch();
   void alertFoldersList.refetch();
-  void syntheticFoldersList.refetch();
+  if (!syntheticsLocked.value) void syntheticFoldersList.refetch();
 };
 
 useShortcuts([

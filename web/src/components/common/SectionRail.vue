@@ -22,7 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   tinted-active treatment. Sentence-case group headings, soft single-line items.
 -->
 <template>
-  <nav class="bg-surface-panel flex h-full min-h-0 flex-col" data-test="section-rail">
+  <FeatureLockExempt
+    as="nav"
+    class="bg-surface-panel flex h-full min-h-0 flex-col"
+    data-test="section-rail"
+  >
     <!-- Collapsed there is room for one mark, so the module icon doubles as the
          expand control rather than sitting inert beside a second button. It is
          tinted like MenuLink's active module for the same reason the primary nav
@@ -104,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="collapsed ? undefined : item.label"
               :tooltip="collapsed ? item.label : undefined"
               :icon="item.icon"
-              :suffix-icon="item.locked && !collapsed ? 'lock' : undefined"
+              :suffix-icon="(item.locked || item.licenseLocked) && !collapsed ? 'lock' : undefined"
               :data-test="item.locked ? `${item.dataTest}-locked` : item.dataTest"
               class="w-full"
               :class="collapsed ? 'justify-center!' : undefined"
@@ -114,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTabs>
     </div>
-  </nav>
+  </FeatureLockExempt>
 </template>
 
 <script setup lang="ts">
@@ -129,6 +133,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { SectionHubGroup } from "@/components/common/SectionHub.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 
 const router = useRouter();
 const { t } = useI18nTyped();

@@ -16,6 +16,7 @@
 import { ref, computed } from "vue";
 import { gt } from "@/types/i18n";
 import { useStore } from "vuex";
+import { featureState } from "@/utils/featureGate";
 import serviceStreamsApi from "@/services/service_streams";
 import settingsApi from "@/services/settings";
 import type {
@@ -127,6 +128,8 @@ export function useServiceCorrelation() {
   ): Promise<CorrelationResult | null> {
     error.value = null;
     noMatch.value = false;
+    // Identity config and _correlate are correlation APIs; a locked license would 403 both.
+    if (featureState(store.state.zoConfig?.features, "correlation") === "locked") return null;
 
     try {
       // Validate inputs

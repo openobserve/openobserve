@@ -2363,6 +2363,25 @@ describe("TraceDetails", () => {
       expect(replayBtn.exists()).toBe(true);
     });
 
+    it("should render the session replay button disabled with a lock when rum is locked", async () => {
+      store.state.zoConfig.features = { rum: "locked" };
+      try {
+        wrapper.vm.searchObj.data.traceDetails.spanList = [
+          {
+            ...tracesMockData.tracesDetails.traceSpans.hits[0],
+            rum_session_id: "session-123",
+            rum_session_has_replay: true,
+          },
+        ];
+        await wrapper.vm.$nextTick();
+        const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
+        expect(replayBtn.attributes("disabled")).toBeDefined();
+        expect(replayBtn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+    });
+
     it("should not show session replay button when no RUM session exists", async () => {
       wrapper.vm.searchObj.data.traceDetails.spanList =
         tracesMockData.tracesDetails.traceSpans.hits;
@@ -3736,6 +3755,20 @@ describe("TraceDetails", () => {
       await pending;
 
       expect(viewSpanLogs).not.toHaveBeenCalled();
+    });
+
+    it("opens a plain logs search without a warning when correlation is license-locked", async () => {
+      store.state.zoConfig.features = { correlation: "locked" };
+      try {
+        const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+        wrapper.vm.searchObj.data.traceDetails.correlationProps = null;
+        const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+        await wrapper.vm.handleTreeViewCorrelatedLogs({ span_id: spanId });
+        await flushPromises();
+        expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ path: "/logs" }));
+      } finally {
+        delete store.state.zoConfig.features;
+      }
     });
   });
 });

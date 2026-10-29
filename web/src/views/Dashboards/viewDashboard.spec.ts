@@ -1629,6 +1629,42 @@ describe("ViewDashboard", () => {
       expect(wrapper.vm.saveJsonDashboard).toBeDefined();
     });
 
+    describe("reports license lock", () => {
+      const setReports = (state: string | undefined) => {
+        for (const zoConfig of [mockStoreState.zoConfig, (store.state as any).zoConfig]) {
+          zoConfig.features = state ? { reports: state } : undefined;
+        }
+      };
+      afterEach(() => setReports(undefined));
+
+      it("locks the scheduled reports button and lists no reports while reports is locked", async () => {
+        setReports("locked");
+        const { default: reportsService } = await import("@/services/reports");
+        vi.mocked(reportsService.list).mockClear();
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.vm.reportsLocked).toBe(true);
+        expect(wrapper.vm.reportsLockedReason).toContain("Locked");
+        wrapper.vm.openScheduledReports();
+        expect(reportsService.list).not.toHaveBeenCalled();
+        expect(wrapper.vm.showScheduledReportsDialog).toBe(false);
+      });
+
+      it("opens scheduled reports as before while reports is enabled", async () => {
+        setReports("enabled");
+        const { default: reportsService } = await import("@/services/reports");
+        vi.mocked(reportsService.list).mockClear();
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.vm.reportsLocked).toBe(false);
+        wrapper.vm.openScheduledReports();
+        expect(reportsService.list).toHaveBeenCalled();
+        expect(wrapper.vm.showScheduledReportsDialog).toBe(true);
+      });
+    });
+
     it("should handle reports loading error", async () => {
       wrapper = createWrapper();
       await flushPromises();

@@ -342,6 +342,7 @@ import {
 } from "../../../utils/commons";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import AddSettingVariable from "../../../components/dashboards/settings/AddSettingVariable.vue";
@@ -458,6 +459,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+    const { locked: dashboardsLocked } = useLicenseLock("dashboards");
 
     // Initialize or inject variables manager
     const injectedManager = inject("variablesManager", null);
@@ -1033,6 +1035,8 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      // The page is route-locked and the top bar explains it; loading would only 403.
+      if (dashboardsLocked.value) return;
       // assign the route query params
       routeQueryParamsOnMount = withoutFocusParam(JSON.parse(JSON.stringify(route?.query ?? {})));
 

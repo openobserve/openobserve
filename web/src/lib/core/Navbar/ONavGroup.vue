@@ -157,6 +157,13 @@ const visibleChildren = computed<SubnavChild[]>(() =>
 // has nothing left to offer.
 const hasVisibleChildren = computed(() => visibleChildren.value.length > 0);
 
+// One free child keeps the tile unlocked; only a tile whose every destination is license-locked shows the lock.
+const tileLicenseLocked = computed(
+  () =>
+    hasVisibleChildren.value &&
+    visibleChildren.value.every((c) => !!c.feature && licenseState(c) === "locked"),
+);
+
 /**
  * Blocks, not a flat row list, so the grouping is real to assistive tech.
  *
@@ -667,6 +674,7 @@ function onChildMouseenter(event: MouseEvent) {
       :active="isGroupActive"
       :expanded="isOpen"
       :paywalled="tilePaywalled"
+      :license-locked="tileLicenseLocked"
       @click="onLinkClick"
       @keydown="onTileKeydown"
     />
@@ -680,6 +688,7 @@ function onChildMouseenter(event: MouseEvent) {
       :active="isGroupActive"
       :expanded="isOpen"
       :paywalled="tilePaywalled"
+      :license-locked="tileLicenseLocked"
       @click="onTriggerClick"
       @keydown="onTileKeydown"
     />

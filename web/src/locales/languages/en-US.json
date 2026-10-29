@@ -9,7 +9,6 @@
     "toastTitle": "Not included in your license",
     "toastMessage": "Your license does not include: {features}. Ask your administrator to update the license.",
     "toastMessageGeneric": "Your license does not include this feature. Ask your administrator to update the license.",
-    "dialogScope": "Only these features are blocked; everything else keeps working.",
     "bannerMessage": "This feature is locked. It needs the {feature} feature in your license.",
     "bannerMessageGeneric": "This page needs a feature that is not in your license.",
     "headerLocked": "Locked: needs {feature}"

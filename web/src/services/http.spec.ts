@@ -190,7 +190,9 @@ describe("response interceptor — license 403 handling", () => {
   // Builds a real instance and returns the rejection handler it registered.
   function errorHandler() {
     const use = vi.fn();
-    vi.mocked(axios.create).mockReturnValue({ interceptors: { response: { use } } } as any);
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: { request: { use: vi.fn() }, response: { use } },
+    } as any);
     http();
     return use.mock.calls[0][1] as (error: unknown) => Promise<unknown>;
   }
@@ -210,12 +212,13 @@ describe("response interceptor — license 403 handling", () => {
     (config as any).isEnterprise = "false";
   });
 
-  it("shows the license toast with the missing features for code 40001", async () => {
+  it("sends the missing features of a code 40001 denial to the top bar", async () => {
     const error = forbidden({ code: 40001, error_detail: "oncall, workflows" });
+    (error.config as Record<string, unknown>).startedAt = 42;
 
     await expect(errorHandler()(error)).rejects.toBe(error);
 
-    expect(addLicenseDeniedError).toHaveBeenCalledWith(["oncall", "workflows"]);
+    expect(addLicenseDeniedError).toHaveBeenCalledWith(["oncall", "workflows"], 42);
     expect(addUnauthorizedError).not.toHaveBeenCalled();
   });
 
@@ -235,6 +238,7 @@ describe("http 403 interceptor", () => {
     let onError: (error: any) => Promise<unknown> = () => Promise.resolve();
     vi.mocked(axios.create).mockReturnValue({
       interceptors: {
+        request: { use: vi.fn() },
         response: {
           use: (_ok: unknown, err: (error: any) => Promise<unknown>) => {
             onError = err;
@@ -289,6 +293,7 @@ describe("403 handling", () => {
     addUnauthorizedError.mockClear();
     vi.mocked(axios.create).mockReturnValue({
       interceptors: {
+        request: { use: vi.fn() },
         response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
       },
     } as any);

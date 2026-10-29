@@ -3006,6 +3006,21 @@ describe("EditRole savedGrants - getRoleDetails orchestration", () => {
     );
     push.mockRestore();
   });
+
+  it("stays on the page, without a toast, for a license denial", async () => {
+    ctl.resourcesError = Object.assign(new Error("denied"), {
+      response: { status: 403, data: { code: 40001, error_detail: "rbac" } },
+    });
+    const push = vi.spyOn(router, "push");
+    const wrapper = await mountEditRole();
+    await flushPromises();
+
+    expect(push).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(wrapper.vm.isFetchingInitialRoles).toBe(false);
+    expect(wrapper.vm.licenseDenied).toEqual(["rbac"]);
+    push.mockRestore();
+  });
 });
 
 describe("EditRole savedGrants - savePermissionHash / seedSaved", () => {

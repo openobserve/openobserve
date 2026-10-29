@@ -41,6 +41,9 @@ import { isExtensionOnlyError } from "./utils/rum/extensionFrames";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
+import { installFetchLicenseReceiver } from "@/services/licenseDenialReceiver";
+
+installFetchLicenseReceiver();
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).

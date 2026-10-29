@@ -29,8 +29,9 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
 import {
   addLicenseDeniedError,
   addUnauthorizedError,
+  clearLicenseDenials,
   resetUnauthorizedErrors,
-  useLicenseDeniedDialog,
+  useLicenseDenials,
 } from "./useUnauthorizedErrorGrouper";
 import { dismissAll, toast, toastRecords } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
@@ -62,19 +63,37 @@ describe("grouped access toast", () => {
   });
 });
 
-describe("license denied dialog", () => {
-  it("collects distinct features while open and forgets them on close", () => {
-    const { features, close } = useLicenseDeniedDialog();
+describe("license denials", () => {
+  afterEach(() => useLicenseDenials().dismiss());
+
+  it("collects distinct features until dismissed", () => {
+    const { features, dismiss } = useLicenseDenials();
     expect(features.value).toBeNull();
 
     addLicenseDeniedError(["dashboards"]);
     addLicenseDeniedError(["functions", "dashboards"]);
     expect(features.value).toEqual(["dashboards", "functions"]);
 
-    close();
+    dismiss();
     expect(features.value).toBeNull();
 
     addLicenseDeniedError([]);
     expect(features.value).toEqual([]);
+  });
+
+  it("forgets them on navigation, and never raises the access toast", () => {
+    vi.useFakeTimers();
+    addLicenseDeniedError(["workflows"]);
+    vi.advanceTimersByTime(300);
+    expect(toastRecords).toHaveLength(0);
+    resetUnauthorizedErrors();
+    expect(useLicenseDenials().features.value).toEqual(["workflows"]);
+    clearLicenseDenials();
+    expect(useLicenseDenials().features.value).toBeNull();
+    addLicenseDeniedError(["oncall"], Date.now() - 1);
+    expect(useLicenseDenials().features.value).toBeNull();
+    addLicenseDeniedError(["oncall"]);
+    expect(useLicenseDenials().features.value).toEqual(["oncall"]);
+    vi.useRealTimers();
   });
 });

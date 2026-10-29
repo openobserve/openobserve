@@ -59,13 +59,15 @@ interface LicensedRoute {
 }
 
 /** Tags a route and its children with the license feature their page needs (`meta.licenseFeature`). */
-export const withLicenseFeature = <T extends LicensedRoute>(key: string, route: T): T => ({
-  ...route,
-  meta: { ...route.meta, licenseFeature: key },
-  ...(route.children
-    ? { children: route.children.map((child) => withLicenseFeature(key, child)) }
-    : {}),
-});
+export const withLicenseFeature = <T extends object>(key: string, route: T): T => {
+  // `T extends object`, not LicensedRoute: a weak-type constraint rejects inline route literals.
+  const { meta, children } = route as LicensedRoute;
+  return {
+    ...route,
+    meta: { ...meta, licenseFeature: key },
+    ...(children ? { children: children.map((child) => withLicenseFeature(key, child)) } : {}),
+  };
+};
 
 /** A denied list's state: false, true for an RBAC 403, or the missing feature keys of a license 403. */
 export type ForbiddenState = boolean | string[];

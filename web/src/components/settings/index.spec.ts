@@ -248,6 +248,59 @@ describe("SettingsIndex", () => {
       expect(orgManagementItem?.visible).toBe(true);
       expect(syntheticsItem?.visible).toBe(true);
     });
+
+    describe("license-gated items", () => {
+      const byKeyUnder = (zoConfig: Record<string, unknown>) => {
+        mockStore.state.zoConfig = { service_streams_enabled: true, ...zoConfig } as any;
+        const items = getAllItems(createWrapper());
+        return (key: string) => items.find((i: any) => i.key === key);
+      };
+
+      it.each([
+        ["synthetics_locations", "synthetics"],
+        ["queryManagement", "query_management"],
+        ["storageSettings", "byob"],
+        ["correlation_settings", "correlation"],
+      ])("marks %s license-locked under a locked %s license", (key, feature) => {
+        const byKey = byKeyUnder({ features: { [feature]: "locked" } });
+        expect(byKey(key)?.licenseLocked).toBe(true);
+      });
+
+      it.each([
+        ["synthetics_locations", "synthetics"],
+        ["queryManagement", "query_management"],
+        ["storageSettings", "byob"],
+        ["correlation_settings", "correlation"],
+      ])("hides %s under a hidden %s license", (key, feature) => {
+        const byKey = byKeyUnder({ features: { [feature]: "hidden" } });
+        expect(byKey(key)?.visible).toBe(false);
+      });
+
+      it("keeps locked synthetics locations and correlation visible though their flags are off", () => {
+        const byKey = byKeyUnder({
+          synthetics_enabled: false,
+          service_streams_enabled: false,
+          features: { synthetics: "locked", correlation: "locked" },
+        });
+        expect(byKey("synthetics_locations")).toMatchObject({ visible: true, licenseLocked: true });
+        expect(byKey("correlation_settings")).toMatchObject({ visible: true, licenseLocked: true });
+      });
+
+      it("leaves every item unlocked when the license enables it", () => {
+        const byKey = byKeyUnder({});
+        for (const key of [
+          "synthetics_locations",
+          "queryManagement",
+          "storageSettings",
+          "correlation_settings",
+        ]) {
+          expect(byKey(key)?.licenseLocked).toBe(false);
+        }
+        expect(byKey("synthetics_locations")?.visible).toBe(true);
+        expect(byKey("queryManagement")?.visible).toBe(true);
+        expect(byKey("correlation_settings")?.visible).toBe(true);
+      });
+    });
   });
 
   describe("Router integration", () => {

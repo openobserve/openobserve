@@ -109,6 +109,7 @@ const useManagementRoutes = () => {
       keepAlive: true,
       titleKey: "routeTitles.syntheticsLocations",
       allowOnEmptyData: true,
+      licenseFeature: "synthetics",
     },
     beforeEnter(to: any, from: any, next: any) {
       routeGuard(to, from, next);
@@ -197,6 +198,7 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             titleKey: "settings.queryManagement",
+            licenseFeature: "query_management",
           },
           beforeEnter: withFeatureGate("queryManagement", routeGuard),
         },
@@ -210,7 +212,7 @@ const useManagementRoutes = () => {
           },
           beforeEnter: withFeatureGate("cipherKeys", routeGuard),
         },
-        withLicenseFeature("ai_assistant", {
+        withLicenseFeature("ai_toolsets", {
           path: "ai_toolsets",
           name: "aiToolsets",
           component: () => import("@/components/settings/AiToolsets.vue"),
@@ -245,6 +247,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
             titleKey: "routeTitles.storageSettings",
+            licenseFeature: "byob",
           },
           beforeEnter: withFeatureGate("storageSettings", routeGuard),
         },
