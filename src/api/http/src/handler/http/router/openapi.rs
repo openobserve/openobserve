@@ -748,8 +748,6 @@ use crate::{
             config::meta::alerts::deduplication::GlobalDeduplicationConfig,
             config::meta::correlation::FieldAlias,
             config::meta::alerts::deduplication::DeduplicationConfig,
-            config::meta::alerts::deduplication::GroupingConfig,
-            config::meta::alerts::deduplication::SendStrategy,
             openobserve_api_management::request::alerts::dedup_stats::DedupSummaryResponse,
             // Backfill
             pipelines::backfill::BackfillRequest,

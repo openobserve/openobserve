@@ -18,9 +18,12 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   colorToRgba,
+  createDistinctSeriesColor,
   getAreaFillOpacity,
   getAreaGradientColor,
   getAreaStyleOverride,
+  getDistinctSeriesColors,
+  getSeriesHash,
 } from "./colorPalette";
 
 const COLOR = "#5b8ef0";
@@ -160,5 +163,123 @@ describe("area fill tokens", () => {
     expect(value(darkCss, "--chart-area-fill-bottom-opacity")).toBeUndefined();
     expect(value(darkCss, "--chart-area-stacked-fill-top-opacity")).toBe("1");
     expect(value(darkCss, "--chart-area-stacked-fill-bottom-opacity")).toBe("1");
+  });
+});
+
+describe("getDistinctSeriesColors", () => {
+  // Vitest stubs CSS imports, so the shipped light/dark series palettes are read from disk.
+  const palette = (file: string) => {
+    const css = readFileSync(resolve(process.cwd(), "src/lib/styles/tokens", file), "utf8");
+    return Array.from(
+      { length: 12 },
+      (_, i) => css.match(new RegExp(`--color-chart-series-${i + 1}:\\s*(#[0-9a-f]{6})`, "i"))![1],
+    );
+  };
+  const phases = ["Failed", "Pending", "Running", "Succeeded", "Unknown"];
+
+  it.each(["base.css", "dark.css"])("gives pod phases five different colours in %s", (file) => {
+    const colors = palette(file);
+    // The bare name hash sends Pending and Succeeded to one slot and Failed to its near-twin amber.
+    expect(getSeriesHash("Pending", colors)).toBe(getSeriesHash("Succeeded", colors));
+    const assigned = getDistinctSeriesColors(phases, colors);
+    expect(new Set(assigned.values()).size).toBe(5);
+    const amberTwins = [colors[5], colors[11]];
+    expect(phases.filter((p) => amberTwins.includes(assigned.get(p)!))).toHaveLength(1);
+  });
+
+  it("keeps a name that does not collide on its hash colour", () => {
+    const colors = palette("base.css");
+    expect(getDistinctSeriesColors(phases, colors).get("Running")).toBe(
+      colors[getSeriesHash("Running", colors)],
+    );
+  });
+
+  it("does not depend on the order the names arrive in", () => {
+    const colors = palette("base.css");
+    const forward = getDistinctSeriesColors(phases, colors);
+    const backward = getDistinctSeriesColors([...phases].reverse(), colors);
+    phases.forEach((p) => expect(backward.get(p)).toBe(forward.get(p)));
+  });
+
+  it("keeps every uncontested name on its colour in any subset of the names", () => {
+    const colors = palette("base.css");
+    const full = getDistinctSeriesColors(phases, colors);
+    const uncontested = phases.filter((p) => full.get(p) === colors[getSeriesHash(p, colors)]);
+    expect(uncontested.length).toBeGreaterThanOrEqual(3);
+    for (let mask = 1; mask < 1 << phases.length; mask++) {
+      const subset = phases.filter((_, i) => mask & (1 << i));
+      const assigned = getDistinctSeriesColors(subset, colors);
+      subset
+        .filter((p) => uncontested.includes(p))
+        .forEach((p) => expect(assigned.get(p)).toBe(full.get(p)));
+    }
+  });
+
+  it("keeps a name's colour when other names disappear, unless a sorted-earlier name shares its hash slot", () => {
+    const colors = palette("base.css");
+    const alone = getDistinctSeriesColors(["Succeeded"], colors).get("Succeeded");
+    expect(alone).toBe(colors[getSeriesHash("Succeeded", colors)]);
+    expect(getDistinctSeriesColors(["Running", "Succeeded"], colors).get("Succeeded")).toBe(alone);
+    expect(getDistinctSeriesColors(["Succeeded", "Unknown"], colors).get("Succeeded")).toBe(alone);
+    // Pending hashes to the same slot and sorts first, so it holds that colour whenever present.
+    expect(getDistinctSeriesColors(["Pending", "Succeeded"], colors).get("Succeeded")).not.toBe(
+      alone,
+    );
+  });
+
+  it("never auto-assigns a reserved colour or a near shade of it", () => {
+    const colors = palette("base.css");
+    const home = colors[getSeriesHash("Running", colors)];
+    const nearShade = `#${((parseInt(home.slice(1), 16) + 0x020202) & 0xffffff).toString(16).padStart(6, "0")}`;
+    [home, nearShade].forEach((reserved) => {
+      const assigned = getDistinctSeriesColors(phases, colors, [reserved]);
+      expect([...assigned.values()]).not.toContain(home);
+      expect(new Set(assigned.values()).size).toBe(phases.length);
+    });
+  });
+
+  it("reuses colours only once every slot is taken", () => {
+    const names = Array.from({ length: 14 }, (_, i) => `series-${i}`);
+    const assigned = getDistinctSeriesColors(names, palette("base.css"));
+    expect(new Set(assigned.values()).size).toBe(12);
+  });
+});
+
+describe("createDistinctSeriesColor", () => {
+  const root = document.documentElement.style;
+  const hexes = ["#5b8ef0", "#34d399", "#fb923c", "#f472b6"];
+  afterEach(() => hexes.forEach((_, i) => root.removeProperty(`--color-chart-series-${i + 1}`)));
+
+  it("leaves non-hash colour modes to getSeriesColor", () => {
+    const color = createDistinctSeriesColor(["a", "b"], { mode: "fixed" }, "light");
+    expect(color("a")).toBeUndefined();
+  });
+
+  it("skips names that have their own colorBySeries mapping", () => {
+    hexes.forEach((hex, i) => root.setProperty(`--color-chart-series-${i + 1}`, hex));
+    const color = createDistinctSeriesColor(
+      ["a", "b"],
+      { mode: "palette-classic-by-series", colorBySeries: [{ value: "a", color: "#000000" }] },
+      "light",
+    );
+    expect(color("a")).toBeUndefined();
+    expect(color("b")).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  it("keeps a colorBySeries colour away from the automatic slices", () => {
+    hexes.forEach((hex, i) => root.setProperty(`--color-chart-series-${i + 1}`, hex));
+    const auto = createDistinctSeriesColor(
+      ["a", "b"],
+      { mode: "palette-classic-by-series" },
+      "light",
+    );
+    const bColor = auto("b")!;
+    const color = createDistinctSeriesColor(
+      ["a", "b"],
+      { mode: "palette-classic-by-series", colorBySeries: [{ value: "a", color: bColor }] },
+      "light",
+    );
+    expect(color("b")).toBeDefined();
+    expect(color("b")).not.toBe(bColor);
   });
 });

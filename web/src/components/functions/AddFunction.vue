@@ -197,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
   />
+  <EditorDraftDialogs :draft="functionDraft" />
 </template>
 
 <script lang="ts">
@@ -220,7 +221,7 @@ import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { onBeforeRouteLeave, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -232,6 +233,15 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+
+interface FunctionDraftData {
+  name: string;
+  transType: string;
+  function: string;
+  params: string;
+}
 export const defaultValue: any = () => {
   return {
     name: "",
@@ -304,6 +314,7 @@ export default defineComponent({
     TestFunction,
     ConfirmDialog,
     O2AIChat,
+    EditorDraftDialogs,
   },
   emits: ["update:list", "cancel:hideform", "sendToAiChat"],
   setup(props, { emit, expose }) {
@@ -429,8 +440,69 @@ export default defineComponent({
       },
     );
 
-    onMounted(() => {
+    // The forced language is written to the form after setup, so it is part of the starting state, not an edit.
+    const initialTransType = props.forcedLanguage
+      ? props.forcedLanguage === "javascript"
+        ? "1"
+        : "0"
+      : String(props.modelValue?.transType ?? "0");
+    const initialParams = String(props.modelValue?.params ?? "row");
+    const hasUnsavedEdits = computed(
+      () =>
+        isFunctionDataChanged.value ||
+        transType.value !== initialTransType ||
+        String(formData.value.params ?? "row") !== initialParams,
+    );
+
+    // Drafts belong to the Functions page; hosts that embed this editor keep their own flow.
+    const draftsActive = router.currentRoute.value.name === "functionList" && !props.hideTestPanel;
+    let serverFunction: FunctionDraftData | null = null;
+    // Set while the leave dialog's Save runs, so a successful save neither navigates nor resets the editor.
+    let leaveSave: { saved: boolean } | null = null;
+
+    const functionDraft = useEditorDraft<FunctionDraftData>({
+      kind: "function",
+      entityLabel: () => t("common.editorDraft.entities.function"),
+      entityId: () => serverFunction?.name ?? null,
+      snapshot: () => ({
+        name: nameValue.value,
+        transType: transType.value,
+        function: String(formData.value.function ?? ""),
+        params: String(formData.value.params ?? "row"),
+      }),
+      apply: (data) => {
+        formData.value = { ...formData.value, function: data.function, params: data.params };
+        if (!beingUpdated.value) addFunctionForm.setFieldValue("name", data.name);
+        if (!props.forcedLanguage) addFunctionForm.setFieldValue("transType", data.transType);
+        isFunctionDataChanged.value = true;
+      },
+      base: () => serverFunction,
+      hasChanges: () => hasUnsavedEdits.value,
+      save: async () => {
+        const run = { saved: false };
+        leaveSave = run;
+        try {
+          await addFunctionForm.handleSubmit();
+        } finally {
+          leaveSave = null;
+        }
+        return run.saved;
+      },
+    });
+
+    onMounted(async () => {
       window.addEventListener("beforeunload", beforeUnloadHandler);
+      if (!draftsActive) return;
+      const loaded = props.modelValue;
+      serverFunction = loaded?.name
+        ? {
+            name: String(loaded.name),
+            transType: String(loaded.transType ?? "0"),
+            function: String(loaded.function ?? ""),
+            params: String(loaded.params ?? "row"),
+          }
+        : null;
+      await functionDraft.start();
     });
 
     onUnmounted(() => {
@@ -439,7 +511,7 @@ export default defineComponent({
 
     const beforeUnloadHandler = (e: any) => {
       //check is data updated or not
-      if (isFunctionDataChanged.value) {
+      if (hasUnsavedEdits.value) {
         // Display a confirmation message
         const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
         e.returnValue = confirmMessage;
@@ -447,36 +519,6 @@ export default defineComponent({
       }
       return;
     };
-
-    let forceSkipBeforeUnloadListener = false;
-
-    onBeforeRouteLeave((to, from, next) => {
-      // check if it is a force navigation, then allow
-      if (forceSkipBeforeUnloadListener) {
-        next();
-        return;
-      }
-      // else continue to warn user
-      const actions = ["add", "update"];
-
-      if (
-        from.path === "/pipeline/functions" &&
-        actions.includes((from.query?.action as string) || "none") &&
-        isFunctionDataChanged.value
-      ) {
-        const confirmMessage = t("pipeline.unsavedMessage");
-        if (window.confirm(confirmMessage)) {
-          // User confirmed, allow navigation
-          next();
-        } else {
-          // User canceled, prevent navigation
-          next(false);
-        }
-      } else {
-        // No unsaved changes or not leaving the edit route, allow navigation
-        next();
-      }
-    });
 
     // @submit handler — OForm only calls it once the schema passes (name
     // required + method-name regex), so the schema, not a manual validate()
@@ -510,17 +552,19 @@ export default defineComponent({
         transType: parseInt(value.transType ?? "0"),
       };
 
-      forceSkipBeforeUnloadListener = true;
-
       try {
         // The write no longer knows what it invalidates — `saveFunctionMutation`
         // declares that beside the endpoint, and the mutation cache applies it.
         const res = await saveFunction.mutateAsync(payload);
 
-        const _formData: any = { ...payload };
-        formData.value = { ...defaultValue() };
-
-        emit("update:list", _formData);
+        if (leaveSave) {
+          leaveSave.saved = true;
+        } else {
+          const _formData: any = { ...payload };
+          formData.value = { ...defaultValue() };
+          functionDraft.markSaved();
+          emit("update:list", _formData);
+        }
 
         loadingNotification();
         toast({
@@ -568,8 +612,12 @@ export default defineComponent({
       }
     };
 
-    const closeAddFunction = () => {
-      if (isFunctionDataChanged.value) {
+    const closeAddFunction = async () => {
+      if (draftsActive) {
+        if (await functionDraft.confirmLeave()) emit("cancel:hideform");
+        return;
+      }
+      if (hasUnsavedEdits.value) {
         confirmDialogMeta.value.show = true;
         confirmDialogMeta.value.title = t("common.unsavedTitle");
         confirmDialogMeta.value.message = t("common.unsavedMessage");
@@ -582,8 +630,16 @@ export default defineComponent({
       }
     };
 
-    const cancelAddFunction = () => {
-      if (isFunctionDataChanged.value) {
+    const cancelAddFunction = async () => {
+      track("Button Click", {
+        button: "Cancel Function",
+        page: "Add Function",
+      });
+      if (draftsActive) {
+        if (await functionDraft.confirmLeave()) emit("cancel:hideform");
+        return;
+      }
+      if (hasUnsavedEdits.value) {
         confirmDialogMeta.value.show = true;
         confirmDialogMeta.value.title = t("common.cancelTitle");
         confirmDialogMeta.value.message = t("common.cancelMessage");
@@ -594,10 +650,6 @@ export default defineComponent({
       } else {
         emit("cancel:hideform");
       }
-      track("Button Click", {
-        button: "Cancel Function",
-        page: "Add Function",
-      });
     };
 
     const resetConfirmDialog = () => {
@@ -698,6 +750,7 @@ export default defineComponent({
       splitterModel,
       isMobile,
       closeAddFunction,
+      functionDraft,
       confirmDialogMeta,
       transformTypeOptions,
       resetConfirmDialog,
@@ -721,7 +774,8 @@ export default defineComponent({
     if (this.modelValue && this.modelValue.name != undefined && this.modelValue.name != "") {
       this.beingUpdated = true;
       this.disableColor = "grey-5";
-      this.formData = this.modelValue;
+      // A copy, so edits never reach the list row the server copy and the draft baseline are read from.
+      this.formData = { ...this.modelValue };
       // Ensure transType is a string for radio button binding
       if (this.formData.transType !== undefined) {
         this.formData.transType = String(this.formData.transType);

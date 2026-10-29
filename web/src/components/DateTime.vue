@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     icon="info"
-    class="date-time-container inline-flex items-stretch"
+    class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
     :class="{
       'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
       'w-full [&>*]:flex-1': fieldAppearance,
