@@ -121,8 +121,8 @@ describe("health checks", () => {
     expect(fixTarget("unpriced_models", "default", "org1")).toEqual({
       kind: "route",
       to: {
-        name: "modelPricing",
-        query: { tab: "unpriced", stream: "default", org_identifier: "org1" },
+        name: "modelPricingGaps",
+        query: { stream: "default", org_identifier: "org1" },
       },
     });
     expect(fixTarget("missing_agent_identity", "default", "org1")).toMatchObject({

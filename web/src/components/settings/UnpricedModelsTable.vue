@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- Models seen in a stream's spans over the last 24 h that matched no price, or
-     only part of a pattern, each with a one-step fix. The parent owns the read
-     (its row count labels the tab); this view owns the fixes. -->
+     only part of a pattern, each with a one-step fix. The Pricing gaps page owns
+     the read; this view owns the fixes. -->
 <template>
   <div class="flex h-full min-h-0 flex-col" data-test="model-pricing-unpriced-tab">
     <OBanner
@@ -44,10 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #toolbar>
           <div class="flex w-full min-w-0 flex-wrap items-center gap-2">
-            <div class="app-tabs-container h-9">
-              <slot name="tabs" />
-            </div>
-            <div class="ms-auto w-64" data-test="model-pricing-unpriced-stream-select">
+            <div class="w-64" data-test="model-pricing-unpriced-stream-select">
               <OSelect
                 :model-value="stream"
                 :label="t('modelPricing.unpriced.streamLabel')"
@@ -381,6 +378,9 @@ function createPrice(row: UnpricedModel) {
       org_identifier: orgIdentifier.value,
       name: row.model,
       match_pattern: exactModelPattern(row.model),
+      // The editor's Back and Save return here instead of to the price list.
+      from: "gaps",
+      stream: props.stream,
     },
   });
 }

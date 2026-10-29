@@ -18,7 +18,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import type { AxiosResponse } from "axios";
 import type { UnpricedModel } from "@/services/model_pricing";
-import UnpricedModelsTab from "./UnpricedModelsTab.vue";
+import UnpricedModelsTable from "./UnpricedModelsTable.vue";
 
 vi.mock("@/services/model_pricing", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -81,7 +81,7 @@ function mountTab(
   overrides: Record<string, unknown> = {},
 ) {
   const store = createStore({ state: { selectedOrganization: { identifier: "test-org" } } });
-  return mount(UnpricedModelsTab, {
+  return mount(UnpricedModelsTable, {
     props: {
       models,
       loading: false,
@@ -111,7 +111,7 @@ async function waitForRow(w: VueWrapper, model: string) {
   });
 }
 
-describe("UnpricedModelsTab", () => {
+describe("UnpricedModelsTable", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
@@ -237,6 +237,8 @@ describe("UnpricedModelsTab", () => {
         org_identifier: "test-org",
         name: "gpt-5.4-mini",
         match_pattern: "^gpt-5\\.4-mini$",
+        from: "gaps",
+        stream: "default",
       },
     });
   });
