@@ -27,4 +27,6 @@ test("the pass count reads the hidden tag, and a legacy review counts as one", (
   assert.equal(reviewPassCount(`<!-- ai-code-review -->\nbody\n${reviewPassTag(2)}`), 2);
   assert.equal(reviewPassCount("<!-- ai-code-review -->\nbody"), 1);
   assert.equal(reviewPassCount(`x\n${reviewPassTag(0)}`), 0);
+  assert.equal(reviewPassCount("<!-- o2-paired-pointer -->", 0), 0);
+  assert.equal(reviewPassCount(`<!-- o2-paired-pointer -->\n${reviewPassTag(2)}`, 0), 2);
 });

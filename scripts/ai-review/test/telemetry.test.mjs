@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  addUsage,
   cleanAttributeValue,
   genAiRequestAttributes,
   genAiResponseAttributes,
@@ -58,9 +59,10 @@ test("response content and provider-reported usage use standard attributes", () 
     },
   ]);
   assert.deepEqual(attributes["gen_ai.response.finish_reasons"], ["stop"]);
-  assert.equal(attributes["gen_ai.usage.input_tokens"], 1234);
+  assert.equal(attributes["gen_ai.usage.input_tokens"], 1321);
   assert.equal(attributes["gen_ai.usage.output_tokens"], 68);
-  assert.equal(attributes["gen_ai.usage.total_tokens"], 1302);
+  assert.equal(attributes["gen_ai.usage.total_tokens"], 1389);
+  assert.equal(attributes["ai.review.usage.uncached_input_tokens"], 1234);
   assert.equal(attributes["gen_ai.usage.cache_read_tokens"], 78);
   assert.equal(attributes["gen_ai.usage.cache_write_tokens"], 9);
   assert.equal(attributes["gen_ai.usage.cost"], 0.42);
@@ -98,4 +100,14 @@ test("review instrumentation does not emit legacy TraceLoop content attributes",
 
   assert.doesNotMatch(reviewSource, /["']gen_ai\.prompt\./);
   assert.doesNotMatch(reviewSource, /["']gen_ai\.completion\./);
+});
+
+test("usage of retried attempts is summed, and a missing side is skipped", () => {
+  const a = { cost: 0.1, tokens: { input: 10, output: 2, reasoning: 5, cache: { read: 100, write: 0 } } };
+  const b = { cost: 0.2, tokens: { input: 20, output: 3, reasoning: 7, cache: { read: 50, write: 1 } } };
+  const sum = addUsage(a, b);
+  assert.equal(sum.cost.toFixed(2), "0.30");
+  assert.deepEqual(sum.tokens, { input: 30, output: 5, reasoning: 12, cache: { read: 150, write: 1 } });
+  assert.equal(addUsage(null, b), b);
+  assert.equal(addUsage(a, undefined), a);
 });

@@ -36,9 +36,18 @@ already posted by `REVIEW_BOT_LOGIN`. A failed inline post only logs a warning. 
 off by default; set the variable `AI_REVIEW_INLINE` to `true` to turn them on.
 
 Each PR gets at most `AI_REVIEW_MAX_PASSES` automatic reviews (default 2). The count is a hidden
-`o2-review-pass` tag in the review comment, so later pushes skip before any model call; a run in
-which every reviewer failed does not count. To review again, dispatch the workflow with
-`ignore_pass_limit`, or delete the review comment to reset the count. Every reviewer's parsed findings and the
+`o2-review-pass` tag in the review comment, written before the reviewers start, so a run cancelled
+by a newer push still counts; later pushes skip before any model call. A run in which every
+reviewer failed gives its pass back. The paired pointer and the "key not set" notice keep the tag.
+If the bot's comments cannot be read (no reviewer app token, or the list call fails) the run fails
+instead of reviewing, since the count cannot be checked. To review again, dispatch the workflow with
+`ignore_pass_limit` (forwarded to a paired o2-enterprise review), or delete the review comment to
+reset the count.
+
+Token attributes follow the GenAI conventions: `gen_ai.usage.input_tokens` includes cached input
+and `gen_ai.usage.output_tokens` includes reasoning; the opencode splits are kept as
+`ai.review.usage.uncached_input_tokens`, `ai.review.usage.visible_output_tokens` and
+`ai.review.usage.reasoning_tokens`. Usage of failed and retried attempts is added to the call's span. Every reviewer's parsed findings and the
 coordinator's kept list are also uploaded as the `ai-review-findings-*` artifact (7 days,
 scrubbed like the comment). Full engine details live in the code;
 the rest of this README covers **trusted execution, setup, activation, and rollback**.
