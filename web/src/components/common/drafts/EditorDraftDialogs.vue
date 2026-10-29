@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :saving="draft.state.leaveSaving"
     :can-keep-draft="draft.state.canKeepDraft"
     :signing-out="draft.state.signingOut"
+    :other-draft-count="draft.state.signOutOtherDrafts"
     :can-save="draft.state.canSave"
     :server-draft-item="draft.state.serverDraftItem"
     :save-label="draft.state.saveLabel"

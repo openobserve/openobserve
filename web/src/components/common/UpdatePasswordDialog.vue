@@ -156,7 +156,7 @@ watch(
   { immediate: true },
 );
 
-// The server refuses every save until the password changes, so editors offer only Discard; once it has changed the old session is dead and cannot be kept.
+// The server refuses every save until the password changes, so editors offer only Discard; once it has changed the old session is dead, so editors keep their work as drafts and go.
 const signOut = async ({ passwordChanged = false } = {}) => {
   const options = passwordChanged ? { forced: true } : { discardOnly: true };
   if (await signOutThroughLeaveGuards(router, store, options)) close();

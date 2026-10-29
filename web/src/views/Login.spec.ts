@@ -64,6 +64,8 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(),
 }));
 
+vi.mock("@/utils/sessionServices", () => ({ expireSession: vi.fn() }));
+
 vi.mock("@/components/login/Login.vue", () => ({
   default: {
     name: "Login",
@@ -77,6 +79,7 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import * as zincutils from "@/utils/zincutils";
 import config from "@/aws-exports";
+import { expireSession } from "@/utils/sessionServices";
 
 // Mock Toast
 const mockNotify = vi.fn(() => vi.fn());
@@ -510,6 +513,16 @@ describe("Login.vue", () => {
       await wrapper.vm.getDefaultOrganization();
 
       expect(organizationsService.list).toHaveBeenCalledWith(0, 100000, "id", false, "");
+    });
+
+    it("ends the session as an expired one, keeping drafts, when the organizations are refused", async () => {
+      (organizationsService.list as any).mockRejectedValueOnce({ response: { status: 403 } });
+
+      await wrapper.vm.getDefaultOrganization();
+      await flushPromises();
+
+      expect(expireSession).toHaveBeenCalledWith(store, { toLogin: true });
+      expect(store.dispatch).not.toHaveBeenCalledWith("logout", expect.anything());
     });
 
     it("should set organizations in store", async () => {

@@ -65,18 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Name -->
       <template #cell-name="{ row }: { row: StatusPageListItem }">
         <div class="flex min-w-0 items-center gap-2">
-          <OTooltip
-            v-if="row.name"
-            :content="raw(row.name)"
-            content-class="max-w-[25rem] whitespace-normal break-words text-xs"
-          >
-            <span class="cursor-pointer truncate">{{ row.name }}</span>
-          </OTooltip>
+          <OTruncatedText v-if="row.name" as="span" class="cursor-pointer">{{
+            row.name
+          }}</OTruncatedText>
           <span v-else class="truncate">—</span>
           <EditorDraftDot
             v-if="pageDrafts.ids.has(row.id)"
             :saved-at="pageDrafts.savedAt(row.id)"
-            :data-test="`status-pages-draft-dot-${row.id}`"
+            :data-test="`status-pages-${row.id}-draft-dot`"
           />
         </div>
       </template>
@@ -294,6 +290,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";

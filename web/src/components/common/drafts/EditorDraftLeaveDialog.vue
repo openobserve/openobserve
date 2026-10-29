@@ -19,55 +19,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     size="sm"
-    :persistent="saving"
+    :persistent="saving || forced"
+    :show-close="!forced"
     :title="t('common.editorDraft.leaveTitle')"
     :primary-button-label="canSave ? (saveLabel ?? t('common.save')) : undefined"
     primary-button-data-test="editor-draft-leave-save"
     :primary-button-loading="saving"
-    :secondary-button-label="
-      canKeepDraft
-        ? serverDraftItem
-          ? t('common.editorDraft.keepInBrowser')
-          : t('common.editorDraft.keepDraft')
-        : undefined
-    "
-    :neutral-button-label="t('panel.discard')"
+    :secondary-button-label="secondaryLabel"
+    :neutral-button-label="t('common.editorDraft.discard')"
     neutral-button-variant="ghost-destructive"
     data-test="editor-draft-leave-dialog"
     @update:open="onOpenChange"
     @click:primary="emit('choose', 'save')"
-    @click:secondary="emit('choose', 'keep')"
+    @click:secondary="emit('choose', canKeepDraft ? 'keep' : 'stay')"
     @click:neutral="emit('choose', 'discard')"
   >
-    <div class="flex flex-col gap-3">
-      <p class="text-text-body text-sm" data-test="editor-draft-leave-message">
-        {{
-          !canSave
-            ? t("common.editorDraft.leaveMessageDiscardOnly", { entity: entityLabel })
-            : !canKeepDraft
-              ? t("common.editorDraft.leaveMessageNoDraft", { entity: entityLabel })
-              : serverDraftItem
-                ? t("common.editorDraft.leaveMessageInBrowser", { entity: entityLabel })
-                : t("common.editorDraft.leaveMessage", { entity: entityLabel })
-        }}
+    <div class="flex items-start gap-1">
+      <p class="text-text-body min-w-0 flex-1 text-sm" data-test="editor-draft-leave-message">
+        {{ leaveMessage }}
       </p>
-      <p
-        v-if="signingOut"
-        class="text-text-secondary text-sm"
+      <EditorDraftInfoHint
+        v-if="signingOut && !forced"
+        :content="
+          t('common.editorDraft.signOutDiscardsOthers', { count: otherDraftCount }, otherDraftCount)
+        "
         data-test="editor-draft-leave-sign-out"
-      >
-        {{ t("common.editorDraft.signOutDiscards") }}
-      </p>
+      />
     </div>
   </ODialog>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import EditorDraftInfoHint from "./EditorDraftInfoHint.vue";
 import type { EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     open: boolean;
     entityLabel: I18nText;
@@ -75,11 +64,17 @@ withDefaults(
     canKeepDraft?: boolean;
     signingOut?: boolean;
     canSave?: boolean;
+    /** The sign-out cannot be cancelled, so the dialog cannot be closed and offers no Stay. */
+    forced?: boolean;
+    /** While signing out, how many of the user's other drafts the sign-out discards. */
+    otherDraftCount?: number;
     /** The item has a server-side draft of its own, so the copy avoids the word "draft". */
     serverDraftItem?: boolean;
     saveLabel?: I18nText | null;
+    /** The host's own message, when the default copy does not fit its buttons. */
+    message?: I18nText | null;
   }>(),
-  { canSave: true },
+  { canSave: true, otherDraftCount: 0 },
 );
 
 const emit = defineEmits<{
@@ -88,7 +83,28 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
+const leaveMessage = computed(() => {
+  if (props.message) return props.message;
+  const entity = props.entityLabel;
+  if (props.forced) return t("common.editorDraft.leaveMessageForced", { entity });
+  if (!props.canSave) return t("common.editorDraft.leaveMessageDiscardOnly", { entity });
+  if (!props.canKeepDraft) return t("common.editorDraft.leaveMessageNoDraft", { entity });
+  return props.serverDraftItem
+    ? t("common.editorDraft.leaveMessageInBrowser", { entity })
+    : t("common.editorDraft.leaveMessage", { entity });
+});
+
+// The discard-only copy offers to stay, so it carries a button for it.
+const secondaryLabel = computed<I18nText | undefined>(() => {
+  if (props.canKeepDraft) {
+    return props.serverDraftItem
+      ? t("common.editorDraft.keepInBrowser")
+      : t("common.editorDraft.keepDraft");
+  }
+  return !props.canSave && !props.forced ? t("common.editorDraft.stay") : undefined;
+});
+
 const onOpenChange = (value: boolean) => {
-  if (!value) emit("choose", "stay");
+  if (!value && !props.forced) emit("choose", "stay");
 };
 </script>

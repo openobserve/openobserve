@@ -1194,9 +1194,22 @@ const bannerDraft = useEditorDraft<BannerDraftData>({
 const unkeptLeave = reactive({ open: false, saving: false });
 let resolveUnkeptLeave: ((allowed: boolean) => void) | null = null;
 
+const settleUnkeptLeave = (allowed: boolean) => {
+  const resolve = resolveUnkeptLeave;
+  resolveUnkeptLeave = null;
+  resolve?.(allowed);
+};
+
 const askUnkeptLeave = (): boolean | Promise<boolean> => {
-  if (draftsKept || !hasUnsavedChanges()) return true;
-  if (resolveUnkeptLeave) return false;
+  if (draftsKept) return true;
+  // A second leave while the dialog's Save runs must not stack another dialog.
+  if (unkeptLeave.saving) return false;
+  // A newer navigation has already cancelled the earlier one, so the open dialog now answers for it.
+  settleUnkeptLeave(false);
+  if (!hasUnsavedChanges()) {
+    unkeptLeave.open = false;
+    return true;
+  }
   unkeptLeave.open = true;
   return new Promise<boolean>((resolve) => {
     resolveUnkeptLeave = resolve;
@@ -1215,7 +1228,7 @@ const chooseUnkeptLeave = async (choice: EditorDraftLeaveChoice) => {
   }
   if (allowed) leavingAfterSave = true;
   unkeptLeave.open = false;
-  resolveUnkeptLeave = null;
+  if (resolveUnkeptLeave === resolve) resolveUnkeptLeave = null;
   resolve(allowed);
 };
 
@@ -1231,7 +1244,10 @@ onMounted(async () => {
   window.addEventListener("beforeunload", warnOnUnload);
   if (draftsKept) await bannerDraft.start();
 });
-onBeforeUnmount(() => window.removeEventListener("beforeunload", warnOnUnload));
+onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", warnOnUnload);
+  settleUnkeptLeave(false);
+});
 
 // Reload means taking the stored banner over the edits, so they are not kept as a draft either.
 const reload = () => {

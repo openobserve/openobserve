@@ -413,6 +413,7 @@ describe("AddAiToolset drafts", () => {
     byTest("editor-draft-continue")?.click();
     await flushPromises();
     expect(byTest("ai-toolset-cred-file-reenter-0")).not.toBeNull();
+    expect(byTest("ai-toolset-cred-file-reenter-0")?.classList).toContain("text-status-error-text");
 
     await edit({ "cli.credFiles[0].value": "apiVersion: v3" });
     await flushPromises();

@@ -18,7 +18,11 @@ import { mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import { createStore } from "vuex";
 import { onBeforeRouteLeave } from "vue-router";
-import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
+import {
+  beginDraftSignOut,
+  cancelDraftSignOut,
+  signOutLeaveWillAsk,
+} from "@/utils/drafts/draftSession";
 import { addPanel, getDashboard, getPanel, updateDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -670,7 +674,7 @@ describe("AddPanel drafts and Save and keep editing", () => {
       expect(readPanelDraft(newScope)).toBeNull();
     });
 
-    it("after Discard, a redirect of the same leave (sign-out going on to login) does not ask again", async () => {
+    it("after Discard, a redirect of the same leave does not ask again", async () => {
       wrapper = await mountEditor();
       await userEdits(wrapper, "Throw away");
       const first = leave("/logout");
@@ -700,6 +704,31 @@ describe("AddPanel drafts and Save and keep editing", () => {
         ).toContain("Save the panel or discard your changes.");
         leaveButton("discard").click();
         await done;
+      } finally {
+        cancelDraftSignOut();
+      }
+    });
+
+    it("tells the sign-out it will ask, so the layout skips its own draft count", async () => {
+      wrapper = await mountEditor();
+      expect(signOutLeaveWillAsk()).toBe(false);
+      await userEdits(wrapper, "Unsaved");
+      expect(signOutLeaveWillAsk()).toBe(true);
+      wrapper.unmount();
+      wrapper = null;
+      expect(signOutLeaveWillAsk()).toBe(false);
+    });
+
+    it("a forced sign-out keeps the panel as a draft and leaves without asking", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Kept on forced sign-out");
+      beginDraftSignOut({ forced: true });
+      try {
+        const { next, done } = leave("/logout");
+        await done;
+        expect(leaveDialog()).toBeNull();
+        expect(next).toHaveBeenCalledWith();
+        expect(readPanelDraft(newScope)?.data.title).toBe("Kept on forced sign-out");
       } finally {
         cancelDraftSignOut();
       }

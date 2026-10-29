@@ -170,7 +170,7 @@ describe("ModelPricingEditor drafts", () => {
   it("Continue restores the draft, Start fresh drops it, Escape keeps it", async () => {
     writeEditorDraft(newScope, { data: formDraft("From draft") });
     await mountAt("modelPricingEditor");
-    expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("model pricing");
+    expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("model price");
     byTest("editor-draft-continue")?.click();
     await flushPromises();
     expect(form().state.values.name).toBe("From draft");
@@ -238,7 +238,7 @@ describe("ModelPricingEditor drafts", () => {
     expect(vi.mocked(toast)).toHaveBeenCalledWith(
       expect.objectContaining({
         variant: "info",
-        message: expect.stringContaining("model pricing"),
+        message: expect.stringContaining("model price"),
       }),
     );
   });
@@ -312,10 +312,32 @@ describe("ModelPricingEditor drafts", () => {
     await mountAt("modelPricing");
 
     expect(byTest("model-pricing-add-draft-dot")).not.toBeNull();
-    await vi.waitFor(() => expect(byTest(`model-pricing-draft-dot-${modelId}`)).not.toBeNull());
-    expect(byTest(`model-pricing-draft-dot-${claude.id}`)).toBeNull();
+    await vi.waitFor(() => expect(byTest(`model-pricing-${modelId}-draft-dot`)).not.toBeNull());
+    expect(byTest(`model-pricing-${claude.id}-draft-dot`)).toBeNull();
     expect(byTest(`model-pricing-${claude.id}-more-actions-draft-dot`)).not.toBeNull();
     expect(byTest(`model-pricing-${modelId}-more-actions-draft-dot`)).toBeNull();
+    const menuOf = (id: string) =>
+      byTest(`model-pricing-${id}-more-actions-draft-dot`)?.closest("button") ?? null;
+    expect(menuOf(claude.id)?.getAttribute("aria-label")).toMatch(
+      /^More actions · unsaved draft · .*\d/,
+    );
+  });
+
+  it("a built-in row's Clone names its kept copy, dated, in its own tooltip", async () => {
+    const builtIn = { ...claude, id: "bi-1", org_id: "_built_in_", source: "built_in" };
+    service.list.mockResolvedValue({ data: [gpt4o(), builtIn] });
+    writeEditorDraft(
+      { ...duplicateScope, variant: `duplicate:${builtIn.id}` },
+      { data: formDraft("Copy") },
+    );
+    await mountAt("modelPricing");
+
+    await vi.waitFor(() =>
+      expect(byTest(`model-pricing-${builtIn.id}-clone-draft-dot`)).not.toBeNull(),
+    );
+    const clone = byTest(`model-pricing-${builtIn.id}-clone-draft-dot`)!.closest("button")!;
+    expect(clone.getAttribute("aria-label")).toMatch(/^Clone to this org · unsaved draft · .*\d/);
+    expect(clone.hasAttribute("title")).toBe(false);
   });
 
   it("deleting a model drops its drafts, singly and in bulk", async () => {

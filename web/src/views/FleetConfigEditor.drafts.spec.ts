@@ -23,7 +23,12 @@ import fleet from "@/services/fleet";
 import { queryClient } from "@/composables/query/queryClient";
 import { graphToYaml } from "@/components/fleet/editor/editorGraph";
 import { SEEDS } from "@/components/fleet/editor/editorGraph.fixtures";
-import { draftSessionEnded, resumeDraftSession } from "@/utils/drafts/draftSession";
+import {
+  DRAFT_SIGNED_OUT_KEY,
+  draftSessionEnded,
+  resumeDraftSession,
+} from "@/utils/drafts/draftSession";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import { stopSessionServices } from "@/utils/sessionServices";
 import FleetConfigEditor from "./FleetConfigEditor.vue";
@@ -133,14 +138,20 @@ const leaveButton = (id: string) =>
     `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
   );
 const pressEscape = () =>
-  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+  );
 
 const traces = (storage: Storage, fleetRelated: (key: string, value: string) => boolean) =>
   Object.keys(storage).filter((key) => fleetRelated(key, storage.getItem(key) ?? ""));
 
 /** Every key the draft store could have written, or that holds the YAML secret; in sessionStorage, anything Fleet's. */
 const storedYamlTraces = () => [
-  ...traces(localStorage, (key, value) => key.startsWith("o2_draft") || value.includes(SECRET)),
+  ...traces(
+    localStorage,
+    (key, value) =>
+      (key.startsWith("o2_draft") && key !== DRAFT_SIGNED_OUT_KEY) || value.includes(SECRET),
+  ),
   ...traces(
     sessionStorage,
     (key, value) =>
@@ -212,11 +223,34 @@ describe("FleetConfigEditor leave guard", () => {
     expect(leaveButton("editor-draft-leave-save")?.textContent).toContain("Save draft");
     expect(leaveButton("o-dialog-neutral-btn")?.textContent).toContain("Discard");
     expect(leaveButton("o-dialog-secondary-btn")).toBeNull();
-    expect(byTest("editor-draft-leave-message")?.textContent).toBe(
-      "Save the collector configuration or discard your changes.",
+    expect(byTest("editor-draft-leave-message")?.textContent?.trim()).toBe(
+      "Save your changes as a draft of this configuration, or discard them.",
     );
     pressEscape();
     await navigation;
+  });
+
+  it("a new configuration offers only Discard or Stay, and never opens the create dialog", async () => {
+    await mountEditor("new");
+    await editYaml(SECRET_YAML);
+    const first = await goToOtherConfig();
+
+    expect(leaveButton("editor-draft-leave-save")).toBeNull();
+    expect(byTest("editor-draft-leave-message")?.textContent?.trim()).toBe(
+      "This collector configuration is not created yet. Discard it to leave, or stay on this page.",
+    );
+    const stay = leaveButton("o-dialog-secondary-btn");
+    expect(stay?.textContent?.trim()).toBe("Stay");
+    stay!.click();
+    await first.navigation;
+    expect(router.currentRoute.value.params.id).toBe("new");
+    expect(wrapper!.findComponent({ name: "FleetCreateConfigDialog" }).props("open")).toBe(false);
+
+    const second = await goToOtherConfig();
+    leaveButton("o-dialog-neutral-btn")!.click();
+    await second.navigation;
+    expect(router.currentRoute.value.params.id).toBe("other");
+    expect(fleet.createConfig).not.toHaveBeenCalled();
   });
 
   it("Save draft saves the server draft, then continues the navigation", async () => {
@@ -371,15 +405,36 @@ describe("FleetConfigEditor leave guard", () => {
       expect(router.currentRoute.value.params.id).toBe("edge");
     });
 
-    it("a forced sign-out offers Discard only, and closing the dialog discards", async () => {
+    it("names the other drafts the sign-out discards behind the info icon", async () => {
+      writeEditorDraft(
+        { kind: "slo", org: "o1", entityId: null, userEmail: "example@gmail.com" },
+        { data: {} },
+      );
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      const signingOut = signOutThroughLeaveGuards(router, signOutStore());
+      await flushPromises();
+
+      expect(byTest("editor-draft-leave-sign-out")?.getAttribute("aria-label")).toBe(
+        "Signing out also discards 1 other unsaved draft in this browser.",
+      );
+      leaveButton("o-dialog-neutral-btn")!.click();
+      expect(await signingOut).toBe(true);
+    });
+
+    it("a forced sign-out offers Discard only, and the dialog cannot be closed", async () => {
       await mountEditor("edge");
       await editYaml(SECRET_YAML);
       const signingOut = signOutThroughLeaveGuards(router, signOutStore(), { forced: true });
       await flushPromises();
 
       expect(leaveButton("editor-draft-leave-save")).toBeNull();
-      expect(leaveButton("o-dialog-neutral-btn")).not.toBeNull();
+      expect(leaveButton("o-dialog-secondary-btn")).toBeNull();
+      expect(leaveButton("o-dialog-close-btn")).toBeNull();
       pressEscape();
+      await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      leaveButton("o-dialog-neutral-btn")!.click();
 
       expect(await signingOut).toBe(true);
       expect(fleet.saveConfigDraft).not.toHaveBeenCalled();

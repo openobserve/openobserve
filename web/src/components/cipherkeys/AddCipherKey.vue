@@ -327,8 +327,18 @@ const redactCipherKeyDraft = (data: AddCipherKeyForm) => {
   return { data: copy, paths };
 };
 
+// The product name is never translated, so it is passed into the label.
+const STATIC_SECRET_PATH = `${AKEYLESS}/store/static_secret`;
+
+const secretFieldLabel = (path: string): I18nText | null => {
+  if (path === STATIC_SECRET_PATH) {
+    return t("cipherKey.staticSecretNameNotKept", { product: raw("Akeyless") });
+  }
+  return SECRET_FIELDS[path] ? t(SECRET_FIELDS[path]) : null;
+};
+
 const describeRedactedCipherKey = (paths: string[]): I18nText[] => [
-  ...new Set(paths.flatMap((path) => (SECRET_FIELDS[path] ? [t(SECRET_FIELDS[path])] : []))),
+  ...new Set(paths.flatMap((path) => secretFieldLabel(path) ?? [])),
 ];
 
 const flagReentries = (paths: string[]) => {

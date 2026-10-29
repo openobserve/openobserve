@@ -136,6 +136,7 @@
           icon="format-list-bulleted"
           data-test="oncall-team-tab-overview"
         />
+        <!-- The default slot drops `label` and `icon`, so these tabs size their icon as the `icon` prop would. -->
         <OTab name="schedule" data-test="oncall-team-tab-schedule">
           <OIcon name="calendar-month" size="sm" class="shrink-0" />
           <span>{{ t("oncall.schedule") }}</span>
@@ -145,10 +146,6 @@
             data-test="oncall-team-tab-schedule-draft-dot"
           />
         </OTab>
-        <!-- Counts via the default slot, which is the documented seam for badges;
-             `label` and `icon` are ignored once it is provided. The icon is
-             sized the way the `icon` prop sizes it on the two tabs above, so the
-             strip carries one glyph size rather than two. -->
         <OTab name="policy" data-test="oncall-team-tab-policy">
           <OIcon name="arrow-upward" size="sm" class="shrink-0" />
           <span>{{ t("oncall.escalationTab") }}</span>

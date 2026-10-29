@@ -239,30 +239,40 @@
               variant="ghost"
               icon-left="content-copy"
               :disabled="cloningId === row.id"
-              :aria-label="cloneLabel(row.id)"
+              :aria-label="draftActionLabel(row.id, t('aiObservability.experiments.clone'))"
               class="max-md:hidden"
               :data-test="`ai-experiment-clone-${row.id}`"
               @click.stop="cloneExperiment(row)"
             >
-              <OTooltip side="bottom" :content="cloneLabel(row.id)" />
+              <OTooltip
+                side="bottom"
+                :content="draftActionLabel(row.id, t('aiObservability.experiments.clone'))"
+              />
               <EditorDraftDot
                 v-if="experimentDrafts.ids.has(row.id)"
                 corner
                 :tooltip="false"
-                :data-test="`ai-experiment-draft-dot-${row.id}`"
+                :data-test="`ai-experiment-${row.id}-clone-draft-dot`"
               />
             </OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
-                  :aria-label="t('common.moreActions')"
+                  :aria-label="draftActionLabel(row.id, t('common.moreActions'))"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="md:hidden"
                   data-test="ai-experiment-actions-menu-btn"
                   @click.stop
-                />
+                >
+                  <EditorDraftDot
+                    v-if="experimentDrafts.ids.has(row.id)"
+                    corner
+                    :saved-at="experimentDrafts.savedAt(row.id)"
+                    :data-test="`ai-experiment-${row.id}-actions-menu-draft-dot`"
+                  />
+                </OButton>
               </template>
               <ODropdownItem
                 :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
@@ -288,7 +298,7 @@
                 <EditorDraftDot
                   v-if="experimentDrafts.ids.has(row.id)"
                   :saved-at="experimentDrafts.savedAt(row.id)"
-                  :data-test="`ai-experiment-draft-dot-${row.id}-menu`"
+                  :data-test="`ai-experiment-${row.id}-clone-menu-draft-dot`"
                 />
               </ODropdownItem>
             </ODropdown>
@@ -302,7 +312,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -336,6 +346,7 @@ import {
 import { canCloneInForm } from "./ExperimentForm.schema";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 
 const props = withDefaults(
@@ -366,9 +377,11 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const experimentDrafts = useEditorDraftIds("experiment");
 
-function cloneLabel(id: string) {
-  const label = t("aiObservability.experiments.clone");
-  return experimentDrafts.ids.has(id) ? t("common.editorDraft.newDot", { label }) : label;
+const draftLabel = useDraftLabel();
+
+// A clone draft is keyed by its source run, so the actions that reopen it say so, dated, in their own name.
+function draftActionLabel(id: string, label: I18nText): I18nText {
+  return experimentDrafts.ids.has(id) ? draftLabel(label, experimentDrafts.savedAt(id)) : label;
 }
 const route = useRoute();
 const router = useRouter();

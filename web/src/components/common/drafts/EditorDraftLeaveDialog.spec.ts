@@ -34,6 +34,23 @@ const button = (id: string) =>
     `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
   );
 
+const click = (id: string) => {
+  const target = button(id);
+  if (!target) throw new Error(`no ${id} in the leave dialog`);
+  target.click();
+};
+
+const messageText = () =>
+  document.body.querySelector('[data-test="editor-draft-leave-message"]')?.textContent ?? "";
+
+const pressEscape = async () => {
+  const content = document.body.querySelector('[data-test="editor-draft-leave-dialog"]');
+  content?.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+  );
+  await flushPromises();
+};
+
 describe("EditorDraftLeaveDialog", () => {
   afterEach(() => {
     wrapper?.unmount();
@@ -44,38 +61,87 @@ describe("EditorDraftLeaveDialog", () => {
     const dialog = await mountDialog();
     const root = document.body.querySelector('[data-test="editor-draft-leave-dialog"]');
     expect(root?.textContent).toContain("Leave with unsaved changes?");
-    expect(root?.textContent).toContain("Save the report");
-    expect(root?.textContent).toContain("in this browser until you sign out");
+    expect(messageText()).toContain("Save the report");
+    expect(messageText()).toContain("in this browser until you sign out");
 
-    button("editor-draft-leave-save")?.click();
-    button("o-dialog-secondary-btn")?.click();
-    button("o-dialog-neutral-btn")?.click();
+    click("editor-draft-leave-save");
+    click("o-dialog-secondary-btn");
+    click("o-dialog-neutral-btn");
     expect(dialog.emitted("choose")).toEqual([["save"], ["keep"], ["discard"]]);
+    expect(button("o-dialog-neutral-btn")?.textContent?.trim()).toBe("Discard");
   });
 
-  it("says signing out discards drafts, and offers only save and discard", async () => {
-    await mountDialog({ canKeepDraft: false, signingOut: true });
-    const message = document.body.querySelector('[data-test="editor-draft-leave-message"]');
-    expect(message?.textContent).toContain("Save the report or discard your changes.");
-    expect(message?.textContent).not.toContain("draft");
-    expect(
-      document.body.querySelector('[data-test="editor-draft-leave-sign-out"]')?.textContent,
-    ).toContain("Signing out discards the unsaved drafts kept in this browser.");
+  it("puts the sign-out note behind an info icon that counts the other drafts", async () => {
+    await mountDialog({ canKeepDraft: false, signingOut: true, otherDraftCount: 2 });
+    expect(messageText()).toContain("Save the report or discard your changes.");
+    expect(messageText()).not.toContain("draft");
+    const hint = document.body.querySelector('[data-test="editor-draft-leave-sign-out"]');
+    expect(hint?.tagName).toBe("BUTTON");
+    expect(hint?.getAttribute("aria-label")).toBe(
+      "Signing out also discards 2 other unsaved drafts in this browser.",
+    );
     expect(button("o-dialog-secondary-btn")).toBeNull();
     expect(button("o-dialog-neutral-btn")).not.toBeNull();
+  });
+
+  it("says why there is no Keep when the sign-out leaves no other draft", async () => {
+    await mountDialog({ canKeepDraft: false, signingOut: true });
+    expect(
+      document.body
+        .querySelector('[data-test="editor-draft-leave-sign-out"]')
+        ?.getAttribute("aria-label"),
+    ).toBe("Drafts are not kept when you sign out.");
   });
 
   it("hides keep draft when drafts cannot be stored", async () => {
     await mountDialog({ canKeepDraft: false });
     expect(button("o-dialog-secondary-btn")).toBeNull();
     expect(button("editor-draft-leave-save")).not.toBeNull();
+    expect(document.body.querySelector('[data-test="editor-draft-leave-sign-out"]')).toBeNull();
+  });
+
+  it("offers a Stay button beside Discard when the item cannot be saved", async () => {
+    const dialog = await mountDialog({ canKeepDraft: false, canSave: false, signingOut: true });
+    expect(messageText()).toContain("or stay on this page");
+    expect(button("editor-draft-leave-save")).toBeNull();
+    expect(button("o-dialog-secondary-btn")?.textContent?.trim()).toBe("Stay");
+    click("o-dialog-secondary-btn");
+    click("o-dialog-neutral-btn");
+    expect(dialog.emitted("choose")).toEqual([["stay"], ["discard"]]);
+  });
+
+  it("cannot be closed or stayed in during a forced sign-out", async () => {
+    const dialog = await mountDialog({ canKeepDraft: false, canSave: false, forced: true });
+    expect(messageText()).toBe(
+      "Your session has ended, so this report cannot be saved. Discard your changes to sign out.",
+    );
+    expect(button("o-dialog-close-btn")).toBeNull();
+    expect(button("o-dialog-secondary-btn")).toBeNull();
+    expect(button("editor-draft-leave-save")).toBeNull();
+    expect(document.body.querySelector('[data-test="editor-draft-leave-sign-out"]')).toBeNull();
+    await pressEscape();
+    expect(dialog.emitted("choose")).toBeUndefined();
+    expect(document.body.querySelector('[data-test="editor-draft-leave-dialog"]')).not.toBeNull();
+    click("o-dialog-neutral-btn");
+    expect(dialog.emitted("choose")).toEqual([["discard"]]);
+  });
+
+  it("shows the host's own message in place of the default copy", async () => {
+    await mountDialog({ canKeepDraft: false, message: raw("Save it as a server draft.") });
+    expect(messageText().trim()).toBe("Save it as a server draft.");
   });
 
   it("stays on close", async () => {
     const dialog = await mountDialog();
-    button("o-dialog-close-btn")?.click();
+    click("o-dialog-close-btn");
     await flushPromises();
     expect(dialog.emitted("choose")).toEqual([["stay"]]);
+  });
+
+  it("stays on Escape when the sign-out is not forced", async () => {
+    const dialog = await mountDialog({ canSave: false, canKeepDraft: false });
+    await pressEscape();
+    expect(dialog.emitted("choose")?.at(-1)).toEqual(["stay"]);
   });
 
   it("is persistent and disables its buttons while saving", async () => {

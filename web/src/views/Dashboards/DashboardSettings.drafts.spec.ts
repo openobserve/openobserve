@@ -317,7 +317,7 @@ describe("DashboardSettings drafts", () => {
     open.value = true;
     await settle();
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain(
-      "unsaved changes to this dashboard settings",
+      "unsaved changes to this dashboard from",
     );
     expect(byTest("editor-draft-changed-on-server")).toBeNull();
     await click(byTest("editor-draft-continue"));

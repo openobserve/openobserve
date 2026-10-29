@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getCurrentInstance, onBeforeUnmount, ref } from "vue";
-import { draftSessionEnded } from "@/utils/drafts/draftSession";
+import { draftSessionEnded, draftUserSignedOut } from "@/utils/drafts/draftSession";
 
 export const PANEL_DRAFT_VERSION = 1;
 export const PANEL_DRAFT_PREFIX = "o2_panel_draft:";
@@ -178,7 +178,7 @@ export const hasPanelDraft = (scope: PanelDraftScope): boolean => {
 /** Returns false when the draft could not be stored, even after pruning for space. */
 export const writePanelDraft = (scope: PanelDraftScope, input: PanelDraftInput): boolean => {
   // After an explicit sign-out nothing may write a draft back until the next login.
-  if (draftSessionEnded.value) return false;
+  if (draftSessionEnded.value || draftUserSignedOut(scope.userEmail)) return false;
   const storage = getStorage();
   if (!storage) return false;
   const key = panelDraftKey(scope);

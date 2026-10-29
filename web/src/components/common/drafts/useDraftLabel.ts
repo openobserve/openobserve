@@ -17,7 +17,7 @@ import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatEditorDraftTime } from "@/utils/drafts/editorDraftStore";
 
-/** A host's own tooltip text for its draft: "{label} · unsaved draft from {date}", undated when no time is known. */
+/** A host's own tooltip text for its draft: "{label} · unsaved draft · {date}", undated when no time is known. */
 export const useDraftLabel = () => {
   const { t, locale } = useI18nTyped();
   const store = useStore();

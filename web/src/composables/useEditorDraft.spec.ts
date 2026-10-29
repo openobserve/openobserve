@@ -572,6 +572,7 @@ describe("useEditorDraft", () => {
       const started = draft.start();
       await flushPromises();
       expect(byTest("editor-draft-continue")?.textContent).toContain("Continue editing");
+      expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("Unsaved local changes");
       draft.chooseRestore("dismiss");
       await started;
 
@@ -589,6 +590,33 @@ describe("useEditorDraft", () => {
       expect(byTest("editor-draft-leave-message")?.textContent).not.toContain("draft");
       draft.chooseLeave("stay");
       expect(await result).toBe(false);
+    });
+
+    it("says the server change and the not-kept secrets without the word draft for a server-draft item", async () => {
+      overrides = { serverDraftItem: true };
+      seed(
+        editScope,
+        { name: "draft", password: "" },
+        {
+          baseHash: hashDraftValue({ old: true }),
+          redactedPaths: ["/password"],
+          changedRedactedPaths: ["/password"],
+        },
+      );
+      const draft = await mountHost();
+      const started = draft.start();
+      await flushPromises();
+      const notices = byTest("editor-draft-restore-notices");
+      expect(notices?.querySelectorAll("li")).toHaveLength(2);
+      expect(byTest("editor-draft-changed-on-server")?.textContent).toContain(
+        "after your changes were kept in this browser",
+      );
+      expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+        "are not kept in this browser",
+      );
+      expect(notices?.textContent).not.toContain("draft");
+      draft.chooseRestore("dismiss");
+      await started;
     });
 
     it("warns when the server item changed after the draft was written", async () => {
@@ -1233,23 +1261,128 @@ describe("useEditorDraft", () => {
   });
 
   describe("forced sign-out", () => {
-    it("treats closing the leave dialog as Discard, so the sign-out goes on", async () => {
-      const draft = await startHost();
+    it("keeps the work as a draft without asking, so the next login can continue it", async () => {
+      await startHost();
       userInput();
       await edit({ name: "typed" });
-      flushAutosave();
       beginDraftSignOut({ forced: true });
       try {
-        const result = leaveGuard()({ path: "/logout" }, { path: "/editor" });
+        await expect(leaveGuard()({ path: "/logout" }, { path: "/editor" })).resolves.toBe(true);
         await flushPromises();
-        expect(leaveDialogButton("editor-draft-leave-save")).toBeNull();
-        expect(leaveDialogButton("o-dialog-secondary-btn")).toBeNull();
-        draft.chooseLeave("stay");
-        expect(await result).toBe(true);
-        expect(readEditorDraft(editScope)).toBeNull();
+        expect(byTest("editor-draft-leave-dialog")).toBeNull();
+        expect(readEditorDraft<Form>(editScope)?.data.name).toBe("typed");
       } finally {
         cancelDraftSignOut();
       }
+    });
+
+    it("answers a leave dialog left open as Stay, then lets the sign-out go", async () => {
+      await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      const earlier = leave();
+      await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      beginDraftSignOut({ forced: true });
+      try {
+        await expect(leaveGuard()({ path: "/logout" }, { path: "/editor" })).resolves.toBe(true);
+        expect(await earlier).toBe(false);
+        expect(readEditorDraft<Form>(editScope)?.data.name).toBe("typed");
+      } finally {
+        cancelDraftSignOut();
+      }
+    });
+  });
+
+  describe("sign-out with other drafts", () => {
+    it("tells the sign-out it will ask, and counts the drafts besides its own", async () => {
+      const { signOutLeaveWillAsk } = await import("@/utils/drafts/draftSession");
+      seed({ ...editScope, entityId: "other" }, { name: "other" });
+      seed({ ...editScope, kind: "slo" }, { name: "slo" });
+      await startHost();
+      expect(signOutLeaveWillAsk()).toBe(false);
+      userInput();
+      await edit({ name: "typed" });
+      flushAutosave();
+      expect(signOutLeaveWillAsk()).toBe(true);
+      beginDraftSignOut();
+      try {
+        const result = leave();
+        await flushPromises();
+        expect(byTest("editor-draft-leave-sign-out")?.getAttribute("aria-label")).toBe(
+          "Signing out also discards 2 other unsaved drafts in this browser.",
+        );
+        leaveDialogButton("o-dialog-neutral-btn")!.click();
+        expect(await result).toBe(true);
+      } finally {
+        cancelDraftSignOut();
+      }
+      wrapper?.unmount();
+      wrapper = null;
+      expect(signOutLeaveWillAsk()).toBe(false);
+    });
+  });
+
+  describe("a start that overtakes an open restore dialog", () => {
+    it("closes the earlier item's dialog, and its answer never loads that draft into the new item", async () => {
+      seed(editScope, { name: "draft of fn1" });
+      seed({ ...editScope, entityId: "fn2" }, { name: "draft of fn2" });
+      const draft = await mountHost();
+      const first = draft.start();
+      await flushPromises();
+      expect(draft.state.restoreOpen).toBe(true);
+
+      entityId = "fn2";
+      const second = draft.start();
+      await flushPromises();
+      await first;
+      expect(apply).not.toHaveBeenCalled();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("draft of fn1");
+      expect(draft.state.restoreOpen).toBe(true);
+
+      byTest("editor-draft-continue")!.click();
+      await second;
+      expect(apply).toHaveBeenCalledTimes(1);
+      expect(apply.mock.calls[0][0].name).toBe("draft of fn2");
+    });
+  });
+
+  describe("secretUrls", () => {
+    it("blanks a URL that can carry a token and keeps a plain one", async () => {
+      overrides = {
+        secretUrls: ["/name"],
+        describeRedacted: (paths) => paths.map(() => raw("endpoint URL")),
+      };
+      await startHost();
+      userInput();
+      await edit({ name: "https://api.test/hook?key=s3cret" });
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("");
+      expect(readEditorDraft(editScope)?.changedRedactedPaths).toEqual(["/name"]);
+
+      await edit({ name: "https://api.test/hook" });
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("https://api.test/hook");
+    });
+
+    it("names the not-kept URL on restore and holds Save until it is typed again", async () => {
+      overrides = {
+        secretUrls: ["/name"],
+        describeRedacted: (paths) => paths.map(() => raw("endpoint URL")),
+      };
+      seed(editScope, { name: "" }, { redactedPaths: ["/name"], changedRedactedPaths: ["/name"] });
+      const draft = await mountHost();
+      const started = draft.start();
+      await flushPromises();
+      expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+        "Your change to the endpoint URL was not kept.",
+      );
+      byTest("editor-draft-continue")!.click();
+      await started;
+      expect(form.name).toBe("");
+      expect(draft.pendingReentries()).toEqual(["/name"]);
+      await edit({ name: "https://api.test" });
+      expect(draft.pendingReentries()).toEqual([]);
     });
   });
 

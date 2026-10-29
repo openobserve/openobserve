@@ -73,18 +73,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-version="{ row }">
-        <span
-          v-if="row.version"
-          class="tabular-nums"
+        <div
+          class="flex min-w-0 items-center gap-2"
           :data-test="`fleet-configurations-version-${row.id}`"
-          >{{ t("fleet.common.versionShort", { version: row.version }) }}</span
         >
-        <span
-          v-else
-          class="text-text-secondary"
-          :data-test="`fleet-configurations-version-${row.id}`"
-          >{{ raw("—") }}</span
-        >
+          <span v-if="row.version" class="tabular-nums">{{
+            t("fleet.common.versionShort", { version: row.version })
+          }}</span>
+          <span
+            v-if="!row.version || row.draft"
+            class="inline-flex shrink-0"
+            :data-test="`fleet-configurations-state-${row.id}`"
+          >
+            <OTag type="fleetConfigState" :value="row.version ? 'draftChanges' : 'draft'" />
+            <OTooltip
+              v-if="row.draft"
+              side="top"
+              :content="
+                t('fleet.configs.draftSaved', {
+                  by: row.draft.by,
+                  date: formatDraftTime(row.draft.at),
+                })
+              "
+            />
+          </span>
+        </div>
       </template>
 
       <template #cell-collectors="{ row }">
@@ -145,6 +158,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -172,7 +186,7 @@ const rows = computed(() =>
 
 const columns = computed<OTableColumnDef<ConfigRow>[]>(() => [
   { id: "name", header: t("fleet.common.name"), accessorKey: "name", size: 340, sortable: true },
-  { id: "version", header: t("fleet.collectors.version"), accessorKey: "version", size: 90 },
+  { id: "version", header: t("fleet.collectors.version"), accessorKey: "version", size: 180 },
   {
     id: "collectors",
     header: t("fleet.tabs.collectors"),
@@ -196,6 +210,10 @@ const columns = computed<OTableColumnDef<ConfigRow>[]>(() => [
     hideable: true,
   },
 ]);
+
+function formatDraftTime(ms: number) {
+  return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
 
 function clearFilters() {
   search.value = "";

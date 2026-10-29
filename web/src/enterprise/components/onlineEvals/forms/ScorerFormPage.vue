@@ -1359,6 +1359,8 @@ interface ScorerDraft {
 // Set while the leave dialog's Save runs, so a successful save neither closes the form nor reloads the page.
 let leaveSave: { saved: boolean } | null = null;
 
+const REMOTE_ENDPOINT_PATH = "/values/remoteEndpoint";
+
 const AUTH_TYPE_BY_SECRET: Record<string, AuthType> = {
   "/values/authBearerToken": "bearer",
   "/values/authBasicPassword": "basic",
@@ -1369,7 +1371,8 @@ const AUTH_TYPE_BY_SECRET: Record<string, AuthType> = {
 function secretInUse(path: string, value: ScorerForm): boolean {
   const auth = AUTH_TYPE_BY_SECRET[path];
   if (auth) return value.scorerType === "remote" && value.authType === auth;
-  if (path.startsWith("/values/customHeaders/")) return value.scorerType === "remote";
+  if (path.startsWith("/values/customHeaders/") || path === REMOTE_ENDPOINT_PATH)
+    return value.scorerType === "remote";
   return true;
 }
 
@@ -1380,12 +1383,11 @@ function secretFieldLabel(path: string, data: ScorerDraft): I18nText | null {
       name: data.values.customHeaders[Number(header[1])]?.key ?? "",
     });
   }
-  if (path === "/values/authBasicPassword") {
-    return t("onlineEvals.scorer.remoteAuth.passwordLabel");
-  }
+  if (path === "/values/authBasicPassword") return t("common.editorDraft.passwordField");
   if (path === "/values/authBearerToken" || path === "/values/authApiKeyToken") {
-    return t("onlineEvals.scorer.remoteAuth.tokenLabel");
+    return t("common.editorDraft.tokenField");
   }
+  if (path === REMOTE_ENDPOINT_PATH) return t("common.editorDraft.urlField");
   return null;
 }
 
@@ -1405,6 +1407,7 @@ const scorerDraft = useEditorDraft<ScorerDraft>({
   secretExemptKeys: ["authApiKeyHeaderName"],
   // Any custom header can carry a credential, whatever its name, so no header value is drafted.
   secretLists: ["/values/customHeaders"],
+  secretUrls: [REMOTE_ENDPOINT_PATH],
   apply: (data) => {
     form.reset({ ...initForm(null, props.scorerType), ...data.values });
     if (data.values.producesScoreConfigId) void prepareSelectedScoreConfigVersion(true);

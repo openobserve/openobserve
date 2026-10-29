@@ -498,9 +498,21 @@ describe("CheckTypePicker drafts (real cards)", () => {
     expect(
       document.body.querySelector('[data-test="check-type-picker-row-card-tcp-draft-dot"]'),
     ).toBeNull();
-    expect(card("http").getAttribute("aria-label")).toMatch(/· unsaved draft from .*2026/);
+    expect(card("http").getAttribute("aria-label")).toMatch(/· unsaved draft · .*2026/);
     expect(card("tcp").hasAttribute("aria-label")).toBe(false);
     expect(card("http").querySelector("[title]")).toBeNull();
+  });
+
+  it("keeps the drafted card's description in its accessible description", async () => {
+    mountReal();
+    await flushPromises();
+    const describedBy = card("http").getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const description = document.getElementById(describedBy!);
+    const visible = card("http").querySelector(".text-text-secondary")?.textContent?.trim();
+    expect(visible).toBeTruthy();
+    expect(description?.textContent?.trim()).toBe(visible);
+    expect(card("tcp").hasAttribute("aria-describedby")).toBe(false);
   });
 
   it("shows the draft's date when the user hovers that card", async () => {

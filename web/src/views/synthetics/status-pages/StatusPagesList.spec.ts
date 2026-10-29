@@ -23,6 +23,8 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import type { StatusPageListItem } from "@/services/status_pages";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import StatusPagesList from "./StatusPagesList.vue";
 
 const scope = (entityId: string): EditorDraftScope => ({
@@ -61,13 +63,19 @@ describe("StatusPagesList draft dots", () => {
     });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="status-pages-draft-dot-sp1"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="status-pages-draft-dot-sp2"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="status-pages-sp1-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="status-pages-sp2-draft-dot"]').exists()).toBe(false);
+    // The name tooltips itself only while cut, never as an always-on repeat beside the dot.
+    const names = wrapper.findAllComponents(OTruncatedText).map((n) => n.text());
+    expect(names).toEqual(expect.arrayContaining(["Public", "Internal"]));
+    expect(
+      wrapper.findAllComponents(OTooltip).some((tip) => tip.props("content") === "Public"),
+    ).toBe(false);
 
     writeEditorDraft(scope("sp2"), { data: {} });
     deleteEditorDraft(scope("sp1"));
     await flushPromises();
-    expect(wrapper.find('[data-test="status-pages-draft-dot-sp1"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="status-pages-draft-dot-sp2"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="status-pages-sp1-draft-dot"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="status-pages-sp2-draft-dot"]').exists()).toBe(true);
   });
 });

@@ -416,13 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="ghost"
                         size="icon-sm"
                         icon-left="more-vert"
-                        :aria-label="
-                          downtimeDrafts.hasNewVariant(`clone:${row.id}`)
-                            ? t('common.editorDraft.newDot', {
-                                label: t('alerts.downtimes.actions.more'),
-                              })
-                            : t('alerts.downtimes.actions.more')
-                        "
+                        :aria-label="moreActionsLabel(row)"
                         :data-test="`downtime-list-${row.id}-more`"
                         @click.stop
                       >
@@ -478,6 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.downtimes.actions.duplicate") }}
                       <EditorDraftDot
                         v-if="downtimeDrafts.hasNewVariant(`clone:${row.id}`)"
+                        :saved-at="downtimeDrafts.savedAtVariant(`clone:${row.id}`)"
                         :data-test="`downtime-list-${row.id}-duplicate-menu-draft-dot`"
                       />
                     </ODropdownItem>
@@ -672,6 +667,7 @@ import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import useBreakpoint from "@/composables/useBreakpoint";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import ExtendDowntimeDialog from "./ExtendDowntimeDialog.vue";
 import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
@@ -705,6 +701,15 @@ const router = useRouter();
 const orgId = useOrgId();
 const { toast } = useToast();
 const downtimeDrafts = useEditorDraftIds("downtime");
+const { isMobile } = useBreakpoint();
+// Only below md does the menu hold Duplicate and show the dot, so only there may its name claim the draft.
+const moreActionsLabel = (row: DowntimeListItem): I18nText => {
+  const label = t("alerts.downtimes.actions.more");
+  const variant = `clone:${row.id}`;
+  return isMobile.value && downtimeDrafts.hasNewVariant(variant)
+    ? draftLabel(label, downtimeDrafts.savedAtVariant(variant))
+    : label;
+};
 
 const listQuery = useQuery(() =>
   Object.assign(downtimesListQuery(orgId.value), { enabled: !!orgId.value }),

@@ -2,7 +2,7 @@
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
 import { getAuthHeaders, getOrgIdentifier } from '../../playwright-tests/utils/cloud-auth.js';
-import { discardEditorDraftIfAsked } from '../alertsPages/editorDraftHelpers.js';
+import { discardEditorDraftIfAsked, dismissEditorDraftRestoreIfShown } from '../alertsPages/editorDraftHelpers.js';
 
 export class SDRPatternsPage {
   constructor(page) {
@@ -77,6 +77,7 @@ export class SDRPatternsPage {
     testLogger.info('Clicking Add Pattern button');
     await this.addPatternButton.click();
     await this.addPatternTitle.waitFor({ state: 'visible' });
+    await dismissEditorDraftRestoreIfShown(this.page);
   }
 
   async clickCancel() {

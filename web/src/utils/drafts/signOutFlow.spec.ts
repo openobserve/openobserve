@@ -14,8 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createRouter, createMemoryHistory, type Router } from "vue-router";
+import {
+  createRouter,
+  createMemoryHistory,
+  onBeforeRouteLeave,
+  RouterView,
+  type Router,
+} from "vue-router";
 import { defineComponent, h } from "vue";
+import { mount } from "@vue/test-utils";
 import {
   draftSessionEnded,
   draftSigningOut,
@@ -93,7 +100,6 @@ describe("signOutThroughLeaveGuards", () => {
       expect(invalidateLoginData).toHaveBeenCalledTimes(1);
       expect(store.dispatch).toHaveBeenCalledWith("logout", { draftsOf: email });
       expect(draftSessionEnded.value).toBe(true);
-      expect(router.currentRoute.value.path).toBe("/login");
       expect(assign).toHaveBeenCalledTimes(1);
       expect(assign.mock.calls[0][0]).toMatch(/login$/);
 
@@ -104,6 +110,53 @@ describe("signOutThroughLeaveGuards", () => {
     } finally {
       window.removeEventListener("beforeunload", prompt);
     }
+  });
+
+  it("runs each leave guard once: the reload, not a redirect to /login, ends the navigation", async () => {
+    const leaves: string[] = [];
+    const Editor = defineComponent({
+      setup() {
+        onBeforeRouteLeave((to) => {
+          leaves.push(to.path);
+          return true;
+        });
+        return () => h("div");
+      },
+    });
+    const app = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/editor", component: Editor },
+        { path: "/login", component: Blank },
+        { path: "/logout", component: Blank },
+      ],
+    });
+    await app.push("/editor");
+    const wrapper = mount(defineComponent({ setup: () => () => h(RouterView) }), {
+      global: { plugins: [app] },
+    });
+    await app.isReady();
+
+    await expect(signOutThroughLeaveGuards(app, makeStore())).resolves.toBe(true);
+
+    expect(leaves).toEqual(["/logout"]);
+    expect(app.currentRoute.value.path).toBe("/editor");
+    expect(assign).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+
+  it("keeps another tab of the signed-out user from writing a draft back until that user logs in", async () => {
+    const scope = { kind: "slo" as const, org: "o1", entityId: null, userEmail: email };
+    await signOutThroughLeaveGuards(router, makeStore());
+    // Another tab never saw this tab's in-memory flag, only the marker in storage.
+    draftSessionEnded.value = false;
+
+    expect(writeEditorDraft(scope, { data: { late: true } })).toBe(false);
+    expect(writeEditorDraft({ ...scope, userEmail: "other@x.io" }, { data: { other: true } })).toBe(
+      true,
+    );
+    resumeDraftSession(email);
+    expect(writeEditorDraft(scope, { data: { again: true } })).toBe(true);
   });
 
   it("drops only the signed-out user's editor drafts", async () => {
@@ -135,7 +188,9 @@ describe("signOutThroughLeaveGuards", () => {
     expect(draftSessionEnded.value).toBe(false);
   });
 
-  it("signs out even when a guard refuses, once the sign-out is forced", async () => {
+  it("signs out even when a guard refuses, once the sign-out is forced, and keeps the drafts", async () => {
+    const scope = { kind: "slo" as const, org: "o1", entityId: null, userEmail: email };
+    writeEditorDraft(scope, { data: { mine: true } });
     let flags: boolean[] = [];
     const removeGuard = router.beforeEach((to) => {
       if (to.path !== "/logout") return true;
@@ -149,8 +204,10 @@ describe("signOutThroughLeaveGuards", () => {
 
     expect(flags).toEqual([true, true, true]);
     expect(stopSessionServices).toHaveBeenCalledWith(store);
-    expect(store.dispatch).toHaveBeenCalledWith("logout", { draftsOf: email });
-    expect(draftSessionEnded.value).toBe(true);
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+    expect(store.dispatch).not.toHaveBeenCalledWith("logout", { draftsOf: email });
+    expect(draftSessionEnded.value).toBe(false);
+    expect(readEditorDraft(scope)?.data).toEqual({ mine: true });
     expect(assign).toHaveBeenCalledTimes(1);
   });
 
@@ -167,7 +224,7 @@ describe("signOutThroughLeaveGuards", () => {
 
     await expect(signOutThroughLeaveGuards(router, store, { forced: true })).resolves.toBe(true);
     removeGuard();
-    expect(store.dispatch).toHaveBeenCalledWith("logout", { draftsOf: email });
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
     expect(assign).toHaveBeenCalledTimes(1);
   });
 });

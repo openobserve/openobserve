@@ -450,7 +450,7 @@ const store = createStore({
   actions: {
     login(context, payload) {
       context.commit("login", payload);
-      if (payload?.loginState) resumeEditorDraftSession();
+      if (payload?.loginState) resumeEditorDraftSession(payload.userInfo?.email);
     },
     logout(context, payload?: { draftsOf?: string }) {
       context.commit("logout");

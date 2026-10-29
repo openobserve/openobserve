@@ -24,8 +24,14 @@ export const draftSigningOut = ref(false);
 /** True while a sign-out runs with a session that can no longer save (a forced password reset): only Discard is offered. */
 export const draftSignOutDiscardOnly = ref(false);
 
-/** True while a sign-out cannot be cancelled (the user's own password changed): closing the leave dialog discards. */
+/** True while a sign-out cannot be cancelled (the user's own password changed): the editors keep their work as drafts and go. */
 export const draftSignOutForced = ref(false);
+
+/** Users signed out in this browser, so a tab still open in the old session never writes their deleted drafts back. */
+export const DRAFT_SIGNED_OUT_KEY = "o2_draft_signed_out";
+
+// Each open editor's "would my leave guard ask?", so a sign-out can let that dialog speak for the drafts.
+const signOutLeaveAskers = new Set<() => boolean>();
 
 export const beginDraftSignOut = ({
   discardOnly = false,
@@ -46,12 +52,50 @@ export const cancelDraftSignOut = (): void => {
   clearSignOutFlags();
 };
 
-export const markDraftSessionEnded = (): void => {
-  clearSignOutFlags();
-  draftSessionEnded.value = true;
+const readSignedOut = (): string[] => {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(DRAFT_SIGNED_OUT_KEY) ?? "[]");
+    return Array.isArray(value)
+      ? value.filter((email): email is string => typeof email === "string")
+      : [];
+  } catch {
+    return [];
+  }
 };
 
-export const resumeDraftSession = (): void => {
+const writeSignedOut = (emails: string[]) => {
+  try {
+    if (emails.length) localStorage.setItem(DRAFT_SIGNED_OUT_KEY, JSON.stringify(emails));
+    else localStorage.removeItem(DRAFT_SIGNED_OUT_KEY);
+  } catch {
+    /* storage blocked: no draft can be written either */
+  }
+};
+
+/** Whether this user signed out in some tab of this browser since their last login here. */
+export const draftUserSignedOut = (userEmail: string): boolean =>
+  readSignedOut().includes(userEmail);
+
+export const markDraftSessionEnded = (userEmail?: string): void => {
+  clearSignOutFlags();
+  draftSessionEnded.value = true;
+  if (userEmail) writeSignedOut([...new Set([...readSignedOut(), userEmail])]);
+};
+
+/** Runs on login: this tab writes drafts again, and so does every tab of this user. */
+export const resumeDraftSession = (userEmail?: string): void => {
   clearSignOutFlags();
   draftSessionEnded.value = false;
+  writeSignedOut(userEmail ? readSignedOut().filter((email) => email !== userEmail) : []);
 };
+
+/** Registers an open editor's leave-guard check; returns the unregister call. */
+export const registerSignOutLeaveAsker = (asks: () => boolean): (() => void) => {
+  signOutLeaveAskers.add(asks);
+  return () => {
+    signOutLeaveAskers.delete(asks);
+  };
+};
+
+/** Whether an open editor's leave dialog will ask on sign-out, and can tell about the other drafts itself. */
+export const signOutLeaveWillAsk = (): boolean => [...signOutLeaveAskers].some((asks) => asks());

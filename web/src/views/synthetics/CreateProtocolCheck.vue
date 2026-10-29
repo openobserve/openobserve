@@ -26,7 +26,7 @@ import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch, type Component } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   AgentSetup,
@@ -48,6 +48,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import {
+  describeCheckRedacted,
   redactCheckDraftSecrets,
   reentryValidationKey,
 } from "@/utils/synthetics/checkDraftSecrets";
@@ -321,20 +322,7 @@ function onConfigureUpdate(val: BrowserCheck) {
   isDirty.value = true;
 }
 
-/** Names each not-kept header; any other path leaves the list empty, so the dialog's general note covers every change. */
-function describeRedactedCheck(paths: string[], data: ProtocolCheck): I18nText[] {
-  const labels = paths.flatMap((path): I18nText[] => {
-    const request = /^\/http\/headers\/(\d+)\/value$/.exec(path);
-    const custom = /^\/headers\/(\d+)\/value$/.exec(path);
-    const name = request
-      ? data.http?.headers[Number(request[1])]?.name
-      : custom
-        ? data.headers?.[Number(custom[1])]?.key
-        : undefined;
-    return name ? [t("common.editorDraft.headerField", { name })] : [];
-  });
-  return labels.length === paths.length ? labels : [];
-}
+const hostTarget = computed(() => ["tcp", "tls", "ssh"].includes(props.checkType));
 
 const checkDraft = useEditorDraft<ProtocolCheck>({
   kind: "synthetic_check",
@@ -347,7 +335,8 @@ const checkDraft = useEditorDraft<ProtocolCheck>({
     isDirty.value = true;
   },
   base: () => serverCheck,
-  redactBase: (base) => redactCheckDraftSecrets(base as ProtocolCheck).data,
+  redactBase: (base) =>
+    redactCheckDraftSecrets(base as ProtocolCheck, "", { hostTarget: hostTarget.value }).data,
   hasChanges: () => isDirty.value,
   save: async () => {
     const result = await persistCheck();
@@ -355,8 +344,9 @@ const checkDraft = useEditorDraft<ProtocolCheck>({
     if (result === "missing") forgetMissingCheck();
     return result !== "failed";
   },
-  redact: (data) => redactCheckDraftSecrets(data),
-  describeRedacted: (paths, data) => describeRedactedCheck(paths, data),
+  redact: (data) => redactCheckDraftSecrets(data, "", { hostTarget: hostTarget.value }),
+  describeRedacted: (paths, data) =>
+    describeCheckRedacted(paths, data, t, { urlLabel: t("common.editorDraft.urlField") }),
 });
 
 /** A changed secret the draft did not keep is flagged on its field until it is typed again. */

@@ -116,8 +116,12 @@ const mockRouterPush = vi.fn().mockResolvedValue(undefined);
 const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 const mockRouterBack = vi.fn();
 // Captures the leave guard ViewDashboard registers so tests can invoke it.
-const routeLeaveGuards: Array<() => unknown> = [];
 type RouteLike = { query: Record<string, string> };
+const routeLeaveGuards: Array<(to?: RouteLike) => unknown> = [];
+// Captures afterEach hooks so a test can say whether the navigation landed or a later guard stopped it.
+const afterEachHooks: Array<(to: unknown, from: unknown, failure?: unknown) => void> = [];
+const land = (to?: RouteLike, failure?: unknown) =>
+  afterEachHooks.forEach((hook) => hook(to, {}, failure));
 const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = [];
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
@@ -137,6 +141,13 @@ vi.mock("vue-router", () => ({
     forward: vi.fn(),
     options: { history: { state: mockHistoryState } },
     resolve: vi.fn().mockReturnValue({ href: "/test" }),
+    afterEach: (hook: (to: unknown, from: unknown, failure?: unknown) => void) => {
+      afterEachHooks.push(hook);
+      return () => {
+        const index = afterEachHooks.indexOf(hook);
+        if (index >= 0) afterEachHooks.splice(index, 1);
+      };
+    },
     currentRoute: {
       value: {
         params: { dashboardId: "test-dashboard-1", folderId: "default" },
@@ -148,7 +159,7 @@ vi.mock("vue-router", () => ({
       },
     },
   }),
-  onBeforeRouteLeave: (guard: () => unknown) => {
+  onBeforeRouteLeave: (guard: (to?: RouteLike) => unknown) => {
     routeLeaveGuards.push(guard);
   },
   onBeforeRouteUpdate: (guard: (to: RouteLike, from: RouteLike) => unknown) => {
@@ -1012,6 +1023,7 @@ describe("ViewDashboard", () => {
       global.mockStoreDispatch.mockClear();
 
       routeLeaveGuards.forEach((guard) => guard());
+      land();
 
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", false);
       Object.assign(global.mockStoreState, { printMode: false });
@@ -1025,6 +1037,7 @@ describe("ViewDashboard", () => {
       global.mockStoreDispatch.mockClear();
 
       routeLeaveGuards.forEach((guard) => guard());
+      land();
 
       expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setPrintMode", expect.anything());
     });
@@ -2228,6 +2241,7 @@ describe("ViewDashboard", () => {
       mockSyncGrid.mockReset();
       routeLeaveGuards.length = 0;
       routeUpdateGuards.length = 0;
+      afterEachHooks.length = 0;
     });
 
     it("opens in view mode with the layout locked", async () => {
@@ -2460,6 +2474,43 @@ describe("ViewDashboard", () => {
       const leave = guard() as Promise<boolean>;
       wrapper.vm.settleDiscard(true);
       await expect(leave).resolves.toBe(true);
+      land();
+      expect(panelLayout().x).toBe(0);
+    });
+
+    it("keeps the layout edits when a later leave guard keeps the user on the page", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const guard = routeLeaveGuards.at(-1)!;
+      const toLogs = { query: {} };
+
+      const leave = guard(toLogs) as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      // The settings drawer's guard answered Stay, so the navigation never landed.
+      land(toLogs, { type: 4 });
+      expect(wrapper.vm.isEditingLayout).toBe(true);
+      expect(panelLayout().x).toBe(30);
+
+      // A later, unrelated navigation must not roll back the edits the user stayed for.
+      land({ query: {} });
+      expect(panelLayout().x).toBe(30);
+    });
+
+    it("rolls the layout back only once a confirmed leave lands", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const toLogs = { query: {} };
+
+      const leave = routeLeaveGuards.at(-1)!(toLogs) as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      expect(panelLayout().x).toBe(30);
+
+      land(toLogs);
+      expect(wrapper.vm.isEditingLayout).toBe(false);
       expect(panelLayout().x).toBe(0);
     });
 
@@ -2482,6 +2533,7 @@ describe("ViewDashboard", () => {
       const leave = guard(toOther, from) as Promise<boolean>;
       wrapper.vm.settleDiscard(true);
       await expect(leave).resolves.toBe(true);
+      land(toOther);
       expect(wrapper.vm.isEditingLayout).toBe(false);
       expect(panelLayout().x).toBe(0);
     });
@@ -2974,6 +3026,7 @@ describe("ViewDashboard", () => {
       global.mockStoreDispatch.mockClear();
 
       routeLeaveGuards.at(-1)?.();
+      land();
 
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
     });

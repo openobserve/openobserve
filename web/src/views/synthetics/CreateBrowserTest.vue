@@ -104,6 +104,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import {
+  describeCheckRedacted,
   redactCheckDraftSecrets,
   reentryValidationKey,
 } from "@/utils/synthetics/checkDraftSecrets";
@@ -851,6 +852,11 @@ const browserDraft = useEditorDraft<BrowserTestDraft>({
     const redacted = redactCheckDraftSecrets(data.check, "/check");
     return { data: { ...data, check: redacted.data }, paths: redacted.paths };
   },
+  describeRedacted: (paths, data) =>
+    describeCheckRedacted(paths, data.check, t, {
+      pointerPrefix: "/check",
+      urlLabel: t("common.editorDraft.startingUrlField"),
+    }),
   // Only an id change leaves this check: a query-only update (the setup `router.replace`) must pass.
   leaveOnRouteUpdate: (to, from) => to.params.id !== from.params.id,
 });

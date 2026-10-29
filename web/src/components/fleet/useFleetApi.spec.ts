@@ -445,8 +445,16 @@ describe("toConfigRow", () => {
       fleetsHidden: 2,
       updatedAt: 1790000000000,
       updatedBy: "ana@acme.io",
+      draft: null,
     });
     expect(toConfigRow(apiConfig()).fleetsHidden).toBe(0);
+  });
+
+  it("carries the unpublished draft's author and time when the list reports one", () => {
+    expect(
+      toConfigRow(apiConfig({ draft_by: "bo@acme.io", draft_at: 1790000001000 })).draft,
+    ).toEqual({ by: "bo@acme.io", at: 1790000001000 });
+    expect(toConfigRow(apiConfig({ draft_by: null, draft_at: null })).draft).toBeNull();
   });
 });
 

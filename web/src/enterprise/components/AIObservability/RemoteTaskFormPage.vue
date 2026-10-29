@@ -359,15 +359,6 @@
                      the test connection is signed with it, so it has to be in
                      the operator's own service before that call goes out. -->
                 <div class="flex flex-col gap-1.5">
-                  <OBanner
-                    v-if="signingKeyRegenerated"
-                    variant="warning"
-                    dense
-                    icon="key"
-                    data-test="ai-remote-task-form-signing-key-regenerated"
-                  >
-                    {{ t("aiObservability.remoteTasks.form.signingKeyRegenerated") }}
-                  </OBanner>
                   <span
                     class="o-input-label text-compact text-input-label-text leading-tight font-medium"
                   >
@@ -414,6 +405,15 @@
                     {{ t("aiObservability.remoteTasks.form.signingKeyOnce") }}
                     <code class="text-text-body font-mono">{{ headerShape }}</code>
                   </span>
+                  <OBanner
+                    v-if="signingKeyRegenerated"
+                    variant="warning"
+                    dense
+                    icon="key"
+                    data-test="ai-remote-task-form-signing-key-regenerated"
+                  >
+                    {{ t("aiObservability.remoteTasks.form.signingKeyRegenerated") }}
+                  </OBanner>
                 </div>
               </template>
             </div>
@@ -1034,8 +1034,9 @@ function secretFieldLabel(path: string, data: RemoteTaskFormValues): I18nText | 
       name: data.headers[Number(header[1])]?.key ?? "",
     });
   }
-  if (path === "/token") return t("aiObservability.remoteTasks.form.tokenLabel");
-  if (path === "/password") return t("aiObservability.remoteTasks.form.passwordLabel");
+  if (path === "/token") return t("common.editorDraft.tokenField");
+  if (path === "/password") return t("common.editorDraft.passwordField");
+  if (path === "/endpoint") return t("common.editorDraft.endpointUrlField");
   return null;
 }
 
@@ -1055,7 +1056,6 @@ const taskDraft = useEditorDraft<RemoteTaskFormValues>({
   kind: "remote_task",
   entityLabel: () => t("common.editorDraft.entities.remote_task"),
   // "Draft" already names the registry's unpublished server version.
-  restoreTitle: () => t("common.editorDraft.fleetRestoreTitle"),
   serverDraftItem: true,
   restoreNote: (data) =>
     data.signingEnabled && mode.value === "create"
@@ -1089,6 +1089,7 @@ const taskDraft = useEditorDraft<RemoteTaskFormValues>({
   describeRedacted,
   // Any header can carry a credential (Cookie, X-Auth, …), so no header value is drafted.
   secretLists: ["/headers"],
+  secretUrls: ["/endpoint"],
 });
 
 onMounted(async () => {

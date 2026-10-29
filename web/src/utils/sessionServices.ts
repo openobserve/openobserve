@@ -18,9 +18,15 @@ import { closeSearchSocket } from "@/composables/useSearchWebSocket";
 import { dismissAll } from "@/lib/feedback/Toast/useToast";
 import { PANEL_DRAFT_PREFIX } from "@/composables/dashboard/usePanelDraft";
 import { EDITOR_DRAFT_INDEX_KEY, EDITOR_DRAFT_PREFIX } from "@/utils/drafts/editorDraftStore";
-import { useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
+import { DRAFT_SIGNED_OUT_KEY } from "@/utils/drafts/draftSession";
+import { getPath, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 
-const DRAFT_KEY_PREFIXES = [EDITOR_DRAFT_PREFIX, EDITOR_DRAFT_INDEX_KEY, PANEL_DRAFT_PREFIX];
+const DRAFT_KEY_PREFIXES = [
+  EDITOR_DRAFT_PREFIX,
+  EDITOR_DRAFT_INDEX_KEY,
+  PANEL_DRAFT_PREFIX,
+  DRAFT_SIGNED_OUT_KEY,
+];
 
 export interface SessionServicesStore {
   state: { zoConfig?: { rum?: { enabled?: boolean } } };
@@ -64,7 +70,14 @@ export const clearLocalStorageKeepingDrafts = (): void => {
 /** Ends a session the server rejected and reloads: the user's drafts stay, so the work survives the next login. */
 export const expireSession = (
   store: ExpiringStore,
-  { clearLocalStorage = false }: { clearLocalStorage?: boolean } = {},
+  {
+    clearLocalStorage = false,
+    toLogin = false,
+  }: {
+    clearLocalStorage?: boolean;
+    /** Goes to the login page instead of reloading, for a page whose reload would sign in again (the login callback). */
+    toLogin?: boolean;
+  } = {},
 ): void => {
   stopSessionServices(store);
   store.dispatch("logout");
@@ -74,5 +87,6 @@ export const expireSession = (
   sessionStorage.clear();
   // The session is gone, so an editor's "leave site?" prompt could only keep the user on a dead page.
   silenceUnloadPrompts();
-  window.location.reload();
+  if (toLogin) window.location.assign(`${getPath()}login`);
+  else window.location.reload();
 };

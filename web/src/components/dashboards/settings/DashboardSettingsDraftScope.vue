@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- The drawer's content remounts on every open, so the draft and its dialogs live here: one draft session per open, its dialogs inside the drawer's focus layer. -->
 <template>
-  <div class="contents [min-height:inherit]" data-test="dashboard-settings-draft-scope">
+  <div class="contents" data-test="dashboard-settings-draft-scope">
     <slot />
     <EditorDraftDialogs :draft="draft" />
   </div>

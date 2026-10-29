@@ -17,6 +17,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import MonitorTable from "./MonitorTable.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { mockMonitorList } from "@/test/unit/mockData/synthetics";
 import store from "@/test/unit/helpers/store";
 
@@ -190,8 +191,8 @@ describe("MonitorTable", () => {
   describe("draft dots", () => {
     it("marks only the rows that have an unsaved editor draft", () => {
       wrapper = mountMonitorTable({ draftSavedAt: { "mon-tcp-1": Date.UTC(2026, 9, 1, 9, 30) } });
-      expect(wrapper.find('[data-test="monitor-table-draft-dot-mon-tcp-1"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="monitor-table-draft-dot-mon-http-1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="monitor-table-mon-tcp-1-draft-dot"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-mon-http-1-draft-dot"]').exists()).toBe(false);
     });
   });
 
@@ -678,14 +679,20 @@ describe("MonitorTable", () => {
     // ── Name cell ──────────────────────────────────────────────────────
 
     describe("name cell", () => {
-      it("renders OTooltip wrapping the name with cursor-pointer when name is present", () => {
+      it("renders the name as cut text that tooltips itself only while cut", () => {
         wrapper = mountMonitorTable();
-        // Per row: name=idx+0, url=idx+1, locations=idx+2, then 5 action OTooltips.
-        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        expect(tooltips.length).toBeGreaterThanOrEqual(3);
-        const nameTooltip = tooltips[0];
-        expect(nameTooltip.props("content")).toBe("HTTP Health Check");
-        expect(nameTooltip.find("span.cursor-pointer").exists()).toBe(true);
+        const name = wrapper.findComponent(OTruncatedText);
+        expect(name.text()).toBe("HTTP Health Check");
+        expect(name.classes()).toContain("cursor-pointer");
+        expect(name.attributes("data-test")).toBe("monitor-table-name-mon-http-1");
+        // The only tooltip in the cell is the cut-text one, never an always-on repeat of the name.
+        const nameTooltip = name.findComponent({ name: "OTooltipStub" });
+        expect(nameTooltip.attributes("overflow-only")).toBeDefined();
+        expect(
+          wrapper
+            .findAllComponents({ name: "OTooltipStub" })
+            .some((tip) => tip.props("content") === "HTTP Health Check"),
+        ).toBe(false);
       });
 
       it("renders em-dash fallback span without OTooltip when name is absent", () => {

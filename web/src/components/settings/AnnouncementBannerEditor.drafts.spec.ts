@@ -260,10 +260,19 @@ describe("AnnouncementBannerEditor drafts", () => {
     await mountAt("announcementBanners");
 
     expect(byTest("announcement-list-add-draft-dot")).not.toBeNull();
-    await vi.waitFor(() => expect(byTest("announcement-list-draft-dot-0")).not.toBeNull());
-    expect(byTest("announcement-list-draft-dot-1")).toBeNull();
-    expect(byTest("announcement-list-duplicate-draft-dot-1")).not.toBeNull();
-    expect(byTest("announcement-list-duplicate-draft-dot-0")).toBeNull();
+    await vi.waitFor(() => expect(byTest("announcement-list-0-draft-dot")).not.toBeNull());
+    expect(byTest("announcement-list-1-draft-dot")).toBeNull();
+    expect(byTest("announcement-list-1-duplicate-draft-dot")).not.toBeNull();
+    expect(byTest("announcement-list-0-duplicate-draft-dot")).toBeNull();
+    // The dot is presentational, so the Duplicate button's own name and tooltip carry the dated draft.
+    const duplicate = byTest("announcement-list-duplicate-1")!;
+    expect(duplicate.getAttribute("aria-label")).toMatch(
+      /^Duplicate banner · unsaved draft · .*\d/,
+    );
+    expect(duplicate.hasAttribute("title")).toBe(false);
+    expect(byTest("announcement-list-duplicate-0")?.getAttribute("aria-label")).toBe(
+      "Duplicate banner",
+    );
   });
 
   describe("a legacy banner stored without an id", () => {
@@ -287,8 +296,8 @@ describe("AnnouncementBannerEditor drafts", () => {
       wrapper!.unmount();
       await mountAt("announcementBanners");
       await vi.waitFor(() => expect(byTest("announcement-list-status-1")).not.toBeNull());
-      expect(byTest("announcement-list-draft-dot-1")).toBeNull();
-      expect(byTest("announcement-list-duplicate-draft-dot-1")).toBeNull();
+      expect(byTest("announcement-list-1-draft-dot")).toBeNull();
+      expect(byTest("announcement-list-1-duplicate-draft-dot")).toBeNull();
     });
 
     it("leaving with changes asks Save or Discard, with no Keep draft", async () => {
@@ -309,6 +318,25 @@ describe("AnnouncementBannerEditor drafts", () => {
       await flushPromises();
       expect(router.currentRoute.value.name).toBe("announcementBanners");
       expect(localStorage.length).toBe(0);
+    });
+
+    it("a newer navigation takes over the open dialog, and Discard follows it", async () => {
+      await mountAt("announcementBannerEditor", { index: "1" });
+      await fillField("announcement-editor-message", "Old banner, edited");
+
+      const first = router.push("/logs");
+      await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      const second = router.push({ name: "announcementBanners" });
+      await flushPromises();
+      // The older navigation stays here; the dialog now answers for the newer one.
+      expect(await first).toBeTruthy();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+
+      leaveButton("o-dialog-neutral-btn")?.click();
+      await second;
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe("announcementBanners");
     });
 
     it("Save in that dialog saves, then the pending navigation goes on", async () => {

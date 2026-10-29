@@ -33,14 +33,17 @@ import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { usePanelDraftAutosave } from "@/composables/dashboard/usePanelDraft";
+import { registerSignOutLeaveAsker } from "@/utils/drafts/draftSession";
 import {
   cleanupEditorDrafts,
+  countAllDraftsFor,
   deleteEditorDraft,
   editorDraftSessionEnded,
   editorDraftSigningOut,
   editorDraftSignOutDiscardOnly,
   editorDraftSignOutForced,
   hashDraftValue,
+  hasEditorDraft,
   isEditorDraftStorageAvailable,
   listEditorDrafts,
   readEditorDraft,
@@ -51,6 +54,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import {
+  blankCredentialUrls,
   blankRedactedPaths,
   blankSecretLists,
   changedRedactedPaths,
@@ -94,6 +98,8 @@ export interface UseEditorDraftOptions<T> {
   redact?: (data: T) => { data: T; paths: string[]; changedPaths?: string[] };
   /** JSON pointers to lists of `{ key|name, value }` entries (e.g. request headers) whose every value is a secret, whatever its name. */
   secretLists?: string[];
+  /** JSON pointers to URL fields blanked when the URL can carry a credential (userinfo, a query string, a token-like path). */
+  secretUrls?: string[];
   /** Keys the built-in redaction never blanks, for a non-secret field whose name matches the secret pattern (e.g. `authApiKeyHeaderName`). */
   secretExemptKeys?: string[];
   /** Extra elements whose fields count as this editor's, for fields rendered outside its own component tree. */
@@ -131,6 +137,8 @@ export interface EditorDraftDialogState {
   readonly canSave: boolean;
   /** Set while signing out, when no draft can be kept. */
   readonly signingOut: boolean;
+  /** While signing out, how many of the user's other drafts the sign-out discards. */
+  readonly signOutOtherDrafts: number;
   /** Set for an item with a server-side draft state: the dialogs avoid the word "draft". */
   readonly serverDraftItem: boolean;
   /** The leave dialog's Save label override. */
@@ -267,13 +275,18 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   // Set once this session's draft is written over the kept one, which comes back when that draft goes.
   let keptReplaced = false;
   let restoreResolver: ((choice: EditorDraftRestoreChoice) => void) | null = null;
+  // Bumped by every start, so an opening sequence a newer start overtook stops after its next await.
+  let startGeneration = 0;
   let leaveResolver: ((choice: EditorDraftLeaveChoice) => void) | null = null;
 
   const state = reactive({
     entityLabel: computed(() => options.entityLabel()),
-    restoreTitle: computed(() =>
-      options.restoreTitle ? options.restoreTitle() : t("common.editorDraft.restoreTitle"),
-    ),
+    restoreTitle: computed(() => {
+      if (options.restoreTitle) return options.restoreTitle();
+      return options.serverDraftItem
+        ? t("common.editorDraft.restoreTitleInBrowser")
+        : t("common.editorDraft.restoreTitle");
+    }),
     restoreOpen: false,
     restoreSavedAt: 0,
     changedOnServer: false,
@@ -285,6 +298,12 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     canKeepDraft: computed(() => storageAvailable && !signingOutNow()),
     canSave: computed(() => !editorDraftSignOutDiscardOnly.value),
     signingOut: computed(() => signingOutNow()),
+    // This editor's own draft goes with the dialog's answer, so only the rest is counted.
+    signOutOtherDrafts: computed(() =>
+      signingOutNow()
+        ? Math.max(0, countAllDraftsFor(scopeParts.userEmail) - (hasEditorDraft(scope()) ? 1 : 0))
+        : 0,
+    ),
     serverDraftItem: !!options.serverDraftItem,
     saveLabel: computed(() => options.saveLabel?.() ?? null),
   });
@@ -332,6 +351,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       exemptKeys: options.secretExemptKeys,
     });
     blankSecretLists(redacted.data, options.secretLists ?? []);
+    blankCredentialUrls(redacted.data, options.secretUrls ?? []);
     return hashDraftValue(redacted.data);
   };
 
@@ -346,7 +366,10 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       containers: !options.redact,
       exemptKeys: options.secretExemptKeys,
     });
-    const listPaths = blankSecretLists(redacted.data, options.secretLists ?? []);
+    const listPaths = [
+      ...blankSecretLists(redacted.data, options.secretLists ?? []),
+      ...blankCredentialUrls(redacted.data, options.secretUrls ?? []),
+    ];
     const extra = options.redact ? options.redact(redacted.data) : null;
     const base = options.base?.();
     const redactedPaths = [...new Set([...redacted.paths, ...listPaths, ...(extra?.paths ?? [])])];
@@ -511,16 +534,18 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     resolve?.(choice);
   };
 
-  const continueDraft = async (draft: EditorDraft<T>) => {
+  const isStale = (generation: number) => disposed || generation !== startGeneration;
+
+  const continueDraft = async (draft: EditorDraft<T>, generation: number) => {
     const { current, restored, notKeptPaths } = planRestore(draft);
     // Taken before applying, so the restored work counts as unsaved against the state it replaces.
     baselineJson = stableStringify(current);
     notKept.value = { paths: notKeptPaths, labels: draft.redactedLabels ?? {} };
     await options.apply(restored, { notKeptPaths });
-    autosave.adopt();
+    if (!isStale(generation)) autosave.adopt();
   };
 
-  const offerRestore = async (draft: EditorDraft<T>) => {
+  const offerRestore = async (draft: EditorDraft<T>, generation: number) => {
     const base = options.base?.();
     if (draftEntityId !== null && options.base && isNil(base)) {
       deleteEditorDraft(scope());
@@ -532,14 +557,18 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     }
     const changedOnServer = !!draft.baseHash && !isNil(base) && baseHashOf(base) !== draft.baseHash;
     const choice = await askRestore(draft, changedOnServer);
-    if (disposed) return;
+    // The scope now belongs to the item a newer start opened, so this answer must not touch it.
+    if (isStale(generation)) return;
     if (choice === "fresh") deleteEditorDraft(scope());
     if (choice === "dismiss") keptDraft = draft;
-    if (choice === "continue") await continueDraft(draft);
+    if (choice === "continue") await continueDraft(draft, generation);
   };
 
   const start = async () => {
     if (disposed) return;
+    const generation = ++startGeneration;
+    // An earlier item's restore dialog still open answers for that item, which this start replaces.
+    if (restoreResolver) chooseRestore("dismiss");
     started = false;
     baselineJson = null;
     keptDraft = null;
@@ -558,8 +587,8 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     if (storageAvailable) {
       cleanupEditorDrafts();
       const draft = readEditorDraft<T>(scope());
-      if (draft) await offerRestore(draft);
-      if (disposed) return;
+      if (draft) await offerRestore(draft, generation);
+      if (isStale(generation)) return;
     }
     started = true;
     retrackSnapshot();
@@ -588,9 +617,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       state.leaveOpen = true;
     });
 
-  const chooseLeave = (requested: EditorDraftLeaveChoice) => {
-    // A forced sign-out cannot be cancelled: closing the dialog discards and the sign-out goes on.
-    const choice = requested === "stay" && editorDraftSignOutForced.value ? "discard" : requested;
+  const chooseLeave = (choice: EditorDraftLeaveChoice) => {
     if (state.leaveSaving || (choice === "save" && !state.canSave)) return;
     const resolve = leaveResolver;
     leaveResolver = null;
@@ -686,7 +713,16 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   const orgChanged = () =>
     started && String(store.state.selectedOrganization?.identifier ?? "") !== scopeParts.org;
 
+  // The old session is already dead and its drafts stay, so the work is kept as after an expired session.
+  const keepForForcedSignOut = (): boolean => {
+    if (leaveResolver) chooseLeave("stay");
+    autosave.flush();
+    markLeaving();
+    return true;
+  };
+
   const guardNavigation = async (): Promise<boolean> => {
+    if (editorDraftSignOutForced.value) return keepForForcedSignOut();
     // A sign-out drops every draft, so only Save or Discard is offered and the org-switch flush is skipped.
     if (signingOutNow()) return confirmLeave();
     // An org switch is forced: the draft is written under the old org and the editor goes.
@@ -703,11 +739,13 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     ((to: RouteLocationNormalized, from: RouteLocationNormalized) => to.path !== from.path);
 
   if (getCurrentInstance()) {
+    const unregisterAsker = registerSignOutLeaveAsker(hasUnsavedChanges);
     EDIT_EVENTS.forEach((name) => window.addEventListener(name, noteEditBeforeStart, true));
     onBeforeRouteLeave(() => guardNavigation());
     onBeforeRouteUpdate((to, from) => (leavesOnUpdate(to, from) ? guardNavigation() : true));
     onBeforeUnmount(() => {
       disposed = true;
+      unregisterAsker();
       removeBaselineListeners();
       removeResumeListeners();
       EDIT_EVENTS.forEach((name) => window.removeEventListener(name, noteEditBeforeStart, true));

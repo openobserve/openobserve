@@ -239,7 +239,7 @@ describe("AddCipherKey drafts", () => {
     });
     await mountPage({ action: "add" });
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
-      "Akeyless static secret name",
+      "Your change to the Akeyless static secret name was not kept.",
     );
   });
 

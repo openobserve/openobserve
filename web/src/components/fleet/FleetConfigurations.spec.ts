@@ -164,14 +164,63 @@ describe("FleetConfigurations", () => {
     push.mockRestore();
   });
 
-  it("shows a dash for a config that was never published", async () => {
-    wrapper = await mountList();
-    expect(wrapper.find('[data-test="fleet-configurations-version-org-baseline"]').text()).toBe(
-      "—",
-    );
-    expect(wrapper.find('[data-test="fleet-configurations-version-edge-minimal"]').text()).toBe(
-      "v3",
-    );
+  describe("publish state", () => {
+    const draftAt = new Date(2026, 9, 28, 14, 5).getTime();
+    const cell = (w: VueWrapper, id: string) =>
+      w.find(`[data-test="fleet-configurations-version-${id}"]`);
+    const state = (w: VueWrapper, id: string) =>
+      w.find(`[data-test="fleet-configurations-state-${id}"]`);
+
+    beforeEach(() => {
+      vi.mocked(fleet.listConfigs).mockResolvedValue({
+        data: {
+          items: [
+            config({ id: "published", latest_version: 3 }),
+            config({
+              id: "edited",
+              latest_version: 2,
+              draft_by: "bo@acme.io",
+              draft_at: draftAt,
+            }),
+            config({ id: "unpublished", latest_version: 0 }),
+          ],
+        },
+      } as any);
+    });
+
+    it("shows a never-published config as a draft instead of a version", async () => {
+      wrapper = await mountList();
+      expect(cell(wrapper, "unpublished").text()).toBe("Draft");
+      const tag = state(wrapper, "unpublished").findComponent({ name: "OTag" });
+      expect(tag.props()).toMatchObject({ type: "fleetConfigState", value: "draft" });
+    });
+
+    it("shows the version and draft changes when a published config has an unpublished draft", async () => {
+      wrapper = await mountList();
+      const text = cell(wrapper, "edited").text();
+      expect(text).toContain("v2");
+      expect(text).toContain("Draft changes");
+    });
+
+    it("shows only the version for a published config without a draft", async () => {
+      wrapper = await mountList();
+      expect(cell(wrapper, "published").text()).toBe("v3");
+      expect(state(wrapper, "published").exists()).toBe(false);
+    });
+
+    it("names who saved the draft and when in the chip's tooltip", async () => {
+      wrapper = await mountList();
+      const tooltip = state(wrapper, "edited").findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      const content = String(tooltip.props("content"));
+      expect(content).toContain("bo@acme.io");
+      expect(content).toContain(
+        new Date(draftAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
+      );
+      expect(state(wrapper, "unpublished").findComponent({ name: "OTooltip" }).exists()).toBe(
+        false,
+      );
+    });
   });
 
   it("shows an error state with a retry when the list fails to load", async () => {

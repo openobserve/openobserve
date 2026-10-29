@@ -676,7 +676,7 @@ describe("AddUser", () => {
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
     });
 
-    it("signout() runs the leave guards, then ends the session and reloads, even when an editor refuses", async () => {
+    it("signout() runs the leave guards, then ends the session keeping the drafts and reloads, even when an editor refuses", async () => {
       store.state.userInfo = { ...store.state.userInfo, email: ADMIN_EMAIL };
       store.state.organizations = [];
       const assign = vi.fn();
@@ -718,7 +718,8 @@ describe("AddUser", () => {
 
       expect(invalidateLoginData).toHaveBeenCalled();
       expect(stopSessionServices).toHaveBeenCalledTimes(1);
-      expect(dispatchSpy).toHaveBeenCalledWith("logout", { draftsOf: ADMIN_EMAIL });
+      expect(dispatchSpy).toHaveBeenCalledWith("logout");
+      expect(dispatchSpy).not.toHaveBeenCalledWith("logout", { draftsOf: ADMIN_EMAIL });
       expect(push).toHaveBeenCalledWith("/logout");
       expect(assign).toHaveBeenCalledTimes(1);
 

@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { useId } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
@@ -53,6 +54,9 @@ const cardName = (card: CheckTypeCard): I18nText | undefined => {
   const at = draftAt(card);
   return at === null ? undefined : draftLabel(t(card.labelKey), at);
 };
+// A name set by aria-label hides the card's description, so the description is linked back.
+const idBase = useId();
+const descriptionId = (card: CheckTypeCard) => `${idBase}-${card.type}-description`;
 
 function isDisabled(card: CheckTypeCard): boolean {
   return props.disabledTypes.includes(card.type);
@@ -105,6 +109,7 @@ function onSelect(card: CheckTypeCard) {
         :sublabel="t(card.descKey)"
         :hide-chevron="variant === 'inline'"
         :aria-label="cardName(card)"
+        :aria-describedby="draftAt(card) === null ? undefined : descriptionId(card)"
         class="w-full max-w-full"
         :class="{ 'pointer-events-none': !isClickable(card) }"
       >
@@ -118,6 +123,9 @@ function onSelect(card: CheckTypeCard) {
           />
         </template>
       </EmptyStateActionCard>
+      <span v-if="draftAt(card) !== null" :id="descriptionId(card)" hidden>{{
+        t(card.descKey)
+      }}</span>
     </div>
   </div>
 </template>

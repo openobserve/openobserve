@@ -717,8 +717,8 @@ export const fleetMock: FleetApi = {
   listConfigs: () =>
     reply({
       items: store.configs.map((c) => {
-        const { draft: _draft, versions: _versions, ...item } = c;
-        return item;
+        const { draft, versions: _versions, ...item } = c;
+        return { ...item, draft_by: draft?.by ?? null, draft_at: draft?.at ?? null };
       }),
       total: store.configs.length,
     }),

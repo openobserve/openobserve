@@ -192,7 +192,9 @@ describe("RemoteTaskFormPage drafts", () => {
     const dialog = byTest("editor-draft-restore-dialog");
     expect(dialog?.textContent).toContain("Unsaved local changes");
     expect(dialog?.textContent).toContain("unsaved changes to this remote task");
-    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("Token");
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "Your change to the token was not kept.",
+    );
 
     byTest("editor-draft-continue")?.click();
     await flushPromises();
@@ -256,8 +258,8 @@ describe("RemoteTaskFormPage drafts", () => {
 
     await mountAt("/ai/remote-tasks/new");
     expect(byTest("editor-draft-credentials-not-saved")).toBeNull();
-    expect(byTest("editor-draft-restore-note")?.textContent).toContain(
-      "Signing keys are not kept in drafts",
+    expect(byTest("editor-draft-restore-note")?.getAttribute("aria-label")).toContain(
+      "Signing keys are not kept in this browser",
     );
     expect(byTest("editor-draft-continue")?.textContent).toContain("Continue editing");
     byTest("editor-draft-continue")?.click();
@@ -265,13 +267,47 @@ describe("RemoteTaskFormPage drafts", () => {
     expect(form().state.values.signingEnabled).toBe(true);
     expect(form().state.values.signingKey).not.toBe("");
     expect(form().state.values.signingKey).not.toBe(first);
-    expect(byTest("ai-remote-task-form-signing-key-regenerated")?.textContent).toContain(
-      "This is a new signing key. The one in your draft was not kept",
+    const notice = byTest("ai-remote-task-form-signing-key-regenerated");
+    expect(notice?.textContent?.trim()).toBe(
+      "This is a new signing key. The one in your draft was not kept.",
     );
+    // The notice sits under the key and its copy hint, so "copy it into your service" is said once.
+    const key = byTest("ai-remote-task-form-signing-key")!;
+    expect(key.compareDocumentPosition(notice!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(notice?.textContent).not.toContain("copy");
 
     byTest("ai-remote-task-form-signing-key-regenerate")?.click();
     await flushPromises();
     expect(byTest("ai-remote-task-form-signing-key-regenerated")).toBeNull();
+  });
+
+  it("never stores an endpoint that carries a token, and names it when it was not kept", async () => {
+    await mountAt("/ai/remote-tasks/new");
+    await edit("name", "summarizer");
+    await edit("endpoint", "https://tasks.example.com/run?api_key=s3cr3t");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(JSON.stringify(localStorage)).not.toContain("s3cr3t");
+    expect(readEditorDraft<RemoteTaskFormValues>(newScope)?.data.endpoint).toBe("");
+    wrapper!.unmount();
+    wrapper = null;
+
+    await mountAt("/ai/remote-tasks/new");
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "Your change to the endpoint URL was not kept.",
+    );
+    byTest("editor-draft-continue")!.click();
+    await flushPromises();
+    expect(form().state.values).toMatchObject({ name: "summarizer", endpoint: "" });
+  });
+
+  it("keeps a plain endpoint in the draft", async () => {
+    await mountAt("/ai/remote-tasks/new");
+    await edit("name", "summarizer");
+    await edit("endpoint", "https://tasks.example.com/run");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft<RemoteTaskFormValues>(newScope)?.data.endpoint).toBe(
+      "https://tasks.example.com/run",
+    );
   });
 
   it("switching auth to none releases a token that was not kept", async () => {

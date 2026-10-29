@@ -378,6 +378,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :saving="leaveSaving"
       :can-keep-draft="false"
       :can-save="leaveCanSave"
+      :forced="draftSignOutForced"
+      :signing-out="draftSigningOut"
+      :other-draft-count="signOutDrafts"
+      :message="leaveMessage"
       :save-label="t('fleet.editor.saveDraft')"
       @choose="chooseLeave"
     />
@@ -394,6 +398,7 @@ import {
   type RouteLocationNormalized,
 } from "vue-router";
 import { useMutation } from "@tanstack/vue-query";
+import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -450,7 +455,13 @@ import {
 import { useOrgId } from "@/composables/query/useOrgId";
 import type { EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
 import EditorDraftLeaveDialog from "@/components/common/drafts/EditorDraftLeaveDialog.vue";
-import { draftSignOutDiscardOnly, draftSignOutForced } from "@/utils/drafts/draftSession";
+import {
+  draftSigningOut,
+  draftSignOutDiscardOnly,
+  draftSignOutForced,
+  registerSignOutLeaveAsker,
+} from "@/utils/drafts/draftSession";
+import { countAllDraftsFor } from "@/utils/drafts/editorDraftStore";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
   deleteFleetConfigMutation,
@@ -461,6 +472,7 @@ import {
 import type { FleetConfigIssues, FleetConfigReferences } from "@/services/fleet";
 
 const { t } = useI18nTyped();
+const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = useOrgId();
@@ -1062,7 +1074,17 @@ watch([panelOpen, paletteCollapsed], ([open, collapsed], [wasOpen, wasCollapsed]
 
 const leaveOpen = ref(false);
 const leaveSaving = ref(false);
-const leaveCanSave = computed(() => !draftSignOutDiscardOnly.value);
+// A new configuration's Save opens the create dialog, which a leave dialog must not chain into.
+const leaveCanSave = computed(() => !draftSignOutDiscardOnly.value && !isNew.value);
+const leaveMessage = computed<I18nText | null>(() => {
+  if (draftSignOutForced.value) return null;
+  if (isNew.value) return t("fleet.editor.leaveMessageNew");
+  return draftSigningOut.value ? null : t("fleet.editor.leaveMessage");
+});
+// The YAML is never kept in this browser, so every draft the user has is one the sign-out discards.
+const signOutDrafts = computed(() =>
+  draftSigningOut.value ? countAllDraftsFor(String(store.state.userInfo?.email ?? "")) : 0,
+);
 let leaveResolver: ((allowed: boolean) => void) | null = null;
 let leaveTarget: string | null = null;
 
@@ -1090,7 +1112,7 @@ async function chooseLeave(requested: EditorDraftLeaveChoice) {
 
 // Unsaved YAML is never written to browser storage, so leaving offers only the server draft or Discard.
 function guardLeave(to: RouteLocationNormalized): boolean | Promise<boolean> {
-  // A guard redirect (the sign-out's /logout to /login) is the same leave, and keeps the first target in redirectedFrom.
+  // A guard redirect is the same leave, and keeps the first target in redirectedFrom.
   const target = to.redirectedFrom?.fullPath ?? to.fullPath;
   if (leaveAllowedTo !== null && leaveAllowedTo === target) return true;
   leaveAllowedTo = null;
@@ -1110,6 +1132,8 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 }
 
 onBeforeRouteLeave(guardLeave);
+// A sign-out skips its own draft count when this editor's leave dialog will tell it.
+onBeforeUnmount(registerSignOutLeaveAsker(() => unsaved.value));
 // Another config's page reuses this view, so only an id change leaves the draft.
 onBeforeRouteUpdate((to: RouteLocationNormalized, from: RouteLocationNormalized) =>
   to.params.id === from.params.id ? true : guardLeave(to),

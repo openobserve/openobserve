@@ -37,7 +37,7 @@ interface SignOutStore extends SessionServicesStore {
 interface SignOutOptions {
   /** The session can no longer save (forced password reset), so the leave dialogs offer only Discard. */
   discardOnly?: boolean;
-  /** The old session is already dead (the user's own password changed): no guard can keep the user in it. */
+  /** The old session is already dead (the user's own password changed): no guard can keep the user in it, and the drafts stay as after an expired session. */
   forced?: boolean;
 }
 
@@ -48,13 +48,19 @@ export const reloadToLogin = (): void => {
   window.location.assign(`${getPath()}login`);
 };
 
-/** Ends the signed-in session here: services stopped, login data and this user's drafts gone, no draft written after. */
-export const endSignedInSession = (store: SignOutStore): void => {
+/** Ends the signed-in session here: services stopped, login data gone and, unless kept, this user's drafts gone with no draft written after. */
+export const endSignedInSession = (
+  store: SignOutStore,
+  { keepDrafts = false }: { keepDrafts?: boolean } = {},
+): void => {
   const userEmail = String(store.state.userInfo?.email ?? "");
   stopSessionServices(store);
   invalidateLoginData();
-  store.dispatch("logout", { draftsOf: userEmail });
-  endEditorDraftSession(userEmail);
+  if (keepDrafts) store.dispatch("logout");
+  else {
+    store.dispatch("logout", { draftsOf: userEmail });
+    endEditorDraftSession(userEmail);
+  }
   useLocalCurrentUser("", true);
   useLocalUserInfo("", true);
   forgetLinkRequest();
@@ -71,14 +77,14 @@ export const signOutThroughLeaveGuards = (
   const endSession = () => {
     if (signedOut) return;
     signedOut = true;
-    endSignedInSession(store);
+    endSignedInSession(store, { keepDrafts: forced });
   };
-  // Global guards run after the leave guards; going to /login in place first unmounts the editors.
+  // Global guards run after the leave guards; a redirect would run every leave guard again, so the reload ends the navigation.
   const removeGuard = router.beforeEach((to) => {
     removeGuard();
     if (to.path !== "/logout") return true;
     endSession();
-    return { path: "/login", replace: true };
+    return false;
   });
   const finish = (refused: boolean) => {
     removeGuard();

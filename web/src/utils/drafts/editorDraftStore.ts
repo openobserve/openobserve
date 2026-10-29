@@ -17,6 +17,7 @@ import { ref } from "vue";
 import { countPanelDraftsFor, formatPanelDraftTime } from "@/composables/dashboard/usePanelDraft";
 import {
   draftSessionEnded,
+  draftUserSignedOut,
   markDraftSessionEnded,
   resumeDraftSession,
 } from "@/utils/drafts/draftSession";
@@ -455,7 +456,7 @@ export const writeEditorDraft = <T>(
   scope: EditorDraftScope,
   input: EditorDraftInput<T>,
 ): boolean => {
-  if (draftSessionEnded.value) return false;
+  if (draftSessionEnded.value || draftUserSignedOut(scope.userEmail)) return false;
   const storage = getStorage();
   if (!storage) return false;
   const key = editorDraftKey(scope);
@@ -629,13 +630,13 @@ export const clearEditorDraftsFor = (userEmail: string): void => {
 
 /** Runs on an explicit sign-out: drops that user's drafts and refuses writes until `resumeEditorDraftSession`, so an editor still open cannot write one back. */
 export const endEditorDraftSession = (userEmail: string): void => {
-  markDraftSessionEnded();
+  markDraftSessionEnded(userEmail);
   clearEditorDraftsFor(userEmail);
 };
 
-/** Runs on login, and on app start with a live session. */
-export const resumeEditorDraftSession = (): void => {
-  resumeDraftSession();
+/** Runs on login, and on app start with a live session; the user's other tabs may write drafts again too. */
+export const resumeEditorDraftSession = (userEmail?: string): void => {
+  resumeDraftSession(userEmail);
   purgeRetiredEditorDrafts();
 };
 

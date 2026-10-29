@@ -17,6 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, DOMWrapper, type VueWrapper } from "@vue/test-utils";
 import type { RouteLocationNormalizedLoaded } from "vue-router";
 import TemplateList from "./TemplateList.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { http, HttpResponse } from "msw";
 import templateService from "@/services/alert_templates";
 import alertsFixture from "@/test/unit/mockData/alerts";
@@ -432,8 +433,12 @@ describe("TemplateList drafts", () => {
     const add = wrapper.get('[data-test="template-list-add-btn"]');
     expect(add.find('[data-test="template-list-add-draft-dot"]').exists()).toBe(true);
     expect(add.attributes("aria-label")).toContain("unsaved draft");
-    expect(wrapper.find('[data-test="template-list-draft-dot-Template2"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="template-list-draft-dot-Template3"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-template-list-Template2-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="alert-template-list-Template3-draft-dot"]').exists()).toBe(
+      false,
+    );
   });
 
   it("marks the clone action of a template whose clone has a kept draft", async () => {
@@ -444,10 +449,16 @@ describe("TemplateList drafts", () => {
     expect(clone.find('[data-test="alert-template-list-Template2-clone-draft-dot"]').exists()).toBe(
       true,
     );
-    expect(clone.attributes("aria-label")).toContain("unsaved draft");
+    expect(clone.attributes("aria-label")).toMatch(/^Clone · unsaved draft · .*\d/);
+    // Sighted users read the same dated name in the button's own tooltip, not a bare native title.
+    expect(clone.attributes("title")).toBeUndefined();
+    const tip = clone.findComponent(OTooltip);
+    expect(tip.props("content")).toBe(clone.attributes("aria-label"));
     expect(
       wrapper.find('[data-test="alert-template-list-Template3-clone-draft-dot"]').exists(),
     ).toBe(false);
+    const plain = wrapper.get('[data-test="alert-template-list-Template3-clone-template"]');
+    expect(plain.findComponent(OTooltip).props("content")).toBe("Clone");
   });
 
   it("marks the phone row menu and its Clone item for a kept clone draft", async () => {
@@ -458,7 +469,8 @@ describe("TemplateList drafts", () => {
     const trigger = triggers.find((t: DOMWrapper<Element>) =>
       t.find('[data-test="alert-template-list-Template2-more-actions-draft-dot"]').exists(),
     );
-    expect(trigger?.attributes("aria-label")).toContain("unsaved draft");
+    expect(trigger?.attributes("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(trigger?.attributes("title")).toBeUndefined();
     expect(wrapper.findAll('[data-test$="-more-actions-draft-dot"]').length).toBe(1);
 
     await trigger!.trigger("keydown", { key: "Enter" });
@@ -466,11 +478,10 @@ describe("TemplateList drafts", () => {
     const item = document.body.querySelector(
       '[data-test="alert-template-list-Template2-clone-template-menu"]',
     );
-    expect(
-      item?.querySelector(
-        '[data-test="alert-template-list-Template2-clone-template-menu-draft-dot"]',
-      ),
-    ).not.toBeNull();
+    const menuDot = item?.querySelector(
+      '[data-test="alert-template-list-Template2-clone-template-menu-draft-dot"]',
+    );
+    expect(menuDot?.getAttribute("aria-label")).toMatch(/^Unsaved draft · .*\d/);
   });
 
   it("drops a deleted template's draft", async () => {

@@ -989,9 +989,15 @@ describe("ReportList editor drafts", () => {
     wrapper = mountComponent().wrapper;
     await flushPromises();
 
-    const dot = wrapper.get(`[data-test="report-list-draft-dot-${REPORT_SCHEDULED.name}"]`);
+    const dot = wrapper.get(`[data-test="report-list-${REPORT_SCHEDULED.name}-draft-dot"]`);
     expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
-    expect(wrapper.find(`[data-test="report-list-draft-dot-${REPORT_CACHED.name}"]`).exists()).toBe(
+    // Spaced by its row's gap like every other list's dot, not a margin of its own.
+    expect(dot.classes()).not.toContain("ms-2");
+    const nameRow = dot.element.closest(".gap-2");
+    expect(
+      nameRow?.querySelector(`[data-test="report-list-name-cell-${REPORT_SCHEDULED.name}"]`),
+    ).not.toBeNull();
+    expect(wrapper.find(`[data-test="report-list-${REPORT_CACHED.name}-draft-dot"]`).exists()).toBe(
       false,
     );
     const addButton = wrapper.get('[data-test="report-list-add-report-btn"]');
@@ -1018,7 +1024,7 @@ describe("ReportList editor drafts", () => {
     wrapper = mountComponent().wrapper;
     await flushPromises();
 
-    const dot = (name: string) => wrapper.find(`[data-test="report-list-draft-dot-${name}"]`);
+    const dot = (name: string) => wrapper.find(`[data-test="report-list-${name}-draft-dot"]`);
     expect(dot(REPORT_SCHEDULED.name).exists()).toBe(false);
     expect(dot(inOtherFolder.name).exists()).toBe(false);
 

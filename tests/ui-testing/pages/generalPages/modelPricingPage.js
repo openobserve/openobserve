@@ -5,7 +5,7 @@
 //   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
 
 import { expect } from '@playwright/test';
-import { discardEditorDraftIfAsked } from '../alertsPages/editorDraftHelpers.js';
+import { discardEditorDraftIfAsked, dismissEditorDraftRestoreIfShown } from '../alertsPages/editorDraftHelpers.js';
 const modelPricingStrings = require('../../../../web/src/locales/languages/en-US.json').modelPricing;
 
 // en-US trigger labels for each rule operator. The rule-op select renders a
@@ -197,11 +197,13 @@ export class ModelPricingPage {
     async clickAdd() {
         await this.addBtn.click();
         await this.editorTitle.waitFor({ state: 'visible', timeout: 10000 });
+        await dismissEditorDraftRestoreIfShown(this.page);
     }
 
     async clickEmptyAdd() {
         await this.emptyAddBtn.click();
         await this.editorTitle.waitFor({ state: 'visible', timeout: 10000 });
+        await dismissEditorDraftRestoreIfShown(this.page);
     }
 
     async clickImport() {

@@ -177,11 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 :disabled="!canCreate"
-                :aria-label="
-                  hasDuplicateDraft(row)
-                    ? t('common.editorDraft.newDot', { label: t('rum.analytics.events.duplicate') })
-                    : t('rum.analytics.events.duplicate')
-                "
+                :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.duplicate'))"
                 :data-test="`rum-analytics-named-events-row-${index}-duplicate-btn`"
                 @click="duplicate(row)"
               >
@@ -214,10 +210,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   class="md:hidden"
-                  :aria-label="t('rum.analytics.events.moreActions')"
+                  :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.moreActions'))"
                   :data-test="`rum-analytics-named-events-row-${index}-more-btn`"
                   @click.stop
-                />
+                >
+                  <EditorDraftDot
+                    v-if="hasDuplicateDraft(row)"
+                    corner
+                    :saved-at="duplicateDraftSavedAt(row)"
+                    :data-test="`rum-analytics-named-events-row-${index}-more-draft-dot`"
+                  />
+                </OButton>
               </template>
               <ODropdownItem
                 icon-left="edit"
@@ -412,9 +415,11 @@ const draftLabel = useDraftLabel();
 const duplicateTip = (ev: NamedEvent): I18nText => {
   if (!canWrite.value) return readOnlyTip.value;
   if (!canCreate.value) return t("rum.analytics.events.capReached", { max: MAX_EVENTS_PER_APP });
-  const label = t("rum.analytics.events.duplicate");
-  return hasDuplicateDraft(ev) ? draftLabel(label, duplicateDraftSavedAt(ev)) : label;
+  return duplicateDraftLabel(ev, t("rum.analytics.events.duplicate"));
 };
+// The corner dot is presentational, so an action that reopens a kept copy says so, dated, in its own name.
+const duplicateDraftLabel = (ev: NamedEvent, label: I18nText): I18nText =>
+  hasDuplicateDraft(ev) ? draftLabel(label, duplicateDraftSavedAt(ev)) : label;
 
 const filtered = computed(() => {
   const term = filter.value.trim().toLowerCase();

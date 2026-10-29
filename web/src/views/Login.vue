@@ -67,7 +67,6 @@ import {
   useLocalCurrentUser,
   useLocalOrganization,
   invalidateLoginData,
-  useLocalUserInfo,
   getImageURL,
 } from "@/utils/zincutils";
 import usersService from "@/services/users";
@@ -75,8 +74,7 @@ import organizationsService from "@/services/organizations";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
-import { endEditorDraftSession } from "@/utils/drafts/editorDraftStore";
-import { stopSessionServices } from "@/utils/sessionServices";
+import { expireSession } from "@/utils/sessionServices";
 import { isSameOriginRedirect } from "@/utils/safeUrl";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { capturePrefill } from "@/components/login/firstSourceOptions";
@@ -242,23 +240,13 @@ export default defineComponent({
         });
     };
 
+    // The server refused this user's organizations, so the session ends as an expired one does: the drafts stay for the next login.
     const signout = () => {
       if (config?.isEnterprise == "true" || config?.isCloud == "true") {
         invalidateLoginData();
       }
-
-      const userEmail = String(store.state.userInfo?.email ?? "");
-      stopSessionServices(store);
-      store.dispatch("logout", { draftsOf: userEmail });
-      // No editor is open on the login page, so there are no leave guards to run first.
-      endEditorDraftSession(userEmail);
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      router.push("/login");
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // A reload here could re-run the login callback, so this goes to the login page instead.
+      expireSession(store, { toLogin: true });
     };
 
     /**

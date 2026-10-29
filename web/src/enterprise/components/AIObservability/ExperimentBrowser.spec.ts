@@ -637,14 +637,41 @@ describe("ExperimentBrowser", () => {
     await flushPromises();
 
     const clone = wrapper.get('[data-test="ai-experiment-clone-two"]');
-    expect(clone.find('[data-test="ai-experiment-draft-dot-two"]').exists()).toBe(true);
-    expect(clone.attributes("aria-label")).toContain("common.editorDraft.newDot");
+    expect(clone.find('[data-test="ai-experiment-two-clone-draft-dot"]').exists()).toBe(true);
+    expect(clone.attributes("aria-label")).toContain(
+      "common.editorDraft.newDotDated aiObservability.experiments.clone",
+    );
     expect(
-      wrapper
-        .get('[data-test="ai-experiment-row-two"]')
-        .find('[data-test^="ai-experiment-draft-dot"]')
-        .exists(),
+      wrapper.get('[data-test="ai-experiment-row-two"]').find('[data-test$="-draft-dot"]').exists(),
     ).toBe(false);
-    expect(wrapper.find('[data-test="ai-experiment-draft-dot-one"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-experiment-one-clone-draft-dot"]').exists()).toBe(false);
+  });
+
+  it("marks the phone row menu of a run that has an unsaved clone draft", async () => {
+    writeEditorDraft(
+      { kind: "experiment", org: "acme", entityId: "two", userEmail: "me@x.io" },
+      { data: { name: "two (Copy)" } },
+    );
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const menus = wrapper.findAll('[data-test="ai-experiment-actions-menu-btn"]');
+    const drafted = menus.filter((m) =>
+      m.find('[data-test="ai-experiment-two-actions-menu-draft-dot"]').exists(),
+    );
+    expect(drafted).toHaveLength(1);
+    expect(drafted[0].attributes("aria-label")).toContain(
+      "common.editorDraft.newDotDated common.moreActions",
+    );
+    expect(wrapper.findAll('[data-test$="-actions-menu-draft-dot"]')).toHaveLength(1);
+    const plain = menus.find((m) => m !== drafted[0]);
+    expect(plain?.attributes("aria-label")).toBe("common.moreActions");
   });
 });

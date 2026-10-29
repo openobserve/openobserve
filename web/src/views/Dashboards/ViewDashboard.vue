@@ -674,7 +674,12 @@ import { ANNOTATION_PREVIEW_CONTEXT_KEY } from "@/composables/dashboard/useDashb
 import ShareButton from "@/components/common/ShareButton.vue";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRouter,
+  type RouteLocationNormalized,
+} from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
@@ -2692,17 +2697,43 @@ export default defineComponent({
       leaveKioskState();
     };
 
+    // A later leave guard (the settings drawer's) can still keep the user here, so leaving acts only once the navigation lands.
+    let onLanded: { to: RouteLocationNormalized; run: () => void } | null = null;
+    const removeLandedHook = router.afterEach((to, _from, failure) => {
+      if (onLanded?.to !== to) return;
+      const { run } = onLanded;
+      onLanded = null;
+      if (!failure) run();
+    });
+    onUnmounted(() => {
+      removeLandedHook();
+      // A redirect never reports the original navigation, but unmounting means the user did leave.
+      const pending = onLanded;
+      onLanded = null;
+      pending?.run();
+    });
+
     // Unsaved layout edits are the store's cached dashboard object, so a confirmed leave must roll them back.
-    onBeforeRouteLeave(() => {
+    onBeforeRouteLeave((to) => {
       if (!layoutDraft.isDirty.value) {
-        layoutDraft.finish();
-        clearPrintModeOnLeave();
+        onLanded = {
+          to,
+          run: () => {
+            layoutDraft.finish();
+            clearPrintModeOnLeave();
+          },
+        };
         return;
       }
       return confirmDiscard("leave").then((confirmed) => {
         if (!confirmed) return false;
-        layoutDraft.discard();
-        clearPrintModeOnLeave();
+        onLanded = {
+          to,
+          run: () => {
+            layoutDraft.discard();
+            clearPrintModeOnLeave();
+          },
+        };
         return true;
       });
     });
@@ -2712,7 +2743,7 @@ export default defineComponent({
       if (to.query.dashboard === from.query.dashboard || !layoutDraft.isDirty.value) return;
       return confirmDiscard("leave").then((confirmed) => {
         if (!confirmed) return false;
-        layoutDraft.discard();
+        onLanded = { to, run: () => layoutDraft.discard() };
         return true;
       });
     });

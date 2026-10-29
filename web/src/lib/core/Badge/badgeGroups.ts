@@ -2033,6 +2033,17 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
+  // Fleet configuration publish state — a never-published draft, or unpublished changes over a version.
+  fleetConfigState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      draft: { variant: "default-soft", labelKey: "fleet.configs.stateDraft" },
+      draftchanges: { variant: "default-soft", labelKey: "fleet.configs.stateDraftChanges" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   slackInstallStatus: {
     mode: "dot",
     shape: "pill",

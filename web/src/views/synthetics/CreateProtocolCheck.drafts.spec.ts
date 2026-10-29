@@ -287,6 +287,53 @@ describe("CreateProtocolCheck drafts", () => {
     expect(syntheticsService.update).toHaveBeenCalledTimes(1);
   });
 
+  it("a target URL carrying a token is never stored, is named on restore, and blocks Save", async () => {
+    await mountEditor({ checkType: "http", editId: "chk-1" });
+    await edit({ url: "https://api.test/health?api_key=k3y-123" });
+    window.dispatchEvent(new Event("pagehide"));
+    expect(JSON.stringify(localStorage)).not.toContain("k3y-123");
+    expect(readEditorDraft(editScope)?.changedRedactedPaths).toEqual(["/url"]);
+    wrapper!.unmount();
+
+    await mountEditor({ checkType: "http", editId: "chk-1" });
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "Your change to the URL was not kept.",
+    );
+    byTest("editor-draft-continue")!.click();
+    await flushPromises();
+    expect((configure().props("check") as ProtocolCheck).url).toBe("");
+    expect(configure().props("validationErrors")).toMatchObject({
+      url: "Re-enter this value: your change was not kept in the draft.",
+    });
+    await wrapper!.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+    await flushPromises();
+    expect(syntheticsService.update).not.toHaveBeenCalled();
+
+    await edit({ url: "https://api.test/health" });
+    await wrapper!.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+    await flushPromises();
+    expect(syntheticsService.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("an unchanged target URL with a query string comes back from the saved check", async () => {
+    vi.mocked(syntheticsService.get).mockResolvedValue({
+      data: { ...savedCheck(), target: "https://api.test/health?token=t0k" },
+    } as never);
+    await mountEditor({ checkType: "http", editId: "chk-1" });
+    await edit({ name: "Renamed" });
+    window.dispatchEvent(new Event("pagehide"));
+    expect(JSON.stringify(localStorage)).not.toContain("t0k");
+    wrapper!.unmount();
+
+    await mountEditor({ checkType: "http", editId: "chk-1" });
+    byTest("editor-draft-continue")!.click();
+    await flushPromises();
+    expect(configure().props("check")).toMatchObject({
+      name: "Renamed",
+      url: "https://api.test/health?token=t0k",
+    });
+  });
+
   it("a changed request header is named on restore, flagged on its value and blocks Save", async () => {
     vi.mocked(syntheticsService.get).mockResolvedValue({
       data: {

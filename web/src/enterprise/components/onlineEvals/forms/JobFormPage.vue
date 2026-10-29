@@ -779,7 +779,6 @@ const jobDraft = useEditorDraft<JobDraft>({
   kind: "eval_job",
   entityLabel: () => t("common.editorDraft.entities.eval_job"),
   // "Draft" already names a job that has never been activated.
-  restoreTitle: () => t("common.editorDraft.fleetRestoreTitle"),
   serverDraftItem: true,
   entityId: () => (props.mode === "edit" ? (props.row?.id ?? null) : null),
   snapshot: () => ({

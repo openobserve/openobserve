@@ -88,6 +88,7 @@ import {
   resumeDraftSession,
 } from "@/utils/drafts/draftSession";
 import { stopSessionServices } from "@/utils/sessionServices";
+import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 const realLocation = window.location;
 import userService from "@/services/users";
@@ -348,6 +349,26 @@ describe("UpdatePasswordDialog", () => {
     expect(pushMock).toHaveBeenCalledWith("/logout");
     expect(assign).toHaveBeenCalledTimes(1);
     expect(isOpen.value).toBe(false);
+  });
+
+  it("keeps the user's drafts once the password has changed, as an expired session does", async () => {
+    const scope = { kind: "slo" as const, org: "acme", entityId: null, userEmail: "maya@acme.io" };
+    writeEditorDraft(scope, { data: { name: "unsaved" } });
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+
+    await (wrapper.vm as unknown as { submit: (v: UpdatePasswordForm) => Promise<void> }).submit({
+      old_password: "old-secret",
+      new_password: "New-Secret-1!",
+      confirm_password: "New-Secret-1!",
+    });
+    await flushPromises();
+
+    expect(assign).toHaveBeenCalledTimes(1);
+    resumeDraftSession();
+    expect(readEditorDraft(scope)?.data).toEqual({ name: "unsaved" });
+    localStorage.clear();
   });
 
   it("cannot be kept in the old session once the password has changed", async () => {

@@ -361,6 +361,58 @@ describe("PipelineEditor drafts", () => {
     expect(readEditorDraft(newScope)).toBeNull();
   });
 
+  it("Save in the leave dialog of a basic pipeline asks first, then goes where the user was headed", async () => {
+    await mountEditor("/pipeline/pipelines/add");
+    await addValidPipeline();
+    pipelineObj.currentSelectedPipeline.nodes = [
+      streamNode("n1", "input", "same"),
+      streamNode("n2", "output", "same"),
+    ];
+    await nextTick();
+
+    const navigation = router.push("/logs");
+    await flushPromises();
+    leaveButton("editor-draft-leave-save")?.click();
+    await navigation;
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("createPipeline");
+    expect(pipelineService.createPipeline).not.toHaveBeenCalled();
+
+    document.body
+      .querySelector<HTMLElement>('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]')
+      ?.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("logs"));
+    expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1);
+    expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  it("the toolbar Save of a basic pipeline still opens the list after the prompt", async () => {
+    await mountEditor("/pipeline/pipelines/add");
+    await addValidPipeline();
+    pipelineObj.currentSelectedPipeline.nodes = [
+      streamNode("n1", "input", "same"),
+      streamNode("n2", "output", "same"),
+    ];
+    await nextTick();
+    // A stayed leave must not leave its destination behind for a later prompt.
+    const stayed = router.push("/logs");
+    await flushPromises();
+    leaveButton("o-dialog-close-btn")?.click();
+    await stayed;
+    await flushPromises();
+
+    byTest("add-pipeline-save-btn")?.click();
+    const confirm = () =>
+      document.body.querySelector<HTMLElement>(
+        '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+      );
+    await vi.waitFor(() => expect(confirm()).not.toBeNull());
+    confirm()!.click();
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("pipelines"));
+    expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1);
+  });
+
   it("Save in the leave dialog keeps the user in the editor when the pipeline is invalid", async () => {
     await mountEditor("/pipeline/pipelines/add");
     await addValidPipeline("");

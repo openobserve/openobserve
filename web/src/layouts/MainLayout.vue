@@ -306,6 +306,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
 import { countAllDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
+import { signOutLeaveWillAsk } from "@/utils/drafts/draftSession";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -388,9 +389,9 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
-      // Signing out clears this user's drafts in this browser, so the user is told first.
+      // Signing out clears this user's drafts in this browser, so the user is told first, by the open editor's leave dialog when it asks anyway.
       const count = countAllDraftsFor(String(this.store.state.userInfo?.email ?? ""));
-      if (count > 0) {
+      if (count > 0 && !signOutLeaveWillAsk()) {
         this.signOutDraftCount = count;
         this.signOutDraftsOpen = true;
         return;

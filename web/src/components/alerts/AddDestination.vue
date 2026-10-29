@@ -1562,7 +1562,7 @@ const describeRedactedDestination = (paths: string[], data: AddDestinationForm):
     if (header) {
       const name = data.apiHeaders[Number(header[1])]?.key;
       return [
-        name ? t("common.editorDraft.headerField", { name }) : t("alert_destinations.headers"),
+        name ? t("common.editorDraft.headerField", { name }) : t("common.editorDraft.headersField"),
       ];
     }
     const field = credentialFields.find((f) => path === `/credentials/${f.key}`);

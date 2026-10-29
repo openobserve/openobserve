@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  blankCredentialUrls,
   blankRedactedPaths,
   changedRedactedPaths,
   isSecretKeyName,
@@ -385,6 +386,30 @@ describe("restoreRedacted", () => {
     const { data, paths } = redactDraftSecrets({ "a/b": { "~token": "x" } });
     expect(restoreRedacted(data, { "a/b": { "~token": "now" } }, paths)).toEqual({
       "a/b": { "~token": "now" },
+    });
+  });
+});
+
+describe("blankCredentialUrls", () => {
+  it("blanks only the URLs that can carry a credential, and returns their pointers", () => {
+    const data = {
+      endpoint: "https://api.test/run?api_key=s3cret",
+      values: { remote: "https://user:pw@api.test", plain: "https://api.test/run" },
+      count: 3,
+    };
+    expect(
+      blankCredentialUrls(data, [
+        "/endpoint",
+        "/values/remote",
+        "/values/plain",
+        "/count",
+        "/none",
+      ]),
+    ).toEqual(["/endpoint", "/values/remote"]);
+    expect(data).toEqual({
+      endpoint: "",
+      values: { remote: "", plain: "https://api.test/run" },
+      count: 3,
     });
   });
 });

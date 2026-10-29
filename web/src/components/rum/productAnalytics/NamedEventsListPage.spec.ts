@@ -222,8 +222,18 @@ describe("NamedEventsListPage (AC-44)", () => {
     expect(q("rum-analytics-named-events-row-1-draft-dot")).toBeNull();
     expect(q("rum-analytics-named-events-row-0-duplicate-draft-dot")).toBeNull();
     expect(q("rum-analytics-named-events-row-1-duplicate-draft-dot")).not.toBeNull();
-    expect(q("rum-analytics-named-events-row-1-duplicate-btn")?.getAttribute("aria-label")).toBe(
-      "Duplicate · unsaved draft",
+    expect(q("rum-analytics-named-events-row-1-duplicate-btn")?.getAttribute("aria-label")).toMatch(
+      /^Duplicate · unsaved draft · .*\d/,
+    );
+    // The phone row menu is the only way to Duplicate below md, so it carries the dot too.
+    const more = q("rum-analytics-named-events-row-1-more-btn");
+    expect(
+      more?.querySelector('[data-test="rum-analytics-named-events-row-1-more-draft-dot"]'),
+    ).not.toBeNull();
+    expect(more?.getAttribute("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(q("rum-analytics-named-events-row-0-more-draft-dot")).toBeNull();
+    expect(q("rum-analytics-named-events-row-0-more-btn")?.getAttribute("aria-label")).toBe(
+      "More actions",
     );
     // What the user sees on hover: the button's own tooltip names the kept copy and its date.
     vi.useFakeTimers();
@@ -234,7 +244,7 @@ describe("NamedEventsListPage (AC-44)", () => {
       vi.advanceTimersByTime(800);
       await flushPromises();
       const tip = document.body.querySelector('[data-test="o-tooltip-content"]')?.textContent;
-      expect(tip).toMatch(/Duplicate · unsaved draft from .*\d/);
+      expect(tip).toMatch(/Duplicate · unsaved draft · .*\d/);
     } finally {
       vi.useRealTimers();
     }

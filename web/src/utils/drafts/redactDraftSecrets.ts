@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
+
 export interface RedactedDraft<T> {
   data: T;
   /** JSON pointers (RFC 6901) of the string values that were blanked. */
@@ -217,6 +219,17 @@ export const blankSecretLists = (data: unknown, pointers: string[]): string[] =>
   }
   return paths;
 };
+
+/** Blanks each string at `pointers` that is a URL able to hold a credential, and returns the pointers it blanked. */
+export const blankCredentialUrls = (data: unknown, pointers: string[]): string[] =>
+  pointers.filter((path) => {
+    const segments = parsePointer(path);
+    if (!segments?.length) return false;
+    const value = valueAt(data, segments);
+    if (typeof value !== "string" || !urlCarriesCredential(value)) return false;
+    setChild(valueAt(data, segments.slice(0, -1)), segments[segments.length - 1], "");
+    return true;
+  });
 
 /** The label of the list entry each path sits in, read from the unredacted data; paths outside a list are skipped. */
 export const redactedEntryLabels = (data: unknown, paths: string[]): Record<string, string> => {

@@ -216,7 +216,7 @@ import functionsService from "@/services/jstransform";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import pipelineService from "@/services/pipelines";
-import { useRouter } from "vue-router";
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
@@ -655,6 +655,16 @@ const applyPipelineDraft = (data: PipelineDraftData) => {
   reopenDrawer(data.drawer);
 };
 
+// Registered before the draft's own leave guard, so a leave Save that stops at the basic-pipeline prompt knows where to go after it.
+let leaveTarget: string | null = null;
+let basicPromptLeaveTarget: string | null = null;
+onBeforeRouteLeave((to) => {
+  leaveTarget = to.fullPath;
+});
+onBeforeRouteUpdate((to) => {
+  leaveTarget = to.fullPath;
+});
+
 const pipelineDraft = useEditorDraft<PipelineDraftData>({
   kind: "pipeline",
   entityLabel: () => t("common.editorDraft.entities.pipeline"),
@@ -671,13 +681,13 @@ const pipelineDraft = useEditorDraft<PipelineDraftData>({
   onLeaveWithoutSave: resetPipelineData,
 });
 
-const goToPipelines = () =>
-  router.push({
-    name: "pipelines",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
+const pipelinesRoute = () => ({
+  name: "pipelines",
+  query: {
+    org_identifier: store.state.selectedOrganization.identifier,
+  },
+});
+const goToPipelines = () => router.push(pipelinesRoute());
 
 onBeforeMount(() => {
   // Self-hosted-only (cloudOffers: false) — a pure-Cloud build reports
@@ -960,7 +970,8 @@ const savePipeline = async ({ navigate = true }: { navigate?: boolean } = {}): P
 
   const isValid = isValidNodes(pipelineObj.currentSelectedPipeline.nodes);
   if (!isValid && showJsonEditorDialog.value == false) {
-    // The leave dialog's Save stops here too: the user answers this prompt in the editor.
+    // The leave dialog's Save stops here too: the user answers this prompt in the editor, then the leave goes on.
+    basicPromptLeaveTarget = navigate ? null : leaveTarget;
     confirmDialogBasicPipeline.value = true;
     return false;
   }
@@ -970,7 +981,13 @@ const savePipeline = async ({ navigate = true }: { navigate?: boolean } = {}): P
 
 const confirmSaveBasicPipeline = async () => {
   confirmDialogBasicPipeline.value = false;
-  await onSubmitPipeline();
+  const target = basicPromptLeaveTarget;
+  basicPromptLeaveTarget = null;
+  if (!target) {
+    await onSubmitPipeline();
+    return;
+  }
+  if (await onSubmitPipeline(false)) await router.push(target);
 };
 const validatePipeline = () => {
   // Find input node
@@ -1060,6 +1077,7 @@ const onSubmitPipeline = async (navigate = true): Promise<boolean> => {
 
 const openCancelDialog = async () => {
   const hadChanges = pipelineDraft.hasUnsavedChanges();
+  leaveTarget = router.resolve(pipelinesRoute()).fullPath;
   if (!(await pipelineDraft.confirmLeave())) return;
   if (hadChanges) {
     track("Button Click", {
@@ -1074,6 +1092,7 @@ const resetBasicDialog = () => {
   // Cancelling the "save anyway?" prompt should only dismiss the dialog and keep
   // the user on the editor (matching the close/X button) — NOT navigate away to
   // the pipelines listing.
+  basicPromptLeaveTarget = null;
   confirmDialogBasicPipeline.value = false;
 };
 

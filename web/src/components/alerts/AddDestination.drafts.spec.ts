@@ -195,6 +195,21 @@ describe("AddDestination drafts", () => {
     );
   });
 
+  it("names a header value with no header name in lowercase, as part of the sentence", async () => {
+    await mountEditor();
+    await fillCustomWebhook();
+    await edit({
+      url: "https://hooks.example.com/notify/v2",
+      apiHeaders: [{ key: "", value: "unnamed-secret" }],
+    });
+    window.dispatchEvent(new Event("pagehide"));
+
+    await remount();
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "Your change to the headers was not kept.",
+    );
+  });
+
   it("keeps a URL that cannot carry a secret, and names every blanked field on restore", async () => {
     await mountEditor();
     await fillCustomWebhook();

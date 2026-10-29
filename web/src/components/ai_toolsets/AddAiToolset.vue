@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="pendingCredFileRows.has(idx)"
-                class="text-error-500 mt-1 text-xs"
+                class="text-status-error-text mt-1 text-xs"
                 :data-test="`ai-toolset-cred-file-reenter-${idx}`"
               >
                 {{ t("common.editorDraft.reenterField") }}

@@ -202,15 +202,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Name column: badges for type/preview -->
               <template #cell-name="{ row }">
                 <div class="flex min-w-0 items-center">
-                  <OTruncatedText :data-test="`report-list-name-cell-${row.name}`">{{
-                    row.name
-                  }}</OTruncatedText>
-                  <EditorDraftDot
-                    v-if="reportDrafts.ids.has(rowDraftId(row))"
-                    :saved-at="reportDrafts.savedAt(rowDraftId(row))"
-                    class="ms-2 shrink-0"
-                    :data-test="`report-list-draft-dot-${row.name}`"
-                  />
+                  <div class="flex min-w-0 items-center gap-2">
+                    <OTruncatedText :data-test="`report-list-name-cell-${row.name}`">{{
+                      row.name
+                    }}</OTruncatedText>
+                    <EditorDraftDot
+                      v-if="reportDrafts.ids.has(rowDraftId(row))"
+                      :saved-at="reportDrafts.savedAt(rowDraftId(row))"
+                      :data-test="`report-list-${row.name}-draft-dot`"
+                    />
+                  </div>
                   <OTag
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
                     type="reportTag"

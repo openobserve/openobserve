@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <EditorDraftDot
                 v-if="templateDrafts.ids.has(row.name)"
                 :saved-at="templateDrafts.savedAt(row.name)"
-                :data-test="`template-list-draft-dot-${row.name}`"
+                :data-test="`alert-template-list-${row.name}-draft-dot`"
               />
               <OTag
                 v-if="row.isPrebuilt"
@@ -215,16 +215,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
-              :title="t('alert_templates.clone')"
-              :aria-label="
-                templateDrafts.hasNewVariant(`clone:${row.name}`)
-                  ? t('common.editorDraft.newDot', { label: t('alert_templates.clone') })
-                  : undefined
-              "
+              :aria-label="cloneActionLabel(row, t('alert_templates.clone'))"
               @click="cloneTemplate(row)"
               data-row-action="duplicate"
             >
               <OIcon name="content-copy" size="sm" />
+              <OTooltip
+                side="bottom"
+                :content="cloneActionLabel(row, t('alert_templates.clone'))"
+              />
               <EditorDraftDot
                 v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
                 corner
@@ -253,18 +252,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #trigger>
                 <OButton
                   icon-left="more-vert"
-                  :title="t('dashboard.moreActions')"
-                  :aria-label="
-                    templateDrafts.hasNewVariant(`clone:${row.name}`)
-                      ? t('common.editorDraft.newDot', { label: t('dashboard.moreActions') })
-                      : undefined
-                  "
+                  :aria-label="cloneActionLabel(row, t('dashboard.moreActions'))"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="md:hidden"
                   data-test="alert-template-list-row-more-actions"
                   @click.stop
                 >
+                  <OTooltip
+                    side="bottom"
+                    :content="cloneActionLabel(row, t('dashboard.moreActions'))"
+                  />
                   <EditorDraftDot
                     v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
                     corner
@@ -303,6 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ t("alert_templates.clone") }}</span>
                 <EditorDraftDot
                   v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
+                  :saved-at="templateDrafts.savedAtVariant(`clone:${row.name}`)"
                   :data-test="`alert-template-list-${row.name}-clone-template-menu-draft-dot`"
                 />
               </ODropdownItem>
@@ -389,7 +388,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { ref, onActivated, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
@@ -425,6 +424,8 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const AddTemplate = defineAsyncComponent(() => import("@/components/alerts/AddTemplate.vue"));
 
@@ -434,6 +435,14 @@ const router = useRouter();
 const { track } = useReo();
 const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
 const templateDrafts = useEditorDraftIds("alert_template");
+const draftLabel = useDraftLabel();
+// The corner dot is presentational, so an action that reopens a kept clone says so, dated, in its own name.
+const cloneActionLabel = (row: { name: string }, label: I18nText): I18nText => {
+  const variant = `clone:${row.name}`;
+  return templateDrafts.hasNewVariant(variant)
+    ? draftLabel(label, templateDrafts.savedAtVariant(variant))
+    : label;
+};
 const orgIdForList = useOrgId();
 const templatesList = useQuery(() =>
   Object.assign(templatesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),

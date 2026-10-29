@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-message="{ row }">
             <div class="flex min-w-0 items-center gap-2">
-              <span class="text-text-heading block truncate text-sm" :title="row.text">
-                {{ row.text }}
-              </span>
+              <OTruncatedText as="span" class="text-text-heading block text-sm">{{
+                row.text
+              }}</OTruncatedText>
               <EditorDraftDot
                 v-if="row.draftKey && bannerDrafts.ids.has(row.draftKey)"
                 :saved-at="bannerDrafts.savedAt(row.draftKey)"
-                :data-test="`announcement-list-draft-dot-${row.index}`"
+                :data-test="`announcement-list-${row.index}-draft-dot`"
               />
             </div>
           </template>
@@ -149,20 +149,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="content-copy"
-                :title="t('announcements.list.duplicate')"
-                :aria-label="
-                  hasDuplicateDraft(row)
-                    ? t('common.editorDraft.newDot', { label: t('announcements.list.duplicate') })
-                    : t('announcements.list.duplicate')
-                "
+                :aria-label="duplicateLabel(row)"
                 :data-test="`announcement-list-duplicate-${row.index}`"
                 @click.stop="openEditor({ duplicate: String(row.index) })"
               >
+                <OTooltip side="bottom" :content="duplicateLabel(row)" />
                 <EditorDraftDot
                   v-if="hasDuplicateDraft(row)"
                   corner
                   :tooltip="false"
-                  :data-test="`announcement-list-duplicate-draft-dot-${row.index}`"
+                  :data-test="`announcement-list-${row.index}-duplicate-draft-dot`"
                 />
               </OButton>
               <OButton
@@ -213,10 +209,13 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { announcementConfigQuery } from "@/services/announcements.queries";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import { bannerRank } from "@/utils/announcementOrder";
 import { bannerMessageText } from "@/utils/announcementMarkdown";
@@ -291,6 +290,14 @@ const { update } = useAnnouncementConfigUpdate();
 const bannerDrafts = useEditorDraftIds("announcement_banner");
 const hasDuplicateDraft = (row: BannerRow) =>
   !!row.draftKey && bannerDrafts.hasNewVariant(`duplicate:${row.draftKey}`);
+const draftLabel = useDraftLabel();
+// The corner dot is presentational, so Duplicate says it reopens a kept copy, dated, in its own name.
+const duplicateLabel = (row: BannerRow): I18nText => {
+  const label = t("announcements.list.duplicate");
+  return hasDuplicateDraft(row)
+    ? draftLabel(label, bannerDrafts.savedAtVariant(`duplicate:${row.draftKey}`))
+    : label;
+};
 
 // A copy of a deleted banner has nothing left to come from, so its draft goes too.
 const dropBannerDrafts = (key: string) => {

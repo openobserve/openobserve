@@ -161,7 +161,7 @@ describe("MainLayout — sign out with drafts", () => {
       expect(invalidateLoginData).toHaveBeenCalledTimes(1);
       expect(stopSessionServices).toHaveBeenCalledTimes(1);
       expect(editorDraftSessionEnded.value).toBe(true);
-      expect(router.currentRoute.value.path).toBe("/login");
+      expect(router.currentRoute.value.path).toBe("/");
       expect(assign).toHaveBeenCalledTimes(1);
     } finally {
       removeGuard();

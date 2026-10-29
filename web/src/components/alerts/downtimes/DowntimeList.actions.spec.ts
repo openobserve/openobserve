@@ -14,6 +14,19 @@ import {
 } from "@/utils/drafts/editorDraftStore";
 
 // The route guard opens this page only with downtimes on.
+const viewport = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => viewport.mobile),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => !viewport.mobile),
+      mdUp: computed(() => !viewport.mobile),
+      lgUp: computed(() => !viewport.mobile),
+    }),
+  };
+});
 vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
   const { computed } = await import("vue");
   return { useDowntimesEnabled: () => computed(() => true) };
@@ -252,6 +265,7 @@ describe("DowntimeList drafts", () => {
   });
 
   beforeEach(() => {
+    viewport.mobile = false;
     queryClient.clear();
     localStorage.clear();
     writeEditorDraft(scope(null), { data: {} });
@@ -292,12 +306,21 @@ describe("DowntimeList drafts", () => {
     wrapper.unmount();
   });
 
+  it("names the draft on the desktop row menu only where its dot and Duplicate item show", async () => {
+    writeEditorDraft({ ...scope(null), variant: "clone:ended" }, { data: {} });
+    const wrapper = await mountList();
+    const more = wrapper.get('[data-test="downtime-list-ended-more"]');
+    expect(more.attributes("aria-label")).toBe("More actions");
+    wrapper.unmount();
+  });
+
   it("marks the row menu and its Duplicate item for a kept duplicate draft", async () => {
+    viewport.mobile = true;
     writeEditorDraft({ ...scope(null), variant: "clone:ended" }, { data: {} });
     const wrapper = await mountList();
     const more = wrapper.get('[data-test="downtime-list-ended-more"]');
     expect(more.find('[data-test="downtime-list-ended-more-draft-dot"]').exists()).toBe(true);
-    expect(more.attributes("aria-label")).toContain("unsaved draft");
+    expect(more.attributes("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
     expect(wrapper.find('[data-test="downtime-list-active-more-draft-dot"]').exists()).toBe(false);
 
     await more.trigger("keydown", { key: "Enter" });

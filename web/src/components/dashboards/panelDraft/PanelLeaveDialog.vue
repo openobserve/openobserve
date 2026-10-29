@@ -24,17 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :primary-button-label="canSave ? t('panel.save') : undefined"
     primary-button-data-test="dashboard-panel-leave-save"
     :primary-button-loading="saving"
-    :secondary-button-label="canKeepDraft ? t('dashboard.panelDraft.keepDraft') : undefined"
-    :neutral-button-label="t('panel.discard')"
+    :secondary-button-label="secondaryLabel"
+    :neutral-button-label="t('common.editorDraft.discard')"
     neutral-button-variant="ghost-destructive"
     data-test="dashboard-panel-leave-dialog"
     @update:open="onOpenChange"
     @click:primary="emit('choose', 'save')"
-    @click:secondary="emit('choose', 'keep')"
+    @click:secondary="emit('choose', canKeepDraft ? 'keep' : 'stay')"
     @click:neutral="emit('choose', 'discard')"
   >
-    <div class="flex flex-col gap-3">
-      <p class="text-text-body text-sm" data-test="dashboard-panel-leave-message">
+    <div class="flex items-start gap-1">
+      <p class="text-text-body min-w-0 flex-1 text-sm" data-test="dashboard-panel-leave-message">
         {{
           !canSave
             ? t("dashboard.panelDraft.leaveMessageDiscardOnly")
@@ -43,31 +43,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : t("dashboard.panelDraft.leaveMessageNoDraft")
         }}
       </p>
-      <p
+      <EditorDraftInfoHint
         v-if="signingOut"
-        class="text-text-secondary text-sm"
+        :content="
+          t('common.editorDraft.signOutDiscardsOthers', { count: otherDraftCount }, otherDraftCount)
+        "
         data-test="dashboard-panel-leave-sign-out"
-      >
-        {{ t("common.editorDraft.signOutDiscards") }}
-      </p>
+      />
     </div>
   </ODialog>
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { computed } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import EditorDraftInfoHint from "@/components/common/drafts/EditorDraftInfoHint.vue";
 import type { PanelLeaveChoice } from "./panelDraft.types";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     open: boolean;
     saving?: boolean;
     canKeepDraft?: boolean;
     signingOut?: boolean;
     canSave?: boolean;
+    /** While signing out, how many of the user's other drafts the sign-out discards. */
+    otherDraftCount?: number;
   }>(),
-  { canSave: true },
+  { canSave: true, otherDraftCount: 0 },
 );
 
 const emit = defineEmits<{
@@ -75,6 +79,12 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+// The discard-only copy offers to stay, so it carries a button for it.
+const secondaryLabel = computed<I18nText | undefined>(() => {
+  if (props.canKeepDraft) return t("dashboard.panelDraft.keepDraft");
+  return props.canSave ? undefined : t("common.editorDraft.stay");
+});
 
 const onOpenChange = (value: boolean) => {
   if (!value) emit("choose", "stay");

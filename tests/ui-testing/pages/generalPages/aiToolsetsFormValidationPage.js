@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-import { discardEditorDraftIfAsked } from '../alertsPages/editorDraftHelpers.js';
+import { discardEditorDraftIfAsked, dismissEditorDraftRestoreIfShown } from '../alertsPages/editorDraftHelpers.js';
 
 export class AiToolsetsFormValidationPage {
     /**
@@ -86,6 +86,7 @@ export class AiToolsetsFormValidationPage {
         await this.page.locator(this.addToolsetBtn).click();
         // Wait for the form to mount — name input is the first interactive field
         await this.page.locator(this.nameInput).waitFor({ state: 'visible', timeout: 10000 });
+        await dismissEditorDraftRestoreIfShown(this.page);
     }
 
     // ── Form field actions ────────────────────────────────────────────────────

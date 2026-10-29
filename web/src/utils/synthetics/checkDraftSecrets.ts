@@ -14,14 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { BrowserCheck, HttpCheckConfig } from "@/types/synthetics";
+import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import type { RedactedDraft } from "@/utils/drafts/redactDraftSecrets";
+import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
 
 type ValueEntry = { value: string };
 
-/** Blanks the Auth & network and HTTP request header values, the cookie values, the secrets and the secure variables of a check. */
+/** Blanks a target URL that can hold a credential, the Auth & network and HTTP request header values, the cookie values, the secrets and the secure variables of a check. */
 export const redactCheckDraftSecrets = <T extends BrowserCheck>(
   check: T,
   pointerPrefix = "",
+  // A tcp, tls or ssh check targets a bare host, which holds no credential.
+  { hostTarget = false }: { hostTarget?: boolean } = {},
 ): RedactedDraft<T> => {
   const paths: string[] = [];
   const blank = <E extends ValueEntry>(
@@ -36,6 +40,10 @@ export const redactCheckDraftSecrets = <T extends BrowserCheck>(
     });
 
   const data: T = { ...check };
+  if (!hostTarget && urlCarriesCredential(check.url ?? "")) {
+    data.url = "";
+    paths.push(`${pointerPrefix}/url`);
+  }
   // Custom headers and cookies on this card exist to carry credentials, whatever they are named.
   if (check.headers) data.headers = blank("headers", check.headers);
   if (check.cookies) data.cookies = blank("cookies", check.cookies);
@@ -50,6 +58,54 @@ export const redactCheckDraftSecrets = <T extends BrowserCheck>(
     };
   }
   return { data, paths };
+};
+
+type EntryField = {
+  name: (check: BrowserCheck, index: number) => string | undefined;
+  key: I18nKey;
+};
+
+const ENTRY_FIELDS: Record<string, EntryField> = {
+  "http/headers": {
+    name: (check, index) => (check as { http?: HttpCheckConfig }).http?.headers[index]?.name,
+    key: "common.editorDraft.headerField",
+  },
+  headers: {
+    name: (check, index) => check.headers?.[index]?.key,
+    key: "common.editorDraft.headerField",
+  },
+  cookies: {
+    name: (check, index) => check.cookies?.[index]?.name,
+    key: "common.editorDraft.cookieField",
+  },
+  secrets: {
+    name: (check, index) => check.secrets?.[index]?.name,
+    key: "common.editorDraft.secretField",
+  },
+  variables: {
+    name: (check, index) => check.variables?.[index]?.name,
+    key: "common.editorDraft.variableField",
+  },
+};
+
+const ENTRY_PATH = /^\/(http\/headers|headers|cookies|secrets|variables)\/(\d+)\/value$/;
+
+/** Names the fields behind a check's redacted paths; empty when one cannot be named, so the dialog's general note covers them. */
+export const describeCheckRedacted = (
+  paths: string[],
+  check: BrowserCheck,
+  t: TranslateFn,
+  { pointerPrefix = "", urlLabel }: { pointerPrefix?: string; urlLabel: I18nText },
+): I18nText[] => {
+  const labels = paths.flatMap((pointer): I18nText[] => {
+    const path = pointer.slice(pointerPrefix.length);
+    if (path === "/url") return [urlLabel];
+    const match = ENTRY_PATH.exec(path);
+    const field = match ? ENTRY_FIELDS[match[1]] : undefined;
+    const name = match && field ? field.name(check, Number(match[2])) : undefined;
+    return field && name ? [t(field.key, { name })] : [];
+  });
+  return labels.length === paths.length ? labels : [];
 };
 
 /** The configure cards' validation key (`auth.password`, `headers.0.value`) for a redacted pointer under `pointerPrefix`. */

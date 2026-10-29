@@ -73,30 +73,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Monitor name -->
     <template #cell-name="{ row }">
       <div class="flex min-w-0 items-center gap-1.5">
-        <OTooltip
-          v-if="(row as any).name"
-          :content="(row as any).name"
-          content-class="max-w-[25rem] whitespace-normal break-words text-xs"
-        >
-          <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-            <span
-              class="cursor-pointer truncate"
-              :data-test="`${dataTest}-name-${(row as any).id}`"
-              >{{ (row as any).name || "—" }}</span
-            >
-            <MutedChip
-              v-if="(row as any).active_downtime"
-              :downtime="(row as any).active_downtime"
-              :data-test="`${dataTest}-${(row as any).id}-muted`"
-            />
-          </div>
-        </OTooltip>
+        <template v-if="(row as any).name">
+          <OTruncatedText
+            as="span"
+            class="cursor-pointer"
+            :data-test="`${dataTest}-name-${(row as any).id}`"
+            >{{ (row as any).name }}</OTruncatedText
+          >
+          <MutedChip
+            v-if="(row as any).active_downtime"
+            :downtime="(row as any).active_downtime"
+            :data-test="`${dataTest}-${(row as any).id}-muted`"
+          />
+        </template>
         <span v-else class="truncate">—</span>
-        <!-- Outside the name's tooltip, so hovering the dot shows only its own. -->
         <EditorDraftDot
           v-if="draftSavedAt[String((row as any).id)]"
           :saved-at="draftSavedAt[String((row as any).id)]"
-          :data-test="`${dataTest}-draft-dot-${(row as any).id}`"
+          :data-test="`${dataTest}-${(row as any).id}-draft-dot`"
         />
       </div>
     </template>
@@ -622,6 +616,7 @@ import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
 import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 type Mode = "all" | "browser";
 

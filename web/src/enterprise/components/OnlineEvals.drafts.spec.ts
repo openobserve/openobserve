@@ -578,6 +578,27 @@ describe("OnlineEvals editor drafts", () => {
       expect(onlineEvalsService.scorers.create).toHaveBeenCalledTimes(1);
     });
 
+    it("never stores a remote endpoint that carries a token, names it, and blocks Save until retyped", async () => {
+      await mountAt("tab=scorers&action=add&scorer_type=remote");
+      await edit("name", "remote judge");
+      await edit("remoteEndpoint", "https://judge.example.com/score?token=s3cr3t");
+      window.dispatchEvent(new Event("pagehide"));
+      expect(JSON.stringify(localStorage)).not.toContain("s3cr3t");
+      await remount("tab=scorers&action=add&scorer_type=remote");
+
+      expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+        "Your change to the URL was not kept.",
+      );
+      byTest("editor-draft-continue")!.click();
+      await flushPromises();
+      expect(form().state.values.remoteEndpoint).toBe("");
+
+      await edit("remoteEndpoint", "https://judge.example.com/score");
+      await form().handleSubmit();
+      await flushPromises();
+      expect(onlineEvalsService.scorers.create).toHaveBeenCalledTimes(1);
+    });
+
     it("switching a remote scorer's auth to none releases a token that was not kept", async () => {
       await mountAt("tab=scorers&action=add&scorer_type=remote");
       await edit("name", "remote judge");

@@ -15,7 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { BrowserCheck, HttpCheckConfig } from "@/types/synthetics";
-import { redactCheckDraftSecrets } from "./checkDraftSecrets";
+import { raw, type TranslateFn } from "@/types/i18n";
+import { describeCheckRedacted, redactCheckDraftSecrets } from "./checkDraftSecrets";
 
 const check = (over: Partial<BrowserCheck> = {}): BrowserCheck => ({
   name: "Shop",
@@ -85,5 +86,63 @@ describe("redactCheckDraftSecrets", () => {
     expect(paths).toEqual([]);
     expect(data).toEqual(input);
     expect("cookies" in data).toBe(false);
+  });
+
+  it("blanks a target URL that can carry a credential, but keeps a plain one and any host target", () => {
+    const tokened = redactCheckDraftSecrets(
+      check({ url: "https://shop.test/?token=abc" }),
+      "/check",
+    );
+    expect(tokened.data.url).toBe("");
+    expect(tokened.paths).toEqual(["/check/url"]);
+
+    expect(redactCheckDraftSecrets(check({ url: "https://user:pw@shop.test" })).paths).toEqual([
+      "/url",
+    ]);
+    expect(redactCheckDraftSecrets(check()).paths).toEqual([]);
+    expect(
+      redactCheckDraftSecrets(check({ url: "bot@db.internal" }), "", { hostTarget: true }).paths,
+    ).toEqual([]);
+  });
+});
+
+describe("describeCheckRedacted", () => {
+  const t = ((key: string, named?: Record<string, unknown>) =>
+    raw(`${key}${named ? `:${JSON.stringify(named)}` : ""}`)) as TranslateFn;
+
+  it("names the URL by the label it is given and each entry by its name", () => {
+    const data = check({
+      headers: [{ key: "X-Team", value: "" }],
+      cookies: [{ name: "sid", value: "", domain: "shop.test" }],
+      secrets: [{ name: "PIN", value: "" }],
+      variables: [{ name: "PASS", value: "", secure: true }],
+    });
+    expect(
+      describeCheckRedacted(
+        [
+          "/check/url",
+          "/check/headers/0/value",
+          "/check/cookies/0/value",
+          "/check/secrets/0/value",
+          "/check/variables/0/value",
+        ],
+        data,
+        t,
+        { pointerPrefix: "/check", urlLabel: raw("starting URL") },
+      ),
+    ).toEqual([
+      "starting URL",
+      'common.editorDraft.headerField:{"name":"X-Team"}',
+      'common.editorDraft.cookieField:{"name":"sid"}',
+      'common.editorDraft.secretField:{"name":"PIN"}',
+      'common.editorDraft.variableField:{"name":"PASS"}',
+    ]);
+  });
+
+  it("names nothing when one path cannot be named, so the general note covers them all", () => {
+    const data = check({ headers: [{ key: "", value: "" }] });
+    expect(
+      describeCheckRedacted(["/url", "/headers/0/value"], data, t, { urlLabel: raw("URL") }),
+    ).toEqual([]);
   });
 });

@@ -66,6 +66,7 @@ describe("expireSession", () => {
     localStorage.setItem("unrelated", "u");
     localStorage.setItem("o2_draft:function:o:f:me%40x.io", "{}");
     localStorage.setItem("o2_panel_draft:me@x.io:o:d:p", "{}");
+    localStorage.setItem("o2_draft_signed_out", '["gone@x.io"]');
     const prompt = vi.fn();
     window.addEventListener("beforeunload", prompt);
     const store = { state: { zoConfig: { rum: { enabled: false } } }, dispatch: vi.fn() };
@@ -79,7 +80,24 @@ describe("expireSession", () => {
     expect(localStorage.getItem("unrelated")).toBeNull();
     expect(localStorage.getItem("o2_draft:function:o:f:me%40x.io")).toBe("{}");
     expect(localStorage.getItem("o2_panel_draft:me@x.io:o:d:p")).toBe("{}");
+    expect(localStorage.getItem("o2_draft_signed_out")).toBe('["gone@x.io"]');
     expect(prompt).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("goes to the login page instead of reloading when asked, keeping the drafts", () => {
+    const reload = vi.fn();
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload, assign });
+    localStorage.setItem("o2_draft:function:o:f:me%40x.io", "{}");
+    const store = { state: { zoConfig: { rum: { enabled: false } } }, dispatch: vi.fn() };
+
+    expireSession(store, { toLogin: true });
+
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign.mock.calls[0][0]).toMatch(/login$/);
+    expect(reload).not.toHaveBeenCalled();
+    expect(localStorage.getItem("o2_draft:function:o:f:me%40x.io")).toBe("{}");
   });
 });
