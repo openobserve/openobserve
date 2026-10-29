@@ -216,6 +216,7 @@ describe("TelephonySettings", () => {
       expect(cardText("status")).toBe("Not working");
       expect(card("problem")).not.toBeNull();
       expect(card("problem-update")).toBeNull();
+      expect(q("press4")).toBeNull();
       expect(text("deployment")).toContain(NOTE);
       expect(text("deployment")).not.toContain("already work");
     });
@@ -253,6 +254,7 @@ describe("TelephonySettings", () => {
       await render(CONNECTED, true, status("ok", over));
       expect(cardText("status")).toBe("Connected");
       expect(["cant-text", "cant-call"].filter((id) => card(id))).toEqual(shown);
+      expect(q("press4") !== null).toBe(!shown.includes("cant-call"));
       expect(cardText("cant-text") + cardText("cant-call")).toBe(
         shown
           .map((id) =>

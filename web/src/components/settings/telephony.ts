@@ -106,7 +106,9 @@ export function telephonyHealth(
   status: TelephonyStatus | null | undefined,
   err: unknown,
 ): TelephonyHealth {
-  if (!status) return err ? "unchecked" : "checking";
+  // A failed re-check keeps the last answer cached, which must not read as current.
+  if (err) return "unchecked";
+  if (!status) return "checking";
   switch (status.state) {
     case "ok":
       return "ok";

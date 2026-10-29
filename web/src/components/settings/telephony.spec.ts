@@ -158,6 +158,12 @@ describe("telephonyHealth", () => {
     ["no answer yet", null, null, "checking"],
     ["the check itself failed", null, { response: { status: 500 } }, "unchecked"],
     ["ok", status("ok"), null, "ok"],
+    [
+      "a re-check failed after an earlier answer",
+      status("ok"),
+      { response: { status: 500 } },
+      "unchecked",
+    ],
     ["credentials refused", status("account_rejected"), null, "broken"],
     ["number not on the account", status("from_not_on_account"), null, "broken"],
     ["stored account unreadable", status("unreadable"), null, "broken"],

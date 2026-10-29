@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OBanner>
 
     <div class="border-border-default grid grid-cols-1 gap-2 border-t pt-4">
-      <TelephonyPress4Row :available="press4Available" />
+      <TelephonyPress4Row v-if="callsMayWork" :available="press4Available" />
       <span
         v-if="ok && !ok.can_text"
         class="text-status-warning-text flex items-center gap-2 text-sm"
@@ -130,6 +130,7 @@ const orgId = computed<string>(() => store.state.selectedOrganization.identifier
 const status = useQuery(() => telephonyStatusQuery(orgId.value));
 const health = computed(() => telephonyHealth(status.data.value, status.error.value));
 const ok = computed(() => (status.data.value?.state === "ok" ? status.data.value : null));
+const callsMayWork = computed(() => health.value !== "broken" && ok.value?.can_call !== false);
 
 const tagLabel = computed<I18nText>(() => {
   const labels: Record<TelephonyHealth, I18nText> = {
