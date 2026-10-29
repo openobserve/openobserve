@@ -375,3 +375,40 @@ describe("JiraDestinationFields - edit", () => {
     expect(wrapper.find('[data-test="jira-token-input"]').exists()).toBe(true);
   });
 });
+
+describe("JiraDestinationFields - stale responses", () => {
+  it("does not mark edited credentials as connected when an older Connect returns", async () => {
+    await mountFields();
+    await setCred("url", "https://acme.atlassian.net/");
+    await setCred("email", "alerts-bot@example.com");
+    await setCred("token", "secret-token");
+    let finish: (value: unknown) => void = () => {};
+    jiraSetup.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    await wrapper.find('[data-test="jira-connect-button"]').trigger("click");
+    await setCred("token", "other-token");
+
+    finish({ data: CONNECT });
+    await flushPromises();
+    expect(creds().connectedAs).toBeFalsy();
+    expect(wrapper.find('[data-test="jira-project-select"]').exists()).toBe(false);
+  });
+
+  it("keeps the newest project's required fields when an older fields lookup returns late", async () => {
+    const webFields = { ...FIELDS, required_fields: [] };
+    await connectNew();
+    await setCred("projectKey", "OPS");
+    let finishOps: (value: unknown) => void = () => {};
+    jiraSetup.mockImplementationOnce(() => new Promise((resolve) => (finishOps = resolve)));
+    await setCred("issueTypeId", "10004");
+
+    jiraSetup.mockImplementationOnce(() => Promise.resolve({ data: ISSUE_TYPES }));
+    jiraSetup.mockImplementationOnce(() => Promise.resolve({ data: webFields }));
+    await setCred("projectKey", "WEB");
+    await setCred("issueTypeId", "10004");
+    expect(creds().createMeta.requiredFields).toEqual([]);
+
+    finishOps({ data: FIELDS });
+    await flushPromises();
+    expect(creds().createMeta.requiredFields).toEqual([]);
+  });
+});

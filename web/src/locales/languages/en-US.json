@@ -11234,6 +11234,7 @@
       "jiraRequiredFields": "Required Jira Fields",
       "jiraRequiredFieldHelp": "Required by Jira for this issue type",
       "jiraUnsupportedField": "Jira requires '{field}' for {issueType}. OpenObserve cannot fill this field type. Pick another issue type, or ask your Jira admin to make it optional.",
+      "jiraCreateScreenNotLoaded": "The create screen for this issue type has not loaded. Wait for it to load, or pick the issue type again.",
       "jiraLabelsMissing": "The Labels field is not on the create screen for {issueType} in {project}. OpenObserve needs it to find its tickets. Ask your Jira admin to add it.",
       "jiraBehavior": "Recovery adds a comment and does not close the ticket.",
       "jiraTestCreated": "Created {key}. You can delete it in Jira.",

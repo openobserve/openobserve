@@ -859,7 +859,8 @@ const isJiraReady = computed(
   () =>
     !!prebuiltCredentials.value.connectedAs &&
     !!prebuiltCredentials.value.projectKey &&
-    !!prebuiltCredentials.value.issueTypeId,
+    !!prebuiltCredentials.value.issueTypeId &&
+    !!prebuiltCredentials.value.createMeta,
 );
 const showPrebuiltAdvancedSettings = computed(() => {
   if (props.isAlerts && dtVal.value === "jira") return isJiraReady.value;

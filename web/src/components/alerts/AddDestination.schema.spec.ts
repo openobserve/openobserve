@@ -239,6 +239,12 @@ describe("AddDestination schema Jira", () => {
     projectKey: "OPS",
     issueTypeId: "10004",
     connectedAs: "Alerts Bot",
+    createMeta: {
+      projectName: "Operations",
+      issueTypeName: "Bug",
+      hasLabels: true,
+      requiredFields: [],
+    },
   };
   const jiraValues = (credentials: Record<string, unknown> = {}) => ({
     ...addDestinationDefaults(),
@@ -277,6 +283,10 @@ describe("AddDestination schema Jira", () => {
     const edit = { token: "", savedDestination: "jira-ops" };
     expect(errorPaths(jiraValues(edit))).toEqual([]);
     expect(errorPaths(jiraValues({ ...edit, changing: true }))).toEqual(["credentials.token"]);
+  });
+
+  it("blocks Save until the create screen has loaded", () => {
+    expect(errorPaths(jiraValues({ createMeta: undefined }))).toEqual(["credentials.issueTypeId"]);
   });
 
   it("blocks Save on an empty required field, a missing Labels field and an unsupported field", () => {
