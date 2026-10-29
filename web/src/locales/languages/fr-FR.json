@@ -669,6 +669,7 @@
     "dateRangeCopied": "Plage de dates copiée",
     "dateRangePasted": "Plage de dates collée",
     "dateRangePasteError": "Impossible d'analyser la plage de dates",
+    "dateRangePasteBlocked": "Ce navigateur a bloqué la lecture du presse-papiers. Appuyez sur {shortcut} avec le sélecteur ouvert pour coller.",
     "pastSecond": "Dernière {count} seconde | Dernières {count} secondes",
     "pastMinute": "Dernière {count} minute | Dernières {count} minutes",
     "pastHour": "Dernière {count} heure | Dernières {count} heures",
@@ -1005,7 +1006,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "Brouillon non enregistré · {date}",
       "newDot": "{label} · brouillon non enregistré",
-      "newDotDated": "{label} · unsaved draft · {date}",
+      "newDotDated": "{label} · brouillon non enregistré · {date}",
       "entities": {
         "alert": "alerte",
         "alert_template": "modèle d'alerte",
@@ -1019,7 +1020,7 @@
         "synthetic_browser": "test navigateur",
         "prompt": "prompt",
         "experiment": "expérience",
-        "dashboard_settings": "dashboard",
+        "dashboard_settings": "tableau de bord",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
         "announcement_banner": "announcement banner",
@@ -1029,10 +1030,11 @@
         "oncall_policy": "escalation policy",
         "oncall_schedule": "on-call schedule",
         "regex_pattern": "regex pattern",
-        "model_pricing": "model price",
+        "model_pricing": "prix du modèle",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "configuration du collecteur"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1041,8 +1043,7 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    },
-    "dateRangePasteBlocked": "Ce navigateur a bloqué la lecture du presse-papiers. Appuyez sur {shortcut} avec le sélecteur ouvert pour coller."
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6285,7 +6286,7 @@
       "panelDeleted": "Ce panneau n'existe plus, son brouillon non enregistré a donc été supprimé.",
       "variablesSkipped": "{count} variable de votre brouillon n'a pas été ajoutée car son nom est déjà utilisé | {count} variables de votre brouillon n'ont pas été ajoutées car leurs noms sont déjà utilisés",
       "leaveTitle": "Quitter avec des modifications non enregistrées ?",
-      "leaveMessage": "Enregistrez le panneau, conservez vos modifications comme brouillon dans ce navigateur jusqu'à votre déconnexion ou supprimez-les.",
+      "leaveMessage": "Enregistrez le panneau, conservez vos modifications comme brouillon dans ce navigateur jusqu'à votre déconnexion, ou abandonnez-les.",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Conserver le brouillon",
@@ -14997,7 +14998,7 @@
     "secretType": "Type de secret",
     "staticSecret": "Secret statique",
     "staticSecretName": "Nom",
-    "staticSecretNameNotKept": "{product} static secret name",
+    "staticSecretNameNotKept": "Nom du secret statique de {product}",
     "dfcName": "Nom DFC",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "Données cryptées DFC",
@@ -16866,8 +16867,8 @@
           "concurrencyRange": "Le nombre maximal de requêtes simultanées doit être compris entre 1 et 32.",
           "signingKeyRequired": "Impossible de générer une clé de signature. Réessayez."
         },
-        "signingKeyNotKept": "Signing keys are not kept in this browser. Continuing generates a new key, which you must copy into your service.",
-        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept."
+        "signingKeyNotKept": "Les clés de signature ne sont pas conservées dans ce navigateur. Continuer génère une nouvelle clé, que vous devez copier dans votre service.",
+        "signingKeyRegenerated": "Il s'agit d'une nouvelle clé de signature. Celle de votre brouillon n'a pas été conservée."
       },
       "generatedSigning": {
         "title": "Copiez votre clé de signature",
@@ -25252,6 +25253,7 @@
     "simulatorLadder": "échelle {priority}",
     "simulatorLadderEnds": "{rungs}, se termine à {at}",
     "simulatorReachableNow": "{channels} · maintenant",
+    "simulatorSendsNothing": "Cette priorité n'envoie rien qu'ils puissent recevoir",
     "simulatorSendTest": "Envoyer une notification de test",
     "unroutedNoneTitle": "Aucune alerte non routée",
     "unroutedNone": "Chaque alerte déclenchée a atteint une équipe.",
@@ -25490,8 +25492,7 @@
     "scopeClaimServiceEverywhere": "{service} contacte cette équipe dans chaque cluster et espace de noms, quel que soit le propriétaire de ce qui l'entoure.",
     "scopeClaimServiceHere": "{service} contacte cette équipe uniquement dans {scope}. Ailleurs, cela revient au propriétaire du périmètre environnant.",
     "scopeNothingDiscovered": "Rien n'a encore été découvert, il n'y a donc aucun parc parmi lequel choisir. Utilisez le mode Avancé pour définir la règle par champ, ou envoyez d'abord de la télémétrie.",
-    "scopeAdvancedHint": "Correspond à n'importe quel champ et valeur, y compris ceux que les niveaux ci-dessus ne couvrent pas.",
-    "simulatorSendsNothing": "Cette priorité n'envoie rien qu'ils puissent recevoir"
+    "scopeAdvancedHint": "Correspond à n'importe quel champ et valeur, y compris ceux que les niveaux ci-dessus ne couvrent pas."
   },
   "paidUsage": {
     "consentTitle": "Activer l'utilisation payante de l'IA ?",
@@ -26603,6 +26604,15 @@
     "saveFailed": "Impossible d'enregistrer le compte. Réessayez.",
     "disconnectFailed": "Le compte n'a pas pu être déconnecté. Réessayez.",
     "connected": "Connecté",
+    "statusChecking": "Vérification…",
+    "statusBroken": "Ne fonctionne pas",
+    "statusUnchecked": "Vérification impossible",
+    "cardMeta": "Depuis {number} · Compte {account}",
+    "deploymentMeta": "Depuis {number}",
+    "uncheckedNow": "{provider} est injoignable pour le moment.",
+    "trial": "Compte d'essai : les SMS et appels n'atteignent que les numéros vérifiés dans {provider}.",
+    "cantText": "Ce numéro ne peut pas envoyer de SMS",
+    "cantCall": "Ce numéro ne peut pas passer d'appels",
     "fromNumber": "Numéro expéditeur",
     "press4": "Touches d'appel (4 accuser réception, 6 résoudre, 8 escalader)",
     "press4Available": "Disponible",
@@ -26611,6 +26621,7 @@
     "update": "Mettre à jour",
     "disconnect": "Déconnecter",
     "deploymentTitle": "Le compte {provider} de ce déploiement",
+    "deploymentOwner": "Défini par l'opérateur, il n'y a donc rien à configurer ici.",
     "useOwn": "Utiliser plutôt votre propre compte {provider}",
     "connectTitle": "Connecter {provider}",
     "updateTitle": "Mettre à jour {provider}",
@@ -26618,6 +26629,7 @@
     "accountSid": "SID du compte",
     "authToken": "Jeton d'authentification",
     "tokenKeep": "Laisser vide pour conserver le jeton actuel",
+    "tokenNewAccount": "Un autre compte nécessite son propre jeton d'authentification",
     "fromHelp": "Un numéro de ce compte {provider}, avec l'indicatif du pays.",
     "connect": "Connecter",
     "checking": "Vérification auprès de {provider}…",
@@ -26631,21 +26643,10 @@
       "tokenRequired": "Un jeton d'authentification est requis pour se connecter.",
       "noMasterKey": "Demandez à votre opérateur de définir {variable}.",
       "accountRejected": "{provider} n'a pas accepté ce compte. Vérifiez le SID du compte et le jeton d'authentification, et que le compte est actif.",
-      "unreadable": "Le compte du fournisseur téléphonique de cette organisation n'a pas pu être lu.",
       "fromNotOnAccount": "Ce numéro n'appartient pas à ce compte {provider}. Utilisez-en un de Phone Numbers → Active numbers dans {provider}.",
-      "unavailable": "{provider} est injoignable. Réessayez."
-    },
-    "statusChecking": "Vérification…",
-    "statusBroken": "Ne fonctionne pas",
-    "statusUnchecked": "Vérification impossible",
-    "cardMeta": "Depuis {number} · Compte {account}",
-    "deploymentMeta": "Depuis {number}",
-    "uncheckedNow": "{provider} est injoignable pour le moment.",
-    "trial": "Compte d'essai : les SMS et appels n'atteignent que les numéros vérifiés dans {provider}.",
-    "cantText": "Ce numéro ne peut pas envoyer de SMS",
-    "cantCall": "Ce numéro ne peut pas passer d'appels",
-    "deploymentOwner": "Défini par l'opérateur, il n'y a donc rien à configurer ici.",
-    "tokenNewAccount": "Un autre compte nécessite son propre jeton d'authentification"
+      "unavailable": "{provider} est injoignable. Réessayez.",
+      "unreadable": "Le compte du fournisseur téléphonique de cette organisation n'a pas pu être lu."
+    }
   },
   "slackApp": {
     "prereq": {
@@ -27780,6 +27781,7 @@
       "visualUnavailable": "L'éditeur visuel ne peut pas afficher ce YAML sans en perdre des parties",
       "publishedWithWarnings": "v{version} publiée avec {count} avertissement | v{version} publiée avec {count} avertissements",
       "notFound": "Configuration {name} introuvable",
+      "importNotApplied": "Le fichier importé n'a pas été appliqué car vous avez poursuivi votre brouillon précédent. Importez-le à nouveau pour l'utiliser.",
       "deleteInUse": "Encore référencée par des flottes : {fleets}, des collecteurs : {collectors}, des déploiements actifs : {rollouts}. Faites d'abord passer ces flottes à une autre configuration."
     },
     "history": {

@@ -669,6 +669,7 @@
     "dateRangeCopied": "Datumsbereich kopiert",
     "dateRangePasted": "Datumsbereich eingefügt",
     "dateRangePasteError": "Datumsbereich konnte nicht geparst werden",
+    "dateRangePasteBlocked": "Dieser Browser hat das Lesen der Zwischenablage blockiert. Drücken Sie {shortcut} bei geöffnetem Auswahlfeld, um einzufügen.",
     "pastSecond": "Letzte {count} Sekunde | Letzte {count} Sekunden",
     "pastMinute": "Letzte {count} Minute | Letzte {count} Minuten",
     "pastHour": "Letzte {count} Stunde | Letzte {count} Stunden",
@@ -1005,7 +1006,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "Nicht gespeicherter Entwurf · {date}",
       "newDot": "{label} · nicht gespeicherter Entwurf",
-      "newDotDated": "{label} · unsaved draft · {date}",
+      "newDotDated": "{label} · ungespeicherter Entwurf · {date}",
       "entities": {
         "alert": "Alarm",
         "alert_template": "Alarmvorlage",
@@ -1019,7 +1020,7 @@
         "synthetic_browser": "Browsertest",
         "prompt": "Prompt",
         "experiment": "Experiment",
-        "dashboard_settings": "dashboard",
+        "dashboard_settings": "Dashboard",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
         "announcement_banner": "announcement banner",
@@ -1029,10 +1030,11 @@
         "oncall_policy": "escalation policy",
         "oncall_schedule": "on-call schedule",
         "regex_pattern": "regex pattern",
-        "model_pricing": "model price",
+        "model_pricing": "Modellpreis",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "Collector-Konfiguration"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1041,8 +1043,7 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    },
-    "dateRangePasteBlocked": "Dieser Browser hat das Lesen der Zwischenablage blockiert. Drücken Sie {shortcut} bei geöffnetem Auswahlfeld, um einzufügen."
+    }
   },
   "flow": {
     "stepPicker": {
@@ -14997,7 +14998,7 @@
     "secretType": "Geheimer Typ",
     "staticSecret": "Statisches Geheimnis",
     "staticSecretName": "Name",
-    "staticSecretNameNotKept": "{product} static secret name",
+    "staticSecretNameNotKept": "{product} statischer Secret-Name",
     "dfcName": "DFC-Name",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC-verschlüsselte Daten",
@@ -16866,8 +16867,8 @@
           "concurrencyRange": "Maximale Parallelität muss zwischen 1 und 32 liegen.",
           "signingKeyRequired": "Signaturschlüssel konnte nicht generiert werden. Bitte erneut versuchen."
         },
-        "signingKeyNotKept": "Signing keys are not kept in this browser. Continuing generates a new key, which you must copy into your service.",
-        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept."
+        "signingKeyNotKept": "Signaturschlüssel werden in diesem Browser nicht gespeichert. Wenn Sie fortfahren, wird ein neuer Schlüssel generiert, den Sie in Ihren Service kopieren müssen.",
+        "signingKeyRegenerated": "Dies ist ein neuer Signaturschlüssel. Der in Ihrem Entwurf wurde nicht beibehalten."
       },
       "generatedSigning": {
         "title": "Signaturschlüssel kopieren",
@@ -25252,6 +25253,7 @@
     "simulatorLadder": "Eskalationsleiter {priority}",
     "simulatorLadderEnds": "{rungs}, endet bei {at}",
     "simulatorReachableNow": "{channels} · jetzt",
+    "simulatorSendsNothing": "Diese Priorität sendet nichts, was sie empfangen können",
     "simulatorSendTest": "Test-Alarmierung senden",
     "unroutedNoneTitle": "Keine ungerouteten Alarme",
     "unroutedNone": "Jeder ausgelöste Alarm hat ein Team erreicht.",
@@ -25490,8 +25492,7 @@
     "scopeClaimServiceEverywhere": "{service} alarmiert dieses Team in jedem Cluster und jedem Namespace, unabhängig davon, wem die umliegenden Cluster oder Namespaces gehören.",
     "scopeClaimServiceHere": "{service} alarmiert dieses Team nur in {scope}. Andernorts geht es an den Verantwortlichen des umgebenden Bereichs.",
     "scopeNothingDiscovered": "Es wurde noch nichts entdeckt, daher gibt es keine Ressourcen zur Auswahl. Verwenden Sie „Erweitert“, um die Regel nach Feld zu schreiben, oder senden Sie zuerst Telemetriedaten.",
-    "scopeAdvancedHint": "Gilt für jedes Feld und jeden Wert, auch für solche, die die obigen Ebenen nicht abdecken.",
-    "simulatorSendsNothing": "Diese Priorität sendet nichts, was sie empfangen können"
+    "scopeAdvancedHint": "Gilt für jedes Feld und jeden Wert, auch für solche, die die obigen Ebenen nicht abdecken."
   },
   "paidUsage": {
     "consentTitle": "Kostenpflichtige KI-Nutzung aktivieren?",
@@ -26603,6 +26604,15 @@
     "saveFailed": "Das Konto konnte nicht gespeichert werden. Versuchen Sie es erneut.",
     "disconnectFailed": "Das Konto konnte nicht getrennt werden. Versuchen Sie es erneut.",
     "connected": "Verbunden",
+    "statusChecking": "Wird geprüft…",
+    "statusBroken": "Funktioniert nicht",
+    "statusUnchecked": "Prüfung nicht möglich",
+    "cardMeta": "Von {number} · Konto {account}",
+    "deploymentMeta": "Von {number}",
+    "uncheckedNow": "{provider} war gerade nicht erreichbar.",
+    "trial": "Testkonto: SMS und Anrufe erreichen nur in {provider} verifizierte Nummern.",
+    "cantText": "Diese Nummer kann keine SMS senden",
+    "cantCall": "Diese Nummer kann keine Anrufe tätigen",
     "fromNumber": "Absendernummer",
     "press4": "Anruftasten (4 bestätigen, 6 lösen, 8 eskalieren)",
     "press4Available": "Verfügbar",
@@ -26611,6 +26621,7 @@
     "update": "Aktualisieren",
     "disconnect": "Trennen",
     "deploymentTitle": "Das {provider}-Konto dieser Bereitstellung",
+    "deploymentOwner": "Vom Betreiber festgelegt, daher gibt es hier nichts zu konfigurieren.",
     "useOwn": "Stattdessen ein eigenes {provider}-Konto verwenden",
     "connectTitle": "{provider} verbinden",
     "updateTitle": "{provider} aktualisieren",
@@ -26618,6 +26629,7 @@
     "accountSid": "Konto-SID",
     "authToken": "Authentifizierungs-Token",
     "tokenKeep": "Leer lassen, um das aktuelle Token beizubehalten",
+    "tokenNewAccount": "Ein anderes Konto braucht sein eigenes Authentifizierungs-Token",
     "fromHelp": "Eine Nummer aus diesem {provider}-Konto, mit Ländervorwahl.",
     "connect": "Verbinden",
     "checking": "Prüfung mit {provider}…",
@@ -26631,21 +26643,10 @@
       "tokenRequired": "Zum Verbinden ist ein Authentifizierungs-Token erforderlich.",
       "noMasterKey": "Bitten Sie Ihren Betreiber, {variable} festzulegen.",
       "accountRejected": "{provider} hat dieses Konto nicht akzeptiert. Prüfen Sie die Konto-SID und das Authentifizierungs-Token und ob das Konto aktiv ist.",
-      "unreadable": "Das Telefonanbieter-Konto dieser Organisation konnte nicht gelesen werden.",
       "fromNotOnAccount": "Diese Nummer gehört nicht zu diesem {provider}-Konto. Verwenden Sie eine aus Phone Numbers → Active numbers in {provider}.",
-      "unavailable": "{provider} war nicht erreichbar. Versuchen Sie es erneut."
-    },
-    "statusChecking": "Wird geprüft…",
-    "statusBroken": "Funktioniert nicht",
-    "statusUnchecked": "Prüfung nicht möglich",
-    "cardMeta": "Von {number} · Konto {account}",
-    "deploymentMeta": "Von {number}",
-    "uncheckedNow": "{provider} war gerade nicht erreichbar.",
-    "trial": "Testkonto: SMS und Anrufe erreichen nur in {provider} verifizierte Nummern.",
-    "cantText": "Diese Nummer kann keine SMS senden",
-    "cantCall": "Diese Nummer kann keine Anrufe tätigen",
-    "deploymentOwner": "Vom Betreiber festgelegt, daher gibt es hier nichts zu konfigurieren.",
-    "tokenNewAccount": "Ein anderes Konto braucht sein eigenes Authentifizierungs-Token"
+      "unavailable": "{provider} war nicht erreichbar. Versuchen Sie es erneut.",
+      "unreadable": "Das Telefonanbieter-Konto dieser Organisation konnte nicht gelesen werden."
+    }
   },
   "slackApp": {
     "prereq": {
@@ -27780,6 +27781,7 @@
       "visualUnavailable": "Der visuelle Editor kann dieses YAML nicht anzeigen, ohne Teile davon zu verlieren",
       "publishedWithWarnings": "v{version} mit {count} Warnung veröffentlicht | v{version} mit {count} Warnungen veröffentlicht",
       "notFound": "Konfiguration {name} wurde nicht gefunden",
+      "importNotApplied": "Die importierte Datei wurde nicht übernommen, weil Sie Ihren früheren Entwurf fortgesetzt haben. Importieren Sie sie erneut, um sie zu verwenden.",
       "deleteInUse": "Wird noch verwendet von Fleets: {fleets}, Collector: {collectors}, aktiven Rollouts: {rollouts}. Stellen Sie diese Fleets zuerst auf eine andere Konfiguration um."
     },
     "history": {

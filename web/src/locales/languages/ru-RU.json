@@ -669,6 +669,7 @@
     "dateRangeCopied": "Диапазон дат скопирован",
     "dateRangePasted": "Диапазон дат вставлен",
     "dateRangePasteError": "Не удалось разобрать диапазон дат",
+    "dateRangePasteBlocked": "Этот браузер заблокировал чтение буфера обмена. Нажмите {shortcut} при открытом средстве выбора, чтобы вставить.",
     "pastSecond": "Последняя {count} секунда | Последние {count} с",
     "pastMinute": "Последняя {count} минута | Последние {count} мин",
     "pastHour": "Последний {count} час | Последние {count} ч",
@@ -1005,7 +1006,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "Несохранённый черновик · {date}",
       "newDot": "{label} · несохранённый черновик",
-      "newDotDated": "{label} · unsaved draft · {date}",
+      "newDotDated": "{label} · несохранённый черновик · {date}",
       "entities": {
         "alert": "оповещение",
         "alert_template": "шаблон оповещения",
@@ -1019,7 +1020,7 @@
         "synthetic_browser": "браузерный тест",
         "prompt": "промпт",
         "experiment": "эксперимент",
-        "dashboard_settings": "dashboard",
+        "dashboard_settings": "дашборд",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
         "announcement_banner": "announcement banner",
@@ -1029,10 +1030,11 @@
         "oncall_policy": "escalation policy",
         "oncall_schedule": "on-call schedule",
         "regex_pattern": "regex pattern",
-        "model_pricing": "model price",
+        "model_pricing": "цена модели",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "конфигурация коллектора"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1041,8 +1043,7 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    },
-    "dateRangePasteBlocked": "Этот браузер заблокировал чтение буфера обмена. Нажмите {shortcut} при открытом средстве выбора, чтобы вставить."
+    }
   },
   "flow": {
     "stepPicker": {
@@ -14997,7 +14998,7 @@
     "secretType": "Тип секрета",
     "staticSecret": "Статический секрет",
     "staticSecretName": "Имя",
-    "staticSecretNameNotKept": "{product} static secret name",
+    "staticSecretNameNotKept": "имя статического секрета {product}",
     "dfcName": "Имя DFC",
     "dfcIV": "IV DFC",
     "dfcEncryptedData": "Зашифрованные данные DFC",
@@ -16866,8 +16867,8 @@
           "concurrencyRange": "Максимальный параллелизм должен быть от 1 до 32",
           "signingKeyRequired": "Не удалось создать ключ подписи. Попробуйте еще раз."
         },
-        "signingKeyNotKept": "Signing keys are not kept in this browser. Continuing generates a new key, which you must copy into your service.",
-        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept."
+        "signingKeyNotKept": "Ключи подписи не хранятся в этом браузере. При продолжении будет создан новый ключ, который нужно скопировать в ваш сервис.",
+        "signingKeyRegenerated": "Это новый ключ подписи. Ключ из вашего черновика не был сохранён."
       },
       "generatedSigning": {
         "title": "Скопируйте ключ подписи",
@@ -25252,6 +25253,7 @@
     "simulatorLadder": "Лестница {priority}",
     "simulatorLadderEnds": "{rungs}, заканчивается на {at}",
     "simulatorReachableNow": "{channels} · сейчас",
+    "simulatorSendsNothing": "Этот приоритет не отправляет ничего, что они могут получить",
     "simulatorSendTest": "Отправить тестовый вызов",
     "unroutedNoneTitle": "Нет ненаправленных",
     "unroutedNone": "Каждое сработавшее оповещение дошло до команды.",
@@ -25490,8 +25492,7 @@
     "scopeClaimServiceEverywhere": "{service} вызывает эту команду в каждом кластере и пространстве имён, независимо от того, кто владеет окружающими.",
     "scopeClaimServiceHere": "{service} вызывает эту команду только в {scope}. В других местах это отходит к тому, кто владеет окружающей областью.",
     "scopeNothingDiscovered": "Пока ничего не обнаружено, поэтому выбирать не из чего. Используйте «Расширенный», чтобы задать правило по полю, или сначала отправьте телеметрию.",
-    "scopeAdvancedHint": "Сопоставление по любому полю и значению, включая те, которые не охвачены уровнями выше.",
-    "simulatorSendsNothing": "Этот приоритет не отправляет ничего, что они могут получить"
+    "scopeAdvancedHint": "Сопоставление по любому полю и значению, включая те, которые не охвачены уровнями выше."
   },
   "paidUsage": {
     "consentTitle": "Включить платное использование ИИ?",
@@ -26603,6 +26604,15 @@
     "saveFailed": "Не удалось сохранить аккаунт. Повторите попытку.",
     "disconnectFailed": "Не удалось отключить аккаунт. Повторите попытку.",
     "connected": "Подключено",
+    "statusChecking": "Проверка…",
+    "statusBroken": "Не работает",
+    "statusUnchecked": "Не удалось проверить",
+    "cardMeta": "С {number} · Аккаунт {account}",
+    "deploymentMeta": "С {number}",
+    "uncheckedNow": "{provider} сейчас недоступен.",
+    "trial": "Пробный аккаунт: SMS и звонки доходят только до номеров, подтверждённых в {provider}.",
+    "cantText": "Этот номер не может отправлять SMS",
+    "cantCall": "Этот номер не может совершать звонки",
     "fromNumber": "Исходящий номер",
     "press4": "Клавиши вызова (4 — принять, 6 — решить, 8 — эскалировать)",
     "press4Available": "Доступно",
@@ -26611,6 +26621,7 @@
     "update": "Обновить",
     "disconnect": "Отключить",
     "deploymentTitle": "Аккаунт {provider} этого развертывания",
+    "deploymentOwner": "Задаётся оператором, поэтому здесь нечего настраивать.",
     "useOwn": "Использовать свой аккаунт {provider}",
     "connectTitle": "Подключить {provider}",
     "updateTitle": "Обновить {provider}",
@@ -26618,6 +26629,7 @@
     "accountSid": "Account SID",
     "authToken": "Токен авторизации",
     "tokenKeep": "Оставьте пустым, чтобы сохранить текущий токен",
+    "tokenNewAccount": "Для другого аккаунта нужен его собственный токен авторизации",
     "fromHelp": "Номер из этого аккаунта {provider}, с кодом страны.",
     "connect": "Подключить",
     "checking": "Проверка через {provider}…",
@@ -26631,21 +26643,10 @@
       "tokenRequired": "Для подключения требуется токен авторизации.",
       "noMasterKey": "Попросите оператора задать {variable}.",
       "accountRejected": "{provider} не принял этот аккаунт. Проверьте Account SID и токен авторизации, а также что аккаунт активен.",
-      "unreadable": "Не удалось прочитать аккаунт телефонного провайдера этой организации.",
       "fromNotOnAccount": "Этот номер не принадлежит этому аккаунту {provider}. Используйте номер из Phone Numbers → Active numbers в {provider}.",
-      "unavailable": "{provider} недоступен. Попробуйте ещё раз."
-    },
-    "statusChecking": "Проверка…",
-    "statusBroken": "Не работает",
-    "statusUnchecked": "Не удалось проверить",
-    "cardMeta": "С {number} · Аккаунт {account}",
-    "deploymentMeta": "С {number}",
-    "uncheckedNow": "{provider} сейчас недоступен.",
-    "trial": "Пробный аккаунт: SMS и звонки доходят только до номеров, подтверждённых в {provider}.",
-    "cantText": "Этот номер не может отправлять SMS",
-    "cantCall": "Этот номер не может совершать звонки",
-    "deploymentOwner": "Задаётся оператором, поэтому здесь нечего настраивать.",
-    "tokenNewAccount": "Для другого аккаунта нужен его собственный токен авторизации"
+      "unavailable": "{provider} недоступен. Попробуйте ещё раз.",
+      "unreadable": "Не удалось прочитать аккаунт телефонного провайдера этой организации."
+    }
   },
   "slackApp": {
     "prereq": {
@@ -27780,6 +27781,7 @@
       "visualUnavailable": "Визуальный редактор не может показать этот YAML без потери его частей",
       "publishedWithWarnings": "Опубликована v{version} с {count} предупреждением | Опубликована v{version}, предупреждений: {count}",
       "notFound": "Конфигурация {name} не найдена",
+      "importNotApplied": "Импортированный файл не был применён, так как вы продолжили работу с предыдущим черновиком. Импортируйте его снова, чтобы использовать.",
       "deleteInUse": "Всё ещё используется парками: {fleets}, коллекторами: {collectors}, активными развертываниями: {rollouts}. Сначала переведите эти парки на другую конфигурацию."
     },
     "history": {

@@ -669,6 +669,7 @@
     "dateRangeCopied": "Datumbereik gekopieerd",
     "dateRangePasted": "Datumbereik geplakt",
     "dateRangePasteError": "Kon datumbereik niet parseren",
+    "dateRangePasteBlocked": "Deze browser heeft het lezen van het klembord geblokkeerd. Druk op {shortcut} terwijl de kiezer open is om te plakken.",
     "pastSecond": "Laatste {count} seconde | Laatste {count} seconden",
     "pastMinute": "Laatste {count} minuut | Laatste {count} minuten",
     "pastHour": "Laatste {count} uur | Laatste {count} uren",
@@ -1005,7 +1006,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "Niet-opgeslagen concept · {date}",
       "newDot": "{label} · niet-opgeslagen concept",
-      "newDotDated": "{label} · unsaved draft · {date}",
+      "newDotDated": "{label} · niet-opgeslagen concept · {date}",
       "entities": {
         "alert": "alarm",
         "alert_template": "alarmsjabloon",
@@ -1029,10 +1030,11 @@
         "oncall_policy": "escalation policy",
         "oncall_schedule": "on-call schedule",
         "regex_pattern": "regex pattern",
-        "model_pricing": "model price",
+        "model_pricing": "modelprijs",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "collectorconfiguratie"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1041,8 +1043,7 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    },
-    "dateRangePasteBlocked": "Deze browser heeft het lezen van het klembord geblokkeerd. Druk op {shortcut} terwijl de kiezer open is om te plakken."
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6285,7 +6286,7 @@
       "panelDeleted": "Dit paneel bestaat niet meer, dus het niet-opgeslagen concept is verwijderd.",
       "variablesSkipped": "{count} variabele uit je concept is niet toegevoegd omdat de naam al in gebruik is | {count} variabelen uit je concept zijn niet toegevoegd omdat de namen al in gebruik zijn",
       "leaveTitle": "Verlaten met niet-opgeslagen wijzigingen?",
-      "leaveMessage": "Sla het paneel op, bewaar je wijzigingen tot je uitlogt als concept in deze browser of verwijder ze.",
+      "leaveMessage": "Sla het paneel op, bewaar je wijzigingen als concept in deze browser tot je uitlogt, of gooi ze weg.",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Concept bewaren",
@@ -14997,7 +14998,7 @@
     "secretType": "Geheim type",
     "staticSecret": "Statisch geheim",
     "staticSecretName": "Naam",
-    "staticSecretNameNotKept": "{product} static secret name",
+    "staticSecretNameNotKept": "{product} statische secretnaam",
     "dfcName": "DFC-naam",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC-gecodeerde gegevens",
@@ -16866,8 +16867,8 @@
           "concurrencyRange": "Maximale gelijktijdigheid moet tussen 1 en 32 liggen",
           "signingKeyRequired": "Kan geen ondertekeningssleutel genereren. Probeer het opnieuw."
         },
-        "signingKeyNotKept": "Signing keys are not kept in this browser. Continuing generates a new key, which you must copy into your service.",
-        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept."
+        "signingKeyNotKept": "Ondertekeningssleutels worden niet in deze browser bewaard. Als je doorgaat, wordt een nieuwe sleutel gegenereerd; die moet je in je service kopiëren.",
+        "signingKeyRegenerated": "Dit is een nieuwe ondertekeningssleutel. De sleutel uit je concept is niet bewaard gebleven."
       },
       "generatedSigning": {
         "title": "Kopieer je ondertekeningssleutel",
@@ -25252,6 +25253,7 @@
     "simulatorLadder": "{priority} ladder",
     "simulatorLadderEnds": "{rungs}, eindigt bij {at}",
     "simulatorReachableNow": "{channels} · nu",
+    "simulatorSendsNothing": "Deze prioriteit verstuurt niets wat zij kunnen ontvangen",
     "simulatorSendTest": "Stuur een testoproep",
     "unroutedNoneTitle": "Niets ongerouteerd",
     "unroutedNone": "Elk alarm dat afging bereikte een team.",
@@ -25490,8 +25492,7 @@
     "scopeClaimServiceEverywhere": "{service} roept dit team op in elk cluster en elke namespace, ongeacht wie de omringende bezit.",
     "scopeClaimServiceHere": "{service} roept dit team alleen in {scope} op. Elders gaat het naar wie de scope eromheen bezit.",
     "scopeNothingDiscovered": "Er is nog niets ontdekt, dus er is geen inventaris om uit te kiezen. Gebruik 'Geavanceerd' om de regel op basis van velden te schrijven, of stuur eerst wat telemetrie.",
-    "scopeAdvancedHint": "Komt overeen met elk veld en elke waarde, inclusief combinaties die de bovenstaande niveaus niet dekken.",
-    "simulatorSendsNothing": "Deze prioriteit verstuurt niets wat zij kunnen ontvangen"
+    "scopeAdvancedHint": "Komt overeen met elk veld en elke waarde, inclusief combinaties die de bovenstaande niveaus niet dekken."
   },
   "paidUsage": {
     "consentTitle": "Betaald AI-gebruik inschakelen?",
@@ -26603,6 +26604,15 @@
     "saveFailed": "Het account kon niet worden opgeslagen. Probeer het opnieuw.",
     "disconnectFailed": "Het account kon niet worden losgekoppeld. Probeer het opnieuw.",
     "connected": "Verbonden",
+    "statusChecking": "Controleren…",
+    "statusBroken": "Werkt niet",
+    "statusUnchecked": "Kon niet controleren",
+    "cardMeta": "Van {number} · Account {account}",
+    "deploymentMeta": "Van {number}",
+    "uncheckedNow": "{provider} was op dit moment niet bereikbaar.",
+    "trial": "Proefaccount: sms'jes en oproepen bereiken alleen nummers die in {provider} zijn geverifieerd.",
+    "cantText": "Dit nummer kan geen sms versturen",
+    "cantCall": "Dit nummer kan niet bellen",
     "fromNumber": "Afzendernummer",
     "press4": "Gesprekstoetsen (4 accepteren, 6 oplossen, 8 escaleren)",
     "press4Available": "Beschikbaar",
@@ -26611,6 +26621,7 @@
     "update": "Bijwerken",
     "disconnect": "Loskoppelen",
     "deploymentTitle": "Het {provider}-account van deze deployment",
+    "deploymentOwner": "Ingesteld door de operator, dus hier valt niets te configureren.",
     "useOwn": "Gebruik in plaats daarvan je eigen {provider}-account",
     "connectTitle": "{provider} koppelen",
     "updateTitle": "{provider} bijwerken",
@@ -26618,6 +26629,7 @@
     "accountSid": "Account-SID",
     "authToken": "Auth-token",
     "tokenKeep": "Laat leeg om het huidige token te behouden",
+    "tokenNewAccount": "Een ander account heeft een eigen authenticatietoken nodig",
     "fromHelp": "Een nummer van dit {provider}-account, met landcode.",
     "connect": "Koppelen",
     "checking": "Controleren bij {provider}…",
@@ -26631,21 +26643,10 @@
       "tokenRequired": "Er is een auth-token vereist om te koppelen.",
       "noMasterKey": "Vraag je beheerder om {variable} in te stellen.",
       "accountRejected": "{provider} heeft dit account niet geaccepteerd. Controleer de Account-SID en het auth-token, en of het account actief is.",
-      "unreadable": "Het telefoonprovider-account van deze organisatie kon niet worden gelezen.",
       "fromNotOnAccount": "Dit nummer hoort niet bij dit {provider}-account. Gebruik er een uit Phone Numbers → Active numbers in {provider}.",
-      "unavailable": "{provider} was niet bereikbaar. Probeer het opnieuw."
-    },
-    "statusChecking": "Controleren…",
-    "statusBroken": "Werkt niet",
-    "statusUnchecked": "Kon niet controleren",
-    "cardMeta": "Van {number} · Account {account}",
-    "deploymentMeta": "Van {number}",
-    "uncheckedNow": "{provider} was op dit moment niet bereikbaar.",
-    "trial": "Proefaccount: sms'jes en oproepen bereiken alleen nummers die in {provider} zijn geverifieerd.",
-    "cantText": "Dit nummer kan geen sms versturen",
-    "cantCall": "Dit nummer kan niet bellen",
-    "deploymentOwner": "Ingesteld door de operator, dus hier valt niets te configureren.",
-    "tokenNewAccount": "Een ander account heeft een eigen authenticatietoken nodig"
+      "unavailable": "{provider} was niet bereikbaar. Probeer het opnieuw.",
+      "unreadable": "Het telefoonprovider-account van deze organisatie kon niet worden gelezen."
+    }
   },
   "slackApp": {
     "prereq": {
@@ -27780,6 +27781,7 @@
       "visualUnavailable": "De visuele editor kan deze YAML niet tonen zonder delen ervan te verliezen",
       "publishedWithWarnings": "v{version} gepubliceerd met {count} waarschuwing | v{version} gepubliceerd met {count} waarschuwingen",
       "notFound": "Configuratie {name} niet gevonden",
+      "importNotApplied": "Het geïmporteerde bestand is niet toegepast omdat je verder bent gegaan met je eerdere concept. Importeer het opnieuw om het te gebruiken.",
       "deleteInUse": "Nog in gebruik door fleets: {fleets}, collectors: {collectors}, actieve uitrollen: {rollouts}. Zet die fleets eerst op een andere configuratie."
     },
     "history": {

@@ -669,6 +669,7 @@
     "dateRangeCopied": "Intervalo de datas copiado",
     "dateRangePasted": "Intervalo de datas colado",
     "dateRangePasteError": "Não foi possível analisar o intervalo de datas",
+    "dateRangePasteBlocked": "Este navegador bloqueou a leitura da área de transferência. Prima {shortcut} com o seletor aberto para colar.",
     "pastSecond": "Último {count} segundo | Últimos {count} segundos",
     "pastMinute": "Último {count} minuto | Últimos {count} minutos",
     "pastHour": "Última {count} hora | Últimas {count} horas",
@@ -1005,7 +1006,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "Rascunho não guardado · {date}",
       "newDot": "{label} · rascunho não guardado",
-      "newDotDated": "{label} · unsaved draft · {date}",
+      "newDotDated": "{label} · rascunho não guardado · {date}",
       "entities": {
         "alert": "alerta",
         "alert_template": "modelo de alerta",
@@ -1029,10 +1030,11 @@
         "oncall_policy": "escalation policy",
         "oncall_schedule": "on-call schedule",
         "regex_pattern": "regex pattern",
-        "model_pricing": "model price",
+        "model_pricing": "preço do modelo",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "configuração do coletor"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1041,8 +1043,7 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    },
-    "dateRangePasteBlocked": "Este navegador bloqueou a leitura da área de transferência. Prima {shortcut} com o seletor aberto para colar."
+    }
   },
   "flow": {
     "stepPicker": {
@@ -14997,7 +14998,7 @@
     "secretType": "Tipo de segredo",
     "staticSecret": "Segredo Estático",
     "staticSecretName": "Nome",
-    "staticSecretNameNotKept": "{product} static secret name",
+    "staticSecretNameNotKept": "Nome do segredo estático do {product}",
     "dfcName": "Nome do DFC",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "Dados encriptados do DFC",
@@ -16866,8 +16867,8 @@
           "concurrencyRange": "A simultaneidade máxima deve estar entre 1 e 32",
           "signingKeyRequired": "Não foi possível gerar uma chave de assinatura. Tente novamente."
         },
-        "signingKeyNotKept": "Signing keys are not kept in this browser. Continuing generates a new key, which you must copy into your service.",
-        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept."
+        "signingKeyNotKept": "As chaves de assinatura não são guardadas neste navegador. Continuar gera uma nova chave, que tem de copiar para o seu serviço.",
+        "signingKeyRegenerated": "Esta é uma nova chave de assinatura. A que estava no seu rascunho não foi guardada."
       },
       "generatedSigning": {
         "title": "Copie a sua chave de assinatura",
@@ -25252,6 +25253,7 @@
     "simulatorLadder": "Escalonamento {priority}",
     "simulatorLadderEnds": "{rungs}, termina em {at}",
     "simulatorReachableNow": "{channels} · agora",
+    "simulatorSendsNothing": "Esta prioridade não envia nada que possam receber",
     "simulatorSendTest": "Enviar um acionamento de teste",
     "unroutedNoneTitle": "Nada sem equipa",
     "unroutedNone": "Todos os alertas disparados chegaram a uma equipa.",
@@ -25490,8 +25492,7 @@
     "scopeClaimServiceEverywhere": "{service} aciona esta equipa em todos os clusters e namespaces, independentemente de quem possua os que estão à volta.",
     "scopeClaimServiceHere": "{service} aciona esta equipa apenas em {scope}. Noutros locais, cabe a quem possui o âmbito à volta.",
     "scopeNothingDiscovered": "Ainda nada foi descoberto, por isso não há ativos para escolher. Use Avançado para escrever a regra por campo ou envie alguma telemetria primeiro.",
-    "scopeAdvancedHint": "Corresponder a qualquer campo e valor, incluindo os que os níveis acima não abrangem.",
-    "simulatorSendsNothing": "Esta prioridade não envia nada que possam receber"
+    "scopeAdvancedHint": "Corresponder a qualquer campo e valor, incluindo os que os níveis acima não abrangem."
   },
   "paidUsage": {
     "consentTitle": "Ativar o uso pago de IA?",
@@ -26603,6 +26604,15 @@
     "saveFailed": "A conta não pôde ser guardada. Tente novamente.",
     "disconnectFailed": "Não foi possível desligar a conta. Tente novamente.",
     "connected": "Ligado",
+    "statusChecking": "A verificar…",
+    "statusBroken": "Não está a funcionar",
+    "statusUnchecked": "Não foi possível verificar",
+    "cardMeta": "De {number} · Conta {account}",
+    "deploymentMeta": "De {number}",
+    "uncheckedNow": "Não foi possível contactar o {provider} neste momento.",
+    "trial": "Conta de teste: SMS e chamadas só chegam a números verificados no {provider}.",
+    "cantText": "Este número não pode enviar SMS",
+    "cantCall": "Este número não pode fazer chamadas",
     "fromNumber": "Número de origem",
     "press4": "Teclas de chamada (4 assumir, 6 resolver, 8 escalar)",
     "press4Available": "Disponível",
@@ -26611,6 +26621,7 @@
     "update": "Atualizar",
     "disconnect": "Desligar",
     "deploymentTitle": "Conta {provider} desta implementação",
+    "deploymentOwner": "Definido pelo operador, pelo que não há nada para configurar aqui.",
     "useOwn": "Use a sua própria conta {provider} em vez disso",
     "connectTitle": "Ligar {provider}",
     "updateTitle": "Atualizar {provider}",
@@ -26618,6 +26629,7 @@
     "accountSid": "SID da conta",
     "authToken": "Token de autenticação",
     "tokenKeep": "Deixe em branco para manter o token atual",
+    "tokenNewAccount": "Uma conta diferente precisa do seu próprio token de autenticação",
     "fromHelp": "Um número desta conta {provider}, com indicativo de país.",
     "connect": "Ligar",
     "checking": "A verificar com {provider}…",
@@ -26631,21 +26643,10 @@
       "tokenRequired": "Um token de autenticação é obrigatório para ligar.",
       "noMasterKey": "Peça ao seu operador para definir {variable}.",
       "accountRejected": "{provider} não aceitou esta conta. Verifique o SID da conta e o token de autenticação, e se a conta está ativa.",
-      "unreadable": "Não foi possível ler a conta do fornecedor de telefonia desta organização.",
       "fromNotOnAccount": "Este número não pertence a esta conta {provider}. Use um de Phone Numbers → Active numbers no {provider}.",
-      "unavailable": "Não foi possível contactar o {provider}. Tente novamente."
-    },
-    "statusChecking": "A verificar…",
-    "statusBroken": "Não está a funcionar",
-    "statusUnchecked": "Não foi possível verificar",
-    "cardMeta": "De {number} · Conta {account}",
-    "deploymentMeta": "De {number}",
-    "uncheckedNow": "Não foi possível contactar o {provider} neste momento.",
-    "trial": "Conta de teste: SMS e chamadas só chegam a números verificados no {provider}.",
-    "cantText": "Este número não pode enviar SMS",
-    "cantCall": "Este número não pode fazer chamadas",
-    "deploymentOwner": "Definido pelo operador, pelo que não há nada para configurar aqui.",
-    "tokenNewAccount": "Uma conta diferente precisa do seu próprio token de autenticação"
+      "unavailable": "Não foi possível contactar o {provider}. Tente novamente.",
+      "unreadable": "Não foi possível ler a conta do fornecedor de telefonia desta organização."
+    }
   },
   "slackApp": {
     "prereq": {
@@ -27780,6 +27781,7 @@
       "visualUnavailable": "O editor visual não consegue mostrar este YAML sem perder partes do mesmo",
       "publishedWithWarnings": "v{version} publicada com {count} aviso | v{version} publicada com {count} avisos",
       "notFound": "A configuração {name} não foi encontrada",
+      "importNotApplied": "O ficheiro importado não foi aplicado porque continuou o seu rascunho anterior. Importe-o novamente para o utilizar.",
       "deleteInUse": "Ainda referenciada por frotas: {fleets}, coletores: {collectors}, implementações ativas: {rollouts}. Mude primeiro essas frotas para outra configuração."
     },
     "history": {

@@ -669,6 +669,7 @@
     "dateRangeCopied": "Intervallo di date copiato",
     "dateRangePasted": "Intervallo di date incollato",
     "dateRangePasteError": "Impossibile analizzare l'intervallo di date",
+    "dateRangePasteBlocked": "Questo browser ha bloccato la lettura degli appunti. Premi {shortcut} con il selettore aperto per incollare.",
     "pastSecond": "Ultimo {count} secondo | Ultimi {count} secondi",
     "pastMinute": "Ultimo {count} minuto | Ultimi {count} minuti",
     "pastHour": "Ultima {count} ora | Ultime {count} ore",
@@ -1005,7 +1006,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "Bozza non salvata · {date}",
       "newDot": "{label} · bozza non salvata",
-      "newDotDated": "{label} · unsaved draft · {date}",
+      "newDotDated": "{label} · bozza non salvata · {date}",
       "entities": {
         "alert": "avviso",
         "alert_template": "template di avviso",
@@ -1029,10 +1030,11 @@
         "oncall_policy": "escalation policy",
         "oncall_schedule": "on-call schedule",
         "regex_pattern": "regex pattern",
-        "model_pricing": "model price",
+        "model_pricing": "prezzo del modello",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "configurazione del collector"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1041,8 +1043,7 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    },
-    "dateRangePasteBlocked": "Questo browser ha bloccato la lettura degli appunti. Premi {shortcut} con il selettore aperto per incollare."
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6285,7 +6286,7 @@
       "panelDeleted": "Questo pannello non esiste più, quindi la sua bozza non salvata è stata eliminata.",
       "variablesSkipped": "{count} variabile della bozza non è stata aggiunta perché il nome è già in uso | {count} variabili della bozza non sono state aggiunte perché i nomi sono già in uso",
       "leaveTitle": "Uscire con modifiche non salvate?",
-      "leaveMessage": "Salva il pannello, conserva le modifiche come bozza in questo browser fino alla disconnessione oppure eliminale.",
+      "leaveMessage": "Salva il pannello, mantieni le modifiche come bozza in questo browser finché non esci oppure scartale.",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Conserva la bozza",
@@ -14997,7 +14998,7 @@
     "secretType": "Tipo segreto",
     "staticSecret": "Segreto statico",
     "staticSecretName": "Nome",
-    "staticSecretNameNotKept": "{product} static secret name",
+    "staticSecretNameNotKept": "{product} nome del segreto statico",
     "dfcName": "Nome DFC",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "Dati crittografati DFC",
@@ -16866,8 +16867,8 @@
           "concurrencyRange": "La concorrenza massima deve essere compresa tra 1 e 32",
           "signingKeyRequired": "Impossibile generare una chiave di firma. Riprova."
         },
-        "signingKeyNotKept": "Signing keys are not kept in this browser. Continuing generates a new key, which you must copy into your service.",
-        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept."
+        "signingKeyNotKept": "Le chiavi di firma non vengono conservate in questo browser. Se continui, viene generata una nuova chiave, che devi copiare nel tuo servizio.",
+        "signingKeyRegenerated": "Questa è una nuova chiave di firma. Quella nella tua bozza non è stata conservata."
       },
       "generatedSigning": {
         "title": "Copia la tua chiave di firma",
@@ -25252,6 +25253,7 @@
     "simulatorLadder": "Scala {priority}",
     "simulatorLadderEnds": "{rungs}, termina a {at}",
     "simulatorReachableNow": "{channels} · ora",
+    "simulatorSendsNothing": "Questa priorità non invia nulla che possano ricevere",
     "simulatorSendTest": "Invia una notifica di prova",
     "unroutedNoneTitle": "Nessun avviso senza instradamento",
     "unroutedNone": "Ogni avviso attivato ha raggiunto un team.",
@@ -25490,8 +25492,7 @@
     "scopeClaimServiceEverywhere": "{service} avvisa questo team in ogni cluster e namespace, chiunque possieda quelli circostanti.",
     "scopeClaimServiceHere": "{service} avvisa questo team solo in {scope}. Altrove spetta a chi possiede l'ambito circostante.",
     "scopeNothingDiscovered": "Non è stato ancora rilevato nulla, quindi non c'è un insieme di risorse da cui scegliere. Usa Avanzate per scrivere la regola in termini di campi oppure invia prima alcuni dati di telemetria.",
-    "scopeAdvancedHint": "Corrisponde a qualsiasi campo e valore, inclusi quelli non coperti dai livelli superiori.",
-    "simulatorSendsNothing": "Questa priorità non invia nulla che possano ricevere"
+    "scopeAdvancedHint": "Corrisponde a qualsiasi campo e valore, inclusi quelli non coperti dai livelli superiori."
   },
   "paidUsage": {
     "consentTitle": "Attivare l'utilizzo a pagamento dell'IA?",
@@ -26603,6 +26604,15 @@
     "saveFailed": "Impossibile salvare l'account. Riprova.",
     "disconnectFailed": "Non è stato possibile disconnettere l'account. Riprova.",
     "connected": "Connesso",
+    "statusChecking": "Verifica in corso…",
+    "statusBroken": "Non funziona",
+    "statusUnchecked": "Impossibile verificare",
+    "cardMeta": "Da {number} · Account {account}",
+    "deploymentMeta": "Da {number}",
+    "uncheckedNow": "{provider} non è raggiungibile in questo momento.",
+    "trial": "Account di prova: SMS e chiamate raggiungono solo i numeri verificati in {provider}.",
+    "cantText": "Questo numero non può inviare SMS",
+    "cantCall": "Questo numero non può effettuare chiamate",
     "fromNumber": "Numero mittente",
     "press4": "Tasti chiamata (4 prendere in carico, 6 risolvere, 8 escalare)",
     "press4Available": "Disponibile",
@@ -26611,6 +26621,7 @@
     "update": "Aggiorna",
     "disconnect": "Disconnetti",
     "deploymentTitle": "Account {provider} di questa distribuzione",
+    "deploymentOwner": "Impostato dall'operatore, quindi non c'è nulla da configurare qui.",
     "useOwn": "Usa invece il tuo account {provider}",
     "connectTitle": "Connetti {provider}",
     "updateTitle": "Aggiorna {provider}",
@@ -26618,6 +26629,7 @@
     "accountSid": "Account SID",
     "authToken": "Token di autenticazione",
     "tokenKeep": "Lascia vuoto per mantenere il token attuale",
+    "tokenNewAccount": "Un account diverso richiede il proprio token di autenticazione",
     "fromHelp": "Un numero da questo account {provider}, con codice paese.",
     "connect": "Connetti",
     "checking": "Verifica con {provider}…",
@@ -26631,21 +26643,10 @@
       "tokenRequired": "Per connettersi è necessario un token di autenticazione.",
       "noMasterKey": "Chiedi al tuo operatore di impostare {variable}.",
       "accountRejected": "{provider} non ha accettato questo account. Verifica l'Account SID e il token di autenticazione, e che l'account sia attivo.",
-      "unreadable": "Impossibile leggere l'account del provider telefonico di questa organizzazione.",
       "fromNotOnAccount": "Questo numero non appartiene a questo account {provider}. Usane uno da Phone Numbers → Active numbers in {provider}.",
-      "unavailable": "{provider} non è raggiungibile. Riprova."
-    },
-    "statusChecking": "Verifica in corso…",
-    "statusBroken": "Non funziona",
-    "statusUnchecked": "Impossibile verificare",
-    "cardMeta": "Da {number} · Account {account}",
-    "deploymentMeta": "Da {number}",
-    "uncheckedNow": "{provider} non è raggiungibile in questo momento.",
-    "trial": "Account di prova: SMS e chiamate raggiungono solo i numeri verificati in {provider}.",
-    "cantText": "Questo numero non può inviare SMS",
-    "cantCall": "Questo numero non può effettuare chiamate",
-    "deploymentOwner": "Impostato dall'operatore, quindi non c'è nulla da configurare qui.",
-    "tokenNewAccount": "Un account diverso richiede il proprio token di autenticazione"
+      "unavailable": "{provider} non è raggiungibile. Riprova.",
+      "unreadable": "Impossibile leggere l'account del provider telefonico di questa organizzazione."
+    }
   },
   "slackApp": {
     "prereq": {
@@ -27780,6 +27781,7 @@
       "visualUnavailable": "L'editor visuale non può mostrare questo YAML senza perderne alcune parti",
       "publishedWithWarnings": "Pubblicata v{version} con {count} avviso | Pubblicata v{version} con {count} avvisi",
       "notFound": "Configurazione {name} non trovata",
+      "importNotApplied": "Il file importato non è stato applicato perché hai continuato la tua bozza precedente. Importalo di nuovo per usarlo.",
       "deleteInUse": "Ancora referenziata da fleet: {fleets}, collector: {collectors}, rollout attivi: {rollouts}. Cambia prima quei fleet su un'altra configurazione."
     },
     "history": {

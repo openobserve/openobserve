@@ -669,6 +669,7 @@
     "dateRangeCopied": "日期範圍已複製",
     "dateRangePasted": "日期範圍已貼上",
     "dateRangePasteError": "無法解析日期範圍",
+    "dateRangePasteBlocked": "此瀏覽器封鎖了讀取剪貼簿。請在選擇器開啟時按下 {shortcut} 以貼上。",
     "pastSecond": "過去 {count} 秒 | 過去 {count} 秒",
     "pastMinute": "過去 {count} 分鐘 | 過去 {count} 分鐘",
     "pastHour": "過去 {count} 小時 | 過去 {count} 小時",
@@ -1005,7 +1006,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "未儲存的草稿 · {date}",
       "newDot": "{label} · 未儲存的草稿",
-      "newDotDated": "{label} · unsaved draft · {date}",
+      "newDotDated": "{label} · 未儲存草稿 · {date}",
       "entities": {
         "alert": "警示",
         "alert_template": "警示範本",
@@ -1019,7 +1020,7 @@
         "synthetic_browser": "瀏覽器測試",
         "prompt": "提示詞",
         "experiment": "實驗",
-        "dashboard_settings": "dashboard",
+        "dashboard_settings": "儀表板",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
         "announcement_banner": "announcement banner",
@@ -1029,10 +1030,11 @@
         "oncall_policy": "escalation policy",
         "oncall_schedule": "on-call schedule",
         "regex_pattern": "regex pattern",
-        "model_pricing": "model price",
+        "model_pricing": "模型價格",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "收集器設定"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1041,8 +1043,7 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    },
-    "dateRangePasteBlocked": "此瀏覽器封鎖了讀取剪貼簿。請在選擇器開啟時按下 {shortcut} 以貼上。"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6285,7 +6286,7 @@
       "panelDeleted": "此面板已不存在，因此其未儲存的草稿已被捨棄。",
       "variablesSkipped": "草稿中的 {count} 個變數因名稱已被使用而未新增 | 草稿中的 {count} 個變數因名稱已被使用而未新增",
       "leaveTitle": "有未儲存的變更，確定離開？",
-      "leaveMessage": "儲存面板、將變更作為草稿保留在此瀏覽器中直到您登出，或捨棄變更。",
+      "leaveMessage": "儲存面板、將您的變更保留為此瀏覽器中的草稿直到登出，或捨棄變更。",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "保留草稿",
@@ -14992,7 +14993,7 @@
     "secretType": "密碼類型",
     "staticSecret": "靜態機密",
     "staticSecretName": "名稱",
-    "staticSecretNameNotKept": "{product} static secret name",
+    "staticSecretNameNotKept": "{product} 靜態密鑰名稱",
     "dfcName": "DFC 名稱",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC 加密資料",
@@ -16861,8 +16862,8 @@
           "concurrencyRange": "最大並行數必須介於 1 和 32 之間",
           "signingKeyRequired": "無法產生簽署金鑰。請再試一次。"
         },
-        "signingKeyNotKept": "Signing keys are not kept in this browser. Continuing generates a new key, which you must copy into your service.",
-        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept."
+        "signingKeyNotKept": "簽署金鑰不會保留在此瀏覽器中。繼續操作將產生新的金鑰，您必須將其複製到您的服務中。",
+        "signingKeyRegenerated": "這是新的簽署金鑰。草稿中的金鑰並未保留。"
       },
       "generatedSigning": {
         "title": "複製您的簽署金鑰",
@@ -25247,6 +25248,7 @@
     "simulatorLadder": "{priority} 階梯",
     "simulatorLadderEnds": "{rungs}，結束於 {at}",
     "simulatorReachableNow": "{channels} · 現在",
+    "simulatorSendsNothing": "此優先順序不會傳送他們能接收的任何內容",
     "simulatorSendTest": "傳送測試傳呼",
     "unroutedNoneTitle": "沒有未路由項目",
     "unroutedNone": "每個已觸發的警示都已送達某個團隊。",
@@ -25485,8 +25487,7 @@
     "scopeClaimServiceEverywhere": "{service} 在每個叢集和命名空間中都會呼叫此團隊，無論周圍的擁有者是誰。",
     "scopeClaimServiceHere": "{service} 只會在 {scope} 中呼叫此團隊。其他地方則由該範圍的擁有者接管。",
     "scopeNothingDiscovered": "目前尚未探索到任何內容，因此沒有可選擇的資產。使用進階模式依欄位編寫規則，或先傳送一些遙測資料。",
-    "scopeAdvancedHint": "可依任何欄位與值進行比對，包括上方層級未涵蓋的項目。",
-    "simulatorSendsNothing": "此優先順序不會傳送他們能接收的任何內容"
+    "scopeAdvancedHint": "可依任何欄位與值進行比對，包括上方層級未涵蓋的項目。"
   },
   "paidUsage": {
     "consentTitle": "要開啟付費 AI 使用嗎？",
@@ -26598,6 +26599,15 @@
     "saveFailed": "無法儲存此帳戶。請再試一次。",
     "disconnectFailed": "無法中斷此帳戶的連線。請重試。",
     "connected": "已連線",
+    "statusChecking": "正在檢查…",
+    "statusBroken": "無法運作",
+    "statusUnchecked": "無法檢查",
+    "cardMeta": "來自 {number} · 帳戶 {account}",
+    "deploymentMeta": "來自 {number}",
+    "uncheckedNow": "暫時無法連線至 {provider}。",
+    "trial": "試用帳戶：簡訊和電話只能送達在 {provider} 中驗證過的號碼。",
+    "cantText": "此號碼無法傳送簡訊",
+    "cantCall": "此號碼無法撥打電話",
     "fromNumber": "來源號碼",
     "press4": "通話按鍵 (4 確認、6 解決、8 升級)",
     "press4Available": "可用",
@@ -26606,6 +26616,7 @@
     "update": "更新",
     "disconnect": "中斷連線",
     "deploymentTitle": "此部署的 {provider} 帳戶",
+    "deploymentOwner": "由操作員設定，因此這裡無需設定。",
     "useOwn": "改用您自己的 {provider} 帳戶",
     "connectTitle": "連接 {provider}",
     "updateTitle": "更新 {provider}",
@@ -26613,6 +26624,7 @@
     "accountSid": "帳戶 SID",
     "authToken": "驗證權杖",
     "tokenKeep": "留空以保留目前的權杖",
+    "tokenNewAccount": "不同的帳戶需要它自己的驗證權杖",
     "fromHelp": "此 {provider} 帳戶中的號碼，需包含國碼。",
     "connect": "連接",
     "checking": "正在與 {provider} 確認…",
@@ -26626,21 +26638,10 @@
       "tokenRequired": "連接時必須提供驗證權杖。",
       "noMasterKey": "請要求操作人員設定 {variable}。",
       "accountRejected": "{provider} 未接受此帳戶。請檢查帳戶 SID 與驗證權杖，並確認帳戶處於作用中狀態。",
-      "unreadable": "無法讀取此組織的電話供應商帳戶。",
       "fromNotOnAccount": "此號碼不屬於此 {provider} 帳戶。請使用 {provider} 中 Phone Numbers → Active numbers 下的號碼。",
-      "unavailable": "無法連線至 {provider}，請重試。"
-    },
-    "statusChecking": "正在檢查…",
-    "statusBroken": "無法運作",
-    "statusUnchecked": "無法檢查",
-    "cardMeta": "來自 {number} · 帳戶 {account}",
-    "deploymentMeta": "來自 {number}",
-    "uncheckedNow": "暫時無法連線至 {provider}。",
-    "trial": "試用帳戶：簡訊和電話只能送達在 {provider} 中驗證過的號碼。",
-    "cantText": "此號碼無法傳送簡訊",
-    "cantCall": "此號碼無法撥打電話",
-    "deploymentOwner": "由操作員設定，因此這裡無需設定。",
-    "tokenNewAccount": "不同的帳戶需要它自己的驗證權杖"
+      "unavailable": "無法連線至 {provider}，請重試。",
+      "unreadable": "無法讀取此組織的電話供應商帳戶。"
+    }
   },
   "slackApp": {
     "prereq": {
@@ -27775,6 +27776,7 @@
       "visualUnavailable": "視覺化編輯器無法在不遺失部分內容的情況下顯示此 YAML",
       "publishedWithWarnings": "已發佈 v{version}，有 {count} 個警告 | 已發佈 v{version}，有 {count} 個警告",
       "notFound": "找不到組態 {name}",
+      "importNotApplied": "由於您繼續了先前的草稿，因此匯入的檔案未被套用。請再次匯入以使用它。",
       "deleteInUse": "仍被以下項目參照：機群 {fleets}、收集器 {collectors}、進行中的推出 {rollouts}。請先將這些機群變更為其他組態。"
     },
     "history": {

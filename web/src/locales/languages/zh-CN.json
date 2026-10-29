@@ -669,6 +669,7 @@
     "dateRangeCopied": "日期范围已复制",
     "dateRangePasted": "日期范围已粘贴",
     "dateRangePasteError": "无法解析日期范围",
+    "dateRangePasteBlocked": "此浏览器禁止了读取剪贴板。在选取器打开时按 {shortcut} 即可粘贴。",
     "pastSecond": "过去 {count} 秒 | 过去 {count} 秒",
     "pastMinute": "过去 {count} 分钟 | 过去 {count} 分钟",
     "pastHour": "过去 {count} 小时 | 过去 {count} 小时",
@@ -1005,7 +1006,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "未保存的草稿 · {date}",
       "newDot": "{label} · 未保存的草稿",
-      "newDotDated": "{label} · unsaved draft · {date}",
+      "newDotDated": "{label} · 未保存的草稿 · {date}",
       "entities": {
         "alert": "告警",
         "alert_template": "告警模板",
@@ -1019,7 +1020,7 @@
         "synthetic_browser": "浏览器测试",
         "prompt": "提示词",
         "experiment": "实验",
-        "dashboard_settings": "dashboard",
+        "dashboard_settings": "仪表盘",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
         "announcement_banner": "announcement banner",
@@ -1029,10 +1030,11 @@
         "oncall_policy": "escalation policy",
         "oncall_schedule": "on-call schedule",
         "regex_pattern": "regex pattern",
-        "model_pricing": "model price",
+        "model_pricing": "模型价格",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "采集器配置"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1041,8 +1043,7 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    },
-    "dateRangePasteBlocked": "此浏览器禁止了读取剪贴板。在选取器打开时按 {shortcut} 即可粘贴。"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6285,7 +6286,7 @@
       "panelDeleted": "此面板已不存在，因此其未保存的草稿已被丢弃。",
       "variablesSkipped": "草稿中的 {count} 个变量因名称已被使用而未添加 | 草稿中的 {count} 个变量因名称已被使用而未添加",
       "leaveTitle": "有未保存的更改，确定离开？",
-      "leaveMessage": "保存面板，将更改作为草稿保留在此浏览器中直到您退出登录，或放弃更改。",
+      "leaveMessage": "保存面板，将更改作为草稿保留在此浏览器中直至退出，或丢弃更改。",
       "leaveMessageNoDraft": "Save the panel or discard your changes.",
       "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "保留草稿",
@@ -14997,7 +14998,7 @@
     "secretType": "密钥类型",
     "staticSecret": "静态密钥",
     "staticSecretName": "名称",
-    "staticSecretNameNotKept": "{product} static secret name",
+    "staticSecretNameNotKept": "{product} 静态密钥名称",
     "dfcName": "DFC 名称",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC 加密数据",
@@ -16866,8 +16867,8 @@
           "concurrencyRange": "最大并发数必须在 1 到 32 之间",
           "signingKeyRequired": "无法生成签名密钥。请重试。"
         },
-        "signingKeyNotKept": "Signing keys are not kept in this browser. Continuing generates a new key, which you must copy into your service.",
-        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept."
+        "signingKeyNotKept": "签名密钥不会保留在此浏览器中。继续操作将生成新密钥，您必须将其复制到您的服务中。",
+        "signingKeyRegenerated": "这是新的签名密钥。草稿中的密钥未保留。"
       },
       "generatedSigning": {
         "title": "复制您的签名密钥",
@@ -25252,6 +25253,7 @@
     "simulatorLadder": "{priority} 升级阶梯",
     "simulatorLadderEnds": "{rungs},结束于 {at}",
     "simulatorReachableNow": "{channels} · 现在",
+    "simulatorSendsNothing": "此优先级不会发送他们能接收的任何内容",
     "simulatorSendTest": "发送测试通知",
     "unroutedNoneTitle": "没有未路由的告警",
     "unroutedNone": "所有已触发的告警都已被团队接收。",
@@ -25490,8 +25492,7 @@
     "scopeClaimServiceEverywhere": "{service} 在每个集群和命名空间中都会呼叫此团队，无论周边由谁负责。",
     "scopeClaimServiceHere": "{service} 仅在 {scope} 中呼叫此团队；其他位置则归属于它所在作用域的所有者。",
     "scopeNothingDiscovered": "尚未发现任何内容，因此没有数据资产可供选择。请使用高级模式按字段编写规则，或先发送一些遥测数据。",
-    "scopeAdvancedHint": "可匹配任意字段和值，包括上述层级未涵盖的内容。",
-    "simulatorSendsNothing": "此优先级不会发送他们能接收的任何内容"
+    "scopeAdvancedHint": "可匹配任意字段和值，包括上述层级未涵盖的内容。"
   },
   "paidUsage": {
     "consentTitle": "开启付费 AI 使用？",
@@ -26603,6 +26604,15 @@
     "saveFailed": "无法保存账户。请重试。",
     "disconnectFailed": "无法断开该账户。请重试。",
     "connected": "已连接",
+    "statusChecking": "正在检查…",
+    "statusBroken": "无法使用",
+    "statusUnchecked": "无法检查",
+    "cardMeta": "来自 {number} · 账户 {account}",
+    "deploymentMeta": "来自 {number}",
+    "uncheckedNow": "暂时无法连接 {provider}。",
+    "trial": "试用账户：短信和电话只能发送到在 {provider} 中验证过的号码。",
+    "cantText": "此号码无法发送短信",
+    "cantCall": "此号码无法拨打电话",
     "fromNumber": "主叫号码",
     "press4": "通话按键（4 确认，6 解决，8 升级）",
     "press4Available": "可用",
@@ -26611,6 +26621,7 @@
     "update": "更新",
     "disconnect": "断开连接",
     "deploymentTitle": "此部署的 {provider} 账户",
+    "deploymentOwner": "由操作员设置，因此此处无需配置。",
     "useOwn": "改为使用您自己的 {provider} 账户",
     "connectTitle": "连接 {provider}",
     "updateTitle": "更新 {provider}",
@@ -26618,6 +26629,7 @@
     "accountSid": "账户 SID",
     "authToken": "认证令牌",
     "tokenKeep": "留空则保留当前令牌",
+    "tokenNewAccount": "不同的账户需要它自己的认证令牌",
     "fromHelp": "此 {provider} 账户中的号码，需带国家代码。",
     "connect": "连接",
     "checking": "正在与 {provider} 校验…",
@@ -26631,21 +26643,10 @@
       "tokenRequired": "连接需要认证令牌。",
       "noMasterKey": "请联系运维人员设置 {variable}。",
       "accountRejected": "{provider} 未接受该账户。请检查 Account SID 和认证令牌，并确认账户处于活跃状态。",
-      "unreadable": "无法读取此组织的电话提供商账户。",
       "fromNotOnAccount": "此号码不属于此 {provider} 账户。请使用 {provider} 中 Phone Numbers → Active numbers 下的号码。",
-      "unavailable": "无法连接 {provider}，请重试。"
-    },
-    "statusChecking": "正在检查…",
-    "statusBroken": "无法使用",
-    "statusUnchecked": "无法检查",
-    "cardMeta": "来自 {number} · 账户 {account}",
-    "deploymentMeta": "来自 {number}",
-    "uncheckedNow": "暂时无法连接 {provider}。",
-    "trial": "试用账户：短信和电话只能发送到在 {provider} 中验证过的号码。",
-    "cantText": "此号码无法发送短信",
-    "cantCall": "此号码无法拨打电话",
-    "deploymentOwner": "由操作员设置，因此此处无需配置。",
-    "tokenNewAccount": "不同的账户需要它自己的认证令牌"
+      "unavailable": "无法连接 {provider}，请重试。",
+      "unreadable": "无法读取此组织的电话提供商账户。"
+    }
   },
   "slackApp": {
     "prereq": {
@@ -27780,6 +27781,7 @@
       "visualUnavailable": "可视化编辑器无法在不丢失部分内容的情况下显示此 YAML",
       "publishedWithWarnings": "已发布 v{version}，有 {count} 个警告 | 已发布 v{version}，有 {count} 个警告",
       "notFound": "未找到配置 {name}",
+      "importNotApplied": "由于您继续了先前的草稿，导入的文件未被应用。请再次导入以使用它。",
       "deleteInUse": "仍被以下对象引用：机群：{fleets}，Collector：{collectors}，进行中的上线：{rollouts}。请先将这些机群切换到其他配置。"
     },
     "history": {
