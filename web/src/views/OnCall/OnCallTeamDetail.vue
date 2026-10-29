@@ -60,8 +60,9 @@
       >
         {{ t("oncall.takeOverride") }}
       </OButton>
+      <!-- `loaded` stays true after a refresh finds the team gone, so the failure flags are checked too. -->
       <OButton
-        v-if="canConfigure"
+        v-if="canConfigure && loaded && !teamNotFound && loadError === null"
         variant="primary"
         size="sm-action"
         data-test="oncall-team-detail-edit-btn"

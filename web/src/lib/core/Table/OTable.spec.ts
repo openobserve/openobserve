@@ -903,6 +903,29 @@ describe("OTable", () => {
     });
   });
 
+  describe("persisted columns", () => {
+    beforeEach(() => localStorage.clear());
+
+    /// A column removed from a table must not break a layout saved while it existed.
+    it("ignores saved state for a column the table no longer has", () => {
+      localStorage.setItem(
+        "o2-tables-column-state-v1",
+        JSON.stringify({ "gone-column": { visibility: { state: true }, sizes: { state: 160 } } }),
+      );
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          tableId: "gone-column",
+          persistColumns: true,
+        },
+      });
+
+      expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(2);
+      expect(wrapper.find('[data-test="o2-table-cell-state"]').exists()).toBe(false);
+    });
+  });
+
   // ── Row Selection ──────────────────────────────────────────
 
   describe("selection", () => {

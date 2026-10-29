@@ -1714,7 +1714,9 @@ export default defineComponent({
       }
     }
 
-    const oncallTeamNameFor = (teamId: string) => oncallTeamNames.value[teamId] ?? teamId;
+    // A page nothing routed has no team, so it reads as unrouted rather than as a blank name.
+    const oncallTeamNameFor = (teamId: string | null): string =>
+      teamId ? (oncallTeamNames.value[teamId] ?? teamId) : String(t("oncall.statUnrouted"));
 
     const oncallTeamName = computed(() =>
       oncallResponse.value ? oncallTeamNameFor(oncallResponse.value.team_id) : "",
