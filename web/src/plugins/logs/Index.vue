@@ -672,7 +672,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
-import { featureState } from "@/utils/featureGate";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import useLogs from "@/composables/useLogs";
@@ -1654,11 +1653,7 @@ export default defineComponent({
 
     // Helper function to check if the environment is enterprise and super cluster is enabled
     function isEnterpriseClusterEnabled() {
-      return (
-        config.isEnterprise === "true" &&
-        store.state.zoConfig.super_cluster_enabled &&
-        featureState(store.state.zoConfig.features, "super_cluster") !== "locked"
-      );
+      return config.isEnterprise === "true" && store.state.zoConfig.super_cluster_enabled;
     }
 
     // Helper function to check if quick mode is enabled
@@ -3951,9 +3946,7 @@ export default defineComponent({
     };
 
     const permalinkResolveContext = (): ResolveContext => {
-      const superCluster =
-        !!store.state.zoConfig?.super_cluster_enabled &&
-        featureState(store.state.zoConfig?.features, "super_cluster") !== "locked";
+      const superCluster = !!store.state.zoConfig?.super_cluster_enabled;
       return {
         regions: superCluster ? [...(searchObj.meta.regions ?? [])] : [],
         clusters: superCluster ? [...(searchObj.meta.clusters ?? [])] : [],

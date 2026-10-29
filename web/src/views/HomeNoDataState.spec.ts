@@ -39,27 +39,4 @@ describe("HomeNoDataState", () => {
       }),
     });
   });
-
-  it("disables the Profiles chip with a lock when continuous profiling is license-locked", async () => {
-    push.mockClear();
-    store.state.zoConfig = {
-      ...store.state.zoConfig,
-      profiling_enabled: true,
-      features: { continuous_profiling: "locked" },
-    };
-    const wrapper = mount(HomeNoDataState, {
-      props: { tab: "overview" },
-      global: { plugins: [i18n, store] },
-    });
-
-    const chip = wrapper.find('[data-test="home-no-data-profiles-btn"]');
-    expect(chip.attributes("disabled")).toBeDefined();
-    const chipComponent = wrapper
-      .findAllComponents({ name: "EmptyStateIngestionChip" })
-      .find((c) => c.attributes("data-test") === "home-no-data-profiles-btn")!;
-    expect(chipComponent.props("icon")).toBe("lock");
-    await chip.trigger("click");
-    expect(push).not.toHaveBeenCalled();
-    store.state.zoConfig = { ...store.state.zoConfig, features: {} };
-  });
 });

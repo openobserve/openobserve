@@ -16,12 +16,7 @@
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { defineComponent, h, ref } from "vue";
-
 import i18n from "@/locales";
-import { provideFeatureLock } from "@/composables/useFeatureLock";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 
 import { DBM_ORIGIN_QUERY_KEY } from "@/utils/dbm/queryDetailOrigin";
 
@@ -544,46 +539,6 @@ describe("DbmSectionTabs", () => {
       const wrapper = mountAt("dbmDatabases");
       await selectTab(wrapper, "deadlocks");
       expect(push).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("on a license-locked page", () => {
-    const mountLocked = (child: () => ReturnType<typeof h>) => {
-      currentRoute = { name: "dbmDatabases", query: {} };
-      const LockedPage = defineComponent({
-        setup() {
-          provideFeatureLock(ref("db_monitoring"));
-          return child;
-        },
-      });
-      return mount(LockedPage, { global: { plugins: [i18n] } });
-    };
-    const disabledTabs = (wrapper: ReturnType<typeof mount>) =>
-      wrapper
-        .findAll('[role="tab"]')
-        .filter((tab) => tab.attributes("aria-disabled") === "true")
-        .map((tab) => tab.attributes("data-test"));
-
-    it("disables a plain tab strip, which is why the section tabs opt out", () => {
-      const wrapper = mountLocked(() =>
-        h(OTabs, { modelValue: "a" }, () => [h(OTab, { name: "a", "data-test": "plain-a" })]),
-      );
-      expect(disabledTabs(wrapper)).toEqual(["plain-a"]);
-    });
-
-    it("keeps every section tab live so the reader can still move between sections", () => {
-      const wrapper = mountLocked(() => h(DbmSectionTabs, { databaseCount: 2, queryCount: 34 }));
-      expect(disabledTabs(wrapper)).toEqual([]);
-    });
-
-    it("keeps the edition gate on its own tabs", () => {
-      mockConfig.isEnterprise = "false";
-      const wrapper = mountLocked(() => h(DbmSectionTabs, { databaseCount: 2, queryCount: 34 }));
-      expect(disabledTabs(wrapper)).toEqual([
-        "dbm-section-tab-deadlocks",
-        "dbm-section-tab-blocked",
-        "dbm-section-tab-tableHealth",
-      ]);
     });
   });
 });

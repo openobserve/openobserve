@@ -110,7 +110,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -223,8 +222,6 @@ const getGroupDetails = () => {
     })
     .catch((err) => {
       console.log(err);
-      // The page stays and renders locked; the license bar explains the denial.
-      if (licenseDeniedFeatures(err)) return;
       toast({
         message: err?.message || t("iam.editGroup.groupNotFound"),
         variant: "error",

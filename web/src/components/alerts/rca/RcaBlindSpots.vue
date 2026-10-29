@@ -52,24 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-text-heading text-sm font-semibold">{{ spot.title }}</div>
           <div class="text-text-secondary text-compact [text-wrap:pretty]">{{ spot.why }}</div>
         </div>
-        <OTooltip v-if="actions[spot.id]?.lockedReason" :content="actions[spot.id]!.lockedReason!">
-          <span class="inline-flex">
-            <OButton
-              data-test="rca-blind-spot-action"
-              :data-fix="spot.fix"
-              variant="outline"
-              size="sm"
-              disabled
-            >
-              <template #icon-left>
-                <OIcon name="lock" size="sm" data-test="rca-blind-spot-action-lock" />
-              </template>
-              {{ actions[spot.id]!.label }}
-            </OButton>
-          </span>
-        </OTooltip>
         <OButton
-          v-else-if="actions[spot.id]"
+          v-if="actions[spot.id]"
           data-test="rca-blind-spot-action"
           :data-fix="spot.fix"
           variant="outline"
@@ -105,9 +89,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { RcaBlindSpot, RcaBlindSpotFix } from "@/services/incidents";
-import { rcaBlindSpotFeature, rcaBlindSpotRoute } from "@/utils/incidents/rcaEvidenceLinks";
-import { useLicenseLock } from "@/composables/useFeatureLock";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { rcaBlindSpotRoute } from "@/utils/incidents/rcaEvidenceLinks";
 
 const props = withDefaults(
   defineProps<{
@@ -132,10 +114,6 @@ defineEmits<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const headingId = useId();
-const featureLocks = {
-  ai_toolsets: useLicenseLock("ai_toolsets"),
-  pipelines: useLicenseLock("pipelines"),
-};
 
 const actionLabel = (fix: RcaBlindSpotFix): { label: I18nText; icon: IconName } | null => {
   switch (fix) {
@@ -154,17 +132,11 @@ const actionLabel = (fix: RcaBlindSpotFix): { label: I18nText; icon: IconName } 
 
 /** Blind spot id → its button, for the spots that have one. */
 const actions = computed(() => {
-  const byId: Record<
-    string,
-    { label: I18nText; icon: IconName; route: RouteLocationRaw; lockedReason: I18nText | null }
-  > = {};
+  const byId: Record<string, { label: I18nText; icon: IconName; route: RouteLocationRaw }> = {};
   for (const spot of props.blindSpots) {
     const route = rcaBlindSpotRoute(spot.fix, props.org);
     const action = actionLabel(spot.fix);
-    const feature = rcaBlindSpotFeature(spot.fix);
-    const lock = feature ? featureLocks[feature] : null;
-    const lockedReason = lock?.locked.value ? lock.lockedReason.value : null;
-    if (route && action) byId[spot.id] = { ...action, route, lockedReason };
+    if (route && action) byId[spot.id] = { ...action, route };
   }
   return byId;
 });

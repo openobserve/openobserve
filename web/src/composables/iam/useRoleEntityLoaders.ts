@@ -38,21 +38,6 @@ import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import llmPromptsService from "@/services/llm-prompts.service";
-import { featureState } from "@/utils/featureGate";
-
-// A locked feature's list API answers 403, so its rows stay empty instead of raising the license bar.
-const LOADER_LICENSE_FEATURE: Record<string, string> = {
-  dashboard: "dashboards",
-  dfolder: "dashboards",
-  pipeline: "pipelines",
-  alert: "alerts",
-  downtime_folder: "alerts",
-  downtime: "alerts",
-  report: "reports",
-  synthetic_folder: "synthetics",
-  synthetics: "synthetics",
-  synthetic_environment: "synthetics",
-};
 
 type RowBuilders = {
   updateResourceEntities: (
@@ -99,11 +84,6 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
 
   // Keyed by the row itself: two rows can share a name (every folder list has a `default`).
   const entityLoads = new WeakMap<object, Promise<unknown>>();
-
-  const isLicenseLocked = (loaderKey: string): boolean => {
-    const feature = LOADER_LICENSE_FEATURE[loaderKey];
-    return !!feature && featureState(store.state.zoConfig?.features, feature) === "locked";
-  };
 
   const getResourceEntities = (resource: Resource | Entity) => {
     if (!resource) return Promise.resolve(true);
@@ -168,10 +148,11 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
           if (!resource.entities?.length) {
             resource.is_loading = true;
             try {
-              const key = resource.childName || resource.resourceName;
-              const listEntities = listEntitiesFnMap[key];
+              const listEntities = resource.childName
+                ? listEntitiesFnMap[resource.childName]
+                : listEntitiesFnMap[resource.resourceName];
 
-              if (listEntities && !isLicenseLocked(key)) {
+              if (listEntities) {
                 await listEntities(resource);
               }
             } finally {

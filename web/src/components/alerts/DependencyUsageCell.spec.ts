@@ -65,19 +65,6 @@ describe("DependencyUsageCell", () => {
     wrapper.unmount();
   });
 
-  it("shows an em dash and no badges or dialog while alerts is license-locked", async () => {
-    store.state.zoConfig.features = { alerts: "locked" };
-    try {
-      const wrapper = mountCell(graph, { kind: "destination", name: "slack" });
-      expect(wrapper.find('[data-test="used-by-slack-locked"]').text()).toBe("—");
-      expect(wrapper.find('[data-test="used-by-slack"]').exists()).toBe(false);
-      expect(wrapper.findComponent({ name: "DependencyImpactDialog" }).exists()).toBe(false);
-      wrapper.unmount();
-    } finally {
-      delete store.state.zoConfig.features;
-    }
-  });
-
   it("shows the Unused chip for an orphan entity", async () => {
     const wrapper = mountCell(graph, { kind: "destination", name: "lonely" });
     await flushPromises();

@@ -277,7 +277,6 @@ import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
-import { featureLockedPath, menuState, type FeatureState } from "@/utils/featureGate";
 import AppHeader from "../components/Header.vue";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
 import { resetAccess } from "@/composables/useAccessStore";
@@ -503,31 +502,44 @@ export default defineComponent({
       layoutStreams,
     );
     provide(FIRST_DATA_NOTICE, firstDataNotice);
-    const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
-    // Locked and hidden come from the license `features` map; the enabled path keeps the legacy flag for older backends.
-    const features = computed(() => store.state.zoConfig?.features);
-    const incidentsMenuState = computed(() =>
-      menuState(
-        features.value,
-        "incidents",
-        isEnterpriseOrCloud && !!store.state.zoConfig.incidents_enabled,
-      ),
-    );
+    const isIncidentsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig.incidents_enabled
+      );
+    });
 
+    // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
+    // Enterprise/cloud build AND the backend `/config` flag `workflows_enabled`
+    // (enterprise `O2_WORKFLOWS_ENABLED`). Reactive so the menu picks it up
+    // regardless of whether the config response arrived before or after mount.
     // `=== true`, not truthy: /config is fetched without await, so the flag is
     // briefly undefined and the entry must stay hidden rather than flash in.
-    const workflowsMenuState = computed(() =>
-      menuState(
-        features.value,
-        "workflows",
-        isEnterpriseOrCloud && store.state.zoConfig?.workflows_enabled === true,
-      ),
+    const isWorkflowsEnabled = computed(
+      () =>
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig?.workflows_enabled === true,
     );
 
-    // Monitor needs no flag or (on OSS) license; the eval sections gate on `online_evals_enabled` themselves.
-    const aiObservabilityMenuState = computed<FeatureState>(() =>
-      isEnterpriseOrCloud ? featureState(features.value, "ai_observability") : "enabled",
-    );
+    // Backend `/config` flag `online_evals_enabled` — controlled by
+    // enterprise `O2_EVAL_ENABLED`. Reactive so the menu picks it up regardless
+    // of whether the config response arrived before or after this component
+    // mounted.
+    const isOnlineEvalsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.online_evals_enabled)
+      );
+    });
+
+    // The AI Observability menu entry itself ships on true OSS builds too —
+    // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
+    // of the module. AIObservabilityShell (Index.vue) renders Evaluate/
+    // Experiment/Annotate/Agent Graph/Agent Behavior too, but locked (lock
+    // icon + tooltip) rather than hidden, so this entry point itself doesn't
+    // need to wait on `isOnlineEvalsEnabled` for those.
+    const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
+    const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
 
     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
     // no longer an enterprise build check: synthetics ships in OSS, and only the
@@ -846,69 +858,56 @@ export default defineComponent({
       }
     });
 
-    // One idempotent add/update/remove for a license-gated entry; `insertAt` returns -1 to skip.
-    const syncFeatureLink = (
-      item: NavItem,
-      feature: string,
-      state: FeatureState,
-      insertAt: () => number,
-    ) => {
-      const existingIndex = linksList.value.findIndex((link) => link.name === item.name);
-      // Removed, not just skipped: the menu is rebuilt on org switch and the state can change.
-      if (state === "hidden") {
-        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
-        return;
-      }
-      const entry =
-        state === "locked"
-          ? { ...item, link: featureLockedPath(feature), licenseLocked: true }
-          : item;
-      if (existingIndex !== -1) {
-        linksList.value[existingIndex] = entry;
-        return;
-      }
-      const at = insertAt();
-      if (at === -1) return;
-      linksList.value.splice(at, 0, entry);
-    };
-
-    const afterAlerts = () => {
-      const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
-      return alertIndex === -1 ? -1 : alertIndex + 1;
-    };
-
     // Shows the entry — locked, if this edition doesn't unlock `featureKey` —
-    // whenever its menu state is not hidden OR the edition flat-out doesn't
+    // whenever `enabledByRuntimeFlag` is true OR the edition flat-out doesn't
     // unlock it (so the locked entry stays discoverable rather than only
     // appearing once an admin has also flipped the runtime flag on). Hides it
     // only when the edition allows the feature but the runtime flag is off —
     // that's a deployment choice, not something to upsell.
-    // The edition check runs first because OSS backends report every license feature as locked.
     const syncGatedMenuEntry = (
+      name: string,
       featureKey: "incidents" | "workflows",
-      state: FeatureState,
-      entry: NavItem,
+      enabledByRuntimeFlag: boolean,
+      anchorName: string,
+      entry: Omit<NavItem, "locked" | "lockedMessage">,
     ) => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === name);
       const access = checkFeatureAccess(featureKey, buildFeatureGateContext(store.state.zoConfig));
-      if (access.allowed) {
-        syncFeatureLink(entry, featureKey, state, afterAlerts);
+      const shouldShow = enabledByRuntimeFlag || !access.allowed;
+
+      if (!shouldShow) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
         return;
       }
-      syncFeatureLink(
-        { ...entry, locked: true, lockedMessage: access.message },
-        featureKey,
-        "enabled",
-        afterAlerts,
-      );
+
+      if (existingIndex !== -1) {
+        linksList.value[existingIndex].locked = !access.allowed;
+        linksList.value[existingIndex].lockedMessage = access.message;
+        return;
+      }
+
+      const anchor = linksList.value.findIndex((link) => link.name === anchorName);
+      if (anchor === -1) return;
+      linksList.value.splice(anchor + 1, 0, {
+        ...entry,
+        locked: !access.allowed,
+        lockedMessage: access.message,
+      });
     };
 
     const updateIncidentsMenu = () => {
-      syncGatedMenuEntry("incidents", incidentsMenuState.value, {
-        title: t("menu.incidents"),
-        icon: "notifications-active",
-        link: "/incidents",
-        name: "incidentList",
-      });
+      syncGatedMenuEntry(
+        "incidentList",
+        "incidents",
+        Boolean(isIncidentsEnabled.value),
+        "alertList",
+        {
+          title: t("menu.incidents"),
+          icon: "notifications-active",
+          link: "/incidents",
+          name: "incidentList",
+        },
+      );
     };
 
     const updateAutoObserveMenu = () => {
@@ -955,7 +954,7 @@ export default defineComponent({
 
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
-      syncGatedMenuEntry("workflows", workflowsMenuState.value, {
+      syncGatedMenuEntry("workflows", "workflows", isWorkflowsEnabled.value, "alertList", {
         title: t("menu.workflows"),
         icon: "schema",
         link: "/workflows",
@@ -963,10 +962,9 @@ export default defineComponent({
       });
     };
 
-    // If `/config` resolves after this component mounted (or the state flips),
+    // If `/config` resolves after this component mounted (or the flag flips),
     // keep the menu in sync — same contract as the other flag-driven entries.
-    watch(incidentsMenuState, () => updateIncidentsMenu(), { immediate: false });
-    watch(workflowsMenuState, () => updateWorkflowsMenu(), { immediate: false });
+    watch(isWorkflowsEnabled, () => updateWorkflowsMenu(), { immediate: false });
     const splitterModel = ref(100);
     const selectedLanguage: any = langList.find((l) => l.code == getLocale()) || langList[0];
 
@@ -974,27 +972,30 @@ export default defineComponent({
     // flag. Position: directly after Traces. Idempotent — safe to call from
     // multiple lifecycle hooks.
     const updateAIObservabilityMenu = () => {
-      syncFeatureLink(
-        {
+      const existingIndex = linksList.value.findIndex(
+        (link: any) => link.name === "aiObservability",
+      );
+
+      if (isAiObservabilityMenuVisible.value) {
+        if (existingIndex !== -1) return;
+        const anchorIndex = linksList.value.findIndex(
+          (link: any) => link.name === "profiles" || link.name === "traces",
+        );
+        const insertAt = anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
+        linksList.value.splice(insertAt, 0, {
           title: t("menu.aiObservability"),
           icon: "auto-awesome",
           link: "/ai",
           name: "aiObservability",
-        },
-        "ai_observability",
-        aiObservabilityMenuState.value,
-        () => {
-          const anchorIndex = linksList.value.findIndex(
-            (link) => link.name === "profiles" || link.name === "traces",
-          );
-          return anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
-        },
-      );
+        });
+      } else if (existingIndex !== -1) {
+        linksList.value.splice(existingIndex, 1);
+      }
     };
 
-    // If `/config` resolves after this component mounted (or if the state
+    // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(aiObservabilityMenuState, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(isAiObservabilityMenuVisible, () => updateAIObservabilityMenu(), { immediate: false });
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");

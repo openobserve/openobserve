@@ -18,7 +18,6 @@ import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import PinnedDashboardTab from "./PinnedDashboardTab.vue";
-import { getDashboard } from "@/utils/commons";
 
 vi.mock("@/utils/commons", () => ({
   getDashboard: vi.fn(async () => ({ title: "Pinned", tabs: [{ tabId: "t1", panels: [] }] })),
@@ -26,17 +25,13 @@ vi.mock("@/utils/commons", () => ({
 
 describe("PinnedDashboardTab", () => {
   let wrapper: VueWrapper<any>;
-  let store: any;
 
-  const mountTab = async (features: Record<string, string> = {}) => {
-    store = createStore({
-      state: { zoConfig: { features }, selectedOrganization: { identifier: "o1" } },
-    });
+  const mountTab = async () => {
     wrapper = mount(PinnedDashboardTab, {
       props: { dashboardId: "d1", folderId: "default" },
       global: {
         plugins: [
-          store,
+          createStore({ state: { zoConfig: {}, selectedOrganization: { identifier: "o1" } } }),
           createI18n({
             legacy: false,
             locale: "en",
@@ -44,11 +39,6 @@ describe("PinnedDashboardTab", () => {
           }),
         ],
         stubs: {
-          LicenseDeniedState: {
-            name: "LicenseDeniedState",
-            props: ["features"],
-            template: '<div v-bind="$attrs" />',
-          },
           RenderDashboardCharts: true,
           DateTimePickerDashboard: true,
           AutoRefreshInterval: true,
@@ -72,55 +62,6 @@ describe("PinnedDashboardTab", () => {
 
   afterEach(() => {
     wrapper?.unmount();
-    vi.mocked(getDashboard).mockClear();
-  });
-
-  it("shows the license-denied state and loads nothing when dashboards are locked", async () => {
-    await mountTab({ dashboards: "locked" });
-
-    const denied = wrapper.findComponent({ name: "LicenseDeniedState" });
-    expect(denied.exists()).toBe(true);
-    expect(denied.props("features")).toEqual(["dashboards"]);
-    expect(getDashboard).not.toHaveBeenCalled();
-    expect(wrapper.emitted("unavailable")).toBeUndefined();
-  });
-
-  it("never emits unavailable for a license 403 that beat the config, and shows the license state", async () => {
-    vi.mocked(getDashboard).mockRejectedValueOnce({
-      response: { status: 403, data: { code: 40001, error_detail: "dashboards" } },
-    });
-    await mountTab();
-
-    expect(wrapper.emitted("unavailable")).toBeUndefined();
-    expect(wrapper.findComponent({ name: "LicenseDeniedState" }).props("features")).toEqual([
-      "dashboards",
-    ]);
-  });
-
-  it("still emits unavailable for a dashboard that is really gone", async () => {
-    vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 404 } });
-    await mountTab();
-
-    expect(wrapper.emitted("unavailable")).toEqual([["d1"]]);
-  });
-
-  it("drops the dashboard and shows the license state when the lock arrives late", async () => {
-    await mountTab();
-    expect(wrapper.findComponent({ name: "LicenseDeniedState" }).exists()).toBe(false);
-
-    store.state.zoConfig = { features: { dashboards: "locked" } };
-    await flushPromises();
-
-    expect(wrapper.findComponent({ name: "LicenseDeniedState" }).exists()).toBe(true);
-    expect(wrapper.find('[data-test="pinned-dashboard-refresh-btn"]').exists()).toBe(false);
-    expect(wrapper.emitted("unavailable")).toBeUndefined();
-  });
-
-  it("loads the dashboard when dashboards are enabled", async () => {
-    await mountTab({ dashboards: "enabled" });
-
-    expect(wrapper.findComponent({ name: "LicenseDeniedState" }).exists()).toBe(false);
-    expect(getDashboard).toHaveBeenCalledTimes(1);
   });
 
   it("shows Refresh as a labelled primary button", async () => {

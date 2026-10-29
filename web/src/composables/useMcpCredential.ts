@@ -29,7 +29,6 @@ import { serviceAccountKeys } from "@/services/service_accounts.querykeys";
 import { iamKeys } from "@/services/iam.querykeys";
 import { userKeys } from "@/services/users.querykeys";
 import { buildServiceAccountEmail } from "@/components/iam/serviceAccounts/AddServiceAccount.schema";
-import { featureState } from "@/utils/featureGate";
 
 // Underscore, not hyphen: create_role normalizes the name (non-[A-Za-z0-9_] → "_"), update_role does not.
 export const MCP_READONLY_ROLE = "mcp_readonly";
@@ -111,10 +110,6 @@ export function useMcpCredential() {
     org: string,
   ): Promise<Pick<McpCredential, "role" | "scope">> => {
     if (!store.state.zoConfig?.rbac_enabled) return { role: null, scope: "rbacDisabled" };
-    // The license gates only the role APIs while RBAC stays enforced, so the account is left unscoped.
-    if (featureState(store.state.zoConfig?.features, "rbac") !== "enabled") {
-      return { role: null, scope: "unscoped" };
-    }
 
     const isMetaOrg = org === store.state.zoConfig?.meta_org;
     try {
@@ -133,7 +128,6 @@ export function useMcpCredential() {
   };
 
   const generate = async (): Promise<McpCredential | null> => {
-    if (featureState(store.state.zoConfig?.features, "mcp") === "locked") return null;
     const org = currentOrg();
     const cached = sessionCredentials.get(org);
     if (cached) {

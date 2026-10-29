@@ -51,8 +51,6 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
 import type { RichCardContent } from "@/components/ingestion/setupCard/types";
 
@@ -65,7 +63,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { generate, generating, error: genError, credential } = useMcpCredential();
-const { locked: mcpLocked, lockedReason: mcpLockedReason } = useLicenseLock("mcp");
 
 const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
@@ -510,21 +507,7 @@ const openSkillsRepo = () => {
                 </OText>
               </div>
               <template #actions>
-                <OTooltip v-if="mcpLocked" :content="mcpLockedReason">
-                  <span class="inline-flex">
-                    <OButton
-                      variant="primary"
-                      size="sm-action"
-                      icon-left="lock"
-                      disabled
-                      data-test="ai-integrations-mcp-generate-btn"
-                    >
-                      {{ t("ingestion.mcp.credential.generate") }}
-                    </OButton>
-                  </span>
-                </OTooltip>
                 <OButton
-                  v-else
                   variant="primary"
                   size="sm-action"
                   :loading="generating"
@@ -584,21 +567,7 @@ const openSkillsRepo = () => {
               >
                 {{ t("ingestion.mcp.credential.download") }}
               </OButton>
-              <OTooltip v-if="mcpLocked" :content="mcpLockedReason">
-                <span class="inline-flex">
-                  <OButton
-                    variant="ghost"
-                    size="sm-action"
-                    icon-left="lock"
-                    disabled
-                    data-test="ai-integrations-mcp-manage-btn"
-                  >
-                    {{ t("ingestion.mcp.credential.manage") }}
-                  </OButton>
-                </span>
-              </OTooltip>
               <OButton
-                v-else
                 variant="ghost"
                 size="sm-action"
                 icon-left="open-in-new"

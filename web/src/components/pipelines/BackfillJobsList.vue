@@ -409,7 +409,6 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -419,7 +418,7 @@ const { isMobile } = useBreakpoint();
 const qTableRef = ref();
 
 const loading = ref(false);
-const forbidden = ref<ForbiddenState>(false);
+const forbidden = ref(false);
 const jobs = ref<BackfillJob[]>([]);
 const showDetailsDialog = ref(false);
 const selectedJobId = ref("");
@@ -537,7 +536,7 @@ const loadJobs = async () => {
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
-    forbidden.value = forbiddenState(error);
+    forbidden.value = error?.response?.status === 403;
     if (!forbidden.value) {
       toast({
         variant: "error",

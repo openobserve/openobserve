@@ -1753,30 +1753,6 @@ describe("LibraryInstallDialog", () => {
       expect(mocks.createAlert).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps anomaly alerts out of the batch while anomaly_detection is license-locked", async () => {
-      store.state.zoConfig = {
-        ...store.state.zoConfig,
-        features: { anomaly_detection: "locked" },
-      } as typeof original.zoConfig;
-      const wrapper = await mountDialog({
-        seed: null,
-        entries: [seedEntry(), anomalyEntry()],
-        preselect: [seedEntry(), anomalyEntry()],
-      });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      expect(
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
-      ).toBe("1");
-
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-run");
-      expect(mocks.createAnomaly).not.toHaveBeenCalled();
-      expect(mocks.createAlert).toHaveBeenCalledTimes(1);
-    });
-
     it("disables Run when the feature turns off under an anomaly-only batch", async () => {
       const wrapper = await mountDialog({
         seed: { entry: anomalyEntry(), file: anomalyFile() },

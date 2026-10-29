@@ -230,27 +230,6 @@ describe("AddServiceAccount", () => {
       });
       w.unmount();
     });
-
-    it("drops the role and group pickers, and their gated lists, while rbac is locked", async () => {
-      expect(wrapper.find('[data-test="iam-add-service-account-roles-select"]').exists()).toBe(
-        true,
-      );
-      const { getRoles, getGroups } = await import("@/services/iam");
-      const saved = store.state.zoConfig;
-      store.state.zoConfig = { ...saved, features: { rbac: "locked" } };
-      queryClient.clear();
-      vi.mocked(getRoles).mockClear();
-      vi.mocked(getGroups).mockClear();
-      const w = mountComp();
-      await flushPromises();
-
-      expect(w.find('[data-test="iam-add-service-account-roles-select"]').exists()).toBe(false);
-      expect(w.find('[data-test="iam-add-service-account-groups-select"]').exists()).toBe(false);
-      expect(getRoles).not.toHaveBeenCalled();
-      expect(getGroups).not.toHaveBeenCalled();
-      w.unmount();
-      store.state.zoConfig = saved;
-    });
   });
 
   describe("schema validation (real OForm, create mode)", () => {

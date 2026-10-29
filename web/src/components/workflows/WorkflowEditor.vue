@@ -351,7 +351,6 @@ import useWorkflowCanvas, {
   clearTestData,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
-import { useFeatureLock } from "@/composables/useFeatureLock";
 import analytics from "@/services/product_analytics";
 
 // Emitted after a successful save so the parent WorkflowsList refreshes its rows.
@@ -559,11 +558,8 @@ const goBack = () => {
 const unsavedDialog = ref(false);
 const pendingRoute = ref<RouteLocationRaw | null>(null);
 
-// A locked page cannot be edited, and its locked Discard button would trap the user.
-const { locked: pageLocked } = useFeatureLock();
-
 onBeforeRouteLeave((to) => {
-  if (pageLocked.value || !workflowObj.dirtyFlag) return true;
+  if (!workflowObj.dirtyFlag) return true;
   pendingRoute.value = to.fullPath;
   unsavedDialog.value = true;
   return false;
@@ -584,7 +580,7 @@ const onKeepEditing = () => {
 
 // Native browser prompt for tab close / reload while there are unsaved edits.
 const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
-  if (pageLocked.value || !workflowObj.dirtyFlag) return;
+  if (!workflowObj.dirtyFlag) return;
   e.preventDefault();
   e.returnValue = "";
 };

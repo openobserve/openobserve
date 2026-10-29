@@ -75,8 +75,6 @@ vi.mock("@/components/shared/HomeViewSkeleton.vue", () => ({
 
 import config from "@/aws-exports";
 import HomeView from "./HomeView.vue";
-import { useHomeDashboard } from "@/composables/useHomeDashboard";
-import { raw } from "@/types/i18n";
 
 const mountHome = () =>
   mount(HomeView, {
@@ -110,37 +108,6 @@ describe("HomeView", () => {
     config.isCloud = originalFlags.isCloud;
     localStorage.removeItem("o2_home_active_tab");
     vi.restoreAllMocks();
-  });
-
-  describe("a pinned home dashboard", () => {
-    const { homeDashboard } = useHomeDashboard(i18n.global.t as never);
-    const TAB = "dash:default:d1";
-
-    beforeEach(() => {
-      setFlag(false);
-      homeDashboard.value = { folderId: "default", dashboardId: "d1", label: raw("Pinned") };
-    });
-    afterEach(() => {
-      homeDashboard.value = null;
-    });
-
-    it("should show a lock on the pinned tab when dashboards are locked", async () => {
-      store.commit("setConfig", { ...store.state.zoConfig, features: { dashboards: "locked" } });
-      wrapper = mountHome();
-      await flushPromises();
-
-      expect(has(`home-tab-${TAB}`)).toBe(true);
-      expect(has(`home-tab-lock-${TAB}`)).toBe(true);
-    });
-
-    it("should show no lock on the pinned tab when dashboards are enabled", async () => {
-      store.commit("setConfig", { ...store.state.zoConfig, features: { dashboards: "enabled" } });
-      wrapper = mountHome();
-      await flushPromises();
-
-      expect(has(`home-tab-${TAB}`)).toBe(true);
-      expect(has(`home-tab-lock-${TAB}`)).toBe(false);
-    });
   });
 
   describe("with the empty-data flag off", () => {

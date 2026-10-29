@@ -14,7 +14,6 @@ import type { RadioProps, RadioSlots } from "./ORadio.types";
 import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupItem, RadioGroupIndicator } from "reka-ui";
 import { computed, inject, useAttrs, watchEffect } from "vue";
-import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 defineOptions({ inheritAttrs: false });
 
@@ -37,8 +36,6 @@ const props = withDefaults(defineProps<RadioProps>(), {
 });
 
 defineSlots<RadioSlots>();
-
-const isDisabled = useLockedDisabled(() => props.disabled);
 
 const valueMap = inject(RADIO_VALUE_MAP_KEY, null);
 const resolvedValue = computed(() => props.value ?? props.val);
@@ -74,7 +71,7 @@ const surfaceClasses = computed(() => [
         "has-[[data-state=checked]]:ring-2 has-[[data-state=checked]]:ring-accent/20",
       ]
     : "items-center",
-  isDisabled.value ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+  props.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
 ]);
 </script>
 
@@ -98,7 +95,7 @@ const surfaceClasses = computed(() => [
     <RadioGroupItem
       :id="props.id"
       :value="String(resolvedValue ?? '')"
-      :disabled="isDisabled"
+      :disabled="props.disabled"
       :data-test="parentDataTest"
       :data-test-value="parentDataTestValue"
       :class="[
@@ -124,7 +121,7 @@ const surfaceClasses = computed(() => [
       :class="[
         'o-input-label text-compact leading-tight select-none',
         props.variant === 'card' ? 'flex-1' : '',
-        isDisabled
+        props.disabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',
       ]"

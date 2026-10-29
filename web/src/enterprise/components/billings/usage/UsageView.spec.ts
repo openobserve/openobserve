@@ -387,14 +387,6 @@ describe("UsageView AI credits warning", () => {
       false,
     );
   });
-
-  it("skips the AI usage read while the assistant is not licensed", async () => {
-    aiUsage.mockClear();
-    store.state.zoConfig.features = { ai_assistant: "locked" };
-    await mountView();
-    expect(aiUsage).not.toHaveBeenCalled();
-    delete store.state.zoConfig.features;
-  });
 });
 
 describe("UsageView load failures", () => {

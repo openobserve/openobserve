@@ -350,7 +350,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
@@ -1329,7 +1328,6 @@ export default defineComponent({
 
     // Context menu state for alert creation (shared with usePanelAlertCreation)
     const contextMenuData = ref<any>(null);
-    const { locked: alertsLocked } = useLicenseLock("alerts");
 
     const {
       contextMenuVisible,
@@ -1341,7 +1339,7 @@ export default defineComponent({
       handleCreateAlert,
     } = usePanelAlertCreation({
       panelSchema,
-      allowAlertCreation: computed(() => allowAlertCreation.value && !alertsLocked.value),
+      allowAlertCreation,
       metadata,
       selectedTimeObj,
       contextMenuData,

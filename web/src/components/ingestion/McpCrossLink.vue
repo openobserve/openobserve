@@ -29,11 +29,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const { t } = useI18nTyped();
-const { locked: mcpLocked, lockedReason: mcpLockedReason } = useLicenseLock("mcp");
 const store = useStore();
 const router = useRouter();
 
@@ -67,26 +64,7 @@ const goToMcp = () => {
           })
         }}
       </p>
-      <OTooltip v-if="mcpLocked" :content="mcpLockedReason">
-        <span class="inline-flex">
-          <OButton
-            variant="primary"
-            size="sm-action"
-            icon-left="lock"
-            disabled
-            data-test="mcp-cross-link-btn"
-          >
-            {{ t("ingestion.mcp.crossLinkCta") }}
-          </OButton>
-        </span>
-      </OTooltip>
-      <OButton
-        v-else
-        variant="primary"
-        size="sm-action"
-        data-test="mcp-cross-link-btn"
-        @click="goToMcp"
-      >
+      <OButton variant="primary" size="sm-action" data-test="mcp-cross-link-btn" @click="goToMcp">
         {{ t("ingestion.mcp.crossLinkCta") }}
         <OIcon name="arrow-forward" size="sm" />
       </OButton>

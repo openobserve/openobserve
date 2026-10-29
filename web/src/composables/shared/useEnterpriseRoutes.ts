@@ -15,7 +15,6 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import { featureLockedPath, featureState } from "@/utils/featureGate";
 import store from "@/stores";
 import {
   withFeatureGate as withFeatureGateBase,
@@ -32,18 +31,11 @@ const withFeatureGate: typeof withFeatureGateBase = (key, guard, getContext) =>
     getContext ?? (() => buildFeatureGateContext(store.state.zoConfig)),
   );
 
-// Checked before the flag guards: a locked feature also reports its legacy flag false.
-const redirectIfLocked = (feature: string, to: any, next: any): boolean => {
-  if (featureState(store.state.zoConfig?.features, feature) !== "locked") return false;
-  next({ path: featureLockedPath(feature), query: { org_identifier: to.query.org_identifier } });
-  return true;
-};
-
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
 // access redirects home when off.
 const syntheticsRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.synthetics_enabled === false && !isLicenseLocked("synthetics")) {
+  if (store.state.zoConfig?.synthetics_enabled === false) {
     next("/");
     return;
   }
@@ -56,10 +48,7 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
 // without await, so redirecting on "not yet known" would bounce a bookmarked
 // link on a cold load.
 const privateLocationRouteGuard = (to: any, from: any, next: any) => {
-  if (
-    store.state.zoConfig?.synthetics_private_locations_enabled === false &&
-    !isLicenseLocked("synthetics")
-  ) {
+  if (store.state.zoConfig?.synthetics_private_locations_enabled === false) {
     next("/");
     return;
   }
@@ -77,21 +66,10 @@ const privateLocationRouteGuard = (to: any, from: any, next: any) => {
 // never flashes in) — the two are not meant to match. Same split as
 // syntheticsRouteGuard above.
 const workflowsRouteGuard = (to: any, from: any, next: any) => {
-  if (redirectIfLocked("workflows", to, next)) return;
   if (store.state.zoConfig?.workflows_enabled === false) {
     next("/");
     return;
   }
-  routeGuard(to, from, next);
-};
-
-const lockableOncallRouteGuard = (to: any, from: any, next: any) => {
-  if (redirectIfLocked("oncall", to, next)) return;
-  oncallRouteGuard(to, from, next);
-};
-
-const incidentsRouteGuard = (to: any, from: any, next: any) => {
-  if (redirectIfLocked("incidents", to, next)) return;
   routeGuard(to, from, next);
 };
 
@@ -170,7 +148,6 @@ const useEnterpriseRoutes = () => {
           name: "syntheticsTokens",
           meta: {
             titleKey: "iam.syntheticsTokens",
-            licenseFeature: "synthetics",
           },
           component: () => import("@/components/iam/SyntheticsTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -219,7 +196,7 @@ const useEnterpriseRoutes = () => {
         {
           path: "mcpServer",
           name: "mcpServer",
-          meta: { titleKey: "iam.mcpServerLabel", licenseFeature: "mcp" },
+          meta: { titleKey: "iam.mcpServerLabel" },
           component: () => import("@/components/iam/McpServer.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -239,16 +216,17 @@ const useEnterpriseRoutes = () => {
   // `?section=status-pages`), so it needs no route of its own — it ships
   // with synthetics, no separate toggle. Notices/Custom Domains within it
   // are Enterprise-only, gated in-view on `build_type` instead.
-  const syntheticsRoutes = [
-    {
-      path: "synthetics",
-      name: "synthetics",
-      component: () => import("@/views/SyntheticMonitoring.vue"),
-      meta: { titleKey: "menu.synthetic", allowOnEmptyData: true },
-      beforeEnter(to: any, from: any, next: any) {
-        syntheticsRouteGuard(to, from, next);
-      },
+  routes.push({
+    path: "synthetics",
+    name: "synthetics",
+    component: () => import("@/views/SyntheticMonitoring.vue"),
+    meta: { titleKey: "menu.synthetic", allowOnEmptyData: true },
+    beforeEnter(to: any, from: any, next: any) {
+      syntheticsRouteGuard(to, from, next);
     },
+  });
+
+  routes.push(
     {
       path: "synthetics/add",
       name: "synthetics-add",
@@ -303,8 +281,7 @@ const useEnterpriseRoutes = () => {
         syntheticsRouteGuard(to, from, next);
       },
     },
-  ];
-  routes.push(...syntheticsRoutes.map((route) => withLicenseFeature("synthetics", route)));
+  );
 
   //the below are the routes that we support for enterprise and cloud
   //the above are the routes that we support for oss including both enterprise and cloud
@@ -320,14 +297,14 @@ const useEnterpriseRoutes = () => {
       name: "onCallResponses",
       component: OnCallResponses,
       meta: { titleKey: "oncall.responsesTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       path: "oncall/responses/:responseId",
       name: "onCallResponseDetail",
       component: OnCallResponseDetail,
       meta: { titleKey: "oncall.responseDetail", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       // A page again. It was retired to a redirect for being a stub that
@@ -343,14 +320,14 @@ const useEnterpriseRoutes = () => {
       name: "onCallMine",
       component: OnCallMine,
       meta: { titleKey: "oncall.mineTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       path: "oncall/teams",
       name: "onCallTeams",
       component: OnCallTeams,
       meta: { titleKey: "oncall.teamsTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       // The tab is part of the URL, so a schedule somebody sends is the
@@ -366,21 +343,21 @@ const useEnterpriseRoutes = () => {
       name: "onCallTeamDetail",
       component: OnCallTeamDetail,
       meta: { titleKey: "oncall.teamDetail", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       path: "oncall/policies",
       name: "onCallPolicies",
       component: OnCallPolicies,
       meta: { titleKey: "oncall.policiesTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       path: "oncall/routing",
       name: "onCallRouting",
       component: OnCallRouting,
       meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
   );
 
@@ -392,7 +369,7 @@ const useEnterpriseRoutes = () => {
       meta: {
         titleKey: "menu.incidents",
       },
-      beforeEnter: withFeatureGate("incidents", incidentsRouteGuard),
+      beforeEnter: withFeatureGate("incidents", routeGuard),
     },
     {
       path: "incidents/:id",
@@ -401,7 +378,7 @@ const useEnterpriseRoutes = () => {
       meta: {
         titleKey: "routeTitles.incidentDetail",
       },
-      beforeEnter: withFeatureGate("incidents", incidentsRouteGuard),
+      beforeEnter: withFeatureGate("incidents", routeGuard),
     },
   );
 
@@ -517,13 +494,13 @@ const useEnterpriseRoutes = () => {
         component: EditRole,
         beforeEnter: withFeatureGate("rbac", routeGuard),
       },
-    ].map((route) => withLicenseFeature("rbac", route)),
-    withLicenseFeature("ratelimit", {
-      path: "quota",
-      name: "quota",
-      component: Quota,
-      beforeEnter: withFeatureGate("rbac", routeGuard),
-    }),
+      {
+        path: "quota",
+        name: "quota",
+        component: Quota,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
+      },
+    ],
   );
 
   if (config.isCloud == "true") {

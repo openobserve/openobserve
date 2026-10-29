@@ -120,13 +120,6 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
 export const rcaEvidenceQuery = (link: RcaEvidenceTarget): string | null =>
   link.sql || link.promql || link.filter || link.command || null;
 
-/** The license feature whose page a blind spot's button opens, or null when that page is free. */
-export function rcaBlindSpotFeature(fix: RcaBlindSpotFix): "ai_toolsets" | "pipelines" | null {
-  if (fix === "connect_toolset") return "ai_toolsets";
-  if (fix === "open_pipeline" || fix === "sampling_rules") return "pipelines";
-  return null;
-}
-
 /** The page a blind spot's button opens, or null for no button. */
 export function rcaBlindSpotRoute(fix: RcaBlindSpotFix, org: string): RouteLocationRaw | null {
   const query = { org_identifier: org };

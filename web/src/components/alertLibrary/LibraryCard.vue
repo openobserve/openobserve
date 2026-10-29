@@ -101,13 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alert_library.alertTypeAnomaly')"
           data-test="alert-library-card-anomaly"
         />
-        <OTooltip v-if="licenseLockedReason" :content="licenseLockedReason">
-          <span class="inline-flex" data-test="alert-library-card-license-locked">
-            <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
-          </span>
-        </OTooltip>
         <OTag
-          v-else-if="locked"
+          v-if="locked"
           variant="default-soft"
           icon="lock"
           :label="t('alert_library.enterprise')"
@@ -163,9 +158,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import { alertTypeOf, queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
 
@@ -177,8 +171,6 @@ const props = defineProps<{
   selected?: boolean;
   /** An anomaly alert this build is not entitled to; the gallery turns its clicks into the upsell. */
   locked?: boolean;
-  /** Set when the license, not the edition, locks this alert; the card shows a lock with this reason. */
-  licenseLockedReason?: I18nText;
 }>();
 
 const emit = defineEmits<{

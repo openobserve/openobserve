@@ -25,27 +25,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
-    <template #tabs="{ tabs, filter }">
-      <!-- The rail only navigates, so a license-locked guide still lets the reader move to a free one. -->
-      <FeatureLockExempt class="contents">
-        <FirstSourcePickGroup
-          v-if="pickTab && pickMatches(filter)"
-          rail="recommended"
-          :tab="pickTab"
-          :rest-label="t('ingestion.firstSource.recommended')"
-        />
-        <ORouteTab
-          v-for="tab in tabs.filter((tab) => tab.name !== pickTab?.name)"
-          :key="tab.name"
-          :title="pickTab ? tab.title || tab.name : undefined"
-          :name="tab.name"
-          :to="tab.to"
-          :icon="tab.icon"
-          :label="tab.label"
-          :suffix-icon="lockedTabs.has(tab.name) ? 'lock' : undefined"
-          :data-test="`ingestion-recommended-tab-${tab.name}`"
-        />
-      </FeatureLockExempt>
+    <template v-if="pickTab" #tabs="{ tabs, filter }">
+      <FirstSourcePickGroup
+        v-if="pickMatches(filter)"
+        rail="recommended"
+        :tab="pickTab"
+        :rest-label="t('ingestion.firstSource.recommended')"
+      />
+      <ORouteTab
+        v-for="tab in tabs.filter((tab) => tab.name !== pickTab?.name)"
+        :key="tab.name"
+        :title="tab.title || tab.name"
+        :name="tab.name"
+        :to="tab.to"
+        :icon="tab.icon"
+        :label="tab.label"
+        :data-test="`ingestion-recommended-tab-${tab.name}`"
+      />
     </template>
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
@@ -71,12 +67,10 @@ import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import { firstSourceOption, readFirstSource } from "@/components/login/firstSourceOptions";
-import { featureState } from "@/utils/featureGate";
-import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 
 export default defineComponent({
   name: "RecommendedPage",
-  components: { DataSourceSidebarLayout, ORouteTab, FirstSourcePickGroup, FeatureLockExempt },
+  components: { DataSourceSidebarLayout, ORouteTab, FirstSourcePickGroup },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -256,29 +250,13 @@ export default defineComponent({
       contentClass: "tab_content",
     });
 
-    // Guides owned by a license feature: locked keeps the tab with a lock, hidden drops it.
-    const LICENSED_TABS: Record<string, string> = {
-      frontendMonitoring: "rum",
-      recommendedMcp: "mcp",
-    };
-    const tabState = (name: string) =>
-      LICENSED_TABS[name]
-        ? featureState(store.state.zoConfig?.features, LICENSED_TABS[name])
-        : "enabled";
-    const licensedTabs = computed(() =>
-      recommendedTabs.filter((tab) => tabState(tab.name) !== "hidden"),
-    );
-    const lockedTabs = computed(
-      () => new Set(recommendedTabs.map((tab) => tab.name).filter((n) => tabState(n) === "locked")),
-    );
-
     // A pick from another category links across to its guide.
     const pickTab = computed(() => {
       const option = firstSourceOption(
         readFirstSource(store.state.selectedOrganization.identifier),
       );
       if (!option?.route) return undefined;
-      const listed = licensedTabs.value.find((tab) => tab.name === option.route);
+      const listed = recommendedTabs.find((tab) => tab.name === option.route);
       if (listed) return listed;
       return {
         name: option.route,
@@ -306,8 +284,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       tabs,
       ingestTabType,
-      recommendedTabs: licensedTabs,
-      lockedTabs,
+      recommendedTabs,
       pickTab,
       pickMatches,
     };

@@ -401,9 +401,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Correlated Logs Tab Panel (Custom Component) -->
         <OTabPanel name="correlated-logs" stretch>
-          <LicenseDeniedState v-if="correlationLicenseLocked" :features="['correlation']" />
           <CorrelatedLogsTable
-            v-else-if="correlationProps"
+            v-if="correlationProps"
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
@@ -445,9 +444,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Correlated Metrics Tab Panel -->
         <OTabPanel name="correlated-metrics" stretch>
-          <LicenseDeniedState v-if="correlationLicenseLocked" :features="['correlation']" />
           <TelemetryCorrelationDashboard
-            v-else-if="correlationProps"
+            v-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="metrics"
             :service-name="correlationProps.serviceName"
@@ -488,9 +486,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Correlated Traces Tab Panel -->
         <OTabPanel name="correlated-traces" stretch>
-          <LicenseDeniedState v-if="correlationLicenseLocked" :features="['correlation']" />
           <TelemetryCorrelationDashboard
-            v-else-if="correlationProps"
+            v-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="traces"
             :shortcuts-active="tab === 'correlated-traces'"
@@ -658,8 +655,6 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
-import { useLicenseLock } from "@/composables/useFeatureLock";
-import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -709,7 +704,6 @@ export default defineComponent({
     ChunkedContent,
     TelemetryCorrelationDashboard,
     CorrelatedLogsTable,
-    LicenseDeniedState,
     OButton,
     OSelect,
     ODropdown,
@@ -855,7 +849,6 @@ export default defineComponent({
       checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
     );
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-    const { locked: correlationLicenseLocked } = useLicenseLock("correlation");
 
     const selectedRelativeValue = ref<number>(10);
     const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
@@ -929,7 +922,6 @@ export default defineComponent({
           Object.keys(newRowData).length > 0 &&
           tab.value.startsWith("correlated-") &&
           correlationAccess.value.allowed &&
-          !correlationLicenseLocked.value &&
           !props.correlationProps
         ) {
           // Emit the original modelValue (not flattened rowData) as it has _timestamp
@@ -957,7 +949,6 @@ export default defineComponent({
       // Skip if this is the initial load (oldTab is undefined) as rowData watcher handles it
       if (
         isCorrelationTab &&
-        !correlationLicenseLocked.value &&
         !props.correlationProps &&
         oldTab !== undefined &&
         rowData.value &&
@@ -1072,7 +1063,7 @@ export default defineComponent({
         },
       ];
       if (serviceStreamsEnabled.value) {
-        const locked = !correlationAccess.value.allowed || correlationLicenseLocked.value;
+        const locked = !correlationAccess.value.allowed;
         tabs.push(
           {
             name: "correlated-logs",
@@ -1125,7 +1116,7 @@ export default defineComponent({
     // order whenever the set of available tabs changes — keeping the user's
     // order and appending anything new.
     watch(
-      () => availableTabs.value.map((t) => `${t.name}:${!!t.locked}`).join(","),
+      () => availableTabs.value.map((t) => t.name).join(","),
       () => {
         const merged: DetailTab[] = [];
         tabOrder.value.forEach((t) => {
@@ -1449,7 +1440,6 @@ export default defineComponent({
       detailSearchQuery,
       serviceStreamsEnabled,
       correlationAccess,
-      correlationLicenseLocked,
       onTabChange,
       tabOrder,
       onTabReorder,

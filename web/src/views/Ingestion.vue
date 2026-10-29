@@ -27,8 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <!-- A fixed phone width lets the title, search and token button share one row. -->
-      <!-- The search only routes to a matching guide, so a locked guide must not trap the reader. -->
-      <FeatureLockExempt class="w-50 flex-none max-md:w-40">
+      <div class="w-50 flex-none max-md:w-40">
         <OSearchInput
           v-model="globalSearchQuery"
           :placeholder="t('common.search')"
@@ -36,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="indexlist-search-input w-full"
           data-test="recommended-list-search-input"
         />
-      </FeatureLockExempt>
+      </div>
       <OSelect
         v-if="lgUp && !isRUMPage && tokenOptions.length > 0"
         ref="tokenSelectRef"
@@ -50,33 +49,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="min-width: 13.75rem"
         @update:model-value="onTokenSelected"
       />
-      <FeatureLockExempt v-if="!isRUMPage" class="contents">
-        <OButton
-          variant="primary"
-          size="sm"
-          icon-left="key"
-          :title="isMobile ? t('ingestion.manageTokensBtnLabel') : undefined"
-          data-test="ingestion-manage-tokens-btn"
-          @click="navigateToIngestionTokens"
-        >
-          <span class="max-md:hidden">{{ t("ingestion.manageTokensBtnLabel") }}</span>
-        </OButton>
-      </FeatureLockExempt>
-      <OTooltip v-if="isRUMPage && rumLocked" :content="rumLockedReason">
-        <span class="inline-flex">
-          <OButton
-            variant="primary"
-            size="sm"
-            icon-left="lock"
-            disabled
-            data-test="ingestion-reset-token-btn"
-          >
-            {{ t(`ingestion.generateRUMTokenLabel`) }}
-          </OButton>
-        </span>
-      </OTooltip>
       <OButton
-        v-else-if="
+        v-if="!isRUMPage"
+        variant="primary"
+        size="sm"
+        icon-left="key"
+        :title="isMobile ? t('ingestion.manageTokensBtnLabel') : undefined"
+        @click="navigateToIngestionTokens"
+      >
+        <span class="max-md:hidden">{{ t("ingestion.manageTokensBtnLabel") }}</span>
+      </OButton>
+      <OButton
+        v-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
           store.state.organizationData.rumToken.rum_token != ''
         "
@@ -117,98 +101,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onTokenSelected"
           />
         </div>
-        <FeatureLockExempt>
-          <OTabs v-model="ingestTabType" align="left">
-            <ORouteTab
-              name="recommended"
-              :to="{
-                name: 'recommended',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.recommendedLabel')"
-            />
-            <ORouteTab
-              name="custom"
-              :to="{
-                name: 'custom',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.customLabel')"
-            />
-            <ORouteTab
-              name="server"
-              :to="{
-                name: 'servers',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.serverLabel')"
-            />
-            <ORouteTab
-              name="database"
-              :to="{
-                name: 'databases',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.databaseLabel')"
-            />
-            <ORouteTab
-              name="security"
-              :to="{
-                name: 'security',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.securityLabel')"
-            />
-            <ORouteTab
-              name="devops"
-              :to="{
-                name: 'devops',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.devopsLabel')"
-            />
-            <ORouteTab
-              name="networking"
-              :to="{
-                name: 'networking',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.networkingLabel')"
-            />
-            <ORouteTab
-              name="message-queues"
-              :to="{
-                name: 'message-queues',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.messageQueuesLabel')"
-            />
-            <ORouteTab
-              name="languages"
-              :to="{
-                name: 'languages',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.languagesLabel')"
-            />
-            <ORouteTab
-              name="ai-integrations"
-              :to="{
-                name: 'ai-integrations',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.aiLabel')"
-            />
-            <ORouteTab
-              name="others"
-              :to="{
-                name: 'others',
-                query: { org_identifier: store.state.selectedOrganization.identifier },
-              }"
-              :label="t('ingestion.otherLabel')"
-            />
-          </OTabs>
-        </FeatureLockExempt>
+        <OTabs v-model="ingestTabType" align="left">
+          <ORouteTab
+            name="recommended"
+            :to="{
+              name: 'recommended',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.recommendedLabel')"
+          />
+          <ORouteTab
+            name="custom"
+            :to="{
+              name: 'custom',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.customLabel')"
+          />
+          <ORouteTab
+            name="server"
+            :to="{
+              name: 'servers',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.serverLabel')"
+          />
+          <ORouteTab
+            name="database"
+            :to="{
+              name: 'databases',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.databaseLabel')"
+          />
+          <ORouteTab
+            name="security"
+            :to="{
+              name: 'security',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.securityLabel')"
+          />
+          <ORouteTab
+            name="devops"
+            :to="{
+              name: 'devops',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.devopsLabel')"
+          />
+          <ORouteTab
+            name="networking"
+            :to="{
+              name: 'networking',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.networkingLabel')"
+          />
+          <ORouteTab
+            name="message-queues"
+            :to="{
+              name: 'message-queues',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.messageQueuesLabel')"
+          />
+          <ORouteTab
+            name="languages"
+            :to="{
+              name: 'languages',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.languagesLabel')"
+          />
+          <ORouteTab
+            name="ai-integrations"
+            :to="{
+              name: 'ai-integrations',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.aiLabel')"
+          />
+          <ORouteTab
+            name="others"
+            :to="{
+              name: 'others',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
+            :label="t('ingestion.otherLabel')"
+          />
+        </OTabs>
       </div>
     </template>
     <ConfirmDialog
@@ -261,9 +243,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import { useOrgCredential, type PasscodeRead } from "@/composables/useOrgCredential";
 import { FIRST_EVENT_ASK_AI } from "@/components/ingestion/firstEventAskAi";
-import { useLicenseLock } from "@/composables/useFeatureLock";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -275,8 +254,6 @@ export default defineComponent({
     OButton,
     OSearchInput,
     OSelect,
-    OTooltip,
-    FeatureLockExempt,
   },
   emits: ["sendToAiChat"],
   setup(_props, { emit }) {
@@ -288,7 +265,6 @@ export default defineComponent({
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
     const confirmRUMUpdate = ref<boolean>(false);
-    const { locked: rumLocked, lockedReason: rumLockedReason } = useLicenseLock("rum");
     const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
@@ -420,7 +396,6 @@ export default defineComponent({
 
     // A read failure stays silent: the card falls back to its Generate action.
     const getRUMToken = () => {
-      if (rumLocked.value) return Promise.resolve();
       return queryClient
         .fetchQuery(rumTokensQuery(store.state.selectedOrganization.identifier))
         .then((res: any) => {
@@ -668,8 +643,6 @@ export default defineComponent({
       fetchOrgTokens,
       navigateToIngestionTokens,
       isRUMPage,
-      rumLocked,
-      rumLockedReason,
       confirmUpdate,
       confirmRUMUpdate,
       getImageURL,

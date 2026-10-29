@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { defineComponent, h, ref } from "vue";
-import { provideFeatureLock } from "@/composables/useFeatureLock";
 
 import AlertSectionTabs from "./AlertSectionTabs.vue";
 import i18n from "@/locales";
@@ -103,57 +101,5 @@ describe("AlertSectionTabs", () => {
     store.state.zoConfig.custom_hide_menus = "openapi,reports";
     const wrapper = mountTabs();
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain("Alert Library");
-  });
-
-  describe("license", () => {
-    afterEach(() => {
-      delete store.state.zoConfig.features;
-    });
-
-    const lockOf = (wrapper: ReturnType<typeof mountTabs>, key: string) =>
-      wrapper.find(`[data-test="alert-section-tab-${key}-lock"]`).exists();
-
-    it("puts a lock on the alert-owned tabs only, when alerts is locked", () => {
-      store.state.zoConfig.features = { alerts: "locked" };
-      const wrapper = mountTabs();
-      expect(lockOf(wrapper, "alertList")).toBe(true);
-      expect(lockOf(wrapper, "alertLibrary")).toBe(true);
-      expect(lockOf(wrapper, "alertDestinations")).toBe(false);
-      expect(lockOf(wrapper, "alertTemplates")).toBe(false);
-    });
-
-    it("shows no lock when alerts is enabled", () => {
-      store.state.zoConfig.features = { alerts: "enabled" };
-      const wrapper = mountTabs();
-      expect(wrapper.find('[data-test$="-lock"]').exists()).toBe(false);
-    });
-
-    it("drops the alert-owned tabs when alerts is hidden, keeping destinations and templates", () => {
-      store.state.zoConfig.features = { alerts: "hidden" };
-      const wrapper = mountTabs();
-      expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
-        "Notification Destinations",
-        "Destination Templates",
-      ]);
-    });
-
-    it("still navigates to the free destinations from a license-locked alert page", async () => {
-      store.state.zoConfig.features = { alerts: "locked" };
-      const push = vi.spyOn(router, "push");
-      const LockedPage = defineComponent({
-        setup() {
-          provideFeatureLock(ref("alerts"));
-          return () => h(AlertSectionTabs);
-        },
-      });
-      const wrapper = mount(LockedPage, {
-        global: { provide: { store }, plugins: [i18n, router] },
-      });
-      await wrapper.find('[data-test="alert-section-tab-alertDestinations"]').trigger("mousedown");
-      expect(push).toHaveBeenCalledWith({
-        name: "alertDestinations",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      });
-    });
   });
 });

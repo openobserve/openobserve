@@ -397,42 +397,6 @@ describe("Nodes", () => {
       const ids = wrapper.vm.computedOTableColumns.map((c: any) => c.id);
       expect(ids).not.toContain("region");
     });
-
-    it("drops the region column and shows locked region/cluster filters under a super_cluster lock", async () => {
-      const lockedStore = createStore({
-        state: {
-          selectedOrganization: { identifier: "test-org" },
-          zoConfig: { super_cluster_enabled: true, features: { super_cluster: "locked" } },
-          theme: "light",
-        },
-      });
-      wrapper = mount(Nodes, {
-        global: {
-          plugins: [mockI18n],
-          provide: { store: lockedStore },
-          stubs: {
-            Pagination: { template: "<div />" },
-            NoData: { template: "<div />" },
-            OTooltip: { template: "<div><slot /></div>" },
-          },
-        },
-      });
-      await flushPromises();
-      const ids = wrapper.vm.computedOTableColumns.map((c: any) => c.id);
-      expect(ids).not.toContain("region");
-      for (const key of ["region", "cluster"]) {
-        const btn = wrapper.find(`[data-test="nodes-${key}-filter-locked"]`);
-        expect(btn.exists()).toBe(true);
-        expect(btn.attributes("disabled")).toBeDefined();
-      }
-      expect(wrapper.find('[data-test="nodes-region-table"]').exists()).toBe(false);
-    });
-
-    it("shows no locked filters when the license leaves super_cluster enabled", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.find('[data-test="nodes-region-filter-locked"]').exists()).toBe(false);
-    });
   });
 
   describe("error handling", () => {

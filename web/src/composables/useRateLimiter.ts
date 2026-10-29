@@ -16,13 +16,12 @@
 import { useStore } from "vuex";
 import { ref } from "vue";
 import rateLimiterService from "@/services/rate_limit";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 const useRateLimiter = () => {
   const store = useStore();
   let isApiLimitsLoading = ref<boolean>(false);
   let isRoleLimitsLoading = ref<boolean>(false);
-  const apiLimitsForbidden = ref<ForbiddenState>(false);
-  const roleLimitsForbidden = ref<ForbiddenState>(false);
+  const apiLimitsForbidden = ref<boolean>(false);
+  const roleLimitsForbidden = ref<boolean>(false);
 
   const getApiLimitsByOrganization = async (orgId: string, interval: string = "second") => {
     try {
@@ -70,7 +69,7 @@ const useRateLimiter = () => {
       return transformedData;
     } catch (error: any) {
       isApiLimitsLoading.value = false;
-      apiLimitsForbidden.value = forbiddenState(error);
+      apiLimitsForbidden.value = error?.response?.status === 403;
       console.log(error);
     }
   };
@@ -121,7 +120,7 @@ const useRateLimiter = () => {
       return transformedData;
     } catch (error: any) {
       console.log(error);
-      roleLimitsForbidden.value = forbiddenState(error);
+      roleLimitsForbidden.value = error?.response?.status === 403;
       isRoleLimitsLoading.value = false;
     }
   };

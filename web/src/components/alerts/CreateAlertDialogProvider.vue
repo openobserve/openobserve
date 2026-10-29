@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <CreateAlertFromSourceDialog
-    v-if="dialog && !locked"
+    v-if="dialog"
     :open="dialog.open"
     :prefill="dialog.prefill"
     @update:open="onOpenChange"
@@ -38,9 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, watch } from "vue";
+import { defineAsyncComponent } from "vue";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import {
   alertCreationDialog as dialog,
   closeAlertCreationDialog,
@@ -59,14 +58,6 @@ const CreateAlertFromSourceDialog = defineAsyncComponent({
 });
 
 const { openAlertCreation } = useAlertCreation();
-const { locked } = useLicenseLock("alerts");
-
-// Surfaces that request the dialog without CreateAlertAction must not leave a request that pops up after an unlock.
-watch(
-  () => !!dialog.value && locked.value,
-  (blocked) => blocked && closeAlertCreationDialog(),
-  { immediate: true },
-);
 
 const onConfirm = (prefill: AlertPrefill) => {
   openAlertCreation(prefill, dialog.value?.options ?? {});

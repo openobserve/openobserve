@@ -17,7 +17,6 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
 import { canvasFont } from "@/utils/fonts";
-import { featureState } from "@/utils/featureGate";
 
 import {
   encodeVisualizationConfig,
@@ -532,14 +531,11 @@ export const logsUtils = () => {
     query["quick_mode"] = inputs.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
 
-    const superCluster =
-      store.state.zoConfig?.super_cluster_enabled &&
-      featureState(store.state.zoConfig?.features, "super_cluster") !== "locked";
-    if (superCluster && inputs.regions.length) {
+    if (store.state.zoConfig?.super_cluster_enabled && inputs.regions.length) {
       query["regions"] = inputs.regions.join(",");
     }
 
-    if (superCluster && inputs.clusters.length) {
+    if (store.state.zoConfig?.super_cluster_enabled && inputs.clusters.length) {
       query["clusters"] = inputs.clusters.join(",");
     }
 

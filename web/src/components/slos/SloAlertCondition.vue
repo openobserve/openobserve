@@ -235,7 +235,6 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import sloService from "@/services/slos";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { Slo } from "@/ts/interfaces/slo";
 import { formatTimeToExhaust, formatWindow } from "@/composables/useSloFormat";
@@ -254,7 +253,6 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
 const slos = ref<Slo[]>([]);
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
@@ -456,7 +454,7 @@ onMounted(async () => {
     model.value.slo_id = props.slo.id;
     return;
   }
-  if (!org.value || anomalyLocked.value) return;
+  if (!org.value) return;
   const res = await sloService.list(org.value);
   slos.value = res.data?.list ?? [];
 });

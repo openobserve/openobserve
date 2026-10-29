@@ -73,12 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   class="text-text-heading group-hover:text-accent flex items-center gap-1.5 text-sm font-semibold transition-colors"
                   >{{ item.label }}
-                  <OIcon
-                    v-if="item.locked || item.licenseLocked"
-                    name="lock"
-                    size="xs"
-                    class="text-warning-600"
-                  />
+                  <OIcon v-if="item.locked" name="lock" size="xs" class="text-warning-600" />
                 </span>
                 <span
                   v-if="item.description"
@@ -122,8 +117,6 @@ export interface SectionHubItem {
   locked?: boolean;
   lockedMessage?: I18nText;
   lockedShowUpgradeCta?: boolean;
-  /** The license lacks this feature: shows the lock but still opens `to`, whose page shows the license banner. */
-  licenseLocked?: boolean;
   dataTest?: string;
 }
 

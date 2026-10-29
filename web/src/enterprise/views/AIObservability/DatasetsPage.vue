@@ -294,7 +294,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState } from "@/utils/featureGate";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
@@ -349,7 +348,7 @@ const lastUpdatedAt = datasetsList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = datasetsList.error.value;
-  return forbiddenState(e) || e?.status === 403;
+  return e?.status === 403 || e?.response?.status === 403;
 });
 const search = ref("");
 

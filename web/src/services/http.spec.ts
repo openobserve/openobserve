@@ -58,9 +58,6 @@ vi.mock("@/composables/useAccessStore", () => ({
   resetAccess: vi.fn(),
 }));
 
-const { addLicenseDeniedError } = vi.hoisted(() => ({ addLicenseDeniedError: vi.fn() }));
-vi.mock("@/composables/useLicenseDeniedDialog", () => ({ addLicenseDeniedError }));
-
 import config from "../aws-exports";
 import store from "../stores";
 import axios from "axios";
@@ -234,17 +231,6 @@ describe("http 403 interceptor", () => {
       method: undefined,
       routeKey: undefined,
     });
-    expect(addLicenseDeniedError).not.toHaveBeenCalled();
-  });
-
-  it("opens the license dialog instead of recording a 403 for code 40001", async () => {
-    const error = {
-      ...forbidden(),
-      response: { status: 403, data: { code: 40001, error_detail: "oncall, workflows" } },
-    };
-    await expect(errorHandler()(error)).rejects.toBe(error);
-    expect(addLicenseDeniedError).toHaveBeenCalledWith(["oncall", "workflows"]);
-    expect(recordForbidden).not.toHaveBeenCalled();
   });
 
   it("stamps a new request with the current page but keeps a retried request's stamp", () => {

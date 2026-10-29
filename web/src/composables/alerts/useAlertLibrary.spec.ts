@@ -473,26 +473,6 @@ describe("useAnomalyLibraryAccess", () => {
     );
   });
 
-  it("is license-locked when anomaly_detection is license-locked, even with the feature on", () => {
-    expect(
-      access("true", {
-        build_type: "enterprise",
-        anomaly_detection_enabled: true,
-        features: { anomaly_detection: "locked" },
-      }),
-    ).toBe("licenseLocked");
-  });
-
-  it("is enabled when anomaly_detection is licensed and turned on", () => {
-    expect(
-      access("true", {
-        build_type: "enterprise",
-        anomaly_detection_enabled: true,
-        features: { anomaly_detection: "enabled" },
-      }),
-    ).toBe("enabled");
-  });
-
   it("is hidden when entitled but the feature is turned off", () => {
     expect(access("true", { build_type: "enterprise", anomaly_detection_enabled: false })).toBe(
       "hidden",

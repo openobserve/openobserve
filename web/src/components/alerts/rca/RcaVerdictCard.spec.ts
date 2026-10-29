@@ -18,23 +18,16 @@ import { mount, type VueWrapper } from "@vue/test-utils";
 import type * as VueRouter from "vue-router";
 import type * as Vuex from "vuex";
 
-const { pushMock, storeState } = vi.hoisted(() => ({
-  pushMock: vi.fn(),
-  storeState: {
-    selectedOrganization: { identifier: "acme" },
-    zoConfig: {} as { features?: Record<string, string> },
-  },
-}));
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<typeof VueRouter>()),
   useRouter: () => ({ push: pushMock }),
 }));
 vi.mock("vuex", async (importOriginal) => ({
   ...(await importOriginal<typeof Vuex>()),
-  useStore: () => ({ state: storeState }),
+  useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
 }));
 
-import { createStore } from "vuex";
 import i18n from "@/locales";
 import RcaVerdictCard from "./RcaVerdictCard.vue";
 import {
@@ -801,28 +794,6 @@ describe("RcaVerdictCard", () => {
 
       const without = mountCard({ ...PAUSED, summary: rcaRunSummaryLive({ blind_spots: [] }) });
       expect(byTest(without, "rca-paused-connect-btn").exists()).toBe(false);
-    });
-
-    it("'Connect AI Toolset' is disabled with a lock while ai_toolsets is license-locked", async () => {
-      storeState.zoConfig.features = { ai_toolsets: "locked" };
-      try {
-        // useFeatureLock is loaded by the test setup before this file's vuex mock, so it injects a real store.
-        const wrapper = mount(RcaVerdictCard, {
-          props: {
-            runId: "run-2",
-            ...PAUSED,
-            summary: rcaRunSummaryLive({ blind_spots: [rcaBlindSpot()] }),
-          },
-          global: { plugins: [i18n, createStore({ state: storeState })], stubs },
-        });
-        const button = byTest(wrapper, "rca-paused-connect-btn");
-        expect(button.attributes("disabled")).toBeDefined();
-        expect(byTest(wrapper, "rca-paused-connect-lock").exists()).toBe(true);
-        await button.trigger("click");
-        expect(pushMock).not.toHaveBeenCalled();
-      } finally {
-        delete storeState.zoConfig.features;
-      }
     });
 
     it("no paused banner while running", () => {

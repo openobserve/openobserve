@@ -74,10 +74,9 @@ const OPTION_IDS = [
   "unsure",
 ];
 
-const makeStore = (features: Record<string, string> = {}) =>
+const makeStore = () =>
   createStore({
     state: {
-      zoConfig: { features },
       selectedOrganization: { identifier: ORG, name: "Test Organization" },
       theme: "light",
       userInfo: { email: EMAIL },
@@ -118,11 +117,11 @@ describe("GetStarted.vue", () => {
   let wrapper: VueWrapper | undefined;
   let router: Router;
 
-  const mountAt = async (path = "/", features: Record<string, string> = {}) => {
+  const mountAt = async (path = "/") => {
     router = makeRouter();
     await router.push(path);
     await router.isReady();
-    wrapper = mount(GetStarted, { global: { plugins: [i18n, makeStore(features), router] } });
+    wrapper = mount(GetStarted, { global: { plugins: [i18n, makeStore(), router] } });
     await flush();
     return wrapper;
   };
@@ -247,41 +246,6 @@ describe("GetStarted.vue", () => {
       const radios = wrapper!.findAllComponents({ name: "ORadio" });
       expect(radios).toHaveLength(11);
       for (const radio of radios) expect(radio.props("variant")).toBe("card");
-    });
-  });
-
-  describe("license-locked guides", () => {
-    const radio = (id: string) =>
-      wrapper!.findAllComponents({ name: "ORadio" }).find((r) => r.props("value") === id)!;
-
-    it("disables the agent and RUM cards with a lock, and a locked pick is neither sent nor followed", async () => {
-      await mountAt("/", { mcp: "locked", rum: "locked" });
-      expect(radio("agent").props("disabled")).toBe(true);
-      expect(radio("rum").props("disabled")).toBe(true);
-      expect(radio("linux").props("disabled")).toBe(false);
-      expect(byTest("onboarding-get-started-source-agent-lock").exists()).toBe(true);
-      expect(byTest("onboarding-get-started-source-rum-lock").exists()).toBe(true);
-
-      const push = pushSpy();
-      await pick("agent");
-      await tickTerms();
-      await byTest("onboarding-get-started-skip-btn").trigger("click");
-      await flush();
-      expect(submitNewUserInfo).toHaveBeenCalledWith(ORG, {
-        from: "",
-        company: "",
-        first_source: undefined,
-        skipped: true,
-      });
-      expect(push).not.toHaveBeenCalledWith(expect.objectContaining({ name: "recommendedMcp" }));
-      expect(localStorage.getItem(`o2.onboarding.firstSource.${ORG}`)).toBeNull();
-    });
-
-    it("keeps the agent and RUM cards selectable when their features are enabled", async () => {
-      await mountAt("/", { mcp: "enabled", rum: "enabled" });
-      expect(radio("agent").props("disabled")).toBe(false);
-      expect(radio("rum").props("disabled")).toBe(false);
-      expect(byTest("onboarding-get-started-source-agent-lock").exists()).toBe(false);
     });
   });
 

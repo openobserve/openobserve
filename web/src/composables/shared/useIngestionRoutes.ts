@@ -15,7 +15,6 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import { withLicenseFeature } from "@/utils/featureGate";
 
 import { aiCategories } from "@/components/ingestion/ai/data";
 
@@ -326,7 +325,7 @@ const useIngestionRoutes = () => {
                 },
               ],
             },
-            withLicenseFeature("continuous_profiling", {
+            {
               path: "profiles",
               name: "ingestProfiles",
               component: IngestProfiles,
@@ -343,7 +342,7 @@ const useIngestionRoutes = () => {
                   },
                 },
               ],
-            }),
+            },
             {
               path: "traces",
               name: "ingestTraces",
@@ -452,25 +451,25 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
-            withLicenseFeature("rum", {
+            {
               path: "frontend-monitoring",
               name: "frontendMonitoring",
               component: RUMWeb,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
-            }),
+            },
             // Discoverability pointer → the MCP setup home in IAM. Registered on
             // every edition, matching both the tab in Recommended.vue and the
             // target "mcpServer" route, which are no longer build-gated.
-            withLicenseFeature("mcp", {
+            {
               path: "mcp",
               name: "recommendedMcp",
               component: McpCrossLink,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
-            }),
+            },
           ],
         },
         {

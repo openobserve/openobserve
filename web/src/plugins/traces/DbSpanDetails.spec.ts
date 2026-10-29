@@ -2,8 +2,6 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper, config } from "@vue/test-utils";
 import i18n from "@/locales";
-import { createStore } from "vuex";
-import { createRouter, createMemoryHistory } from "vue-router";
 
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
@@ -272,34 +270,6 @@ describe("DbSpanDetails", () => {
       wrapper = mountDbSpanDetails({ db_query_text: "SELECT 1" });
       const editor = wrapper.findComponent(CodeQueryEditor);
       expect(editor.props("readOnly")).toBe(true);
-    });
-  });
-
-  describe("view query trend license lock", () => {
-    const mountWithFeatures = (features: Record<string, string>) => {
-      const store = createStore({
-        state: { zoConfig: { database_monitoring_enabled: true, features } },
-      });
-      const router = createRouter({
-        history: createMemoryHistory(),
-        routes: [{ path: "/:p(.*)*", component: { template: "<div />" } }],
-      });
-      return mount(DbSpanDetails, {
-        props: { span: { o2_db_fingerprint: "fp1" } },
-        global: { plugins: [store, router] },
-      });
-    };
-    const trend = '[data-test="traces-db-span-details-view-trend"]';
-
-    it("renders the trend button disabled with a lock when db_monitoring is locked", () => {
-      wrapper = mountWithFeatures({ db_monitoring: "locked" });
-      expect(wrapper.find(trend).attributes("disabled")).toBeDefined();
-      expect(wrapper.find(trend).findComponent({ name: "OIcon" }).props("name")).toBe("lock");
-    });
-
-    it("keeps the enabled trend button when db_monitoring is enabled", () => {
-      wrapper = mountWithFeatures({ db_monitoring: "enabled" });
-      expect(wrapper.find(trend).attributes("disabled")).toBeUndefined();
     });
   });
 

@@ -208,7 +208,7 @@ const ORG = "default";
 
 // The row builders live in EditRole.vue; here they are stubs that record what
 // each loader hands them and keep the entity count observable.
-function setup(features?: Record<string, string>) {
+function setup() {
   const updateResourceEntities = vi.fn();
   const updateEntityEntities = vi.fn((entity: any, _keys: string[], entities: any[]) => {
     entity?.entities?.push(...entities);
@@ -216,7 +216,7 @@ function setup(features?: Record<string, string>) {
   const updateResourceResource = vi.fn();
 
   const loaders = useRoleEntityLoaders({
-    store: { state: { selectedOrganization: { identifier: ORG }, zoConfig: { features } } },
+    store: { state: { selectedOrganization: { identifier: ORG } } },
     getStreams: getStreamsMock,
     t: (key: string) => key,
     updateResourceEntities,
@@ -240,58 +240,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
-});
-
-describe("useRoleEntityLoaders - license-locked features", () => {
-  const LOCKED = {
-    dashboards: "locked",
-    pipelines: "locked",
-    alerts: "locked",
-    reports: "locked",
-    synthetics: "locked",
-  };
-
-  it("lists nothing for the rows of locked features", async () => {
-    const { getResourceEntities } = setup(LOCKED);
-    const rows = [
-      row({ resourceName: "dfolder" }),
-      row({ name: "f1", resourceName: "dfolder", childName: "dashboard" }),
-      row({ resourceName: "pipeline" }),
-      row({ name: "f1", resourceName: "afolder", childName: "alert" }),
-      row({ name: "f1", resourceName: "report", childName: "report" }),
-      row({ resourceName: "synthetic_folder" }),
-      row({ name: "f1", resourceName: "synthetic_folder", childName: "synthetics" }),
-      row({ resourceName: "synthetic_environment" }),
-      row({ resourceName: "downtime_folder" }),
-      row({ name: "f1", resourceName: "downtime_folder", childName: "downtime" }),
-    ];
-
-    for (const r of rows) await expect(getResourceEntities(r as any)).resolves.toBe(true);
-
-    expect(downtimesService.list).not.toHaveBeenCalled();
-    expect(commonService.list_Folders).not.toHaveBeenCalled();
-    expect(dashboardService.list).not.toHaveBeenCalled();
-    expect(dashboardService.list_Folders).not.toHaveBeenCalled();
-    expect(pipelineService.getPipelines).not.toHaveBeenCalled();
-    expect(alertService.listByFolderId).not.toHaveBeenCalled();
-    expect(reportService.listByFolderId).not.toHaveBeenCalled();
-    expect(syntheticsService.listByFolderId).not.toHaveBeenCalled();
-    expect(rows.every((r) => !r.is_loading)).toBe(true);
-  });
-
-  it("still lists the same rows when the features are enabled", async () => {
-    const { getResourceEntities } = setup({ dashboards: "enabled", reports: "enabled" });
-
-    await getResourceEntities(
-      row({ name: "f1", resourceName: "dfolder", childName: "dashboard" }) as any,
-    );
-    await getResourceEntities(
-      row({ name: "f9", resourceName: "report", childName: "report" }) as any,
-    );
-
-    expect(dashboardService.list).toHaveBeenCalledTimes(1);
-    expect(reportService.listByFolderId).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe("useRoleEntityLoaders - getResourceEntities dispatch", () => {

@@ -972,7 +972,6 @@ import { matchDetailRow, trustworthyFields } from "@/utils/logs/detailRowMatch";
 import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
@@ -1500,7 +1499,6 @@ export default defineComponent({
 
     // Flag to prevent duplicate correlation API calls
     const correlationFetchInProgress = ref(false);
-    const { locked: correlationLicenseLocked } = useLicenseLock("correlation");
 
     const shouldShowInlineDialog = computed(() => {
       return (
@@ -1871,7 +1869,7 @@ export default defineComponent({
 
     const openCorrelationFromLog = async (logData: any) => {
       // Prevent duplicate calls - if a fetch is already in progress, skip
-      if (correlationFetchInProgress.value || correlationLicenseLocked.value) {
+      if (correlationFetchInProgress.value) {
         return;
       }
 

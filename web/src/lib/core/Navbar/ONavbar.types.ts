@@ -15,7 +15,6 @@
 
 import type { ComputedRef, InjectionKey } from "vue";
 import type { I18nKey, I18nText } from "@/types/i18n";
-import type { FeatureStates } from "@/utils/featureGate";
 
 export interface NavItem {
   title: I18nText;
@@ -34,8 +33,6 @@ export interface NavItem {
    */
   locked?: boolean;
   lockedMessage?: I18nText;
-  /** License-locked: shown with a lock badge, `link` already points at the upsell page. */
-  licenseLocked?: boolean;
 }
 
 /**
@@ -112,8 +109,6 @@ export interface SubnavChild {
    */
   locked?: boolean;
   lockedMessage?: I18nText;
-  /** License feature key; `locked` routes to the upsell page, `hidden` drops the child. */
-  feature?: string;
 }
 
 /** Context for evaluating subnav `gate` predicates (see navGroups.ts). */
@@ -139,8 +134,6 @@ export interface NavGateContext {
   fleetEnabled: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
   hiddenMenus: Set<string>;
-  /** `/config` `features` map (enabled / locked / hidden per license feature). */
-  features: FeatureStates;
 }
 
 /**

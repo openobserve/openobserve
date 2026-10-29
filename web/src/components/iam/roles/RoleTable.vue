@@ -14,7 +14,6 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped } from "@/types/i18n";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
-import type { ForbiddenState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 
@@ -23,7 +22,7 @@ const roleDrafts = useEditorDraftIds("iam_role");
 const props = defineProps<{
   data: any[];
   loading?: boolean;
-  forbidden?: ForbiddenState;
+  forbidden?: boolean;
   actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;

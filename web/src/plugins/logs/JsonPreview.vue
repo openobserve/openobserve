@@ -29,27 +29,8 @@
           }}</span></span
         ></OButton
       >
-      <OTooltip
-        v-if="showViewRelatedBtn && correlationAccess.allowed && correlationLicense.locked.value"
-        :content="correlationLicense.lockedReason.value"
-      >
-        <span class="inline-flex">
-          <OButton
-            size="xs"
-            variant="outline"
-            class="me-2 mb-1.5"
-            disabled
-            data-test="log-correlation-btn"
-          >
-            <template #icon-left>
-              <OIcon name="lock" size="sm" data-test="log-correlation-btn-lock" />
-            </template>
-            {{ t("search.viewRelated") }}
-          </OButton>
-        </span>
-      </OTooltip>
       <OButton
-        v-else-if="showViewRelatedBtn"
+        v-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
         class="me-2 mb-1.5"
@@ -300,7 +281,6 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
@@ -585,7 +565,6 @@ export default {
       checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
     );
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-    const correlationLicense = useLicenseLock("correlation");
 
     // Initialize service correlation composable
     const { isCorrelationAvailable } = useServiceCorrelation();
@@ -607,7 +586,7 @@ export default {
           return;
         }
 
-        if (!correlationAccess.value.allowed || correlationLicense.locked.value) {
+        if (!correlationAccess.value.allowed) {
           // Locked — show it locked, but skip the correlation-availability
           // probe entirely: that call hits a backend route an OSS build 403s
           // on, so there's nothing useful to check before unlocking.
@@ -794,7 +773,6 @@ export default {
         openUpgradeDialog();
         return;
       }
-      if (correlationLicense.locked.value) return;
       emit("show-correlation", props.value);
     };
 
@@ -979,7 +957,6 @@ export default {
       activeTab,
       showViewTraceBtn,
       showViewRelatedBtn,
-      correlationLicense,
       correlationAccess,
       aiAssistantAccess,
       regexPatternsAccess,

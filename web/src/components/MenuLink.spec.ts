@@ -387,20 +387,6 @@ describe("MenuLink", async () => {
     });
   });
 
-  describe("license-locked tile", () => {
-    it("keeps a real link to the page and adds a lock badge", () => {
-      const w = mount(MenuLink, {
-        props: { title: "Workflows", link: "/workflows", licenseLocked: true },
-        global: { plugins: [i18n, mockRouter], provide: { store } },
-      });
-      const tile = w.get('[data-test="menu-link-/workflows-item"]');
-      expect(tile.element.tagName).toBe("A");
-      expect(tile.attributes("href")).toContain("/workflows");
-      expect(w.find('[data-test="menu-link-/workflows-license-lock"]').exists()).toBe(true);
-      w.unmount();
-    });
-  });
-
   describe("trial-paywalled tile (AC-14)", () => {
     function mountTile(props: Record<string, unknown> = {}) {
       return mount(MenuLink, {

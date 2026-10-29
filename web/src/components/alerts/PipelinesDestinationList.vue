@@ -241,7 +241,6 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
@@ -415,7 +414,7 @@ export default defineComponent({
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
-    const forbidden = ref<ForbiddenState>(false);
+    const forbidden = ref(false);
     // Bound to refresh / post-write reloads: always reaches the server.
     const refreshDestinations = () => getDestinations(true);
 
@@ -458,7 +457,7 @@ export default defineComponent({
             queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
         })
         .catch((err: any) => {
-          forbidden.value = forbiddenState(err);
+          forbidden.value = err?.response?.status === 403;
           if (!forbidden.value) {
             toast({
               variant: "error",
