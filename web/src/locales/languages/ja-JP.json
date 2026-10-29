@@ -1041,7 +1041,8 @@
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
       "dotUndated": "Unsaved draft"
-    }
+    },
+    "dateRangePasteBlocked": "このブラウザではクリップボードの読み取りがブロックされています。ピッカーを開いた状態で {shortcut} を押して貼り付けてください。"
   },
   "flow": {
     "stepPicker": {
@@ -10336,6 +10337,10 @@
       "acknowledgeConfirmMessage": "これによりインシデントは対応中としてマークされます。必要に応じて後で再度オープンできます。",
       "acknowledgeConfirmLabel": "確認済みにする",
       "acknowledgeConfirmCancelLabel": "キャンセル",
+      "resolveConfirmTitle": "インシデントを解決しますか？",
+      "resolveConfirmMessage": "インシデントをクローズし、アクティブな一覧から削除します。必要に応じて後で再オープンできます。",
+      "reopenConfirmTitle": "インシデントを再オープンしますか？",
+      "reopenConfirmMessage": "インシデントをオープン状態に戻し、解決と確認済みの情報をクリアします。",
       "acknowledgeAriaLabel": "インシデントを確認済みにする",
       "acknowledgedBy": "確認者",
       "resolve": "解決",
@@ -11646,7 +11651,7 @@
         "weeklySentence": "毎週 {days} · {time}、{duration} 間 · {zone}",
         "fromNoEnd": "{schedule}、{start} から（終了日なし）",
         "fromUntil": "{schedule}、{start} から {until} まで",
-        "onceFor": "1回、{duration}"
+        "onceFor": "1 回、{duration}"
       },
       "validation": {
         "conditionRequired": "条件を追加するか、条件ブロックを削除してください。",
@@ -11988,7 +11993,7 @@
           "30m": "30 分",
           "1h": "1 時間",
           "4h": "4 時間",
-          "24h": "24時間",
+          "24h": "24 時間",
           "custom": "カスタム"
         },
         "endsAt": "終了日時",
@@ -12003,32 +12008,32 @@
         "exclude": "ウィンドウを除外…",
         "firingMuted": "発火中 · ミュート",
         "firingMutedTooltip": "発火は継続中です。通知は {name} によりミュートされています。",
-        "untilClear": "解除されるまで",
-        "untilClearHint": "アラートが復旧したとき、または遅くとも24時間後に終了します。",
-        "confirmUntilClear": "解除されるまでミュート",
-        "titleOne": "{name}をミュート",
-        "subtitleOne": "実行と履歴は継続されます。ウィンドウが終了するまで、通知、呼び出し、ワークフローは停止します。",
-        "untilTime": "{time}まで。",
+        "untilClear": "復旧するまで",
+        "untilClearHint": "アラートが復旧すると終了します。最長 24 時間です。",
+        "confirmUntilClear": "復旧するまでミュート",
+        "titleOne": "{name} をミュート",
+        "subtitleOne": "アラートは実行を続け、履歴も保持します。ウィンドウが終了するまで、通知、呼び出し、ワークフローは停止します。",
+        "untilTime": "{time} まで。",
         "groups": "グループ",
         "groupsThis": "このグループ",
         "groupsAll": "このアラートのすべてのグループ",
-        "addGroup": "発火中のグループを追加",
-        "groupsHint": "これらのグループのみミュートされ、他のグループは通知を続けます",
+        "addGroup": "発火グループを追加",
+        "groupsHint": "これらのグループのみミュートされます。他のグループは通知を続けます。",
         "confirm24h": {
-          "title": "24時間ミュートしますか？",
-          "message": "「解除されるまで」は、アラートが復旧するとすぐにミュートを終了します。",
-          "useUntilClear": "「解除されるまで」を使用",
-          "ok": "24時間ミュート"
+          "title": "24 時間ミュートしますか？",
+          "message": "「復旧するまで」を選ぶと、アラートの復旧と同時にミュートが終了します。",
+          "useUntilClear": "「復旧するまで」を使用",
+          "ok": "24 時間ミュート"
         },
         "muteGroup": "このグループをミュート",
         "endNow": "今すぐミュートを終了",
         "endMute": "ミュートを終了",
-        "mutedUntilClear": "解除されるまでミュート · 最大24時間",
-        "mutedUntilClearGroups": "解除されるまでミュート · {count}グループ | 解除されるまでミュート · {count}グループ",
-        "mutedGroups": "ミュート中 · {count}グループ · {duration}後に終了 | ミュート中 · {count}グループ · {duration}後に終了",
-        "mutedUntilClearTooltip": "{name}により、アラートが復旧するまでミュート、遅くとも{end}",
-        "mutedGroupsTooltip": "{name} により {end} までミュートされています。グループ: {labels}",
-        "mutedUntilClearGroupsTooltip": "{name} によりアラートが復旧するまで、遅くとも {end} までミュートされています。グループ: {labels}",
+        "mutedUntilClear": "復旧するまでミュート · 最長 24 時間",
+        "mutedUntilClearGroups": "復旧するまでミュート · {count} グループ | 復旧するまでミュート · {count} グループ",
+        "mutedGroups": "ミュート中 · {count} グループ · 終了まで {duration} | ミュート中 · {count} グループ · 終了まで {duration}",
+        "mutedUntilClearTooltip": "{name} がアラートの復旧までミュートしています（遅くとも {end}）",
+        "mutedGroupsTooltip": "{name} が {end} までミュートしています。グループ: {labels}",
+        "mutedUntilClearGroupsTooltip": "{name} がアラートの復旧までミュートしています（遅くとも {end}）。グループ: {labels}",
         "untilTomorrow": "明日の {time} まで。"
       },
       "corrected": "修正済み",
@@ -12118,10 +12123,10 @@
       },
       "untilClear": {
         "schedule": "復旧するまで",
-        "atMost": "最大 24 時間",
-        "endsWhenClears": "復旧すると終了",
+        "atMost": "最長 24 時間",
+        "endsWhenClears": "復旧時に終了",
         "byTime": "{time} までに",
-        "whenCleared": "復旧した時刻",
+        "whenCleared": "復旧したとき",
         "endedBy": "{product} により終了",
         "createdFrom": "{source} から"
       },
@@ -12132,12 +12137,12 @@
     },
     "ack": {
       "acknowledge": "確認",
-      "acknowledgeGroups": "発火中の {count} グループを確認 | 発火中の {count} グループを確認",
+      "acknowledgeGroups": "{count} 件の発火グループを確認 | {count} 件の発火グループを確認",
       "unacknowledge": "確認を取り消す",
       "takeOver": "引き継ぐ",
       "chip": "{who} が {source} 経由で確認 · {time}",
       "chipTooltip": "{who} が {time} に {source} から確認",
-      "firingAcknowledged": "発火中 · 確認済み",
+      "firingAcknowledged": "発火 · 確認済み",
       "tile": "確認済み",
       "groupsAcknowledged": "{count} 件確認済み",
       "byAt": "{who} · {time}",
@@ -12146,34 +12151,34 @@
         "incident": "インシデント"
       },
       "history": {
-        "dedupSuppressed": "確認により抑制 ({who})",
-        "acked": "{who} が {source} から確認",
-        "ackedViaPage": "{who} が呼び出し {page} 経由で確認",
-        "ackedViaIncident": "{who} がインシデント {incident} 経由で確認",
-        "unacked": "{who} が {source} から確認を取り消し",
-        "unackedResume": "{who} が {source} から確認を取り消し · 繰り返し通知は {time} に再開",
-        "takenOver": "{who} が {previous} から引き継ぎ ({source})"
+        "dedupSuppressed": "確認応答により抑制 ({who})",
+        "acked": "{who} が {source} から確認応答しました",
+        "ackedViaPage": "{who} が呼び出し {page} 経由で確認応答しました",
+        "ackedViaIncident": "{who} がインシデント {incident} 経由で確認応答しました",
+        "unacked": "{who} が {source} から確認応答を取り消しました",
+        "unackedResume": "{who} が {source} から確認応答を取り消しました · 繰り返しは {time} に再開します",
+        "takenOver": "{previous} から {who} が引き継ぎました ({source})"
       },
       "refused": {
-        "ack": "このアラートを確認することはできません。確認とミュートには管理者または編集者のロール、あるいはアラートのオンコール担当者であることが必要です。",
-        "mute": "このアラートをミュートすることはできません。確認とミュートには管理者または編集者のロール、あるいはアラートのオンコール担当者であることが必要です。",
+        "ack": "このアラートを確認応答できません。確認応答とミュートには管理者または編集者のロール、またはアラートのオンコール応答者である必要があります。",
+        "mute": "このアラートをミュートできません。確認応答とミュートには管理者または編集者のロール、またはアラートのオンコール応答者である必要があります。",
         "onCall": "オンコール: {people}",
         "canAct": "対応可能: {people}",
         "people": "オンコール: {onCall}。対応可能: {canAct}"
       },
       "errors": {
-        "notFiring": "このアラートは発火していないため、確認する対象はありません。",
-        "firingChanged": "このページの読み込み後にアラートが再度発火しました。更新してからもう一度お試しください。"
+        "notFiring": "このアラートは発火していないため、確認応答するものはありません。",
+        "firingChanged": "このページの読み込み後にアラートが再度発火しました。更新して再試行してください。"
       }
     },
     "groupActions": {
-      "menu": "グループの操作",
+      "menu": "グループ操作",
       "viewHistory": "このグループの履歴を表示"
     },
     "firingState": {
       "level": "レベル",
       "firingSince": "発火開始",
-      "firingFor": "{duration} 発火中",
+      "firingFor": "{duration} 間発火中",
       "incident": "インシデント"
     }
   },
@@ -12703,14 +12708,14 @@
       "openSlackSettings": "設定 › Slack でセットアップします"
     },
     "prebuilt": {
-      "slackDescription": "Webhook とテンプレートを使って新しいメッセージを投稿します。オンコールの呼び出しやカスタムの Slack レイアウトに使用します。",
+      "slackDescription": "Webhook とテンプレートで新しいメッセージを投稿します。呼び出しやカスタム Slack レイアウトに使用します。",
       "discordDescription": "Discordチャンネルに通知を送信",
       "msteamsDescription": "Teamsチャンネルに通知を送信",
       "emailDescription": "HTML形式のメール通知を送信",
       "pagerdutyDescription": "PagerDutyでインシデントを作成",
       "opsgenieDescription": "Opsgenieでアラートを作成",
       "servicenowDescription": "ServiceNowでインシデントを作成",
-      "slackAppDescription": "スケジュールされたアラートをその場で更新します。Slack から確認、ミュート、調査ができます。接続済みのワークスペースが必要です。"
+      "slackAppDescription": "スケジュールされたアラートをその場で更新します。Slack から確認応答、ミュート、調査ができます。接続済みのワークスペースが必要です。"
     },
     "import": {
       "title": "宛先をインポート",
@@ -20771,8 +20776,8 @@
         "failed": "失敗",
         "skipped": "スキップ",
         "pending": "保留中",
-        "acknowledged": "確認済み",
-        "ackevent": "確認イベント"
+        "acknowledged": "確認応答済み",
+        "ackevent": "確認応答イベント"
       },
       "alertLevel": {
         "ok": "OK",
@@ -21059,7 +21064,6 @@
       "successfullyImportedTemplates": "テンプレートを{count}件正常にインポートしました | テンプレートを{count}件正常にインポートしました",
       "aiAnalysisIsAlreadyRunningFor": "このインシデントに対してAI分析が既に実行されています",
       "incidentSeverityUpdatedTo": "インシデントの重要度が{severity}に更新されました",
-      "incidentStatusUpdatedTo": "インシデントのステータスが{status}に更新されました",
       "failedToLoadIncidentDetails": "インシデント詳細の読み込みに失敗しました",
       "incidentsRefreshed": "インシデントを更新しました",
       "failedToPostComment": "コメントの投稿に失敗しました",
@@ -21077,13 +21081,13 @@
       "openingDedupConfig": "重複排除設定を開いています: {name}",
       "editingAlert": "アラートを編集中: {name}",
       "ack": {
-        "acked": "{name} を確認しました",
-        "ackedGroups": "{name} の {count} グループを確認しました | {name} の {count} グループを確認しました",
-        "alreadyAcked": "{who} がすでに確認しています",
-        "unacked": "{name} の確認を取り消しました",
-        "takenOver": "{name} の確認を引き継ぎました",
-        "failed": "{name} を確認できませんでした",
-        "unackFailed": "{name} の確認を取り消せませんでした"
+        "acked": "{name} を確認応答しました",
+        "ackedGroups": "{name} の {count} グループを確認応答しました | {name} の {count} グループを確認応答しました",
+        "alreadyAcked": "すでに {who} が確認応答済みです",
+        "unacked": "{name} の確認応答を取り消しました",
+        "takenOver": "{name} の確認応答を引き継ぎました",
+        "failed": "{name} を確認応答できませんでした",
+        "unackFailed": "{name} の確認応答を取り消せませんでした"
       }
     },
     "cipherkeys": {
@@ -21397,13 +21401,13 @@
       "muteFailed": "ミュートを作成できませんでした",
       "viewDowntime": "ダウンタイムを表示",
       "itemsDropped": "選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。 | 選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。",
-      "mutedUntilClear": "{name} を解除されるまでミュートしました（遅くとも {time}）",
-      "alreadyMuted": "{name} は {time} まですでにミュートされています",
-      "muteChanged": "このミュートはページの読み込み後に変更されました。現在は {time} に終了します。",
-      "muteEnded": "ミュートが終了しました。通知が再開されます。",
+      "mutedUntilClear": "{name} を解除されるまでミュートしました (遅くとも {time})",
+      "alreadyMuted": "{name} はすでに {time} までミュートされています",
+      "muteChanged": "このページの読み込み後にミュートが変更されました。現在は {time} に終了します。",
+      "muteEnded": "ミュートが終了しました。通知が再開します。",
       "mutedOne": "{name} を {time} までミュートしました",
       "timeTomorrow": "明日の {time}",
-      "notQuickMute": "このミュートはダウンタイムページで設定されました。変更はそちらで行ってください。"
+      "notQuickMute": "このミュートはダウンタイムページで設定されました。そこで変更してください。"
     }
   },
   "cipherKeys": {
@@ -24183,7 +24187,7 @@
     "deliveriesTitle": "配信",
     "deliveriesNone": "まだ何も送信されていません。",
     "deliveriesRun": "ラダー実行 {run} — ハンドオフにより、受け入れ側チームでラダーが最初から再開されました",
-    "deliveryLanded": "送信成功",
+    "deliveryLanded": "送信済み",
     "deliveryFailed": "送信失敗",
     "deliveriesTruncated": "{total} 件中 {shown} 件の送信を表示中。",
     "teamChannelTitle": "チームチャンネル",
@@ -24777,7 +24781,7 @@
     "myDeliveriesPage": "呼び出し",
     "myDeliveriesLandedColumn": "配信",
     "myDeliveriesSent": "送信済み",
-    "myDeliveriesLanded": "{channel} 経由で届きました",
+    "myDeliveriesLanded": "{channel} で送信されました",
     "myDeliveriesFailed": "{channel} 経由では届きませんでした",
     "myDeliveriesNone": "まだ何も送信されていません。",
     "myDeliveriesNoUnread": "未読はありません。",
@@ -25401,7 +25405,7 @@
     "reachAlarmNoRetry": "再試行の予定はありません — ラダーは終了しました。",
     "reachAlarmNoTransport": "考えられる原因: このデプロイメントにはトランスポートが設定されていません。",
     "reachAlarmCheckTransports": "連絡可能な相手を確認",
-    "reachLanded": "連絡済み",
+    "reachLanded": "送信済み",
     "reachUnreached": "未連絡",
     "onCallDetails": "オンコール詳細",
     "shiftHandover": "引き継ぎ",
@@ -25486,7 +25490,8 @@
     "scopeClaimServiceEverywhere": "{service} は、周囲を所有するのが誰であっても、すべてのクラスタと名前空間でこのチームを呼び出します。",
     "scopeClaimServiceHere": "{service} は {scope} でのみこのチームを呼び出します。それ以外の場所では、周囲のスコープを所有するチームに割り当てられます。",
     "scopeNothingDiscovered": "まだ何も検出されていないため、選択できる対象がありません。詳細設定を使用してフィールドでルールを作成するか、最初にテレメトリを送信してください。",
-    "scopeAdvancedHint": "上記のレベルがカバーしないものを含む、任意のフィールドと値に一致します。"
+    "scopeAdvancedHint": "上記のレベルがカバーしないものを含む、任意のフィールドと値に一致します。",
+    "simulatorSendsNothing": "この優先度では受信できるものが何も送信されません"
   },
   "paidUsage": {
     "consentTitle": "有料のAI使用を有効にしますか？",
@@ -26598,17 +26603,14 @@
     "saveFailed": "アカウントを保存できませんでした。もう一度お試しください。",
     "disconnectFailed": "アカウントを切断できませんでした。もう一度お試しください。",
     "connected": "接続済み",
-    "active": "アクティブ",
-    "account": "アカウント",
     "fromNumber": "発信元番号",
-    "press4": "通話キー: 4 確認、6 解決、8 エスカレーション",
+    "press4": "通話キー（4: 確認、6: 解決、8: エスカレーション）",
     "press4Available": "利用可能",
     "press4NotAvailable": "利用不可",
     "press4NotAvailableHint": "通話では、SMS 内のリンクから確認するよう案内されます。",
     "update": "更新",
     "disconnect": "切断",
     "deploymentTitle": "このデプロイメントの {provider} アカウント",
-    "deploymentNote": "SMS と通話はすでに動作しています。運用担当者が設定済みのため、ここで行う操作はありません。",
     "useOwn": "代わりに独自の {provider} アカウントを使用する",
     "connectTitle": "{provider} を接続",
     "updateTitle": "{provider} を更新",
@@ -26616,7 +26618,7 @@
     "accountSid": "アカウント SID",
     "authToken": "認証トークン",
     "tokenKeep": "空欄のままにすると現在のトークンが保持されます",
-    "fromHelp": "SMS の送信と通話が可能な {provider} の番号(国番号を含む)。",
+    "fromHelp": "この {provider} アカウントの番号（国コード付き）。",
     "connect": "接続",
     "checking": "{provider} で確認中…",
     "disconnectTitle": "{provider} を切断しますか?",
@@ -26629,8 +26631,21 @@
       "tokenRequired": "接続には認証トークンが必要です。",
       "noMasterKey": "運用担当者に {variable} の設定を依頼してください。",
       "accountRejected": "{provider} がこのアカウントを受け入れませんでした。アカウント SID と認証トークン、およびアカウントがアクティブであることを確認してください。",
-      "unreadable": "この組織の電話プロバイダーアカウントを読み取れませんでした。"
-    }
+      "unreadable": "この組織の電話プロバイダーアカウントを読み取れませんでした。",
+      "fromNotOnAccount": "この番号はこの {provider} アカウントのものではありません。{provider} の Phone Numbers → Active numbers にある番号を使用してください。",
+      "unavailable": "{provider} に接続できませんでした。もう一度お試しください。"
+    },
+    "statusChecking": "確認中…",
+    "statusBroken": "動作していません",
+    "statusUnchecked": "確認できませんでした",
+    "cardMeta": "発信元 {number} · アカウント {account}",
+    "deploymentMeta": "発信元 {number}",
+    "uncheckedNow": "現在 {provider} に接続できません。",
+    "trial": "トライアルアカウント: SMS と通話は {provider} で認証済みの番号にのみ届きます。",
+    "cantText": "この番号は SMS を送信できません",
+    "cantCall": "この番号は通話を発信できません",
+    "deploymentOwner": "オペレーターによって設定されるため、ここで設定する項目はありません。",
+    "tokenNewAccount": "別のアカウントには専用の認証トークンが必要です"
   },
   "slackApp": {
     "prereq": {
@@ -26871,8 +26886,8 @@
       "managedTitle": "インスタンス管理者が管理しています。",
       "managedDetail": "認証情報、リンク、および {team} を使用する組織は _meta で設定されます。",
       "managedQuestions": "お問い合わせ: {contact}",
-      "outboundQueue": "アラートメッセージ: {count} 件がキューにあり、最も古いものは {age} | アラートメッセージ: {count} 件がキューにあり、最も古いものは {age}",
-      "outboundEmpty": "キューに入っているアラートメッセージはありません",
+      "outboundQueue": "アラートメッセージ: {count} 件キュー中、最も古いものは {age} | アラートメッセージ: {count} 件キュー中、最も古いものは {age}",
+      "outboundEmpty": "キュー内のアラートメッセージはありません",
       "ageSeconds": "{count} 秒"
     },
     "channels": {
@@ -27070,10 +27085,10 @@
       "webhookTile": "{product} Webhook",
       "twoWay": "双方向",
       "recommendedForAlertResponse": "アラート対応に推奨",
-      "choiceHint": "呼び出しとスーパークラスターは Webhook を使用します。Slack アプリ宛先からの手動送信とリアルタイム送信は別々の投稿になります。",
-      "unavailableReason": "単一クラスター上の Enterprise Slack アプリが必要です",
-      "unavailableFlag": "このサーバーでは無効になっています。オペレーターに {variable} の設定を依頼してください",
-      "unavailableMasterKey": "このサーバーには暗号化キーが必要です。オペレーターに {variable} の設定を依頼してください",
+      "choiceHint": "呼び出しとスーパークラスタは Webhook を使用します。Slack アプリ宛先からの手動送信とリアルタイム送信は別々の投稿になります。",
+      "unavailableReason": "シングルクラスタ上の Enterprise Slack アプリが必要です",
+      "unavailableFlag": "このサーバーでは無効になっています。管理者に {variable} の設定を依頼してください",
+      "unavailableMasterKey": "このサーバーには暗号化キーが必要です。管理者に {variable} の設定を依頼してください",
       "unavailableCloud": "お使いのクラウドリージョンではまだ有効になっていません",
       "unavailableNoAccess": "組織の管理者に Slack アプリの有効化を依頼してください",
       "postOnly": "投稿のみ",
@@ -27084,63 +27099,63 @@
       "workspace": "ワークスペース",
       "channel": "チャンネル",
       "mention": "メンション",
-      "mentionCritical": "重大な場合は {'@'}here、それ以外はなし",
+      "mentionCritical": "{'@'}here はクリティカル時のみ、それ以外はなし",
       "mentionNone": "なし",
-      "mentionHelp": "繰り返しとレベル昇格時に使用されます",
-      "refireReuse": "再発火の再利用（分）",
+      "mentionHelp": "再発火時とレベル昇格時に使用されます",
+      "refireReuse": "再発火の再利用 (分)",
       "refireReuseHelp": "この時間内の再発火は、新しいメッセージを投稿する代わりに以前のメッセージを編集します",
       "buttons": "確認、ミュート、調査のボタン",
-      "buttonsHelp": "発火にインシデントまたは呼び出しがある場合に解決が追加されます",
-      "autoInvestigate": "重大なアラートでは自動的に調査",
-      "autoInvestigateHelp": "組織の AI サービスアカウントとしてその権限で実行され、調査結果をアラートのスレッドに投稿します",
-      "templateDefault": "デフォルトの {product} テンプレート（{name}）",
+      "buttonsHelp": "発火にインシデントまたは呼び出しがある場合は「解決」が追加されます",
+      "autoInvestigate": "クリティカルアラートを自動的に調査",
+      "autoInvestigateHelp": "組織の AI サービスアカウントとして、そのアクセス権で実行され、調査結果をアラートのスレッドに投稿します",
+      "templateDefault": "デフォルトの {product} テンプレート ({name})",
       "sendTest": "テスト送信",
       "setsDefault": "#{channel} のデフォルト組織を {org} に設定します",
-      "answersFor": "#{channel} は組織 {org} の質問に回答します。{thisOrg} からのアラートはここに投稿され、そのスレッドは {thisOrg} で回答されます。チャンネルのデフォルトは変更されません。",
+      "answersFor": "#{channel} は組織 {org} の質問に回答します。{thisOrg} からのアラートはここに投稿され、そのスレッドでは {thisOrg} として回答します。チャンネルのデフォルトは変更されません。",
       "sharedTag": "共有 · {product} Connect",
-      "sharedTitle": "#{channel} は {workspace} 外の人々と共有されています。",
-      "sharedDetail": "彼らにはアラート名、値、チャート、リンクが表示されます。ボタンのクリックは拒否されます。",
+      "sharedTitle": "#{channel} は {workspace} 外のユーザーと共有されています。",
+      "sharedDetail": "彼らにはアラート名、値、グラフ、リンクが表示されます。ボタンをクリックしても拒否されます。",
       "sharedConfirm": "理解しました。この共有チャンネルにアラートを投稿する",
       "sharedRequired": "アラートをこの共有チャンネルに投稿してよいことを確認してください",
       "versionMismatch": "ノードが異なるバージョンで動作しています。先にすべてのノードをアップグレードしてください。",
       "oncallNotAllowed": "{product} アプリの宛先をオンコールチームのチャンネルにすることはできません",
-      "answersForAnother": "#{channel} は別の組織の質問に回答します。{thisOrg} からのアラートはここに投稿され、そのスレッドは {thisOrg} で回答されます。チャンネルのデフォルトは変更されません。",
+      "answersForAnother": "#{channel} は別の組織の質問に回答します。{thisOrg} からのアラートはここに投稿され、そのスレッドでは {thisOrg} として回答します。チャンネルのデフォルトは変更されません。",
       "oncallTag": "オンコールルーム",
-      "oncallTitle": "チーム {team} のオンコール呼び出しも {destination} 経由で #{channel} に投稿されます。",
+      "oncallTitle": "チーム {team} の呼び出しも {destination} 経由で #{channel} に投稿されます。",
       "oncallDetail": "ここへのアラートは別途投稿されます。",
       "oncallConfirm": "理解しました。このオンコールルームにアラートを投稿する",
       "oncallRequired": "アラートをこのオンコールルームに投稿してよいことを確認してください",
-      "workspaceRequired": "ワークスペースを選択してください",
+      "workspaceRequired": "ワークスペースを選択",
       "refireRange": "0 から {max} までの整数の分を入力してください",
-      "connectTitle": "ボタン付きでアラートを投稿できるよう {product} を接続する",
+      "connectTitle": "アラートをボタン付きで投稿するために {product} を接続",
       "connectDetail": "{product} の画面でチャンネルを選択して許可してください。OpenObserve がそのチャンネル用にこの宛先を作成します。",
       "connected": "{name} が #{channel} 用に作成されました。設定を確認して保存してください。",
       "saveFailed": "宛先を保存できませんでした。",
       "switched": "{name} は {product} アプリ経由で投稿するようになりました",
       "switchedBack": "{name} は再び Webhook 経由で投稿します",
-      "switchFailed": "{name} を切り替えできませんでした: {reason}",
+      "switchFailed": "{name} を切り替えられませんでした: {reason}",
       "switchedAll": "{count} 件の宛先を切り替えました | {count} 件の宛先を切り替えました",
-      "switchThisDetail": "確認、ミュート、調査のボタンを使うために {product} アプリに切り替えます。名前、テンプレート、アラートはそのままです。元に戻すと Webhook が復元されます。"
+      "switchThisDetail": "確認、ミュート、調査のボタンを使うため、{product} アプリに切り替えます。名前、テンプレート、アラートはそのままです。元に戻すと Webhook が復元されます。"
     },
     "switchAll": {
       "title": "{count} 件の Webhook 宛先がこのワークスペースに投稿しています。 | {count} 件の Webhook 宛先がこのワークスペースに投稿しています。",
-      "detail": "確認、ミュート、調査のボタンを使うために {product} アプリに切り替えます。名前、テンプレート、アラートはそのままです。元に戻すと Webhook が復元されます。 | 確認、ミュート、調査のボタンを使うために {product} アプリに切り替えます。名前、テンプレート、アラートはそのままです。元に戻すと Webhook が復元されます。",
-      "review": "確認",
+      "detail": "「確認」「ミュート」「調査」ボタンを使えるように {product} アプリへ切り替えます。名前、テンプレート、アラートはそのままです。「元に戻す」で Webhook が復元されます。 | 「確認」「ミュート」「調査」ボタンを使えるように {product} アプリへ切り替えます。名前、テンプレート、アラートはそのままです。「元に戻す」で Webhook が復元されます。",
+      "review": "レビュー",
       "action": "すべて切り替え",
       "summary": "{switched} 件切り替え済み · {count} 件は切り替えできませんでした"
     },
     "oncallUnlinked": {
       "title": "{product} に連携されていないオンコールメンバー",
-      "description": "呼び出しで彼らに DM を送れず、アラートと呼び出しのボタンのクリックは連携するまで保留されます",
+      "description": "呼び出しで本人に DM を送れず、アラートや呼び出しのボタンのクリックは連携が済むまで保留されます",
       "remind": "リマインドする",
-      "columnPerson": "担当者",
+      "columnPerson": "個人",
       "columnTeam": "チーム",
       "columnNextShift": "次のシフト",
-      "columnReminder": "リマインダー",
+      "columnReminder": "リマインド",
       "dmSent": "DM 送信済み {time}",
       "notSent": "未送信",
-      "reminded": "{count} 人にリマインダーを送信しました | {count} 人にリマインダーを送信しました",
-      "remindFailed": "リマインダーを送信できませんでした。"
+      "reminded": "{count} 人にリマインドを送信しました | {count} 人にリマインドを送信しました",
+      "remindFailed": "リマインドを送信できませんでした。"
     }
   },
   "fleet": {
@@ -27765,9 +27780,6 @@
       "visualUnavailable": "ビジュアルエディターでは、この YAML の一部が失われるため表示できません",
       "publishedWithWarnings": "v{version} を公開しました（警告 {count} 件） | v{version} を公開しました（警告 {count} 件）",
       "notFound": "構成 {name} が見つかりません",
-      "leaveEntity": "collector configuration",
-      "leaveMessage": "Save your changes as a draft of this configuration, or discard them.",
-      "leaveMessageNew": "This collector configuration is not created yet. Discard it to leave, or stay on this page.",
       "deleteInUse": "まだ参照されています。フリート: {fleets}、コレクター: {collectors}、アクティブなロールアウト: {rollouts}。先にそれらのフリートを別の構成に変更してください。"
     },
     "history": {

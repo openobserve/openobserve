@@ -62,19 +62,30 @@ async fn process_msg(msg: AlertStateMessage) -> Result<()> {
             // region's `alerts` table, so a plan that outran its alert row is
             // dropped rather than stranding group rows under an alert this
             // region has never heard of. It converges on the next evaluation.
-            table::alert_states::persist_group_plan(&plan, &alert_id).await?;
+            table::alert_states::persist_group_plan(
+                &plan,
+                &alert_id,
+                table::alert_states::PlanApply::Replica,
+            )
+            .await?;
         }
         AlertStateMessage::AdvanceDeliveryState {
             alert_id,
             group_key,
             episode,
             outcome,
+            mint_episode_id,
         } => {
-            // The return value says whether the episode guard still matched.
-            // `false` is not an error here: it means this region's row had
-            // already moved on, which is exactly what the guard is for.
-            table::alert_states::advance_delivery_state(&alert_id, &group_key, episode, outcome)
-                .await?;
+            // A refused guard is not an error here: this region's row had already
+            // moved on, which is what the guard is for. The mint still lands.
+            table::alert_states::advance_delivery_state(
+                &alert_id,
+                &group_key,
+                episode,
+                outcome,
+                mint_episode_id.as_deref(),
+            )
+            .await?;
         }
         AlertStateMessage::DeleteGroups {
             alert_id,
