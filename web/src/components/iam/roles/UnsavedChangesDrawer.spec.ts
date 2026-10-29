@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
@@ -62,6 +63,7 @@ const change = (id: string, overrides: Partial<PendingChange> = {}): PendingChan
   actions: [{ action: "AllowGet", label: raw("Get") }],
   keys: [`${id}:AllowGet`],
   effect: raw(`effect of ${id}`),
+  neededBy: [],
   notes: [],
   ...overrides,
 });
@@ -96,28 +98,40 @@ const mountDrawer = (
     global: { plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
   });
 
+// Truncated labels carry tooltips of their own, so pick the one with a content prop.
+const tooltipOf = (wrapper: ReturnType<typeof mountDrawer>, prop: "content") =>
+  wrapper
+    .findAllComponents(OTooltip)
+    .map((tip) => tip.props(prop))
+    .find(Boolean);
+
 const find = (wrapper: ReturnType<typeof mountDrawer>, dataTest: string) =>
   wrapper.find(`[data-test="${dataTest}"]`);
 
-describe("UnsavedChangesDrawer - Not Added Yet", () => {
+const expand = (wrapper: ReturnType<typeof mountDrawer>) =>
+  find(wrapper, "edit-role-companions-toggle").trigger("click");
+
+describe("UnsavedChangesDrawer - Not added yet", () => {
   it("shows nothing missing when every module is in place", () => {
     const wrapper = mountDrawer({ groups: [group("stream", [change("logs-app-added")])] });
 
     expect(find(wrapper, "edit-role-companions").exists()).toBe(false);
   });
 
-  it("opens the list for one or two missing modules", () => {
+  it("starts closed, naming the missing modules on one line", () => {
     const wrapper = mountDrawer({
       gaps: [gap("destination", ["AllowList"]), gap("template", ["AllowList"])],
     });
 
-    expect(find(wrapper, "edit-role-companions").text()).toContain("Not Added Yet · 2 modules");
-    expect(find(wrapper, "edit-role-companion-destination").exists()).toBe(true);
-    expect(find(wrapper, "edit-role-companions-toggle").attributes("aria-expanded")).toBe("true");
-    expect(find(wrapper, "edit-role-companions-names").exists()).toBe(false);
+    expect(find(wrapper, "edit-role-companions").text()).toContain("Not added yet · 2 modules");
+    expect(find(wrapper, "edit-role-companion-destination").exists()).toBe(false);
+    expect(find(wrapper, "edit-role-companions-toggle").attributes("aria-expanded")).toBe("false");
+    expect(find(wrapper, "edit-role-companions-names").text()).toBe(
+      "Destinations: List, Templates: List",
+    );
   });
 
-  it("closes the list for three or more, still naming them on one line", async () => {
+  it("opens the list when the admin expands it", async () => {
     const wrapper = mountDrawer({
       gaps: [
         gap("stream", ["AllowList", "AllowGet"]),
@@ -138,25 +152,30 @@ describe("UnsavedChangesDrawer - Not Added Yet", () => {
 
   it("returns to the default each time the drawer opens", async () => {
     const wrapper = mountDrawer({ gaps: [gap("destination", ["AllowList"])] });
-    await find(wrapper, "edit-role-companions-toggle").trigger("click");
-    expect(find(wrapper, "edit-role-companion-destination").exists()).toBe(false);
+    await expand(wrapper);
+    expect(find(wrapper, "edit-role-companion-destination").exists()).toBe(true);
 
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ open: true });
 
-    expect(find(wrapper, "edit-role-companion-destination").exists()).toBe(true);
+    expect(find(wrapper, "edit-role-companion-destination").exists()).toBe(false);
   });
 
-  it("says which module needs a missing one, and why", () => {
+  it("says which module needs a missing one, and why", async () => {
     const wrapper = mountDrawer({ gaps: [gap("destination", ["AllowList"])] });
+    await expand(wrapper);
 
-    expect(find(wrapper, "edit-role-companion-destination").text()).toContain(
+    expect(find(wrapper, "edit-role-companion-needs-destination").text()).toBe(
+      "Needed by Alert Folders",
+    );
+    expect(tooltipOf(wrapper, "content")).toBe(
       "Alert Folders needs it to choose where alerts send.",
     );
   });
 
   it("adds the module-wide grant for one row", async () => {
     const wrapper = mountDrawer({ gaps: [gap("destination", ["AllowList"])] });
+    await expand(wrapper);
 
     await find(wrapper, "edit-role-companion-add-destination").trigger("click");
 
@@ -166,6 +185,7 @@ describe("UnsavedChangesDrawer - Not Added Yet", () => {
   // Streams Get is picked per stream (D1), so Open Streams covers it and Add never grants a module-wide read.
   it("offers Open Streams for Get and Add for List when both Streams grants are missing", async () => {
     const wrapper = mountDrawer({ gaps: [gap("stream", ["AllowList", "AllowGet"], "dfolder")] });
+    await expand(wrapper);
 
     await find(wrapper, "edit-role-companion-open-stream").trigger("click");
     await find(wrapper, "edit-role-companion-add-stream").trigger("click");
@@ -178,6 +198,7 @@ describe("UnsavedChangesDrawer - Not Added Yet", () => {
     const wrapper = mountDrawer({
       gaps: [gap("destination", ["AllowList"]), gap("template", ["AllowList"])],
     });
+    await expand(wrapper);
 
     find(wrapper, "edit-role-companion-add-destination").element.dispatchEvent(
       new MouseEvent("click", { detail: 2, bubbles: true }),
@@ -189,8 +210,9 @@ describe("UnsavedChangesDrawer - Not Added Yet", () => {
     expect(wrapper.emitted("add")).toBeUndefined();
   });
 
-  it("offers Add when Streams lacks only List", () => {
+  it("offers Add when Streams lacks only List", async () => {
     const wrapper = mountDrawer({ gaps: [gap("stream", ["AllowList"], "dfolder")] });
+    await expand(wrapper);
 
     expect(find(wrapper, "edit-role-companion-add-stream").exists()).toBe(true);
     expect(find(wrapper, "edit-role-companion-open-stream").exists()).toBe(false);
@@ -256,21 +278,61 @@ describe("UnsavedChangesDrawer - Your Changes", () => {
     ).toBe(true);
   });
 
-  it("shows a change's effect and notes", () => {
+  it("shows no effect sentence on an added row", () => {
+    const wrapper = mountDrawer({ groups: [group("stream", [change("logs-app-added")])] });
+
+    expect(find(wrapper, "edit-role-unsaved-logs-app-added").text()).not.toContain("effect of");
+  });
+
+  it("keeps the effect sentence on a removed row", () => {
+    const wrapper = mountDrawer({
+      groups: [group("stream", [change("logs-app-removed", { state: "removed" })])],
+    });
+
+    expect(find(wrapper, "edit-role-unsaved-logs-app-removed").text()).toContain(
+      "effect of logs-app-removed",
+    );
+  });
+
+  it("says who needs an added row and holds the full reason in the tooltip", () => {
     const wrapper = mountDrawer({
       groups: [
         group("stream", [
           change("stream-all-added", {
-            effect: raw("Can see the list of every stream."),
-            notes: [raw("Dash Folders needs this to load panel data.")],
+            neededBy: [raw("Alert Folders")],
+            notes: [raw("Alert Folders needs this to load panel data.")],
           }),
         ]),
       ],
     });
 
-    const row = find(wrapper, "edit-role-unsaved-stream-all-added");
-    expect(row.text()).toContain("Can see the list of every stream.");
-    expect(row.text()).toContain("Dash Folders needs this to load panel data.");
+    expect(find(wrapper, "edit-role-unsaved-needed-stream-all-added").text()).toBe(
+      "Needed by Alert Folders",
+    );
+    expect(tooltipOf(wrapper, "content")).toBe("Alert Folders needs this to load panel data.");
+  });
+
+  it("says a removed row is still needed", () => {
+    const wrapper = mountDrawer({
+      groups: [
+        group("stream", [
+          change("stream-all-removed", { state: "removed", neededBy: [raw("Alert Folders")] }),
+        ]),
+      ],
+    });
+
+    expect(find(wrapper, "edit-role-unsaved-needed-stream-all-removed").text()).toBe(
+      "Still needed by Alert Folders",
+    );
+  });
+
+  it("shows only the info icon for a note with no needer", () => {
+    const wrapper = mountDrawer({
+      groups: [group("stream", [change("a-added", { notes: [raw("Shows only some.")] })])],
+    });
+
+    expect(find(wrapper, "edit-role-unsaved-needed-a-added").text()).toBe("");
+    expect(find(wrapper, "edit-role-unsaved-needed-info-a-added").exists()).toBe(true);
   });
 
   it("undoes one change with its own keys", async () => {

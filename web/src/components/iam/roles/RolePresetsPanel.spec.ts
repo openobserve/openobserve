@@ -59,6 +59,7 @@ const ALERT_MANAGER = ready({
     `stream:${ORG_WIDE}:AllowList`,
     `stream:${ORG_WIDE}:AllowGet`,
   ],
+  readsEveryStream: true,
 });
 
 let wrapper: VueWrapper | undefined;
@@ -290,6 +291,19 @@ describe("RolePresetsPanel - detail", () => {
     expect(detail.find('[data-test="edit-role-preset-missing"]').text()).toBe(
       "Still missing after adding: Streams: List and Get, Destinations: List",
     );
+  });
+
+  it.each([
+    ["alert_manager", ALERT_MANAGER, true],
+    ["alert_viewer", ready({ adds: [`afolder:${ORG_WIDE}:AllowList`] }), false],
+  ])("%s: the reads-every-stream line shows is %s", async (id, preview, shown) => {
+    const w = await mountPanel({ [id]: preview });
+
+    const detail = await openDetail(w, id);
+
+    const line = detail.find('[data-test="edit-role-preset-reads-every-stream"]');
+    expect(line.exists()).toBe(shown);
+    if (shown) expect(line.text()).toBe(t("iam.editRole.presetReadsEveryStream"));
   });
 
   it("says nothing will be missing when no gap is left", async () => {

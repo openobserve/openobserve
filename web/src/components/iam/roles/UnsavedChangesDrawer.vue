@@ -30,181 +30,217 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emit('undo', allKeys)"
     @click:primary="emit('save')"
   >
-    <section
-      v-if="gapRows.length"
-      :aria-label="calloutTitle"
-      data-test="edit-role-companions"
-      class="rounded-default border-badge-warning-soft-text/55 bg-badge-warning-soft-bg mx-4 mt-3 mb-1 border border-dashed"
-    >
-      <div class="flex items-start gap-2 pe-3">
+    <div class="flex min-h-full flex-col">
+      <div
+        class="text-text-secondary flex items-baseline gap-1.5 px-4 pt-4 pb-0.5 text-xs font-semibold"
+      >
+        {{ t("iam.editRole.yourChanges") }}
+        <span class="font-normal" data-test="edit-role-unsaved-summary">
+          <span aria-hidden="true">{{ raw("·") }}</span>
+          {{ changesLine }}
+        </span>
+      </div>
+      <section
+        v-for="group in groups"
+        :key="group.key"
+        :data-test="`edit-role-unsaved-group-${group.key}`"
+      >
         <div
-          class="flex min-w-0 flex-1 cursor-pointer items-start gap-2 ps-3 pt-2.5 pb-2"
-          @click="toggleCallout"
+          class="text-text-heading text-compact flex items-center gap-1.5 px-4 pt-2.5 font-semibold"
         >
-          <OIcon name="warning" size="sm" class="text-badge-warning-soft-text mt-0.5 shrink-0" />
-          <span class="min-w-0 flex-1">
-            <span class="text-text-heading text-compact block font-semibold">
-              {{ calloutTitle }}
-            </span>
-            <span class="text-text-secondary block text-xs">
-              {{ t("iam.editRole.notAddedYetHint") }}
-            </span>
-            <span
-              v-if="!calloutOpen"
-              class="text-text-heading mt-1 block text-xs font-medium"
-              data-test="edit-role-companions-names"
+          <OIcon :name="group.icon" size="sm" class="text-text-secondary" />
+          {{ group.label }}
+        </div>
+        <div
+          v-for="change in group.changes"
+          :key="change.id"
+          class="flex items-start gap-2.5 px-4 pt-1.5 pb-2"
+          :data-test="`edit-role-unsaved-${change.id}`"
+        >
+          <OIcon
+            :name="change.state === 'added' ? 'add-circle' : 'do-not-disturb-on'"
+            size="sm"
+            class="mt-0.5"
+            :class="
+              change.state === 'added'
+                ? 'text-badge-success-soft-text'
+                : 'text-badge-error-soft-text'
+            "
+            :label="
+              change.state === 'added'
+                ? t('iam.editRole.summaryChangeAdded')
+                : t('iam.editRole.summaryChangeRemoved')
+            "
+          />
+          <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+              <OTruncatedText
+                class="text-sm"
+                :class="
+                  change.state === 'added' ? 'text-text-body' : 'text-text-secondary line-through'
+                "
+              >
+                {{ change.label }}
+              </OTruncatedText>
+              <OBadge
+                v-for="action in change.actions"
+                :key="action.action"
+                :variant="change.state === 'added' ? 'primary-soft' : 'default-soft'"
+                size="sm"
+              >
+                {{ action.label }}
+              </OBadge>
+            </div>
+            <p v-if="change.state === 'removed'" class="text-compact text-text-secondary">
+              {{ change.effect }}
+            </p>
+            <div
+              v-if="change.neededBy.length || change.notes.length"
+              class="text-text-secondary flex items-center gap-1 text-xs"
+              :data-test="`edit-role-unsaved-needed-${change.id}`"
             >
-              {{ namesLine }}
-            </span>
-          </span>
+              <span v-if="change.neededBy.length">
+                {{
+                  t(
+                    change.state === "added"
+                      ? "iam.editRole.neededBy"
+                      : "iam.editRole.stillNeededBy",
+                    { modules: listOf(change.neededBy) },
+                  )
+                }}
+              </span>
+              <OTooltip v-if="change.notes.length" :content="raw(change.notes.join(' '))">
+                <span class="inline-flex" :data-test="`edit-role-unsaved-needed-info-${change.id}`">
+                  <OIcon name="info" size="sm" />
+                </span>
+              </OTooltip>
+            </div>
+          </div>
           <OButton
             variant="ghost"
-            size="icon-xs"
-            :aria-expanded="calloutOpen"
-            aria-controls="edit-role-companions-list"
-            :aria-label="calloutTitle"
-            data-test="edit-role-companions-toggle"
-            @click.stop="toggleCallout"
+            size="sm"
+            icon-left="undo"
+            :disabled="saving"
+            :data-test="`edit-role-unsaved-undo-${change.id}`"
+            @click="emit('undo', change.keys)"
           >
-            <OIcon :name="calloutOpen ? 'expand-less' : 'expand-more'" size="sm" />
+            {{ t("iam.editRole.summaryUndoRemove") }}
           </OButton>
         </div>
-        <OButton
-          v-if="gapRows.length > 1"
-          variant="ghost"
-          size="sm"
-          icon-left="add"
-          class="mt-2 shrink-0"
-          :disabled="saving"
-          data-test="edit-role-companions-add-all"
-          @click="
-            addKeys(
-              $event,
-              gapRows.flatMap((gap) => gap.keys),
-            )
-          "
+      </section>
+      <!-- Pinned above the footer so the missing grants stay in view next to Save on a long list. -->
+      <div v-if="gapRows.length" class="bg-dialog-bg sticky bottom-0 z-10 mt-auto px-4 py-3">
+        <section
+          :aria-label="calloutTitle"
+          data-test="edit-role-companions"
+          class="rounded-default border-badge-warning-soft-text/55 bg-badge-warning-soft-bg border border-dashed"
         >
-          {{ t("iam.editRole.companionAddAll") }}
-        </OButton>
-      </div>
-      <ul
-        v-if="calloutOpen"
-        id="edit-role-companions-list"
-        class="border-badge-warning-soft-text/20 divide-badge-warning-soft-text/20 max-h-54 divide-y overflow-y-auto border-t ps-9.5 pe-3 pb-0.5"
-      >
-        <li
-          v-for="gap in gapRows"
-          :key="gap.module"
-          class="flex items-center gap-3 py-2"
-          :data-test="`edit-role-companion-${gap.module}`"
-        >
-          <div class="flex min-w-0 flex-1 flex-col gap-1">
-            <OTruncatedText class="text-text-body text-sm">{{ gap.label }}</OTruncatedText>
-            <span v-for="why in gap.why" :key="why" class="text-text-secondary text-xs">
-              {{ why }}
-            </span>
-          </div>
-          <OTooltip v-if="gap.opensModule" :content="t('iam.editRole.companionOpenStreamsTooltip')">
-            <OButton
-              variant="outline"
-              size="sm"
-              :disabled="saving"
-              :data-test="`edit-role-companion-open-${gap.module}`"
-              @click="emit('open-module', gap.module)"
+          <div class="flex items-start gap-2 pe-3">
+            <div
+              class="flex min-w-0 flex-1 cursor-pointer items-start gap-2 ps-3 pt-2.5 pb-2"
+              @click="toggleCallout"
             >
-              {{ t("iam.editRole.companionOpenStreams") }}
-            </OButton>
-          </OTooltip>
-          <OButton
-            v-if="gap.keys.length"
-            variant="outline"
-            size="sm"
-            icon-left="add"
-            :aria-label="t('iam.editRole.companionAddItem', { item: gap.label })"
-            :disabled="saving"
-            :data-test="`edit-role-companion-add-${gap.module}`"
-            @click="addKeys($event, gap.keys)"
-          >
-            {{ t("iam.editRole.companionAdd") }}
-          </OButton>
-        </li>
-      </ul>
-    </section>
-    <div
-      class="text-text-secondary flex items-baseline gap-1.5 px-4 pt-4 pb-0.5 text-xs font-semibold"
-    >
-      {{ t("iam.editRole.yourChanges") }}
-      <span class="font-normal" data-test="edit-role-unsaved-summary">
-        <span aria-hidden="true">{{ raw("·") }}</span>
-        {{ changesLine }}
-      </span>
-    </div>
-    <section
-      v-for="group in groups"
-      :key="group.key"
-      :data-test="`edit-role-unsaved-group-${group.key}`"
-    >
-      <div
-        class="text-text-heading text-compact flex items-center gap-1.5 px-4 pt-2.5 font-semibold"
-      >
-        <OIcon :name="group.icon" size="sm" class="text-text-secondary" />
-        {{ group.label }}
-      </div>
-      <div
-        v-for="change in group.changes"
-        :key="change.id"
-        class="flex items-start gap-2.5 px-4 pt-1.5 pb-2"
-        :data-test="`edit-role-unsaved-${change.id}`"
-      >
-        <OIcon
-          :name="change.state === 'added' ? 'add-circle' : 'do-not-disturb-on'"
-          size="sm"
-          class="mt-0.5"
-          :class="
-            change.state === 'added' ? 'text-badge-success-soft-text' : 'text-badge-error-soft-text'
-          "
-          :label="
-            change.state === 'added'
-              ? t('iam.editRole.summaryChangeAdded')
-              : t('iam.editRole.summaryChangeRemoved')
-          "
-        />
-        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-            <OTruncatedText
-              class="text-sm"
-              :class="
-                change.state === 'added' ? 'text-text-body' : 'text-text-secondary line-through'
+              <OIcon
+                name="warning"
+                size="sm"
+                class="text-badge-warning-soft-text mt-0.5 shrink-0"
+              />
+              <span class="min-w-0 flex-1">
+                <span class="text-text-heading text-compact block font-semibold">
+                  {{ calloutTitle }}
+                </span>
+                <span
+                  v-if="!calloutOpen"
+                  class="text-text-heading mt-1 block text-xs font-medium"
+                  data-test="edit-role-companions-names"
+                >
+                  {{ namesLine }}
+                </span>
+              </span>
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                :aria-expanded="calloutOpen"
+                aria-controls="edit-role-companions-list"
+                :aria-label="calloutTitle"
+                data-test="edit-role-companions-toggle"
+                @click.stop="toggleCallout"
+              >
+                <OIcon :name="calloutOpen ? 'expand-less' : 'expand-more'" size="sm" />
+              </OButton>
+            </div>
+            <OButton
+              v-if="gapRows.length > 1"
+              variant="ghost"
+              size="sm"
+              icon-left="add"
+              class="mt-2 shrink-0"
+              :disabled="saving"
+              data-test="edit-role-companions-add-all"
+              @click="
+                addKeys(
+                  $event,
+                  gapRows.flatMap((gap) => gap.keys),
+                )
               "
             >
-              {{ change.label }}
-            </OTruncatedText>
-            <OBadge
-              v-for="action in change.actions"
-              :key="action.action"
-              :variant="change.state === 'added' ? 'primary-soft' : 'default-soft'"
-              size="sm"
-            >
-              {{ action.label }}
-            </OBadge>
+              {{ t("iam.editRole.companionAddAll") }}
+            </OButton>
           </div>
-          <p class="text-compact text-text-secondary">{{ change.effect }}</p>
-          <p v-for="note in change.notes" :key="note" class="text-text-secondary text-xs">
-            {{ note }}
-          </p>
-        </div>
-        <OButton
-          variant="ghost"
-          size="sm"
-          icon-left="undo"
-          :disabled="saving"
-          :data-test="`edit-role-unsaved-undo-${change.id}`"
-          @click="emit('undo', change.keys)"
-        >
-          {{ t("iam.editRole.summaryUndoRemove") }}
-        </OButton>
+          <ul
+            v-if="calloutOpen"
+            id="edit-role-companions-list"
+            class="border-badge-warning-soft-text/20 divide-badge-warning-soft-text/20 max-h-54 divide-y overflow-y-auto border-t ps-9.5 pe-3 pb-0.5"
+          >
+            <li
+              v-for="gap in gapRows"
+              :key="gap.module"
+              class="flex items-center gap-3 py-2"
+              :data-test="`edit-role-companion-${gap.module}`"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <OTruncatedText class="text-text-body text-sm">{{ gap.label }}</OTruncatedText>
+                <span
+                  class="text-text-secondary flex items-center gap-1 text-xs"
+                  :data-test="`edit-role-companion-needs-${gap.module}`"
+                >
+                  {{ gap.needsLine }}
+                  <OTooltip :content="raw(gap.why.join(' '))">
+                    <span class="inline-flex"><OIcon name="info" size="sm" /></span>
+                  </OTooltip>
+                </span>
+              </div>
+              <OTooltip
+                v-if="gap.opensModule"
+                :content="t('iam.editRole.companionOpenStreamsTooltip')"
+              >
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :disabled="saving"
+                  :data-test="`edit-role-companion-open-${gap.module}`"
+                  @click="emit('open-module', gap.module)"
+                >
+                  {{ t("iam.editRole.companionOpenStreams") }}
+                </OButton>
+              </OTooltip>
+              <OButton
+                v-if="gap.keys.length"
+                variant="outline"
+                size="sm"
+                icon-left="add"
+                :aria-label="t('iam.editRole.companionAddItem', { item: gap.label })"
+                :disabled="saving"
+                :data-test="`edit-role-companion-add-${gap.module}`"
+                @click="addKeys($event, gap.keys)"
+              >
+                {{ t("iam.editRole.companionAdd") }}
+              </OButton>
+            </li>
+          </ul>
+        </section>
       </div>
-    </section>
+    </div>
   </ODrawer>
 </template>
 
@@ -231,6 +267,8 @@ export type PendingChange = {
   keys: string[];
   /** What the change lets the role do, or no longer do, in one sentence. */
   effect: I18nText;
+  /** Module labels of the rules that need this change, for the short "Needed by" line. */
+  neededBy: I18nText[];
   notes: I18nText[];
 };
 
@@ -300,6 +338,9 @@ const gapRows = computed(() =>
         module: props.moduleLabel(gap.module),
         actions: listOf(props.summaryActions(gap.actions).map((action) => action.label)),
       }),
+      needsLine: t("iam.editRole.neededBy", {
+        modules: listOf(gap.neededBy.map((need) => props.moduleLabel(need.module))),
+      }),
       why: gap.neededBy.map((need) =>
         t("iam.editRole.companionNeeds", {
           module: props.moduleLabel(need.module),
@@ -327,10 +368,10 @@ const namesLine = computed(() =>
   ),
 );
 
-// null follows the default: a short list opens, a long one stays out of the way.
+// null follows the default: closed, with the missing modules named on one line until the admin expands it.
 const calloutChoice = ref<boolean | null>(null);
 
-const calloutOpen = computed(() => calloutChoice.value ?? gapRows.value.length <= 2);
+const calloutOpen = computed(() => calloutChoice.value ?? false);
 
 const toggleCallout = () => {
   calloutChoice.value = !calloutOpen.value;

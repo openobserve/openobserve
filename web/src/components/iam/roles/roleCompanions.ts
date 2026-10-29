@@ -85,7 +85,7 @@ const RESOURCES_OF: Record<string, string[]> = {
   stream: ["stream", ...STREAM_TYPES],
 };
 
-// A hand-built role picks its streams; one Add here must not open every stream in the org.
+// The drawer patches a hand-built role whose streams were picked one by one, so its Add never widens to every stream; a job preset does only after its detail says so.
 const PICK_ITEMS_INSTEAD: Record<string, CompanionAction[]> = { stream: ["AllowGet"] };
 
 type ActionIndex = Map<string, Set<string>>;

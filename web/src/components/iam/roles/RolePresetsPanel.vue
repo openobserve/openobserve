@@ -215,6 +215,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </span>
             <div
+              v-if="detailPreview.readsEveryStream"
+              class="text-text-secondary mt-1.5 flex items-start gap-1 text-xs"
+              data-test="edit-role-preset-reads-every-stream"
+            >
+              <OIcon name="info" size="sm" class="shrink-0" />
+              <span>{{ t("iam.editRole.presetReadsEveryStream") }}</span>
+            </div>
+            <div
               v-if="missingLine"
               class="text-badge-warning-soft-text mt-1.5 flex items-start gap-1 text-xs"
               data-test="edit-role-preset-missing"

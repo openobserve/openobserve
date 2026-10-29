@@ -426,15 +426,9 @@ export const useRoleSummary = (deps: SummaryDeps) => {
   };
 
   // "Dash Folders needs this to load panel data." for a change that meets, or no longer meets, another module's need.
-  const companionNotes = (
-    gap: CompanionGap | undefined,
-    actions: string[],
-    key: "iam.editRole.companionNeedsThis" | "iam.editRole.companionStillNeedsThis",
-  ) =>
+  const companionNeeds = (gap: CompanionGap | undefined, actions: string[]) =>
     gap && (actions.includes("AllowAll") || gap.actions.some((a) => actions.includes(a)))
-      ? gap.neededBy.map((need) =>
-          t(key, { module: resourceLabel(need.module), reason: t(need.reasonKey) }),
-        )
+      ? gap.neededBy
       : [];
 
   const pendingChanges = computed<PendingChange[]>(() => {
@@ -462,16 +456,25 @@ export const useRoleSummary = (deps: SummaryDeps) => {
         actions.includes("AllowList") &&
         !current.has(buildGrantKey(resource, "AllowGet", orgWide)) &&
         !current.has(buildGrantKey(resource, "AllowAll", orgWide));
-      return [
-        ...(listOnly ? [t(filtered.note)] : []),
-        ...(state === "added"
-          ? companionNotes(gapsIfMissing(module), actions, "iam.editRole.companionNeedsThis")
-          : companionNotes(
-              companionGaps.value.find((gap) => gap.module === module),
-              actions,
-              "iam.editRole.companionStillNeedsThis",
-            )),
-      ];
+      const needs = companionNeeds(
+        state === "added"
+          ? gapsIfMissing(module)
+          : companionGaps.value.find((gap) => gap.module === module),
+        actions,
+      );
+      const key =
+        state === "added"
+          ? "iam.editRole.companionNeedsThis"
+          : "iam.editRole.companionStillNeedsThis";
+      return {
+        notes: [
+          ...(listOnly ? [t(filtered.note)] : []),
+          ...needs.map((need) =>
+            t(key, { module: resourceLabel(need.module), reason: t(need.reasonKey) }),
+          ),
+        ],
+        neededBy: [...new Set(needs.map((need) => resourceLabel(need.module)))].map(raw),
+      };
     };
 
     const changes: PendingChange[] = [];
@@ -481,6 +484,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
           const ofState = grants.filter((grant) => grant.state === state);
           if (!ofState.length) return;
           const actions = ofState.map((grant) => grant.action);
+          const { notes, neededBy } = notesOf(resource, entity, state, actions);
           changes.push({
             id: `${resource}-${entity}-${state}`,
             state,
@@ -490,7 +494,8 @@ export const useRoleSummary = (deps: SummaryDeps) => {
             actions: summaryActions(actions),
             keys: ofState.map((grant) => buildGrantKey(resource, grant.action, entity)),
             effect: effectOf(resource, entity, state, actions),
-            notes: notesOf(resource, entity, state, actions),
+            neededBy,
+            notes,
           });
         });
       });

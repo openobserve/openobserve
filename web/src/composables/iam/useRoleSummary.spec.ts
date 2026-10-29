@@ -283,6 +283,7 @@ describe("useRoleSummary - pending changes [characterization]", () => {
         keys: ["metrics:cpu:AllowGet", "metrics:cpu:AllowList"],
         moduleKey: "stream",
         effect: "Can view the cpu metrics stream.",
+        neededBy: [],
         notes: [],
       },
     ]);
@@ -466,6 +467,10 @@ describe("useRoleSummary - review drawer model", () => {
     expect(notesOf("logs-app-removed")).toEqual([
       "Dash Folders still needs this to load panel data.",
     ]);
+    const neededByOf = (id: string) =>
+      summary.pendingChanges.value.find((change) => change.id === id)?.neededBy;
+    expect(neededByOf(`stream-${ALL}-added`)).toEqual(["Dash Folders"]);
+    expect(neededByOf("logs-app-removed")).toEqual(["Dash Folders"]);
   });
 
   it("passes the rail's staged counts to the overview card", () => {

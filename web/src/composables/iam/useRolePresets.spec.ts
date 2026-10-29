@@ -297,9 +297,21 @@ describe("useRolePresets - preview", () => {
       adds: [],
       restores: [],
       skipped: 4,
+      readsEveryStream: false,
       stillMissing: [],
     });
     expect(inRole(preview)).toBe(true);
+  });
+
+  it("flags a preset that adds the stream wildcard Get, and only then", () => {
+    const ctx = setup();
+    expect(ctx.previewPreset("alert_manager").readsEveryStream).toBe(true);
+    expect(ctx.previewPreset("alert_viewer").readsEveryStream).toBe(false);
+  });
+
+  it("does not flag a role that already holds the stream wildcard Get", () => {
+    const ctx = setup({ saved: [`stream:${ALL}:AllowGet`, `stream:${ALL}:AllowList`] });
+    expect(ctx.previewPreset("alert_manager").readsEveryStream).toBe(false);
   });
 
   it("does not read In Role while one grant is still missing", () => {

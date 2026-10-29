@@ -18,7 +18,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import type { Resource, Entity, PermissionType } from "@/ts/interfaces";
 import { raw, type TranslateFn } from "@/types/i18n";
 import { useRoleScopes } from "@/composables/iam/useRoleScopes";
-import { splitGrantKey } from "@/composables/iam/useRoleGrants";
+import { buildGrantKey, splitGrantKey } from "@/composables/iam/useRoleGrants";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { STREAM_PARENT_KEY } from "@/components/iam/roles/roleModules";
 import { findCompanionGaps, type CompanionGap } from "@/components/iam/roles/roleCompanions";
@@ -67,6 +67,8 @@ export type PresetPreview = {
   skipped: number;
   stillMissing: CompanionGap[];
   noMatchingStreams?: boolean;
+  /** Add will stage a Get or All on every stream in the org, new ones included. */
+  readsEveryStream?: boolean;
 };
 
 type Row = Resource | Entity;
@@ -522,11 +524,16 @@ export const useRolePresets = (deps: PresetDeps) => {
     const resolved = resolvePreset(presetId);
     const { adds, unique } = pendingGrants(resolved?.grants ?? []);
     const addKeys = adds.map((grant) => permissionHashFor(grant.row, grant.permission));
+    const everyStream = `_all_${orgId()}`;
+    const readsEveryStream = ["AllowGet", "AllowAll"].some((permission) =>
+      addKeys.includes(buildGrantKey(STREAM_PARENT_KEY, permission, everyStream)),
+    );
     return {
       status: "ready",
       adds: addKeys,
       restores: addKeys.filter(isRestore),
       skipped: unique - addKeys.length,
+      readsEveryStream,
       get stillMissing() {
         return findCompanionGaps(
           new Set([...grants.current.value, ...addKeys]),
