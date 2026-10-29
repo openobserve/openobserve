@@ -42,12 +42,13 @@ use crate::common::{
 };
 
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 5] = [
+const OPTIONAL_HISTORY_COLUMNS: [&str; 6] = [
     "downtime_id",
     "acked_by",
     "ack_action",
     "ack_source",
     "taken_over_from",
+    "success_response",
 ];
 
 /// Every column the data query reads but [OPTIONAL_HISTORY_COLUMNS].
@@ -1870,5 +1871,19 @@ mod tests {
         let hit = serde_json::json!({"acked_by": "dana@acme.com", "ack_action": ""});
         assert_eq!(hit_text(&hit, "acked_by").as_deref(), Some("dana@acme.com"));
         assert_eq!(hit_text(&hit, "ack_action"), None);
+    }
+
+    #[test]
+    fn the_destination_send_result_is_read_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        assert!(!history_columns(&Schema::new(fields.clone())).contains("success_response"));
+        fields.push(field("success_response"));
+        assert!(
+            history_columns(&Schema::new(fields)).ends_with(", success_response"),
+            "a sent row such as `destination ops-jira created OPS-141;` must reach the history"
+        );
     }
 }
