@@ -1310,12 +1310,12 @@ mod tests {
         office.restrictions = vec![TimeWindow {
             days: Vec::new(),
             start_minute: 9 * 60,
-            end_minute: 17 * 60,
+            end_minute: 17 * 60 + 15,
         }];
         let away_from = midnight + 16 * HOUR + 50 * minute;
         let s = Schedule {
             timezone: "UTC".into(),
-            unavailability: vec![an_absence("cat@o2.ai", away_from, away_from + 15 * minute)],
+            unavailability: vec![an_absence("cat@o2.ai", away_from, away_from + 40 * minute)],
             ..schedule(vec![layered(
                 "On-call rotation",
                 vec![rule("Catch-all", &["cat@o2.ai"]), office],
@@ -1323,7 +1323,7 @@ mod tests {
         };
         assert_eq!(
             s.first_coverage_gap(midnight, WEEK, HOUR),
-            Some(midnight + 17 * HOUR)
+            Some(midnight + 17 * HOUR + 15 * minute)
         );
     }
 
