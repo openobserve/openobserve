@@ -3788,6 +3788,7 @@ mod tests {
             shift_start: i64,
             next_handover: i64,
             secondary_anchor: i64,
+            secondary_next_handover: i64,
         }
         let cases: Vec<Case> = serde_json::from_str(include_str!("shift_parity.json")).unwrap();
         for c in cases {
@@ -3821,7 +3822,7 @@ mod tests {
             assert_eq!(secondary.anchor_micros, c.secondary_anchor, "{}", c.case);
             assert_eq!(
                 secondary.next_handover(c.secondary_anchor, tz),
-                Some(c.anchor_micros),
+                Some(c.secondary_next_handover),
                 "{}",
                 c.case
             );

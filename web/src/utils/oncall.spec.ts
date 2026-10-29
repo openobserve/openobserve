@@ -131,7 +131,11 @@ describe("shift maths matches the server (shift_parity.json)", () => {
       member: c.holder,
     });
     expect(second).toMatchObject({ startMicros: c.next_handover, member: c.next_holder });
-    expect(offsetAnchor(rule, 1, c.timezone)).toBe(c.secondary_anchor);
+    const secondaryAnchor = offsetAnchor(rule, 1, c.timezone);
+    expect(secondaryAnchor).toBe(c.secondary_anchor);
+    expect(
+      nextHandover({ ...rule, anchor_micros: secondaryAnchor }, secondaryAnchor, c.timezone),
+    ).toBe(c.secondary_next_handover);
   });
 });
 
