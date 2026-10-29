@@ -15,6 +15,7 @@
 
 import { computed, onBeforeUnmount, ref, shallowRef, watch, type Ref } from "vue";
 import { useStore } from "vuex";
+import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import {
   valueMappingPatternError,
   type ValueMappingPatternError,
@@ -232,7 +233,7 @@ export const getLegendSeriesNames = (options: any, chartType: string, extras?: a
     names = (series[0]?.data ?? []).map((item: any) => item?.name);
   } else if (chartType === "gauge") {
     names = series.map((s: any) => s?.data?.[0]?.name);
-  } else if (chartType === "state-timeline") {
+  } else if (isRowTimeline(chartType)) {
     names = extras?.rowEntities ?? [];
   } else if (chartType === "metric") {
     // `_metricLabel` is drawn and may hold a display name; overrides match `_metricName`.

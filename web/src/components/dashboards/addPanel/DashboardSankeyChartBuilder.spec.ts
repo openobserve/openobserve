@@ -139,6 +139,17 @@ describe("DashboardSankeyChartBuilder", () => {
   };
 
   describe("Component Rendering", () => {
+    it("renders the source, target and value slots for a sankey, and none for a bar chart", () => {
+      mockDashboardPanelData.data.type = "sankey";
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="dashboard-source-layout"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-target-layout"]').exists()).toBe(true);
+      wrapper.unmount();
+      mockDashboardPanelData.data.type = "bar";
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="dashboard-source-layout"]').exists()).toBe(false);
+    });
+
     it("should render when panel type is sankey and not in promql mode", () => {
       mockDashboardPanelData.data.type = "sankey";
       mockUseDashboardPanelData.promqlMode = false;
