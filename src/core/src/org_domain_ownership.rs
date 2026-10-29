@@ -158,6 +158,7 @@ pub async fn update_state(org_id: &str, domain: &str, new_state: i32) -> Result<
     } else if existing.is_some_and(|v| org_id == v) {
         lock.remove(domain);
     }
+    drop(lock);
     emit_sync_event(org_id, domain).await;
     Ok(())
 }

@@ -1091,7 +1091,9 @@ pub async fn process_domain_org_mapping(
     }
 
     let mut removed = 0;
-    if org_settings.enforce_allowed_orgs_only && !is_new_user {
+    // if added = 0, it means no viable orgs were there for mapping,
+    // so removing the user would just keep recreating new orgs at each login
+    if org_settings.enforce_allowed_orgs_only && !is_new_user && added > 0 {
         let orgs = org_users::list_orgs_by_user(user_email).await?;
         let mut orgs_to_remove = Vec::new();
         for org in orgs {

@@ -121,7 +121,7 @@ pub async fn get_domain_org_record(
 
 pub async fn save_domain_org_record(model: Model) -> Result<(), anyhow::Error> {
     let client = get_orm_client_rw().await;
-    let am = model.clone().into_active_model().reset_all();
+    let am = model.clone().into_active_model();
     am.update(client).await?;
     Ok(())
 }
