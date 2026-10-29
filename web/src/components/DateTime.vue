@@ -1455,7 +1455,12 @@ export default defineComponent({
     const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
       selectedType.value = "absolute";
       calendarToken.value = null;
+      // Saved once below, so the auto-apply date watcher must not save it a second time.
+      isSeedingAbsolute = true;
       setAbsoluteTime(startMicros, endMicros);
+      nextTick(() => {
+        isSeedingAbsolute = false;
+      });
       // A paste is the user's own change; setAbsoluteTime stamps it programmatic, which pages gating refetch on it ignore.
       isUserInitiated = true;
       if (props.autoApply) {

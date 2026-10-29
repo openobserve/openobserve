@@ -80,9 +80,11 @@ describe("DateTime paste", () => {
     createWrapper();
     await openMenu();
 
+    const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
     const event = firePaste(document.querySelector("#date-time-menu")!, PAYLOAD);
     await flushPromises();
 
+    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore + 1);
     expect(event.defaultPrevented).toBe(true);
     expect(lastEmit()).toMatchObject({
       startTime: START_US,
