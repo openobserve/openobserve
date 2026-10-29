@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Kubernetes setup card: install → optionally instrument for traces (language libraries or eBPF)
-// → optionally send eBPF network flow metrics → verify.
+// Kubernetes setup card: install → optional traces (libraries or eBPF) → optional eBPF network flows → verify.
 //
 // Step 1 deliberately offers ONLY the two endpoint choices — external (reach
 // OpenObserve over the network) and internal (OpenObserve runs in this same
