@@ -7,8 +7,9 @@ const TRACE_STREAM = 'default';
 const SERVICE_NAME = `r12603-gateway-${Date.now()}`;
 // Ends mid-comparison, so the traces SQL parser rejects it on restore.
 const UNPARSABLE_FILTER = 'service_name = ';
+const NESTED_IN_FILTER = `service_name IN ('${SERVICE_NAME}', 'r12603-absent') AND duration > 0`;
 
-test.describe('Traces hard refresh and query placeholder', () => {
+test.describe('Traces hard refresh', () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
   let traceId;
@@ -67,6 +68,18 @@ test.describe('Traces hard refresh and query placeholder', () => {
     expect(pm.tracesPage.getPageErrors(), 'Bug #12603: restoring an unparsable filter must not throw').toEqual([]);
   });
 
+  test('hard refresh of a filtered Traces list with IN nested in AND restores the filter', {
+    tag: ['@bug-12603', '@P0', '@regression', '@traces', '@tracesRegressionRefresh'],
+  }, async () => {
+    await pm.tracesPage.navigateToTracesWithFilter({ filter: NESTED_IN_FILTER, stream: TRACE_STREAM });
+    await pm.tracesPage.expectTracesListRendered();
+
+    await pm.tracesPage.hardReload();
+    await pm.tracesPage.expectTracesListRendered();
+    await pm.tracesPage.expectQueryEditorContains(NESTED_IN_FILTER);
+    expect(pm.tracesPage.getPageErrors(), 'Bug #12603: restoring a nested IN filter must not throw').toEqual([]);
+  });
+
   test('hard refresh of trace details with a selected span keeps the details rendered', {
     tag: ['@bug-12603', '@P0', '@regression', '@traces', '@tracesRegressionRefresh'],
   }, async () => {
@@ -78,6 +91,20 @@ test.describe('Traces hard refresh and query placeholder', () => {
     await pm.tracesPage.hardReload();
     await pm.tracesPage.expectTraceDetailsSelectedSpan(spanId);
     expect(pm.tracesPage.getPageErrors(), 'Bug #12603: a hard refresh of trace details must not throw').toEqual([]);
+  });
+});
+
+test.describe('Traces query placeholder', () => {
+  let pm;
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    pm = new PageManager(page);
+  });
+
+  test.afterEach(async ({}, testInfo) => {
+    testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   test('Traces query placeholder never suggests match_all', {
