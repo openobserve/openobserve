@@ -77,6 +77,18 @@ describe("checkRunProviders", () => {
     expect(missing?.providerId).toBe("gone");
     expect(test).toHaveBeenCalledTimes(1);
   });
+
+  it("does not fail a provider missing from a list that could not be loaded", async () => {
+    const test = vi.fn(async () => "ok");
+    expect(await checkRunProviders(["gone"], [], test, null, false)).toBeNull();
+    expect(test).not.toHaveBeenCalled();
+    // Providers present in the fallback list are still tested, and still fail.
+    const down = vi.fn(async () => {
+      throw new Error("down");
+    });
+    const failure = await checkRunProviders(["p"], [provider("p", "p")], down, "p", false);
+    expect(failure?.providerId).toBe("p");
+  });
 });
 
 describe("experimentCostDisplay", () => {

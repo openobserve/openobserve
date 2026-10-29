@@ -247,15 +247,15 @@ pub async fn get_versions(
 
 /// Updating a score config deactivates its previous versions, so each entity
 /// has one active row; the dedupe only guards legacy rows written before that
-/// rule. Reads use the read-only pool: on SQLite the read-write pool is a
-/// single connection, so list calls would queue behind every write.
+/// rule. Reads the primary: the web refetches this list right after a save, and a
+/// lagging read-only replica would return the pre-save rows.
 pub async fn get_all_by_org(org_id: &str) -> Result<Vec<ScoreConfig>, errors::Error> {
     let records: Vec<Model> = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::IsActive.eq(true))
         .order_by(Column::Name, Order::Asc)
         .order_by(Column::Version, Order::Desc)
-        .all(get_orm_client_ro().await)
+        .all(get_orm_client_rw().await)
         .await?;
 
     // Keep the highest version per logical entity.
