@@ -720,6 +720,14 @@ export default defineComponent({
       return destination ? platformRecoveryKeys[platformOf(destination)] : undefined;
     };
 
+    // Jira keeps one ticket per alert, so its recovery is a comment there, not a new message.
+    const messageKeyFor = (name: any): I18nKey => {
+      const destination = props.destinationObjects.find((d: any) => d?.name === name);
+      return destination && platformOf(destination) === "jira"
+        ? "alerts.alertSettings.recoveryJiraComment"
+        : "alerts.alertSettings.recoveryChatMessage";
+    };
+
     // Ticket closes always go to the firing's own destinations; only the message can be
     // redirected, so an override lists both halves rather than replacing the first.
     const recoveryPlan = computed(() => {
@@ -731,7 +739,7 @@ export default defineComponent({
           return {
             name: String(name),
             isPlatform: !!platformKey,
-            action: t(platformKey ?? "alerts.alertSettings.recoveryChatMessage"),
+            action: t(platformKey ?? messageKeyFor(name)),
           };
         });
       if (!redirected) return rows;
@@ -739,7 +747,7 @@ export default defineComponent({
         props.recoveryDestinations.map((name: any) => ({
           name: String(name),
           isPlatform: false,
-          action: t("alerts.alertSettings.recoveryChatMessage"),
+          action: t(messageKeyFor(name)),
         })),
       );
     });

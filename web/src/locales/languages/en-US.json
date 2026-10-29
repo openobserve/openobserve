@@ -11764,6 +11764,7 @@
       "recoveryResolvesIncident": "resolves the incident",
       "recoveryClosesAlert": "closes the alert",
       "recoveryChatMessage": "new \"Resolved\" message",
+      "recoveryJiraComment": "comment on the open ticket",
       "keepFiringFor": "Keep firing for",
       "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
       "suppressRepeats": "Suppress repeats",
