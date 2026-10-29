@@ -29,7 +29,6 @@ use config::{
     ider::SnowflakeIdGenerator,
     is_uds_internal_column,
     meta::{
-        meta_store::MetaStore,
         promql::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
             VALUE_LABEL,
@@ -62,10 +61,6 @@ pub use watcher::{
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
-/// Longest org id the PostgreSQL file_list and schema_history `org` columns hold.
-pub const ORG_ID_MAX_LEN: usize = 100;
-/// Longest `{org}/{stream_type}/{stream}` key the PostgreSQL file_list `stream` columns hold.
-pub const STREAM_KEY_MAX_LEN: usize = 256;
 /// Shared by both ingestion-window discard messages and the test for them.
 const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
 
@@ -148,30 +143,14 @@ pub struct SavedStreamSettings {
     pub previous_settings: Option<StreamSettings>,
 }
 
-/// Whether the meta store bounds the file_list `org` and `stream` columns; SQLite does not.
-pub fn file_list_keys_bounded() -> bool {
-    MetaStore::from(get_config().common.meta_store.as_str()) == MetaStore::PostgreSQL
-}
-
-/// Why a stream's file_list key or its org cannot be stored, if it cannot; counts no error.
-pub fn stream_key_violation(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Option<String> {
-    if !file_list_keys_bounded() {
-        return None;
-    }
-    stream_key_length_violation(org_id, stream_type, stream_name)
-}
-
 /// Rejects a stream whose file_list key or org cannot be stored, counting it as an ingest error.
 pub fn check_stream_key_len(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<()> {
-    let Some(violation) = stream_key_violation(org_id, stream_type, stream_name) else {
+    let Some(violation) = infra::file_list::stream_key_violation(org_id, stream_type, stream_name)
+    else {
         return Ok(());
     };
     metrics::INGEST_ERRORS
@@ -526,26 +505,6 @@ fn normalize_stream_settings(settings: &mut StreamSettings) {
 fn dedup_preserve_order(values: &mut Vec<String>) {
     let mut seen = HashSet::new();
     values.retain(|value| seen.insert(value.clone()));
-}
-
-fn stream_key_length_violation(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Option<String> {
-    // VARCHAR(n) counts characters, not bytes
-    let org_len = org_id.chars().count();
-    if org_len > ORG_ID_MAX_LEN {
-        return Some(format!(
-            "Organization id too long: {org_id} is {org_len} characters, only {ORG_ID_MAX_LEN} accepted"
-        ));
-    }
-    let len = org_len + stream_type.as_str().len() + stream_name.chars().count() + 2;
-    (len > STREAM_KEY_MAX_LEN).then(|| {
-        format!(
-            "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted"
-        )
-    })
 }
 
 pub async fn check_for_schema(
@@ -1123,42 +1082,13 @@ mod tests {
     }
 
     #[test]
-    fn test_stream_key_length_boundary() {
-        // "org/metrics/" is 12 characters
-        let fits = "m".repeat(STREAM_KEY_MAX_LEN - 12);
-        assert!(stream_key_length_violation("org", StreamType::Metrics, &fits).is_none());
-        let over = format!("{fits}m");
-        let violation = stream_key_length_violation("org", StreamType::Metrics, &over).unwrap();
-        assert!(violation.starts_with("Stream name too long"), "{violation}");
-        assert!(violation.contains("is 257 characters"), "{violation}");
-        // a multi-byte name is measured in characters, as the VARCHAR column is
-        let wide = "é".repeat(STREAM_KEY_MAX_LEN - 12);
-        assert!(stream_key_length_violation("org", StreamType::Metrics, &wide).is_none());
-    }
-
-    #[test]
-    fn test_stream_key_length_org_boundary() {
-        let org = "o".repeat(ORG_ID_MAX_LEN);
-        assert!(stream_key_length_violation(&org, StreamType::Logs, "s").is_none());
-        let org = format!("{org}o");
-        let violation = stream_key_length_violation(&org, StreamType::Logs, "s").unwrap();
-        assert!(
-            violation.starts_with("Organization id too long"),
-            "{violation}"
-        );
-    }
-
-    /// CI runs this under both meta stores; only PostgreSQL bounds the file_list key.
-    #[test]
-    fn test_check_stream_key_len_follows_meta_store() {
-        let over = "s".repeat(STREAM_KEY_MAX_LEN);
-        let bounded = file_list_keys_bounded();
-        assert_eq!(
-            stream_key_violation("org", StreamType::Logs, &over).is_some(),
-            bounded
-        );
+    fn test_check_stream_key_len_counts_and_discards() {
+        let over = "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
         let result = check_stream_key_len("org", StreamType::Logs, &over);
-        assert_eq!(result.is_err(), bounded);
+        assert_eq!(
+            result.is_err(),
+            infra::file_list::stream_key_violation("org", StreamType::Logs, &over).is_some()
+        );
         if let Err(err) = result {
             assert!(err.to_string().ends_with("Data discarded."), "{err}");
         }
