@@ -669,6 +669,7 @@
     "dateRangeCopied": "Zakres dat skopiowany",
     "dateRangePasted": "Zakres dat wklejony",
     "dateRangePasteError": "Nie można przetworzyć zakresu dat",
+    "dateRangePasteBlocked": "Ta przeglądarka zablokowała odczyt schowka. Naciśnij {shortcut} przy otwartym selektorze, aby wkleić.",
     "pastSecond": "W ciągu ostatniej {count} sekundy | W ciągu ostatnich {count} s",
     "pastMinute": "W ciągu ostatniej {count} minuty | W ciągu ostatnich {count} min",
     "pastHour": "W ciągu ostatniej {count} godziny | W ciągu ostatnich {count} godz.",
@@ -1274,6 +1275,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Rozmiar skanowania",
     "deltaScanSize": "Delta rozmiaru skanowania",
+    "scannedSoFar": "Przeskanowano {size}",
+    "resultsProgressLabel": "Postęp wyszukiwania",
     "histogramTitleError": "Błąd podczas generowania tytułu histogramu.",
     "selectLogStream": "Wybierz strumień logów",
     "searchInspect": "Inspekcja wyszukiwania",
@@ -5754,6 +5757,22 @@
       "providerNameRum": "Monitorowanie rzeczywistych użytkowników",
       "quickInstallDesc": "Zainstaluj kolektor OpenObserve **jednym poleceniem** — wystarczy ustawić nazwę klastra i uruchomić. Nazwa taguje każdy rekord, więc możesz odróżnić klastry, gdy kilka z nich raportuje.",
       "quickInstallTitle": "Szybka instalacja (zalecana)",
+      "dbInstallerMetricsOnlyNote": "To polecenie zbiera tylko metryki. Poniższe kroki **monitorowania baz danych** dotyczą wyłącznie polecenia Metryki + Monitorowanie baz danych; jeśli chcesz je wykonać, najpierw przełącz się na nie.",
+      "dbInstallerDbmNote": "Wykonaj poniższe kroki **Monitorowania bazy danych** przed uruchomieniem tego polecenia: kolektor potrzebuje dostępu i rejestrowania skonfigurowanych w tych krokach już od pierwszego uruchomienia. Uruchomiłeś już to polecenie? Dokończ te kroki, a następnie uruchom je ponownie z tą samą nazwą usługi; zaktualizuje ono zainstalowany kolektor w miejscu.",
+      "dbInstallerDbmVariant": "Metryki + monitorowanie bazy danych",
+      "dbInstallerMysqlLogPathHelp": "Kolektor musi mieć możliwość odczytu tego pliku. Zwykle jest to `/var/log/mysql/error.log` lub `/var/log/mariadb/mariadb.log` w systemie RHEL. Znajdź go za pomocą: SHOW VARIABLES LIKE 'log_error';",
+      "dbInstallerManualHint": "W systemie Windows, w kontenerze lub gdy wolisz samodzielnie uruchomić kolektor? Zamiast tego użyj konfiguracji [ręcznej](#manual).",
+      "dbInstallerNote": "Uruchom go z `sudo` na hoście z systemem Linux lub macOS, który ma dostęp do bazy danych. Poprosi o hasło użytkownika bazy danych, dzięki czemu hasło nigdy nie trafi do wiersza poleceń (klucz dostępu organizacji trafia, podobnie jak w instalatorze Kubernetes). Instaluje OpenTelemetry Collector Contrib w wersji {version}, zapisuje konfigurację w `/etc/otelcol-o2/` i uruchamia go jako usługę.",
+      "dbInstallerNoteRedis": "Uruchom go z `sudo` na hoście z systemem Linux lub macOS, który ma dostęp do Redis. Poprosi o hasło Redis (naciśnij Enter, jeśli Redis nie ma uwierzytelniania), dzięki czemu hasło nigdy nie trafi do wiersza poleceń (klucz dostępu organizacji trafia, podobnie jak w instalatorze Kubernetes). Instaluje OpenTelemetry Collector Contrib w wersji {version}, zapisuje konfigurację w `/etc/otelcol-o2/` i uruchamia go jako usługę.",
+      "dbInstallerServiceNameHelp": "Nazwa usługi kolektora; używa jej również polecenie odinstalowania. Dla każdej bazy danych na tym samym hoście użyj innej nazwy. Małe litery, cyfry i myślniki; każdy inny znak zostanie zastąpiony myślnikiem. Pozostaw puste, aby instalator nadał nazwę.",
+      "dbInstallerServiceNameLabel": "Nazwa usługi",
+      "dbInstallerUserHelp": "Użytkownik monitorujący z kroku 1.",
+      "dbInstallerUserLabel": "Użytkownik bazy danych",
+      "dbQuickInstallDesc": "Zainstaluj, skonfiguruj i uruchom OpenTelemetry Collector za pomocą **jednego polecenia** — wskaż lokalizację bazy danych i uruchom je.",
+      "dbUninstallDesc": "Uruchom z `sudo` na hoście, na którym uruchomiono instalator. Zatrzymuje i usuwa usługę kolektora oraz jej konfigurację w `/etc/otelcol-o2/`. Polecenie korzysta z powyższej nazwy usługi; jeśli pozostawiłeś ją pustą, dodaj `--name=` z nazwą wyświetloną przez instalator.",
+      "dbUninstallLabel": "Odinstaluj kolektor",
+      "setupModeAuto": "Automatycznie (skrypt)",
+      "setupModeManual": "Ręcznie",
       "redisHostLabel": "Host Redis",
       "redisNoAuthNote": "Użyj REDIS_PASSWORD='' jeśli Redis nie ma uwierzytelniania.",
       "redisTagline": "Zbieraj metryki Redis za pomocą kolektora OpenTelemetry i przesyłaj je do OpenObserve.",
@@ -10253,6 +10272,10 @@
       "acknowledgeConfirmMessage": "To oznacza incydent jako będący w trakcie obsługi. W razie potrzeby możesz go później ponownie otworzyć.",
       "acknowledgeConfirmLabel": "Potwierdź",
       "acknowledgeConfirmCancelLabel": "Anuluj",
+      "resolveConfirmTitle": "Rozwiązać incydent?",
+      "resolveConfirmMessage": "Spowoduje to zamknięcie incydentu i usunięcie go z listy aktywnych. W razie potrzeby możesz otworzyć go ponownie później.",
+      "reopenConfirmTitle": "Ponownie otworzyć incydent?",
+      "reopenConfirmMessage": "Spowoduje to przywrócenie incydentu do stanu otwartego i wyczyszczenie jego rozwiązania i potwierdzenia.",
       "acknowledgeAriaLabel": "Potwierdź incydent",
       "acknowledgedBy": "Potwierdzone przez",
       "resolve": "Rozwiąż",
@@ -11562,7 +11585,8 @@
         "dailySentence": "Codziennie · {time} przez {duration} · {zone}",
         "weeklySentence": "Co tydzień w {days} · {time} przez {duration} · {zone}",
         "fromNoEnd": "{schedule}, od {start} bez daty końcowej",
-        "fromUntil": "{schedule}, od {start} do {until}"
+        "fromUntil": "{schedule}, od {start} do {until}",
+        "onceFor": "Jednorazowo, {duration}"
       },
       "validation": {
         "conditionRequired": "Dodaj warunek lub usuń blok warunku.",
@@ -11903,8 +11927,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 godz.",
-          "2h": "2 godz.",
           "4h": "4 godz.",
+          "24h": "24 godz.",
           "custom": "Niestandardowy"
         },
         "endsAt": "Kończy się",
@@ -11918,7 +11942,34 @@
         "mutedTooltip": "Wyciszone przez {name} do {end}",
         "exclude": "Wyklucz okno…",
         "firingMuted": "Wyzwolony · wyciszony",
-        "firingMutedTooltip": "Nadal się wyzwala. Powiadomienia wycisza {name}."
+        "firingMutedTooltip": "Nadal się wyzwala. Powiadomienia wycisza {name}.",
+        "untilClear": "Do ustąpienia",
+        "untilClearHint": "Kończy się, gdy alert ustąpi, lub najpóźniej po 24 godz.",
+        "confirmUntilClear": "Wycisz do ustąpienia",
+        "titleOne": "Wycisz {name}",
+        "subtitleOne": "Działa dalej i zachowuje historię. Powiadomienia, wezwania i przepływy pracy są wstrzymane do końca okna serwisowego.",
+        "untilTime": "Do {time}.",
+        "groups": "Grupy",
+        "groupsThis": "Ta grupa",
+        "groupsAll": "Wszystkie grupy tego alertu",
+        "addGroup": "Dodaj wyzwoloną grupę",
+        "groupsHint": "Wyciszone są tylko te grupy; pozostałe nadal wysyłają powiadomienia",
+        "confirm24h": {
+          "title": "Wyciszyć na 24 godziny?",
+          "message": "Opcja „Do ustąpienia” kończy wyciszenie, gdy tylko alert ustąpi.",
+          "useUntilClear": "Użyj do ustąpienia",
+          "ok": "Wycisz na 24 godz."
+        },
+        "muteGroup": "Wycisz tę grupę",
+        "endNow": "Zakończ wyciszenie teraz",
+        "endMute": "Zakończ wyciszenie",
+        "mutedUntilClear": "Wyciszono do ustąpienia · maks. 24 godz.",
+        "mutedUntilClearGroups": "Wyciszono do ustąpienia · grupa: {count} | Wyciszono do ustąpienia · grupy: {count}",
+        "mutedGroups": "Wyciszono · grupa: {count} · koniec za {duration} | Wyciszono · grupy: {count} · koniec za {duration}",
+        "mutedUntilClearTooltip": "Wyciszone przez {name} do ustąpienia alertu, najpóźniej {end}",
+        "mutedGroupsTooltip": "Wyciszone przez {name} do {end}. Grupy: {labels}",
+        "mutedUntilClearGroupsTooltip": "Wyciszone przez {name} do ustąpienia alertu, najpóźniej {end}. Grupy: {labels}",
+        "untilTomorrow": "Do {time} jutro."
       },
       "corrected": "Skorygowane",
       "correctedBy": "Ocena skorygowana przez {names}",
@@ -12004,7 +12055,66 @@
           "sent": "Test wysłano do {count} miejsca docelowego | Test wysłano do {count} miejsc docelowych",
           "failed": "Test nie dotarł do {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "Do ustąpienia",
+        "atMost": "maks. 24 godz.",
+        "endsWhenClears": "kończy się po ustąpieniu",
+        "byTime": "do {time}",
+        "whenCleared": "po ustąpieniu",
+        "endedBy": "zakończone przez {product}",
+        "createdFrom": "z {source}"
+      },
+      "groupTarget": "Grupa: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Szybkie wyciszenie z alertu",
+      "endedLabel": "zakończone"
+    },
+    "ack": {
+      "acknowledge": "Potwierdź",
+      "acknowledgeGroups": "Potwierdź wyzwoloną grupę: {count} | Potwierdź wyzwolone grupy: {count}",
+      "unacknowledge": "Cofnij potwierdzenie",
+      "takeOver": "Przejmij",
+      "chip": "Potwierdzone przez {who} za pośrednictwem {source} · {time}",
+      "chipTooltip": "Potwierdzone przez {who} o {time} z {source}",
+      "firingAcknowledged": "Wyzwolony · potwierdzony",
+      "tile": "Potwierdzone",
+      "groupsAcknowledged": "Potwierdzone: {count}",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "Dyżury",
+        "incident": "incydent"
+      },
+      "history": {
+        "dedupSuppressed": "pominięto z powodu potwierdzenia ({who})",
+        "acked": "Potwierdzone przez {who} z {source}",
+        "ackedViaPage": "Potwierdzone przez {who} za pośrednictwem wezwania {page}",
+        "ackedViaIncident": "Potwierdzone przez {who} za pośrednictwem incydentu {incident}",
+        "unacked": "Potwierdzenie wycofane przez {who} z {source}",
+        "unackedResume": "Potwierdzenie wycofane przez {who} z {source} · powtórzenia wznawiane o {time}",
+        "takenOver": "Przejęte przez {who} od {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Nie możesz potwierdzić tego alertu. Potwierdzanie i wyciszanie wymagają roli Admin lub Editor albo bycia dyżurnym odpowiadającym na ten alert.",
+        "mute": "Nie możesz wyciszyć tego alertu. Potwierdzanie i wyciszanie wymagają roli Admin lub Editor albo bycia dyżurnym odpowiadającym na ten alert.",
+        "onCall": "Na dyżurze: {people}",
+        "canAct": "Może działać: {people}",
+        "people": "Na dyżurze: {onCall}. Może działać: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Ten alert nie jest wyzwolony, więc nie ma czego potwierdzać.",
+        "firingChanged": "Alert został ponownie wyzwolony od czasu wczytania tej strony. Odśwież i spróbuj ponownie."
       }
+    },
+    "groupActions": {
+      "menu": "Działania grupowe",
+      "viewHistory": "Zobacz historię tej grupy"
+    },
+    "firingState": {
+      "level": "Poziom",
+      "firingSince": "Wyzwolony od",
+      "firingFor": "wyzwolony od {duration}",
+      "incident": "Incydent"
     }
   },
   "alert_dependencies": {
@@ -12533,13 +12643,14 @@
       "openSlackSettings": "Skonfiguruj to w Ustawienia › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Wyślij powiadomienia na kanały Slack",
+      "slackDescription": "Publikuje nową wiadomość za pomocą Twojego webhooka i szablonu. Użyj go do wezwań lub niestandardowych układów Slacka.",
       "discordDescription": "Wyślij powiadomienia na kanały Discord",
       "msteamsDescription": "Wyślij powiadomienia na kanały Teams",
       "emailDescription": "Wyślij powiadomienia e-mail w formacie HTML",
       "pagerdutyDescription": "Twórz incydenty w PagerDuty",
       "opsgenieDescription": "Twórz alerty w Opsgenie",
-      "servicenowDescription": "Twórz incydenty w ServiceNow"
+      "servicenowDescription": "Twórz incydenty w ServiceNow",
+      "slackAppDescription": "Aktualizuje zaplanowane alerty w miejscu. Potwierdzaj, wyciszaj i analizuj z poziomu Slacka. Wymaga połączonej przestrzeni roboczej."
     },
     "import": {
       "title": "Importuj miejsce docelowe",
@@ -12581,7 +12692,8 @@
     "severityCriticalDescription": "Incydenty o najwyższym priorytecie",
     "severityErrorDescription": "Incydenty standardowych błędów",
     "severityWarningDescription": "Incydenty poziomu ostrzeżeń",
-    "severityInfoDescription": "Incydenty informacyjne"
+    "severityInfoDescription": "Incydenty informacyjne",
+    "urlRecipientsChannel": "URL / odbiorcy / kanał"
   },
   "pipeline_destinations": {
     "header": "Miejsca docelowe potoków",
@@ -13104,7 +13216,7 @@
     "groupIntegrations": "Integracje",
     "groupAccount": "Konto",
     "slackApp": "Slack",
-    "slackAppDesc": "Zadawaj pytania OpenObserve ze Slacka",
+    "slackAppDesc": "Zadawaj OpenObserve pytania i zarządzaj alertami ze Slacka",
     "generalDesc": "Motyw, domyślne zapytania i podstawowe preferencje",
     "orgDesc": "Parametry organizacji i identyfikatory",
     "cipherKeysDesc": "Klucze szyfrowania dla poufnych pól",
@@ -20602,7 +20714,9 @@
         "succeeded": "Sukces",
         "failed": "Nieudane",
         "skipped": "Pominięto",
-        "pending": "Oczekujące"
+        "pending": "Oczekujące",
+        "acknowledged": "Potwierdzony",
+        "ackevent": "Zdarzenie potwierdzenia"
       },
       "alertLevel": {
         "ok": "OK",
@@ -20889,7 +21003,6 @@
       "successfullyImportedTemplates": "Pomyślnie zaimportowano {count} szablon | Pomyślnie zaimportowano szablony: {count}",
       "aiAnalysisIsAlreadyRunningFor": "Analiza AI już trwa dla tego incydentu",
       "incidentSeverityUpdatedTo": "Poziom ważności incydentu zaktualizowano na {severity}",
-      "incidentStatusUpdatedTo": "Status incydentu zaktualizowano na {status}",
       "failedToLoadIncidentDetails": "Nie udało się wczytać szczegółów incydentu",
       "incidentsRefreshed": "Odświeżono incydenty",
       "failedToPostComment": "Nie udało się dodać komentarza",
@@ -20905,7 +21018,16 @@
       "alertSavedSuccessfully": "Alert został zapisany.",
       "alertUpdatedSuccessfully": "Alert został zaktualizowany.",
       "openingDedupConfig": "Otwieranie konfiguracji deduplikacji dla: {name}",
-      "editingAlert": "Edytowanie alertu: {name}"
+      "editingAlert": "Edytowanie alertu: {name}",
+      "ack": {
+        "acked": "Potwierdzono {name}",
+        "ackedGroups": "Potwierdzono {count} grupę {name} | Potwierdzono {count} grup {name}",
+        "alreadyAcked": "Już potwierdzone przez {who}",
+        "unacked": "Wycofano potwierdzenie {name}",
+        "takenOver": "Przejąłeś potwierdzenie {name}",
+        "failed": "Nie udało się potwierdzić {name}",
+        "unackFailed": "Nie udało się wycofać potwierdzenia {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Klucz szyfrowania został zaktualizowany",
@@ -21217,7 +21339,14 @@
       "muted": "Wyciszono {count} element do {time}. Zapisano w {folder}. | Wyciszono elementy: {count} do {time}. Zapisano w {folder}.",
       "muteFailed": "Nie udało się utworzyć wyciszenia",
       "viewDowntime": "Wyświetl okno serwisowe",
-      "itemsDropped": "{count} wybrany element znajduje się poza wybranymi folderami i został usunięty. | Wybrane elementy spoza wybranych folderów zostały usunięte: {count}."
+      "itemsDropped": "{count} wybrany element znajduje się poza wybranymi folderami i został usunięty. | Wybrane elementy spoza wybranych folderów zostały usunięte: {count}.",
+      "mutedUntilClear": "Wyciszono {name} do momentu ustąpienia, najpóźniej {time}",
+      "alreadyMuted": "{name} jest już wyciszony do {time}",
+      "muteChanged": "To wyciszenie zmieniło się od czasu wczytania strony. Teraz kończy się {time}.",
+      "muteEnded": "Wyciszenie zakończone. Powiadomienia zostały wznowione.",
+      "mutedOne": "Wyciszono {name} do {time}",
+      "timeTomorrow": "{time} jutro",
+      "notQuickMute": "To wyciszenie ustawiono na stronie Okien serwisowych. Zmień je tam."
     }
   },
   "cipherKeys": {
@@ -23997,7 +24126,7 @@
     "deliveriesTitle": "Dostarczenia",
     "deliveriesNone": "Nic jeszcze nie zostało wysłane.",
     "deliveriesRun": "Przebieg drabinki {run} — przekazanie wznowiło wspinaczkę po stronie przejmującego zespołu",
-    "deliveryLanded": "Dostarczone",
+    "deliveryLanded": "Wysłano",
     "deliveryFailed": "Nieudane",
     "deliveriesTruncated": "Wyświetlono {shown} z {total} wysyłek.",
     "teamChannelTitle": "Kanał zespołu",
@@ -24590,7 +24719,7 @@
     "myDeliveriesPage": "Wezwanie",
     "myDeliveriesLandedColumn": "Dostarczenie",
     "myDeliveriesSent": "Wysłano",
-    "myDeliveriesLanded": "Dotarło do Ciebie przez {channel}",
+    "myDeliveriesLanded": "Wysłano do Ciebie przez {channel}",
     "myDeliveriesFailed": "{channel} nie dotarło do Ciebie",
     "myDeliveriesNone": "Nic nie zostało jeszcze do Ciebie wysłane.",
     "myDeliveriesNoUnread": "Brak nieprzeczytanych.",
@@ -25214,7 +25343,7 @@
     "reachAlarmNoRetry": "Nic nie ma zaplanowanej ponownej próby — drabinka zakończyła działanie.",
     "reachAlarmNoTransport": "Prawdopodobna przyczyna: w tym wdrożeniu nie skonfigurowano żadnego transportu.",
     "reachAlarmCheckTransports": "Sprawdź, kto jest osiągalny",
-    "reachLanded": "dotarło",
+    "reachLanded": "wysłano",
     "reachUnreached": "nie dotarło",
     "onCallDetails": "Szczegóły dyżuru",
     "shiftHandover": "Przekazanie zmiany",
@@ -25299,7 +25428,8 @@
     "scopeClaimServiceEverywhere": "{service} wzywa ten zespół w każdym klastrze i przestrzeni nazw, niezależnie od tego, kto posiada te wokół.",
     "scopeClaimServiceHere": "{service} wzywa ten zespół tylko w {scope}. Poza tym trafia do tego, kto posiada otaczający zakres.",
     "scopeNothingDiscovered": "Nic nie zostało jeszcze odkryte, więc nie ma zasobów do wyboru. Użyj trybu Zaawansowane, aby zapisać regułę według pola, albo najpierw wyślij dane telemetryczne.",
-    "scopeAdvancedHint": "Dopasuj według dowolnego pola i wartości, w tym takich, których nie obejmują poziomy powyżej."
+    "scopeAdvancedHint": "Dopasuj według dowolnego pola i wartości, w tym takich, których nie obejmują poziomy powyżej.",
+    "simulatorSendsNothing": "Ten priorytet nie wysyła niczego, co mogą odebrać"
   },
   "paidUsage": {
     "consentTitle": "Włączyć płatne korzystanie z AI?",
@@ -26411,17 +26541,14 @@
     "saveFailed": "Nie udało się zapisać konta. Spróbuj ponownie.",
     "disconnectFailed": "Nie udało się rozłączyć konta. Spróbuj ponownie.",
     "connected": "Połączono",
-    "active": "Aktywne",
-    "account": "Konto",
     "fromNumber": "Numer nadawcy",
-    "press4": "Klawisze połączenia: 4 potwierdź, 6 rozwiąż, 8 eskaluj",
+    "press4": "Klawisze połączenia (4 potwierdź, 6 rozwiąż, 8 eskaluj)",
     "press4Available": "Dostępne",
     "press4NotAvailable": "Niedostępne",
     "press4NotAvailableHint": "Połączenia proszą o potwierdzenie za pomocą linku w otrzymanej wiadomości.",
     "update": "Aktualizuj",
     "disconnect": "Rozłącz",
     "deploymentTitle": "Konto {provider} tego wdrożenia",
-    "deploymentNote": "Wiadomości SMS i połączenia już działają. Ustawione przez operatora; nie ma tu nic do zrobienia.",
     "useOwn": "Użyj własnego konta {provider}",
     "connectTitle": "Połącz {provider}",
     "updateTitle": "Zaktualizuj {provider}",
@@ -26429,7 +26556,7 @@
     "accountSid": "Account SID",
     "authToken": "Token autoryzacji",
     "tokenKeep": "Pozostaw puste, aby zachować bieżący token",
-    "fromHelp": "Numer {provider}, który może wysyłać SMS-y i wykonywać połączenia, z kodem kraju.",
+    "fromHelp": "Numer z tego konta {provider}, z kodem kraju.",
     "connect": "Połącz",
     "checking": "Sprawdzanie w {provider}…",
     "disconnectTitle": "Rozłączyć {provider}?",
@@ -26442,8 +26569,21 @@
       "tokenRequired": "Aby się połączyć, wymagany jest token autoryzacji.",
       "noMasterKey": "Poproś operatora o ustawienie {variable}.",
       "accountRejected": "{provider} nie zaakceptował tego konta. Sprawdź Account SID i token autoryzacji oraz to, czy konto jest aktywne.",
-      "unreadable": "Nie udało się odczytać konta dostawcy telefonii tej organizacji."
-    }
+      "unreadable": "Nie udało się odczytać konta dostawcy telefonii tej organizacji.",
+      "fromNotOnAccount": "Ten numer nie należy do tego konta {provider}. Użyj numeru z Phone Numbers → Active numbers w {provider}.",
+      "unavailable": "{provider} jest nieosiągalny. Spróbuj ponownie."
+    },
+    "statusChecking": "Sprawdzanie…",
+    "statusBroken": "Nie działa",
+    "statusUnchecked": "Nie udało się sprawdzić",
+    "cardMeta": "Z {number} · Konto {account}",
+    "deploymentMeta": "Z {number}",
+    "uncheckedNow": "{provider} jest w tej chwili nieosiągalny.",
+    "trial": "Konto próbne: SMS-y i połączenia docierają tylko do numerów zweryfikowanych w {provider}.",
+    "cantText": "Ten numer nie może wysyłać SMS-ów",
+    "cantCall": "Ten numer nie może wykonywać połączeń",
+    "deploymentOwner": "Ustawiane przez operatora, więc nie ma tu nic do skonfigurowania.",
+    "tokenNewAccount": "Inne konto wymaga własnego tokenu uwierzytelniania"
   },
   "slackApp": {
     "prereq": {
@@ -26683,7 +26823,10 @@
       "managedBy": "zarządzane przez administratora twojej instancji",
       "managedTitle": "Zarządzane przez administratora twojej instancji.",
       "managedDetail": "Poświadczenia, łączenie kont oraz informacja, które organizacje używają {team}, są ustawiane w _meta.",
-      "managedQuestions": "Pytania: {contact}"
+      "managedQuestions": "Pytania: {contact}",
+      "outboundQueue": "Wiadomości alertów: {count} w kolejce, najstarsza {age} | Wiadomości alertów: {count} w kolejce, najstarsza {age}",
+      "outboundEmpty": "Brak wiadomości alertów w kolejce",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Domyślne ustawienia kanałów",
@@ -26719,7 +26862,8 @@
       "instanceAdminOnly": "Tylko administrator instancji",
       "ownOrgOnlyHint": "W obszarze roboczym instancji mapujesz kanały na własną organizację",
       "claimableHint": "Nieprzypisane kanały i kanały należące do {org}",
-      "servedOrgsHint": "Każda organizacja obsługiwana przez ten obszar roboczy"
+      "servedOrgsHint": "Każda organizacja obsługiwana przez ten obszar roboczy",
+      "alertRoutes": "{count} miejsce docelowe | {count} miejsc docelowych"
     },
     "people": {
       "title": "Powiązani użytkownicy",
@@ -26873,6 +27017,83 @@
       "remove": "Usuń",
       "saved": "Zapisano organizacje",
       "saveFailed": "Nie udało się zapisać organizacji."
+    },
+    "destination": {
+      "appTile": "Aplikacja {product}",
+      "webhookTile": "Webhook {product}",
+      "twoWay": "Dwukierunkowy",
+      "recommendedForAlertResponse": "Zalecany do reagowania na alerty",
+      "choiceHint": "Wezwania i superklastry korzystają z webhooka. Wysyłki ręczne i w czasie rzeczywistym z miejsca docelowego aplikacji Slack są osobnymi postami.",
+      "unavailableReason": "Wymaga aplikacji Enterprise Slack w pojedynczym klastrze",
+      "unavailableFlag": "Wyłączone na tym serwerze; poproś administratora o ustawienie {variable}",
+      "unavailableMasterKey": "Wymaga klucza szyfrowania na tym serwerze; poproś administratora o ustawienie {variable}",
+      "unavailableCloud": "Nie jest jeszcze włączone w Twoim regionie Cloud",
+      "unavailableNoAccess": "Poproś administratora organizacji o włączenie aplikacji Slack",
+      "postOnly": "Tylko publikowanie",
+      "switchToApp": "Przełącz na aplikację {product}",
+      "switchThis": "Przełącz to miejsce docelowe",
+      "switchBack": "Przełącz z powrotem",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Obszar roboczy",
+      "channel": "Kanał",
+      "mention": "Wzmianka",
+      "mentionCritical": "{'@'}here dla krytycznych, brak dla pozostałych",
+      "mentionNone": "Brak",
+      "mentionHelp": "Używane przy powtórzeniach i podniesieniu poziomu",
+      "refireReuse": "Ponowne wykorzystanie przy powtórnym wyzwoleniu (minuty)",
+      "refireReuseHelp": "Ponowne wyzwolenie w tym przedziale czasu edytuje wcześniejszą wiadomość zamiast publikować nową",
+      "buttons": "Przyciski Potwierdź, Wycisz i Zbadaj",
+      "buttonsHelp": "Przycisk Rozwiąż jest dodawany, gdy wyzwolenie ma incydent lub wezwanie",
+      "autoInvestigate": "Automatycznie badaj krytyczne alerty",
+      "autoInvestigateHelp": "Działa jako konto usługi AI organizacji, z jego uprawnieniami; publikuje wyniki w wątku alertu",
+      "templateDefault": "Domyślny szablon {product} ({name})",
+      "sendTest": "Wyślij test",
+      "setsDefault": "Ustawia domyślną organizację kanału #{channel} na {org}",
+      "answersFor": "#{channel} odpowiada na pytania w imieniu organizacji {org}. Alerty z {thisOrg} są tu publikowane, a ich wątki odpowiadają w {thisOrg}; domyślne ustawienie kanału pozostaje bez zmian.",
+      "sharedTag": "Współdzielony · {product} Connect",
+      "sharedTitle": "#{channel} jest współdzielony z osobami spoza {workspace}.",
+      "sharedDetail": "Zobaczą nazwy alertów, wartości, wykresy i linki. Ich kliknięcia przycisków są odrzucane.",
+      "sharedConfirm": "Rozumiem, publikuj alerty na tym współdzielonym kanale",
+      "sharedRequired": "Potwierdź, że alerty mogą być publikowane na tym współdzielonym kanale",
+      "versionMismatch": "Węzły działają na różnych wersjach. Najpierw zaktualizuj każdy węzeł.",
+      "oncallNotAllowed": "Miejsce docelowe aplikacji {product} nie może być kanałem zespołu dyżurowego",
+      "answersForAnother": "#{channel} odpowiada na pytania w imieniu innej organizacji. Alerty z {thisOrg} są tu publikowane, a ich wątki odpowiadają w {thisOrg}; domyślne ustawienie kanału pozostaje bez zmian.",
+      "oncallTag": "Pokój dyżurowy",
+      "oncallTitle": "Wezwania dla zespołu {team} są też publikowane na #{channel} przez {destination}.",
+      "oncallDetail": "Alerty są tu publikowane oddzielnie.",
+      "oncallConfirm": "Rozumiem, publikuj alerty w tym pokoju dyżurowym",
+      "oncallRequired": "Potwierdź, że alerty mogą być publikowane w tym pokoju dyżurowym",
+      "workspaceRequired": "Wybierz obszar roboczy",
+      "refireRange": "Podaj liczbę pełnych minut od 0 do {max}",
+      "connectTitle": "Połącz {product}, aby publikować alerty z przyciskami",
+      "connectDetail": "Wybierz kanał na ekranie {product} i zezwól. OpenObserve utworzy to miejsce docelowe dla tego kanału.",
+      "connected": "Utworzono {name} dla #{channel}. Sprawdź ustawienia i zapisz.",
+      "saveFailed": "Nie udało się zapisać miejsca docelowego.",
+      "switched": "{name} publikuje teraz przez aplikację {product}",
+      "switchedBack": "{name} znów publikuje przez swój webhook",
+      "switchFailed": "Nie udało się przełączyć {name}: {reason}",
+      "switchedAll": "Liczba przełączonych miejsc docelowych: {count} | Liczba przełączonych miejsc docelowych: {count}",
+      "switchThisDetail": "Przełącz je na aplikację {product}, aby uzyskać przyciski Potwierdź, Wycisz i Zbadaj. Jego nazwa, szablon i alerty pozostają bez zmian; Przełącz z powrotem przywraca webhook."
+    },
+    "switchAll": {
+      "title": "Liczba miejsc docelowych webhook publikujących w tym obszarze roboczym: {count} | Liczba miejsc docelowych webhook publikujących w tym obszarze roboczym: {count}",
+      "detail": "Przełącz go na aplikację {product}, aby uzyskać przyciski Potwierdź, Wycisz i Zbadaj. Jego nazwa, szablon i alerty pozostają bez zmian; Przełącz z powrotem przywraca webhook. | Przełącz je na aplikację {product}, aby uzyskać przyciski Potwierdź, Wycisz i Zbadaj. Nazwy, szablony i alerty pozostają bez zmian; Przełącz z powrotem przywraca webhook.",
+      "review": "Przejrzyj",
+      "action": "Przełącz wszystkie",
+      "summary": "{switched} przełączono · {count} nie udało się przełączyć"
+    },
+    "oncallUnlinked": {
+      "title": "Członkowie dyżurów niepowiązani z {product}",
+      "description": "Wezwania nie mogą wysyłać im wiadomości prywatnych, a ich kliknięcia przycisków alertów i wezwań są wstrzymane do czasu powiązania konta",
+      "remind": "Przypomnij im",
+      "columnPerson": "Osoba",
+      "columnTeam": "Zespół",
+      "columnNextShift": "Następna zmiana",
+      "columnReminder": "Przypomnienie",
+      "dmSent": "Wysłano wiadomość prywatną {time}",
+      "notSent": "Nie wysłano",
+      "reminded": "Wysłano przypomnienie do {count} osoby | Wysłano przypomnienie do {count} osób",
+      "remindFailed": "Nie udało się wysłać przypomnień."
     }
   },
   "fleet": {

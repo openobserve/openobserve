@@ -19,6 +19,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        alerts::auto_investigate::DecisionRow,
         self_reporting::{
             EnqueueError, ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
             error::ErrorData,
@@ -132,6 +133,16 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
                  Self-reporting service may have shut down."
             );
         }
+    }
+}
+
+/// Logs one auto-investigate gate decision to `_meta`; unconditional, like trigger records.
+pub fn publish_auto_investigate_decision(row: DecisionRow) {
+    let (org, alert_id) = (row.org_id.clone(), row.alert_id.clone());
+    if let Err(e) = try_enqueue(ReportingData::AutoInvestigateDecision(Box::new(row))) {
+        log::warn!(
+            "[SELF-REPORTING] dropped the auto-investigate decision for {org}/{alert_id}: {e}"
+        );
     }
 }
 
@@ -526,9 +537,10 @@ fn decrement_queue_depth(batch: &[ReportingData]) {
 fn count_data(data: &[ReportingData]) -> (i64, i64) {
     // Redaction rides the usage queue, so it must be counted against that depth gauge.
     data.iter().fold((0, 0), |(usage, error), item| match item {
-        ReportingData::Usage(_) | ReportingData::Trigger(_) | ReportingData::Redaction(_) => {
-            (usage + 1, error)
-        }
+        ReportingData::Usage(_)
+        | ReportingData::Trigger(_)
+        | ReportingData::Redaction(_)
+        | ReportingData::AutoInvestigateDecision(_) => (usage + 1, error),
         ReportingData::Error(_) => (usage, error + 1),
     })
 }
@@ -670,6 +682,10 @@ mod tests {
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
             trigger_source: None,
             triggered_by: None,

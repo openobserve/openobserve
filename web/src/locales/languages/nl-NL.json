@@ -669,6 +669,7 @@
     "dateRangeCopied": "Datumbereik gekopieerd",
     "dateRangePasted": "Datumbereik geplakt",
     "dateRangePasteError": "Kon datumbereik niet parseren",
+    "dateRangePasteBlocked": "Deze browser heeft het lezen van het klembord geblokkeerd. Druk op {shortcut} terwijl de kiezer open is om te plakken.",
     "pastSecond": "Laatste {count} seconde | Laatste {count} seconden",
     "pastMinute": "Laatste {count} minuut | Laatste {count} minuten",
     "pastHour": "Laatste {count} uur | Laatste {count} uren",
@@ -1274,6 +1275,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Scangrootte",
     "deltaScanSize": "Delta-scangrootte",
+    "scannedSoFar": "Gescand: {size}",
+    "resultsProgressLabel": "Zoekvoortgang",
     "histogramTitleError": "Fout bij het genereren van de histogramtitel.",
     "selectLogStream": "Logstream selecteren",
     "searchInspect": "Zoek Inspect",
@@ -5754,6 +5757,22 @@
       "providerNameRum": "Real User Monitoring",
       "quickInstallDesc": "Installeer de OpenObserve-collector met **één opdracht** — stel gewoon uw clusternaam in en voer deze uit. De naam labelt elke record, zodat u clusters van elkaar kunt onderscheiden zodra er meerdere rapporteren.",
       "quickInstallTitle": "Snelle installatie (aanbevolen)",
+      "dbInstallerMetricsOnlyNote": "Dit commando verzamelt alleen metrieken. De stappen voor **Databasemonitoring** hieronder gelden alleen voor het commando Metrieken + Databasemonitoring; schakel er eerst naar over als je ze wilt gebruiken.",
+      "dbInstallerDbmNote": "Voer de stappen voor **Databasemonitoring** hieronder uit voordat je dit commando uitvoert: de collector heeft de toegang en logging nodig die daarbij vanaf de eerste start worden ingesteld. Al uitgevoerd? Rond die stappen af en voer dit commando daarna opnieuw uit met dezelfde servicenaam; het werkt de geïnstalleerde collector ter plaatse bij.",
+      "dbInstallerDbmVariant": "Metrieken + Databasemonitoring",
+      "dbInstallerMysqlLogPathHelp": "De collector moet dit bestand kunnen lezen. Meestal `/var/log/mysql/error.log`, of `/var/log/mariadb/mariadb.log` op RHEL. Vind het met: SHOW VARIABLES LIKE 'log_error';",
+      "dbInstallerManualHint": "Op Windows, in een container, of liever zelf de collector uitvoeren? Gebruik in plaats daarvan de [handmatige](#manual) installatie.",
+      "dbInstallerNote": "Voer het uit met `sudo` op een Linux- of macOS-host die de database kan bereiken. Het vraagt om het wachtwoord van de databasegebruiker, zodat het wachtwoord nooit op de opdrachtregel terechtkomt (de toegangssleutel van de organisatie wel, net als bij de Kubernetes-installatie). Het installeert OpenTelemetry Collector Contrib v{version}, schrijft de configuratie onder `/etc/otelcol-o2/` en start het als een service.",
+      "dbInstallerNoteRedis": "Voer het uit met `sudo` op een Linux- of macOS-host die Redis kan bereiken. Het vraagt om het Redis-wachtwoord (druk op Enter als Redis geen authenticatie heeft), zodat het wachtwoord nooit op de opdrachtregel terechtkomt (de toegangssleutel van de organisatie wel, net als bij de Kubernetes-installatie). Het installeert OpenTelemetry Collector Contrib v{version}, schrijft de configuratie onder `/etc/otelcol-o2/` en start het als een service.",
+      "dbInstallerServiceNameHelp": "Hiermee geef je de collectorservice een naam; de verwijderopdracht gebruikt deze ook. Gebruik een andere naam voor elke database op dezelfde host. Kleine letters, cijfers en streepjes; al het andere wordt een streepje. Laat dit leeg als de installer de naam mag bepalen.",
+      "dbInstallerServiceNameLabel": "Servicenaam",
+      "dbInstallerUserHelp": "De monitoringgebruiker uit stap 1.",
+      "dbInstallerUserLabel": "Databasegebruiker",
+      "dbQuickInstallDesc": "Installeer, configureer en start de OpenTelemetry Collector met **één commando** — geef aan waar je database staat en voer het uit.",
+      "dbUninstallDesc": "Voer dit met `sudo` uit op de host waarop je de installer hebt uitgevoerd. Hiermee stop je de collectorservice en verwijder je de configuratie ervan onder `/etc/otelcol-o2/`. Het commando gebruikt de Servicenaam hierboven; als je die leeg hebt gelaten, voeg dan `--name=` toe met de naam die de installer heeft weergegeven.",
+      "dbUninstallLabel": "De collector verwijderen",
+      "setupModeAuto": "Automatisch (script)",
+      "setupModeManual": "Handmatig",
       "redisHostLabel": "Redis-host",
       "redisNoAuthNote": "Gebruik REDIS_PASSWORD='' als Redis geen authenticatie heeft.",
       "redisTagline": "Verzamel Redis-metrieken met de OpenTelemetry Collector en stuur ze naar OpenObserve.",
@@ -10253,6 +10272,10 @@
       "acknowledgeConfirmMessage": "Hiermee wordt het incident gemarkeerd als in behandeling. Je kunt het later opnieuw openen als dat nodig is.",
       "acknowledgeConfirmLabel": "Bevestigen",
       "acknowledgeConfirmCancelLabel": "Annuleren",
+      "resolveConfirmTitle": "Incident oplossen?",
+      "resolveConfirmMessage": "Hiermee wordt het incident gesloten en uit de actieve lijst verwijderd. U kunt het later zo nodig heropenen.",
+      "reopenConfirmTitle": "Incident heropenen?",
+      "reopenConfirmMessage": "Hiermee wordt het incident weer op open gezet en worden de oplossing en bevestiging gewist.",
       "acknowledgeAriaLabel": "Incident bevestigen",
       "acknowledgedBy": "Bevestigd door",
       "resolve": "Oplossen",
@@ -11562,7 +11585,8 @@
         "dailySentence": "Dagelijks · {time} gedurende {duration} · {zone}",
         "weeklySentence": "Wekelijks op {days} · {time} gedurende {duration} · {zone}",
         "fromNoEnd": "{schedule}, vanaf {start} zonder einddatum",
-        "fromUntil": "{schedule}, van {start} tot en met {until}"
+        "fromUntil": "{schedule}, van {start} tot en met {until}",
+        "onceFor": "Eenmalig, {duration}"
       },
       "validation": {
         "conditionRequired": "Voeg een voorwaarde toe of verwijder het voorwaardeblok.",
@@ -11903,8 +11927,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 u",
-          "2h": "2 u",
           "4h": "4 u",
+          "24h": "24 u",
           "custom": "Aangepast"
         },
         "endsAt": "Eindigt op",
@@ -11918,7 +11942,34 @@
         "mutedTooltip": "Gedempt door {name} tot {end}",
         "exclude": "Een venster uitsluiten…",
         "firingMuted": "Actief · gedempt",
-        "firingMutedTooltip": "Nog steeds actief. Meldingen worden gedempt door {name}."
+        "firingMutedTooltip": "Nog steeds actief. Meldingen worden gedempt door {name}.",
+        "untilClear": "Tot het herstelt",
+        "untilClearHint": "Eindigt wanneer het alarm herstelt, of uiterlijk na 24 u.",
+        "confirmUntilClear": "Dempen tot het herstelt",
+        "titleOne": "Dempen: {name}",
+        "subtitleOne": "Het blijft draaien en behoudt zijn geschiedenis. Meldingen, oproepen en Workflows stoppen tot het venster eindigt.",
+        "untilTime": "Tot {time}.",
+        "groups": "Groepen",
+        "groupsThis": "Deze groep",
+        "groupsAll": "Alle groepen van dit alarm",
+        "addGroup": "Een afgaande groep toevoegen",
+        "groupsHint": "Alleen deze groepen worden gedempt; andere groepen blijven meldingen sturen",
+        "confirm24h": {
+          "title": "24 uur dempen?",
+          "message": "Tot het herstelt beëindigt het dempen zodra het alarm herstelt.",
+          "useUntilClear": "Gebruik tot het herstelt",
+          "ok": "24 u dempen"
+        },
+        "muteGroup": "Deze groep dempen",
+        "endNow": "Dempen nu beëindigen",
+        "endMute": "Dempen beëindigen",
+        "mutedUntilClear": "Gedempt tot het herstelt · maximaal 24 u",
+        "mutedUntilClearGroups": "Gedempt tot het herstelt · {count} groep | Gedempt tot het herstelt · {count} groepen",
+        "mutedGroups": "Gedempt · {count} groep · eindigt over {duration} | Gedempt · {count} groepen · eindigt over {duration}",
+        "mutedUntilClearTooltip": "Gedempt door {name} tot het alarm herstelt, uiterlijk {end}",
+        "mutedGroupsTooltip": "Gedempt door {name} tot {end}. Groepen: {labels}",
+        "mutedUntilClearGroupsTooltip": "Gedempt door {name} tot het alarm herstelt, uiterlijk {end}. Groepen: {labels}",
+        "untilTomorrow": "Tot {time} morgen."
       },
       "corrected": "Gecorrigeerd",
       "correctedBy": "Score gecorrigeerd door {names}",
@@ -12004,7 +12055,66 @@
           "sent": "Test verstuurd naar {count} bestemming | Test verstuurd naar {count} bestemmingen",
           "failed": "De test heeft {names} niet bereikt."
         }
+      },
+      "untilClear": {
+        "schedule": "Tot het herstelt",
+        "atMost": "Maximaal 24 u",
+        "endsWhenClears": "eindigt wanneer het herstelt",
+        "byTime": "uiterlijk {time}",
+        "whenCleared": "toen het herstelde",
+        "endedBy": "beëindigd door {product}",
+        "createdFrom": "van {source}"
+      },
+      "groupTarget": "Groep: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Snel dempen vanuit een alarm",
+      "endedLabel": "beëindigd"
+    },
+    "ack": {
+      "acknowledge": "Bevestigen",
+      "acknowledgeGroups": "Bevestig {count} afgaande groep | Bevestig {count} afgaande groepen",
+      "unacknowledge": "Bevestiging intrekken",
+      "takeOver": "Overnemen",
+      "chip": "Bevestigd door {who} via {source} · {time}",
+      "chipTooltip": "Bevestigd door {who} op {time} via {source}",
+      "firingAcknowledged": "Afgaand · bevestigd",
+      "tile": "Bevestigd",
+      "groupsAcknowledged": "{count} bevestigd",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "piket",
+        "incident": "incident"
+      },
+      "history": {
+        "dedupSuppressed": "onderdrukt door bevestiging ({who})",
+        "acked": "Bevestigd door {who} via {source}",
+        "ackedViaPage": "Bevestigd door {who} via oproep {page}",
+        "ackedViaIncident": "Bevestigd door {who} via incident {incident}",
+        "unacked": "Bevestiging ingetrokken door {who} via {source}",
+        "unackedResume": "Bevestiging ingetrokken door {who} via {source} · herhalingen hervatten om {time}",
+        "takenOver": "Overgenomen door {who} van {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Je kunt dit alarm niet bevestigen. Bevestigen en dempen vereisen de rol Admin of Editor, of dat je de piketresponder van het alarm bent.",
+        "mute": "Je kunt dit alarm niet dempen. Bevestigen en dempen vereisen de rol Admin of Editor, of dat je de piketresponder van het alarm bent.",
+        "onCall": "Piket: {people}",
+        "canAct": "Kan handelen: {people}",
+        "people": "Piket: {onCall}. Kan handelen: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Dit alarm gaat niet af, dus er is niets te bevestigen.",
+        "firingChanged": "Het alarm is opnieuw afgegaan sinds deze pagina is geladen. Vernieuw en probeer het opnieuw."
       }
+    },
+    "groupActions": {
+      "menu": "Groepsacties",
+      "viewHistory": "De geschiedenis van deze groep bekijken"
+    },
+    "firingState": {
+      "level": "Niveau",
+      "firingSince": "Afgaand sinds",
+      "firingFor": "gaat al {duration} af",
+      "incident": "Incident"
     }
   },
   "alert_dependencies": {
@@ -12533,13 +12643,14 @@
       "openSlackSettings": "Stel het in bij Instellingen › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Stuur meldingen naar Slack-kanalen",
+      "slackDescription": "Plaatst een nieuw bericht met je webhook en sjabloon. Gebruik het voor oproepen of aangepaste Slack-indelingen.",
       "discordDescription": "Stuur meldingen naar Discord-kanalen",
       "msteamsDescription": "Stuur meldingen naar Teams-kanalen",
       "emailDescription": "Stuur HTML-geformatteerde e-mailmeldingen",
       "pagerdutyDescription": "Maak incidenten aan in PagerDuty",
       "opsgenieDescription": "Maak alarmen aan in Opsgenie",
-      "servicenowDescription": "Maak incidenten aan in ServiceNow"
+      "servicenowDescription": "Maak incidenten aan in ServiceNow",
+      "slackAppDescription": "Werkt geplande alarmen ter plaatse bij. Bevestig, demp en onderzoek vanuit Slack. Vereist een gekoppelde workspace."
     },
     "import": {
       "title": "Bestemming importeren",
@@ -12581,7 +12692,8 @@
     "severityCriticalDescription": "Incidenten met hoogste prioriteit",
     "severityErrorDescription": "Standaard foutincidenten",
     "severityWarningDescription": "Incidenten op waarschuwingsniveau",
-    "severityInfoDescription": "Informatieve incidenten"
+    "severityInfoDescription": "Informatieve incidenten",
+    "urlRecipientsChannel": "URL / ontvangers / kanaal"
   },
   "pipeline_destinations": {
     "header": "Pipelinebestemmingen",
@@ -13104,7 +13216,7 @@
     "groupIntegrations": "Integraties",
     "groupAccount": "Account",
     "slackApp": "Slack",
-    "slackAppDesc": "Stel OpenObserve-vragen vanuit Slack",
+    "slackAppDesc": "Stel vragen aan OpenObserve en onderneem actie op alarmen vanuit Slack",
     "generalDesc": "Thema, standaardwaarden voor query's en kernvoorkeuren",
     "orgDesc": "Organisatieparameters en -identificaties",
     "cipherKeysDesc": "Versleutelingssleutels voor gevoelige velden",
@@ -20602,7 +20714,9 @@
         "succeeded": "Geslaagd",
         "failed": "Mislukt",
         "skipped": "Overgeslagen",
-        "pending": "Wachtend"
+        "pending": "Wachtend",
+        "acknowledged": "Bevestigd",
+        "ackevent": "Bevestigingsgebeurtenis"
       },
       "alertLevel": {
         "ok": "Ok",
@@ -20889,7 +21003,6 @@
       "successfullyImportedTemplates": "{count} sjabloon succesvol geïmporteerd | {count} sjablonen succesvol geïmporteerd",
       "aiAnalysisIsAlreadyRunningFor": "AI-analyse draait al voor dit incident",
       "incidentSeverityUpdatedTo": "Ernst van incident bijgewerkt naar {severity}",
-      "incidentStatusUpdatedTo": "Incidentstatus bijgewerkt naar {status}",
       "failedToLoadIncidentDetails": "Kan incidentdetails niet laden",
       "incidentsRefreshed": "Incidenten vernieuwd",
       "failedToPostComment": "Kan reactie niet plaatsen",
@@ -20905,7 +21018,16 @@
       "alertSavedSuccessfully": "Alarm succesvol opgeslagen.",
       "alertUpdatedSuccessfully": "Alarm succesvol bijgewerkt.",
       "openingDedupConfig": "Deduplicatieconfiguratie openen voor: {name}",
-      "editingAlert": "Alarm bewerken: {name}"
+      "editingAlert": "Alarm bewerken: {name}",
+      "ack": {
+        "acked": "{name} bevestigd",
+        "ackedGroups": "{count} groep van {name} bevestigd | {count} groepen van {name} bevestigd",
+        "alreadyAcked": "Al bevestigd door {who}",
+        "unacked": "Bevestiging van {name} ingetrokken",
+        "takenOver": "Je hebt de bevestiging van {name} overgenomen",
+        "failed": "Kon {name} niet bevestigen",
+        "unackFailed": "Kon de bevestiging van {name} niet intrekken"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Cipher key succesvol bijgewerkt",
@@ -21217,7 +21339,14 @@
       "muted": "{count} item gedempt tot {time}. Opgeslagen in {folder}. | {count} items gedempt tot {time}. Opgeslagen in {folder}.",
       "muteFailed": "Kon de demping niet aanmaken",
       "viewDowntime": "Onderhoudsperiode bekijken",
-      "itemsDropped": "{count} gekozen item valt buiten de gekozen mappen en is verwijderd. | {count} gekozen items vallen buiten de gekozen mappen en zijn verwijderd."
+      "itemsDropped": "{count} gekozen item valt buiten de gekozen mappen en is verwijderd. | {count} gekozen items vallen buiten de gekozen mappen en zijn verwijderd.",
+      "mutedUntilClear": "{name} gedempt tot het opgelost is, uiterlijk {time}",
+      "alreadyMuted": "{name} is al gedempt tot {time}",
+      "muteChanged": "Deze demping is gewijzigd sinds de pagina is geladen. Ze eindigt nu om {time}.",
+      "muteEnded": "Demping beëindigd. Meldingen worden hervat.",
+      "mutedOne": "{name} gedempt tot {time}",
+      "timeTomorrow": "morgen {time}",
+      "notQuickMute": "Deze demping is ingesteld op de pagina Onderhoudsperioden. Wijzig ze daar."
     }
   },
   "cipherKeys": {
@@ -23997,7 +24126,7 @@
     "deliveriesTitle": "Bezorgingen",
     "deliveriesNone": "Er is nog niets verzonden.",
     "deliveriesRun": "Ladderuitvoering {run} — een overdracht herstartte de beklimming bij het ontvangende team.",
-    "deliveryLanded": "Bezorgd",
+    "deliveryLanded": "Verzonden",
     "deliveryFailed": "Mislukt",
     "deliveriesTruncated": "Toont {shown} van de {total} verzendingen.",
     "teamChannelTitle": "Teamkanaal",
@@ -24590,7 +24719,7 @@
     "myDeliveriesPage": "Oproep",
     "myDeliveriesLandedColumn": "Bezorging",
     "myDeliveriesSent": "Verzonden",
-    "myDeliveriesLanded": "{channel} heeft je bereikt",
+    "myDeliveriesLanded": "Aan jou verzonden via {channel}",
     "myDeliveriesFailed": "{channel} heeft je niet bereikt",
     "myDeliveriesNone": "Er is nog niets naar je verzonden.",
     "myDeliveriesNoUnread": "Niets ongelezen.",
@@ -25214,7 +25343,7 @@
     "reachAlarmNoRetry": "Er is geen nieuwe poging meer gepland — de escalatieladder is afgelopen.",
     "reachAlarmNoTransport": "Waarschijnlijke oorzaak: er is geen transport geconfigureerd op deze installatie.",
     "reachAlarmCheckTransports": "Controleer wie er bereikt kunnen worden",
-    "reachLanded": "bereikt",
+    "reachLanded": "verzonden",
     "reachUnreached": "niet bereikt",
     "onCallDetails": "Piketdetails",
     "shiftHandover": "Overdracht",
@@ -25299,7 +25428,8 @@
     "scopeClaimServiceEverywhere": "{service} roept dit team op in elk cluster en elke namespace, ongeacht wie de omringende bezit.",
     "scopeClaimServiceHere": "{service} roept dit team alleen in {scope} op. Elders gaat het naar wie de scope eromheen bezit.",
     "scopeNothingDiscovered": "Er is nog niets ontdekt, dus er is geen inventaris om uit te kiezen. Gebruik 'Geavanceerd' om de regel op basis van velden te schrijven, of stuur eerst wat telemetrie.",
-    "scopeAdvancedHint": "Komt overeen met elk veld en elke waarde, inclusief combinaties die de bovenstaande niveaus niet dekken."
+    "scopeAdvancedHint": "Komt overeen met elk veld en elke waarde, inclusief combinaties die de bovenstaande niveaus niet dekken.",
+    "simulatorSendsNothing": "Deze prioriteit verstuurt niets wat zij kunnen ontvangen"
   },
   "paidUsage": {
     "consentTitle": "Betaald AI-gebruik inschakelen?",
@@ -26411,17 +26541,14 @@
     "saveFailed": "Het account kon niet worden opgeslagen. Probeer het opnieuw.",
     "disconnectFailed": "Het account kon niet worden losgekoppeld. Probeer het opnieuw.",
     "connected": "Verbonden",
-    "active": "Actief",
-    "account": "Account",
     "fromNumber": "Afzendernummer",
-    "press4": "Gesprekstoetsen: 4 erkennen, 6 oplossen, 8 escaleren",
+    "press4": "Gesprekstoetsen (4 accepteren, 6 oplossen, 8 escaleren)",
     "press4Available": "Beschikbaar",
     "press4NotAvailable": "Niet beschikbaar",
     "press4NotAvailableHint": "Gesprekken vragen mensen te erkennen via de link in hun sms.",
     "update": "Bijwerken",
     "disconnect": "Loskoppelen",
     "deploymentTitle": "Het {provider}-account van deze deployment",
-    "deploymentNote": "Sms'jes en gesprekken werken al. Ingesteld door de beheerder; hier is niets te doen.",
     "useOwn": "Gebruik in plaats daarvan je eigen {provider}-account",
     "connectTitle": "{provider} koppelen",
     "updateTitle": "{provider} bijwerken",
@@ -26429,7 +26556,7 @@
     "accountSid": "Account-SID",
     "authToken": "Auth-token",
     "tokenKeep": "Laat leeg om het huidige token te behouden",
-    "fromHelp": "Een {provider}-nummer dat sms kan versturen en kan bellen, met landcode.",
+    "fromHelp": "Een nummer van dit {provider}-account, met landcode.",
     "connect": "Koppelen",
     "checking": "Controleren bij {provider}…",
     "disconnectTitle": "{provider} loskoppelen?",
@@ -26442,8 +26569,21 @@
       "tokenRequired": "Er is een auth-token vereist om te koppelen.",
       "noMasterKey": "Vraag je beheerder om {variable} in te stellen.",
       "accountRejected": "{provider} heeft dit account niet geaccepteerd. Controleer de Account-SID en het auth-token, en of het account actief is.",
-      "unreadable": "Het telefoonprovider-account van deze organisatie kon niet worden gelezen."
-    }
+      "unreadable": "Het telefoonprovider-account van deze organisatie kon niet worden gelezen.",
+      "fromNotOnAccount": "Dit nummer hoort niet bij dit {provider}-account. Gebruik er een uit Phone Numbers → Active numbers in {provider}.",
+      "unavailable": "{provider} was niet bereikbaar. Probeer het opnieuw."
+    },
+    "statusChecking": "Controleren…",
+    "statusBroken": "Werkt niet",
+    "statusUnchecked": "Kon niet controleren",
+    "cardMeta": "Van {number} · Account {account}",
+    "deploymentMeta": "Van {number}",
+    "uncheckedNow": "{provider} was op dit moment niet bereikbaar.",
+    "trial": "Proefaccount: sms'jes en oproepen bereiken alleen nummers die in {provider} zijn geverifieerd.",
+    "cantText": "Dit nummer kan geen sms versturen",
+    "cantCall": "Dit nummer kan niet bellen",
+    "deploymentOwner": "Ingesteld door de operator, dus hier valt niets te configureren.",
+    "tokenNewAccount": "Een ander account heeft een eigen authenticatietoken nodig"
   },
   "slackApp": {
     "prereq": {
@@ -26683,7 +26823,10 @@
       "managedBy": "beheerd door je instantiebeheerder",
       "managedTitle": "Beheerd door je instantiebeheerder.",
       "managedDetail": "Inloggegevens, koppeling en welke organisaties {team} gebruiken, worden ingesteld in _meta.",
-      "managedQuestions": "Vragen: {contact}"
+      "managedQuestions": "Vragen: {contact}",
+      "outboundQueue": "Alarmberichten: {count} in wachtrij, oudste {age} | Alarmberichten: {count} in wachtrij, oudste {age}",
+      "outboundEmpty": "Geen alarmberichten in wachtrij",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Standaardwaarden voor kanalen",
@@ -26719,7 +26862,8 @@
       "instanceAdminOnly": "Alleen voor instantiebeheerders",
       "ownOrgOnlyHint": "Op een instantiewerkruimte koppel je kanalen aan je eigen organisatie",
       "claimableHint": "Niet-geclaimde kanalen en kanalen die {org} bezit",
-      "servedOrgsHint": "Elke organisatie die deze werkruimte bedient"
+      "servedOrgsHint": "Elke organisatie die deze werkruimte bedient",
+      "alertRoutes": "{count} bestemming | {count} bestemmingen"
     },
     "people": {
       "title": "Gekoppelde personen",
@@ -26873,6 +27017,83 @@
       "remove": "Verwijderen",
       "saved": "Organisaties opgeslagen",
       "saveFailed": "De organisaties konden niet worden opgeslagen."
+    },
+    "destination": {
+      "appTile": "{product}-app",
+      "webhookTile": "{product}-webhook",
+      "twoWay": "Tweerichtings",
+      "recommendedForAlertResponse": "Aanbevolen voor alarmrespons",
+      "choiceHint": "Oproepen en superclusters gebruiken de webhook. Handmatige en realtime verzendingen vanuit een Slack-app-bestemming zijn aparte berichten.",
+      "unavailableReason": "Vereist de Enterprise Slack-app op één cluster",
+      "unavailableFlag": "Uitgeschakeld op deze server; vraag je beheerder om {variable} in te stellen",
+      "unavailableMasterKey": "Vereist een encryptiesleutel op deze server; vraag je beheerder om {variable} in te stellen",
+      "unavailableCloud": "Nog niet ingeschakeld voor je Cloud-regio",
+      "unavailableNoAccess": "Vraag een organisatiebeheerder om de Slack-app in te schakelen",
+      "postOnly": "Alleen berichten plaatsen",
+      "switchToApp": "Overschakelen naar {product}-app",
+      "switchThis": "Deze bestemming overschakelen",
+      "switchBack": "Terugschakelen",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Werkruimte",
+      "channel": "Kanaal",
+      "mention": "Vermelding",
+      "mentionCritical": "{'@'}here bij kritieke alarmen, geen bij overige",
+      "mentionNone": "Geen",
+      "mentionHelp": "Wordt gebruikt bij herhalingen en niveauverhogingen",
+      "refireReuse": "Hergebruik bij opnieuw afgaan (minuten)",
+      "refireReuseHelp": "Als een alarm binnen deze tijd opnieuw afgaat, wordt het eerdere bericht bewerkt in plaats van een nieuw bericht geplaatst",
+      "buttons": "Knoppen Bevestigen, Dempen en Onderzoeken",
+      "buttonsHelp": "Oplossen wordt toegevoegd wanneer een afgaand alarm een incident of oproep heeft",
+      "autoInvestigate": "Automatisch onderzoeken bij kritieke alarmen",
+      "autoInvestigateHelp": "Draait als het AI-serviceaccount van de organisatie, met de bijbehorende toegang; plaatst bevindingen in de thread van het alarm",
+      "templateDefault": "Standaardsjabloon van {product} ({name})",
+      "sendTest": "Test verzenden",
+      "setsDefault": "Stelt de standaardorganisatie van #{channel} in op {org}",
+      "answersFor": "#{channel} beantwoordt vragen voor organisatie {org}. Alarmen van {thisOrg} worden hier geplaatst en de bijbehorende threads antwoorden in {thisOrg}; de standaard van het kanaal blijft ongewijzigd.",
+      "sharedTag": "Gedeeld · {product} Connect",
+      "sharedTitle": "#{channel} is gedeeld met mensen buiten {workspace}.",
+      "sharedDetail": "Zij zien alarmnamen, waarden, grafieken en links. Hun klikken op de knoppen worden geweigerd.",
+      "sharedConfirm": "Ik begrijp het, plaats alarmen in dit gedeelde kanaal",
+      "sharedRequired": "Bevestig dat alarmen in dit gedeelde kanaal mogen worden geplaatst",
+      "versionMismatch": "Nodes draaien verschillende versies. Upgrade eerst elke node.",
+      "oncallNotAllowed": "Een bestemming van de {product}-app kan geen piketkanaal van een team zijn",
+      "answersForAnother": "#{channel} beantwoordt vragen voor een andere organisatie. Alarmen van {thisOrg} worden hier geplaatst en de bijbehorende threads antwoorden in {thisOrg}; de standaard van het kanaal blijft ongewijzigd.",
+      "oncallTag": "Piketruimte",
+      "oncallTitle": "Oproepen voor team {team} worden ook via {destination} in #{channel} geplaatst.",
+      "oncallDetail": "Alarmen hier worden apart geplaatst.",
+      "oncallConfirm": "Ik begrijp het, plaats alarmen in deze piketruimte",
+      "oncallRequired": "Bevestig dat alarmen in deze piketruimte mogen worden geplaatst",
+      "workspaceRequired": "Kies een werkruimte",
+      "refireRange": "Voer hele minuten in van 0 tot {max}",
+      "connectTitle": "{product} verbinden om alarmen met knoppen te plaatsen",
+      "connectDetail": "Kies een kanaal op het scherm van {product} en klik op Toestaan. OpenObserve maakt deze bestemming voor dat kanaal aan.",
+      "connected": "{name} is aangemaakt voor #{channel}. Controleer de instellingen en sla op.",
+      "saveFailed": "De bestemming kon niet worden opgeslagen.",
+      "switched": "{name} plaatst nu berichten via de {product}-app",
+      "switchedBack": "{name} plaatst weer berichten via de eigen webhook",
+      "switchFailed": "Kon {name} niet overschakelen: {reason}",
+      "switchedAll": "{count} bestemming overgeschakeld | {count} bestemmingen overgeschakeld",
+      "switchThisDetail": "Schakel deze over naar de {product}-app voor de knoppen Bevestigen, Dempen en Onderzoeken. De naam, het sjabloon en de alarmen blijven hetzelfde; Terugschakelen herstelt de webhook."
+    },
+    "switchAll": {
+      "title": "{count} webhookbestemming plaatst berichten in deze werkruimte. | {count} webhookbestemmingen plaatsen berichten in deze werkruimte.",
+      "detail": "Schakel deze over naar de {product}-app voor de knoppen Bevestigen, Dempen en Onderzoeken. De naam, het sjabloon en de alarmen blijven hetzelfde; terugschakelen herstelt de webhook. | Schakel ze over naar de {product}-app voor de knoppen Bevestigen, Dempen en Onderzoeken. Namen, sjablonen en alarmen blijven hetzelfde; terugschakelen herstelt de webhook.",
+      "review": "Controleren",
+      "action": "Alles overschakelen",
+      "summary": "{switched} overgeschakeld · {count} niet overgeschakeld"
+    },
+    "oncallUnlinked": {
+      "title": "Piketleden die niet aan {product} zijn gekoppeld",
+      "description": "Oproepen kunnen hen geen DM sturen, en hun klikken op alarm- en oproepknoppen wachten tot ze gekoppeld zijn",
+      "remind": "Herinner hen",
+      "columnPerson": "Persoon",
+      "columnTeam": "Team",
+      "columnNextShift": "Volgende dienst",
+      "columnReminder": "Herinnering",
+      "dmSent": "DM verzonden {time}",
+      "notSent": "Niet verzonden",
+      "reminded": "Herinnering verzonden naar {count} persoon | Herinneringen verzonden naar {count} personen",
+      "remindFailed": "De herinneringen konden niet worden verzonden."
     }
   },
   "fleet": {

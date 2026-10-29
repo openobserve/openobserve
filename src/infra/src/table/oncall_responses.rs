@@ -116,6 +116,52 @@ async fn save(
     get(org_id, id).await
 }
 
+async fn acknowledge_in(
+    client: &impl ConnectionTrait,
+    org_id: &str,
+    id: &str,
+    user_email: &str,
+    previous_holder: Option<&str>,
+) -> Result<Option<Response>, errors::Error> {
+    let now = now_micros();
+    let mut query = oncall_responses::Entity::update_many()
+        .col_expr(
+            oncall_responses::Column::AckedBy,
+            Expr::value(user_email.to_string()),
+        )
+        .col_expr(oncall_responses::Column::AckedAt, Expr::value(now))
+        .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
+        .filter(oncall_responses::Column::Id.eq(id))
+        .filter(oncall_responses::Column::OrgId.eq(org_id));
+    query = if let Some(previous_holder) = previous_holder {
+        query
+            .filter(oncall_responses::Column::State.eq(ResponseState::Acknowledged.to_i32()))
+            .filter(
+                Expr::expr(sea_orm::sea_query::Func::lower(Expr::col(
+                    oncall_responses::Column::AckedBy,
+                )))
+                .eq(previous_holder.to_ascii_lowercase()),
+            )
+    } else {
+        query
+            .col_expr(
+                oncall_responses::Column::State,
+                Expr::value(ResponseState::Acknowledged.to_i32()),
+            )
+            .filter(oncall_responses::Column::State.is_in(escalating_states()))
+    };
+    let result = query.exec(client).await?;
+    if previous_holder.is_some() && result.rows_affected == 0 {
+        return Ok(None);
+    }
+    // Read back whether we won or lost: after a lost race, "who has it now" is somebody else.
+    Ok(oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+        .and_then(to_response))
+}
+
 fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
     Some(ResponseEvent {
         kind: ResponseEventKind::from_i32(m.kind)?,
@@ -629,6 +675,67 @@ pub async fn restart_ladder(
     hand_over(org_id, id, None, now).await
 }
 
+/// Re-runs an exhausted, unowned page only if its row is still as `seen`, else `None`. [strong]
+pub async fn restart_exhausted(
+    org_id: &str,
+    seen: &Response,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    if !restart_exhausted_in(get_orm_client_rw().await, org_id, seen, now).await? {
+        return Ok(None);
+    }
+    get(org_id, &seen.id).await
+}
+
+/// The compare-and-swap behind [`restart_exhausted`]: `true` when this call's write won.
+async fn restart_exhausted_in<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    seen: &Response,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    use oncall_responses::Column;
+
+    let next = seen.handed_over(None, now);
+    // The run and its anchor as read: a concurrent restart moves both, so only one write lands.
+    let same_run = match seen.ladder_run {
+        Some(run) => Column::LadderRun.eq(run),
+        None => Column::LadderRun.is_null(),
+    };
+    let same_anchor = match seen.ladder_anchor {
+        Some(anchor) => Column::LadderAnchor.eq(anchor),
+        None => Column::LadderAnchor.is_null(),
+    };
+    let written = oncall_responses::Entity::update_many()
+        .col_expr(Column::State, Expr::value(next.state.to_i32()))
+        .col_expr(Column::AckedBy, Expr::value(next.acked_by.clone()))
+        .col_expr(Column::AckedAt, Expr::value(next.acked_at))
+        .col_expr(Column::SnoozedUntil, Expr::value(next.snoozed_until))
+        .col_expr(Column::LadderAnchor, Expr::value(next.ladder_anchor))
+        .col_expr(Column::LadderRun, Expr::value(next.ladder_run))
+        .col_expr(Column::ExhaustedAt, Expr::value(next.exhausted_at))
+        .col_expr(Column::UpdatedAt, next_revision(now))
+        .filter(Column::Id.eq(&seen.id))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::ClosedAt.is_null())
+        .filter(Column::State.is_in([
+            ResponseState::Triggered.to_i32(),
+            ResponseState::Triaged.to_i32(),
+        ]))
+        .filter(Column::AckedBy.is_null())
+        .filter(Column::ExhaustedAt.is_not_null())
+        .filter(
+            Column::SnoozedUntil
+                .is_null()
+                .or(Column::SnoozedUntil.lte(now)),
+        )
+        .filter(same_run)
+        .filter(same_anchor)
+        .exec(db)
+        .await?;
+    Ok(written.rows_affected == 1)
+}
+
 async fn hand_over(
     org_id: &str,
     id: &str,
@@ -798,25 +905,23 @@ pub async fn acknowledge(
     user_email: &str,
 ) -> Result<Option<Response>, errors::Error> {
     let client = get_orm_client_rw().await;
-    let now = now_micros();
-    oncall_responses::Entity::update_many()
-        .col_expr(
-            oncall_responses::Column::State,
-            Expr::value(ResponseState::Acknowledged.to_i32()),
-        )
-        .col_expr(
-            oncall_responses::Column::AckedBy,
-            Expr::value(user_email.to_string()),
-        )
-        .col_expr(oncall_responses::Column::AckedAt, Expr::value(now))
-        .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
-        .filter(oncall_responses::Column::Id.eq(id))
-        .filter(oncall_responses::Column::OrgId.eq(org_id))
-        .filter(oncall_responses::Column::State.is_in(escalating_states()))
-        .exec(client)
-        .await?;
-    // Read back whether we won or lost: after a lost race, "who has it now" is somebody else.
-    get(org_id, id).await
+    acknowledge_in(client, org_id, id, user_email, None).await
+}
+
+pub async fn take_over_acknowledgement(
+    org_id: &str,
+    id: &str,
+    previous_holder: &str,
+    user_email: &str,
+) -> Result<Option<Response>, errors::Error> {
+    acknowledge_in(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        user_email,
+        Some(previous_holder),
+    )
+    .await
 }
 
 /// The states a record is still climbing its ladder in. Mirrors
@@ -1564,39 +1669,118 @@ pub async fn routing_sentences(
 #[derive(Debug, FromQueryResult)]
 struct RungReached {
     response_id: String,
+    ladder_run: Option<i32>,
     rung: i64,
 }
 
-/// The deepest rung each of these records reached, in one grouped query. The
-/// pages list has to say how far a firing climbed, and asking the timeline once
-/// per row is the N+1 this avoids — the same reason [`runbook_urls`] takes a
-/// page of ids.
+/// The deepest rung each record reached in its current run, in one grouped query (no N+1).
 pub async fn deepest_rungs(
-    ids: &[String],
+    records: &[(String, i32)],
 ) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
-    if ids.is_empty() {
+    deepest_rungs_in(get_orm_client_rw().await, records).await
+}
+
+async fn deepest_rungs_in<C: ConnectionTrait>(
+    db: &C,
+    records: &[(String, i32)],
+) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
+    if records.is_empty() {
         return Ok(Default::default());
     }
-    let client = get_orm_client_rw().await;
-    Ok(oncall_response_events::Entity::find()
-        .filter(oncall_response_events::Column::ResponseId.is_in(ids.to_vec()))
+    let ids: Vec<String> = records.iter().map(|(id, _)| id.clone()).collect();
+    let rows = oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::ResponseId.is_in(ids))
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Page.to_i32()))
         .filter(oncall_response_events::Column::RungMicros.is_not_null())
         .select_only()
         .column_as(oncall_response_events::Column::ResponseId, "response_id")
+        .column_as(oncall_response_events::Column::LadderRun, "ladder_run")
         .column_as(oncall_response_events::Column::RungMicros.max(), "rung")
         .group_by(oncall_response_events::Column::ResponseId)
+        .group_by(oncall_response_events::Column::LadderRun)
         .into_model::<RungReached>()
-        .all(client)
-        .await?
-        .into_iter()
-        .map(|r| (r.response_id, r.rung))
-        .collect())
+        .all(db)
+        .await?;
+    let current: std::collections::HashMap<&str, i32> = records
+        .iter()
+        .map(|(id, run)| (id.as_str(), *run))
+        .collect();
+    let mut deepest: std::collections::HashMap<String, i64> = Default::default();
+    for row in rows {
+        // As `ResponseEvent::run` reads it: an entry with no run belongs to the first.
+        let run = row.ladder_run.unwrap_or(FIRST_LADDER_RUN);
+        if current.get(row.response_id.as_str()) != Some(&run) {
+            continue;
+        }
+        let entry = deepest.entry(row.response_id).or_insert(row.rung);
+        *entry = (*entry).max(row.rung);
+    }
+    Ok(deepest)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn takeover_moves_only_the_previous_holders_acknowledged_page() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(
+            backend.build(&Schema::new(backend).create_table_from_entity(oncall_responses::Entity)),
+        )
+        .await
+        .unwrap();
+        for (id, state, holder) in [
+            ("held", ResponseState::Acknowledged, "alice@example.com"),
+            ("other", ResponseState::Acknowledged, "carol@example.com"),
+            ("open", ResponseState::Triggered, "alice@example.com"),
+            ("closed", ResponseState::Resolved, "alice@example.com"),
+        ] {
+            let mut row = model();
+            row.id = id.into();
+            row.state = state.to_i32();
+            row.acked_by = Some(holder.into());
+            row.acked_at = Some(900);
+            oncall_responses::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+            let updated = acknowledge_in(
+                &db,
+                "default",
+                id,
+                "bob@example.com",
+                Some("ALICE@example.com"),
+            )
+            .await
+            .unwrap();
+            assert_eq!(updated.is_some(), id == "held");
+            let result = oncall_responses::Entity::find_by_id(id)
+                .one(&db)
+                .await
+                .unwrap()
+                .and_then(to_response)
+                .unwrap();
+            assert_eq!(result.state, state);
+            assert_eq!(
+                result.acked_by.as_deref(),
+                Some(if id == "held" {
+                    "bob@example.com"
+                } else {
+                    holder
+                })
+            );
+            assert_eq!(result.ladder_run, Some(FIRST_LADDER_RUN));
+            if id == "held" {
+                assert!(result.acked_at.unwrap() > 900);
+            } else {
+                assert_eq!(result.acked_at, Some(900));
+            }
+        }
+    }
 
     fn model() -> oncall_responses::Model {
         oncall_responses::Model {
@@ -1858,5 +2042,133 @@ mod tests {
         .into_iter()
         .collect();
         assert_eq!(health, expected);
+    }
+
+    /// One in-memory table holding `row`, for the compare-and-swap tests.
+    async fn table_with(row: oncall_responses::Model) -> sea_orm::DatabaseConnection {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(oncall_responses::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        oncall_responses::ActiveModel::from(row)
+            .insert(&db)
+            .await
+            .unwrap();
+        db
+    }
+
+    async fn row_in(db: &sea_orm::DatabaseConnection) -> Response {
+        to_response(
+            oncall_responses::Entity::find_by_id("resp_1")
+                .one(db)
+                .await
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap()
+    }
+
+    /// A re-page wins only against the row it read; an ack or a second join in between wins.
+    #[tokio::test]
+    async fn test_restarting_an_exhausted_page_is_a_compare_and_swap() {
+        let now = 10_000_000_000;
+        let exhausted = oncall_responses::Model {
+            exhausted_at: Some(2_000),
+            ..model()
+        };
+        let seen = to_response(exhausted.clone()).unwrap();
+
+        // Two alerts join at once: the first restarts the ladder, the second finds it moved.
+        let db = table_with(exhausted.clone()).await;
+        assert!(
+            restart_exhausted_in(&db, "default", &seen, now)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !restart_exhausted_in(&db, "default", &seen, now)
+                .await
+                .unwrap()
+        );
+        let after = row_in(&db).await;
+        assert_eq!(
+            after.ladder_run,
+            Some(FIRST_LADDER_RUN + 1),
+            "one restart, not two"
+        );
+        assert_eq!(after.exhausted_at, None);
+        assert_eq!(after.ladder_anchor, Some(now));
+
+        // Acknowledged, snoozed, or re-run and exhausted again after the read: the write loses.
+        let acked = oncall_responses::Model {
+            state: ResponseState::Acknowledged.to_i32(),
+            acked_by: Some("ana@o2.ai".into()),
+            acked_at: Some(5_000),
+            ..exhausted.clone()
+        };
+        let snoozed = oncall_responses::Model {
+            snoozed_until: Some(now + 1),
+            ..exhausted.clone()
+        };
+        let rerun = oncall_responses::Model {
+            ladder_run: Some(FIRST_LADDER_RUN + 1),
+            ladder_anchor: Some(3_000),
+            ..exhausted
+        };
+        for row in [acked, snoozed, rerun] {
+            let db = table_with(row.clone()).await;
+            assert!(
+                !restart_exhausted_in(&db, "default", &seen, now)
+                    .await
+                    .unwrap()
+            );
+            assert_eq!(row_in(&db).await, to_response(row).unwrap());
+        }
+    }
+
+    /// The pages list shows how far the current run climbed, not a run a re-page or handoff ended.
+    #[tokio::test]
+    async fn test_deepest_rung_counts_only_the_records_current_run() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(oncall_response_events::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        // (record, event run, rung): an old event stores no run, which means the first one.
+        let pages = [
+            ("resp_1", None, 900),
+            ("resp_1", Some(1), 600),
+            ("resp_1", Some(2), 0),
+            ("resp_2", None, 300),
+            ("resp_2", Some(1), 600),
+        ];
+        for (i, (record, run, rung)) in pages.into_iter().enumerate() {
+            let mut m = event_model(ResponseEventKind::Page);
+            m.id = format!("ev_{i}");
+            m.response_id = record.into();
+            m.ladder_run = run;
+            m.rung_micros = Some(rung);
+            oncall_response_events::ActiveModel::from(m)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        let deepest = deepest_rungs_in(&db, &[("resp_1".into(), 2), ("resp_2".into(), 1)])
+            .await
+            .unwrap();
+        assert_eq!(
+            deepest.get("resp_1"),
+            Some(&0),
+            "run 2 has only reached rung 0"
+        );
+        assert_eq!(
+            deepest.get("resp_2"),
+            Some(&600),
+            "no stored run is the first run"
+        );
     }
 }

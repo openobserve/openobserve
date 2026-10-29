@@ -46,9 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="auth_token"
         type="password"
         :label="t('telephony.authToken')"
-        :help-text="mode === 'update' ? t('telephony.tokenKeep') : undefined"
+        :help-text="tokenHelp"
         autocomplete="new-password"
-        :required="mode === 'connect'"
+        :required="tokenRequired"
         data-test="telephony-account-dialog-token"
       />
       <OFormInput
@@ -72,7 +72,7 @@ import { useMutation } from "@tanstack/vue-query";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { saveTelephonyMutation } from "@/services/oncall.queries";
@@ -81,6 +81,7 @@ import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   makeTelephonySchema,
+  sidChanged,
   type TelephonyDialogMode,
   type TelephonyForm,
 } from "./TelephonyAccountDialog.schema";
@@ -119,8 +120,16 @@ const form = useOForm<TelephonyForm>({
     auth_token: "",
     from_number: props.account?.from_number ?? "",
   },
-  schema: makeTelephonySchema(t, props.mode),
+  schema: makeTelephonySchema(t, props.mode, props.account?.account_sid),
   onSubmit: submit,
+});
+
+const sid = form.useStore((s) => s.values.account_sid);
+const newAccount = computed(() => sidChanged(props.mode, sid.value, props.account?.account_sid));
+const tokenRequired = computed(() => props.mode === "connect" || newAccount.value);
+const tokenHelp = computed<I18nText | undefined>(() => {
+  if (props.mode === "connect") return undefined;
+  return newAccount.value ? t("telephony.tokenNewAccount") : t("telephony.tokenKeep");
 });
 
 const submitting = form.useStore((s) => s.isSubmitting);
@@ -134,6 +143,16 @@ function failureText(err: unknown): I18nText {
   if (body) return telephonyRefusalText(t, body.reason);
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
   return raw(message) || t("telephony.saveFailed");
+}
+
+function showFailure(err: unknown) {
+  if (telephonyRefusalOf(err)?.reason === "from_not_on_account") {
+    setServerFieldErrors(form, {
+      from_number: telephonyRefusalText(t, "from_not_on_account"),
+    });
+    return;
+  }
+  refusal.value = failureText(err);
 }
 
 async function submit(value: TelephonyForm) {
@@ -154,7 +173,7 @@ async function submit(value: TelephonyForm) {
       emit("update:open", false);
       return;
     }
-    refusal.value = failureText(err);
+    showFailure(err);
   }
 }
 </script>

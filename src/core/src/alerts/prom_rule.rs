@@ -431,6 +431,7 @@ mod tests {
                 &std::collections::HashMap::new(),
                 600,
                 0,
+                0,
             );
             let states: std::collections::HashMap<_, _> = plan
                 .updates
@@ -445,7 +446,7 @@ mod tests {
                 &TriggerCondition::default(),
                 600,
                 0,
-                |_| false,
+                |_, _, _| false,
             );
             assert!(dispatch.inconsistent.is_empty());
             assert_eq!(dispatch.items.len(), 2);

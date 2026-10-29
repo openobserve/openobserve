@@ -223,6 +223,7 @@ module.exports = {
   uniq,
   mockCode,
   call,
+  ok,
   createOrg,
   orgConfig,
   listInstallations,

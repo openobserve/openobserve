@@ -16,7 +16,13 @@
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
-import type { DimensionCondition, DowntimeTarget, TargetModule } from "@/services/downtimes";
+import type {
+  AlertGroupRef,
+  DimensionCondition,
+  DowntimeTarget,
+  TargetModule,
+} from "@/services/downtimes";
+import { groupRefLabels } from "@/utils/alerts/ackState";
 
 export const MODULE_ORDER: TargetModule[] = ["alerts", "anomaly_detections", "synthetics", "slos"];
 
@@ -132,4 +138,17 @@ export function sortedTargets(targets: DowntimeTarget[]): DowntimeTarget[] {
   return [...targets].sort(
     (a, b) => MODULE_ORDER.indexOf(a.module) - MODULE_ORDER.indexOf(b.module),
   );
+}
+
+/** One chip per muted alert group, named by its labels, or by the start of its key when none were recorded. */
+export function alertGroupChips(
+  groups: AlertGroupRef[] | null | undefined,
+  t: TranslateFn,
+): { key: string; label: I18nText }[] {
+  return (groups ?? []).map((group) => ({
+    key: group.group_key,
+    label: t("alerts.downtimes.groupTarget", {
+      labels: groupRefLabels(group) ?? group.group_key.slice(0, 8),
+    }),
+  }));
 }

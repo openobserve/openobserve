@@ -669,6 +669,7 @@
     "dateRangeCopied": "日付範囲をコピーしました",
     "dateRangePasted": "日付範囲を貼り付けました",
     "dateRangePasteError": "日付範囲を解析できませんでした",
+    "dateRangePasteBlocked": "このブラウザではクリップボードの読み取りがブロックされています。ピッカーを開いた状態で {shortcut} を押して貼り付けてください。",
     "pastSecond": "{count} 秒前 | {count} 秒前",
     "pastMinute": "{count} 分前 | {count} 分前",
     "pastHour": "{count} 時間前 | {count} 時間前",
@@ -1274,6 +1275,8 @@
     "tookChip": "{took} ms",
     "scanSize": "スキャンサイズ",
     "deltaScanSize": "デルタスキャンサイズ",
+    "scannedSoFar": "{size} をスキャン済み",
+    "resultsProgressLabel": "検索の進捗",
     "histogramTitleError": "ヒストグラムタイトルの生成中にエラーが発生しました。",
     "selectLogStream": "ログストリームを選択",
     "searchInspect": "検索を検査",
@@ -5754,6 +5757,22 @@
       "providerNameRum": "リアルユーザーモニタリング",
       "quickInstallDesc": "**1 つのコマンド** で OpenObserve コレクターをインストールします — クラスター名を設定して実行するだけです。名前はすべてのレコードにタグ付けされるため、複数が報告されるとクラスターを区別できます。",
       "quickInstallTitle": "クイックインストール（推奨）",
+      "dbInstallerMetricsOnlyNote": "このコマンドはメトリクスのみを収集します。以下の**データベースモニタリング**の手順は、メトリクス + データベースモニタリングコマンドにのみ適用されます。必要な場合は、先にそちらへ切り替えてください。",
+      "dbInstallerDbmNote": "このコマンドを実行する前に、以下の **データベースモニタリング** の手順を完了してください。コレクターは初回起動時から、それらの手順で設定するアクセス権とログ設定を必要とします。すでに実行済みですか？ その場合はそれらの手順を完了してから、同じサービス名でこのコマンドを再実行してください。インストール済みのコレクターがその場で更新されます。",
+      "dbInstallerDbmVariant": "メトリクス + データベースモニタリング",
+      "dbInstallerMysqlLogPathHelp": "コレクターがこのファイルを読み取れる必要があります。通常は `/var/log/mysql/error.log`、RHEL では `/var/log/mariadb/mariadb.log` です。次のコマンドで確認できます: SHOW VARIABLES LIKE 'log_error';",
+      "dbInstallerManualHint": "Windows 上、コンテナ内、またはコレクターを自分で実行したい場合は、代わりに [手動](#manual) セットアップを使用してください。",
+      "dbInstallerNote": "データベースに到達できる Linux または macOS ホストで `sudo` を使用して実行します。データベースユーザーのパスワードを尋ねるため、パスワードがコマンドラインに含まれることはありません（Kubernetes インストーラーと同様に、組織のアクセスキーは含まれます）。OpenTelemetry Collector Contrib v{version} をインストールし、設定を `/etc/otelcol-o2/` に書き込み、サービスとして起動します。",
+      "dbInstallerNoteRedis": "Redis に到達できる Linux または macOS ホストで `sudo` を使用して実行します。Redis のパスワードを尋ねます（Redis で認証を使用していない場合は Enter を押します）。そのため、パスワードがコマンドラインに含まれることはありません（Kubernetes インストーラーと同様に、組織のアクセスキーは含まれます）。OpenTelemetry Collector Contrib v{version} をインストールし、設定を `/etc/otelcol-o2/` に書き込み、サービスとして起動します。",
+      "dbInstallerServiceNameHelp": "コレクターサービスの名前です。アンインストールコマンドでも使用されます。同じホスト上のデータベースごとに異なる名前を使用してください。小文字、数字、ダッシュのみ使用できます。それ以外の文字はダッシュに変換されます。空のままにすると、インストーラーが名前を付けます。",
+      "dbInstallerServiceNameLabel": "サービス名",
+      "dbInstallerUserHelp": "手順 1 の監視ユーザーです。",
+      "dbInstallerUserLabel": "データベースユーザー",
+      "dbQuickInstallDesc": "**1 つのコマンド**で OpenTelemetry Collector をインストール、設定、起動します。データベースの場所を設定して実行するだけです。",
+      "dbUninstallDesc": "インストーラーを実行したホストで `sudo` を付けて実行します。コレクターサービスを停止して削除し、`/etc/otelcol-o2/` 配下の設定も削除します。このコマンドは上記のサービス名を使用します。空のままにした場合は、インストーラーが出力した名前を `--name=` で指定してください。",
+      "dbUninstallLabel": "コレクターをアンインストール",
+      "setupModeAuto": "自動（スクリプト）",
+      "setupModeManual": "手動",
       "redisHostLabel": "Redis ホスト",
       "redisNoAuthNote": "Redis に認証がない場合は REDIS_PASSWORD='' を使用します。",
       "redisTagline": "OpenTelemetry Collector を使用して Redis メトリクスを収集し、OpenObserve に送信します。",
@@ -10253,6 +10272,10 @@
       "acknowledgeConfirmMessage": "これによりインシデントは対応中としてマークされます。必要に応じて後で再度オープンできます。",
       "acknowledgeConfirmLabel": "確認済みにする",
       "acknowledgeConfirmCancelLabel": "キャンセル",
+      "resolveConfirmTitle": "インシデントを解決しますか？",
+      "resolveConfirmMessage": "インシデントをクローズし、アクティブな一覧から削除します。必要に応じて後で再オープンできます。",
+      "reopenConfirmTitle": "インシデントを再オープンしますか？",
+      "reopenConfirmMessage": "インシデントをオープン状態に戻し、解決と確認済みの情報をクリアします。",
       "acknowledgeAriaLabel": "インシデントを確認済みにする",
       "acknowledgedBy": "確認者",
       "resolve": "解決",
@@ -11562,7 +11585,8 @@
         "dailySentence": "毎日 · {time}、{duration} 間 · {zone}",
         "weeklySentence": "毎週 {days} · {time}、{duration} 間 · {zone}",
         "fromNoEnd": "{schedule}、{start} から（終了日なし）",
-        "fromUntil": "{schedule}、{start} から {until} まで"
+        "fromUntil": "{schedule}、{start} から {until} まで",
+        "onceFor": "1 回、{duration}"
       },
       "validation": {
         "conditionRequired": "条件を追加するか、条件ブロックを削除してください。",
@@ -11903,8 +11927,8 @@
         "presets": {
           "30m": "30 分",
           "1h": "1 時間",
-          "2h": "2 時間",
           "4h": "4 時間",
+          "24h": "24 時間",
           "custom": "カスタム"
         },
         "endsAt": "終了日時",
@@ -11918,7 +11942,34 @@
         "mutedTooltip": "{name} により {end} までミュート",
         "exclude": "ウィンドウを除外…",
         "firingMuted": "発火中 · ミュート",
-        "firingMutedTooltip": "発火は継続中です。通知は {name} によりミュートされています。"
+        "firingMutedTooltip": "発火は継続中です。通知は {name} によりミュートされています。",
+        "untilClear": "復旧するまで",
+        "untilClearHint": "アラートが復旧すると終了します。最長 24 時間です。",
+        "confirmUntilClear": "復旧するまでミュート",
+        "titleOne": "{name} をミュート",
+        "subtitleOne": "アラートは実行を続け、履歴も保持します。ウィンドウが終了するまで、通知、呼び出し、ワークフローは停止します。",
+        "untilTime": "{time} まで。",
+        "groups": "グループ",
+        "groupsThis": "このグループ",
+        "groupsAll": "このアラートのすべてのグループ",
+        "addGroup": "発火グループを追加",
+        "groupsHint": "これらのグループのみミュートされます。他のグループは通知を続けます。",
+        "confirm24h": {
+          "title": "24 時間ミュートしますか？",
+          "message": "「復旧するまで」を選ぶと、アラートの復旧と同時にミュートが終了します。",
+          "useUntilClear": "「復旧するまで」を使用",
+          "ok": "24 時間ミュート"
+        },
+        "muteGroup": "このグループをミュート",
+        "endNow": "今すぐミュートを終了",
+        "endMute": "ミュートを終了",
+        "mutedUntilClear": "復旧するまでミュート · 最長 24 時間",
+        "mutedUntilClearGroups": "復旧するまでミュート · {count} グループ | 復旧するまでミュート · {count} グループ",
+        "mutedGroups": "ミュート中 · {count} グループ · 終了まで {duration} | ミュート中 · {count} グループ · 終了まで {duration}",
+        "mutedUntilClearTooltip": "{name} がアラートの復旧までミュートしています（遅くとも {end}）",
+        "mutedGroupsTooltip": "{name} が {end} までミュートしています。グループ: {labels}",
+        "mutedUntilClearGroupsTooltip": "{name} がアラートの復旧までミュートしています（遅くとも {end}）。グループ: {labels}",
+        "untilTomorrow": "明日の {time} まで。"
       },
       "corrected": "修正済み",
       "correctedBy": "スコアは {names} により修正",
@@ -12004,7 +12055,66 @@
           "sent": "{count} 件の宛先にテストを送信しました | {count} 件の宛先にテストを送信しました",
           "failed": "テストは {names} に届きませんでした。"
         }
+      },
+      "untilClear": {
+        "schedule": "復旧するまで",
+        "atMost": "最長 24 時間",
+        "endsWhenClears": "復旧時に終了",
+        "byTime": "{time} までに",
+        "whenCleared": "復旧したとき",
+        "endedBy": "{product} により終了",
+        "createdFrom": "{source} から"
+      },
+      "groupTarget": "グループ: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "アラートからのクイックミュート",
+      "endedLabel": "終了"
+    },
+    "ack": {
+      "acknowledge": "確認",
+      "acknowledgeGroups": "{count} 件の発火グループを確認 | {count} 件の発火グループを確認",
+      "unacknowledge": "確認を取り消す",
+      "takeOver": "引き継ぐ",
+      "chip": "{who} が {source} 経由で確認 · {time}",
+      "chipTooltip": "{who} が {time} に {source} から確認",
+      "firingAcknowledged": "発火 · 確認済み",
+      "tile": "確認済み",
+      "groupsAcknowledged": "{count} 件確認済み",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "オンコール",
+        "incident": "インシデント"
+      },
+      "history": {
+        "dedupSuppressed": "確認応答により抑制 ({who})",
+        "acked": "{who} が {source} から確認応答しました",
+        "ackedViaPage": "{who} が呼び出し {page} 経由で確認応答しました",
+        "ackedViaIncident": "{who} がインシデント {incident} 経由で確認応答しました",
+        "unacked": "{who} が {source} から確認応答を取り消しました",
+        "unackedResume": "{who} が {source} から確認応答を取り消しました · 繰り返しは {time} に再開します",
+        "takenOver": "{previous} から {who} が引き継ぎました ({source})"
+      },
+      "refused": {
+        "ack": "このアラートを確認応答できません。確認応答とミュートには管理者または編集者のロール、またはアラートのオンコール応答者である必要があります。",
+        "mute": "このアラートをミュートできません。確認応答とミュートには管理者または編集者のロール、またはアラートのオンコール応答者である必要があります。",
+        "onCall": "オンコール: {people}",
+        "canAct": "対応可能: {people}",
+        "people": "オンコール: {onCall}。対応可能: {canAct}"
+      },
+      "errors": {
+        "notFiring": "このアラートは発火していないため、確認応答するものはありません。",
+        "firingChanged": "このページの読み込み後にアラートが再度発火しました。更新して再試行してください。"
       }
+    },
+    "groupActions": {
+      "menu": "グループ操作",
+      "viewHistory": "このグループの履歴を表示"
+    },
+    "firingState": {
+      "level": "レベル",
+      "firingSince": "発火開始",
+      "firingFor": "{duration} 間発火中",
+      "incident": "インシデント"
     }
   },
   "alert_dependencies": {
@@ -12533,13 +12643,14 @@
       "openSlackSettings": "設定 › Slack でセットアップします"
     },
     "prebuilt": {
-      "slackDescription": "Slackチャンネルに通知を送信",
+      "slackDescription": "Webhook とテンプレートで新しいメッセージを投稿します。呼び出しやカスタム Slack レイアウトに使用します。",
       "discordDescription": "Discordチャンネルに通知を送信",
       "msteamsDescription": "Teamsチャンネルに通知を送信",
       "emailDescription": "HTML形式のメール通知を送信",
       "pagerdutyDescription": "PagerDutyでインシデントを作成",
       "opsgenieDescription": "Opsgenieでアラートを作成",
-      "servicenowDescription": "ServiceNowでインシデントを作成"
+      "servicenowDescription": "ServiceNowでインシデントを作成",
+      "slackAppDescription": "スケジュールされたアラートをその場で更新します。Slack から確認応答、ミュート、調査ができます。接続済みのワークスペースが必要です。"
     },
     "import": {
       "title": "宛先をインポート",
@@ -12581,7 +12692,8 @@
     "severityCriticalDescription": "最優先インシデント",
     "severityErrorDescription": "標準エラーインシデント",
     "severityWarningDescription": "警告レベルのインシデント",
-    "severityInfoDescription": "情報インシデント"
+    "severityInfoDescription": "情報インシデント",
+    "urlRecipientsChannel": "URL / 受信者 / チャンネル"
   },
   "pipeline_destinations": {
     "header": "パイプライン宛先",
@@ -13104,7 +13216,7 @@
     "groupIntegrations": "インテグレーション",
     "groupAccount": "アカウント",
     "slackApp": "Slack",
-    "slackAppDesc": "Slack から OpenObserve に質問",
+    "slackAppDesc": "OpenObserve に質問し、Slack からアラートに対応できます",
     "generalDesc": "テーマ、クエリのデフォルト、基本設定",
     "orgDesc": "組織のパラメータと識別子",
     "cipherKeysDesc": "機密フィールドの暗号化キー",
@@ -20602,7 +20714,9 @@
         "succeeded": "成功",
         "failed": "失敗",
         "skipped": "スキップ",
-        "pending": "保留中"
+        "pending": "保留中",
+        "acknowledged": "確認応答済み",
+        "ackevent": "確認応答イベント"
       },
       "alertLevel": {
         "ok": "OK",
@@ -20889,7 +21003,6 @@
       "successfullyImportedTemplates": "テンプレートを{count}件正常にインポートしました | テンプレートを{count}件正常にインポートしました",
       "aiAnalysisIsAlreadyRunningFor": "このインシデントに対してAI分析が既に実行されています",
       "incidentSeverityUpdatedTo": "インシデントの重要度が{severity}に更新されました",
-      "incidentStatusUpdatedTo": "インシデントのステータスが{status}に更新されました",
       "failedToLoadIncidentDetails": "インシデント詳細の読み込みに失敗しました",
       "incidentsRefreshed": "インシデントを更新しました",
       "failedToPostComment": "コメントの投稿に失敗しました",
@@ -20905,7 +21018,16 @@
       "alertSavedSuccessfully": "アラートが正常に保存されました。",
       "alertUpdatedSuccessfully": "アラートが正常に更新されました。",
       "openingDedupConfig": "重複排除設定を開いています: {name}",
-      "editingAlert": "アラートを編集中: {name}"
+      "editingAlert": "アラートを編集中: {name}",
+      "ack": {
+        "acked": "{name} を確認応答しました",
+        "ackedGroups": "{name} の {count} グループを確認応答しました | {name} の {count} グループを確認応答しました",
+        "alreadyAcked": "すでに {who} が確認応答済みです",
+        "unacked": "{name} の確認応答を取り消しました",
+        "takenOver": "{name} の確認応答を引き継ぎました",
+        "failed": "{name} を確認応答できませんでした",
+        "unackFailed": "{name} の確認応答を取り消せませんでした"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "暗号鍵が正常に更新されました",
@@ -21217,7 +21339,14 @@
       "muted": "{count} 件のアイテムを {time} までミュートしました。{folder} に保存しました。 | {count} 件のアイテムを {time} までミュートしました。{folder} に保存しました。",
       "muteFailed": "ミュートを作成できませんでした",
       "viewDowntime": "ダウンタイムを表示",
-      "itemsDropped": "選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。 | 選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。"
+      "itemsDropped": "選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。 | 選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。",
+      "mutedUntilClear": "{name} を解除されるまでミュートしました (遅くとも {time})",
+      "alreadyMuted": "{name} はすでに {time} までミュートされています",
+      "muteChanged": "このページの読み込み後にミュートが変更されました。現在は {time} に終了します。",
+      "muteEnded": "ミュートが終了しました。通知が再開します。",
+      "mutedOne": "{name} を {time} までミュートしました",
+      "timeTomorrow": "明日の {time}",
+      "notQuickMute": "このミュートはダウンタイムページで設定されました。そこで変更してください。"
     }
   },
   "cipherKeys": {
@@ -23997,7 +24126,7 @@
     "deliveriesTitle": "配信",
     "deliveriesNone": "まだ何も送信されていません。",
     "deliveriesRun": "ラダー実行 {run} — ハンドオフにより、受け入れ側チームでラダーが最初から再開されました",
-    "deliveryLanded": "送信成功",
+    "deliveryLanded": "送信済み",
     "deliveryFailed": "送信失敗",
     "deliveriesTruncated": "{total} 件中 {shown} 件の送信を表示中。",
     "teamChannelTitle": "チームチャンネル",
@@ -24590,7 +24719,7 @@
     "myDeliveriesPage": "呼び出し",
     "myDeliveriesLandedColumn": "配信",
     "myDeliveriesSent": "送信済み",
-    "myDeliveriesLanded": "{channel} 経由で届きました",
+    "myDeliveriesLanded": "{channel} で送信されました",
     "myDeliveriesFailed": "{channel} 経由では届きませんでした",
     "myDeliveriesNone": "まだ何も送信されていません。",
     "myDeliveriesNoUnread": "未読はありません。",
@@ -25214,7 +25343,7 @@
     "reachAlarmNoRetry": "再試行の予定はありません — ラダーは終了しました。",
     "reachAlarmNoTransport": "考えられる原因: このデプロイメントにはトランスポートが設定されていません。",
     "reachAlarmCheckTransports": "連絡可能な相手を確認",
-    "reachLanded": "連絡済み",
+    "reachLanded": "送信済み",
     "reachUnreached": "未連絡",
     "onCallDetails": "オンコール詳細",
     "shiftHandover": "引き継ぎ",
@@ -25299,7 +25428,8 @@
     "scopeClaimServiceEverywhere": "{service} は、周囲を所有するのが誰であっても、すべてのクラスタと名前空間でこのチームを呼び出します。",
     "scopeClaimServiceHere": "{service} は {scope} でのみこのチームを呼び出します。それ以外の場所では、周囲のスコープを所有するチームに割り当てられます。",
     "scopeNothingDiscovered": "まだ何も検出されていないため、選択できる対象がありません。詳細設定を使用してフィールドでルールを作成するか、最初にテレメトリを送信してください。",
-    "scopeAdvancedHint": "上記のレベルがカバーしないものを含む、任意のフィールドと値に一致します。"
+    "scopeAdvancedHint": "上記のレベルがカバーしないものを含む、任意のフィールドと値に一致します。",
+    "simulatorSendsNothing": "この優先度では受信できるものが何も送信されません"
   },
   "paidUsage": {
     "consentTitle": "有料のAI使用を有効にしますか？",
@@ -26411,17 +26541,14 @@
     "saveFailed": "アカウントを保存できませんでした。もう一度お試しください。",
     "disconnectFailed": "アカウントを切断できませんでした。もう一度お試しください。",
     "connected": "接続済み",
-    "active": "アクティブ",
-    "account": "アカウント",
     "fromNumber": "発信元番号",
-    "press4": "通話キー: 4 確認、6 解決、8 エスカレーション",
+    "press4": "通話キー（4: 確認、6: 解決、8: エスカレーション）",
     "press4Available": "利用可能",
     "press4NotAvailable": "利用不可",
     "press4NotAvailableHint": "通話では、SMS 内のリンクから確認するよう案内されます。",
     "update": "更新",
     "disconnect": "切断",
     "deploymentTitle": "このデプロイメントの {provider} アカウント",
-    "deploymentNote": "SMS と通話はすでに動作しています。運用担当者が設定済みのため、ここで行う操作はありません。",
     "useOwn": "代わりに独自の {provider} アカウントを使用する",
     "connectTitle": "{provider} を接続",
     "updateTitle": "{provider} を更新",
@@ -26429,7 +26556,7 @@
     "accountSid": "アカウント SID",
     "authToken": "認証トークン",
     "tokenKeep": "空欄のままにすると現在のトークンが保持されます",
-    "fromHelp": "SMS の送信と通話が可能な {provider} の番号(国番号を含む)。",
+    "fromHelp": "この {provider} アカウントの番号（国コード付き）。",
     "connect": "接続",
     "checking": "{provider} で確認中…",
     "disconnectTitle": "{provider} を切断しますか?",
@@ -26442,8 +26569,21 @@
       "tokenRequired": "接続には認証トークンが必要です。",
       "noMasterKey": "運用担当者に {variable} の設定を依頼してください。",
       "accountRejected": "{provider} がこのアカウントを受け入れませんでした。アカウント SID と認証トークン、およびアカウントがアクティブであることを確認してください。",
-      "unreadable": "この組織の電話プロバイダーアカウントを読み取れませんでした。"
-    }
+      "unreadable": "この組織の電話プロバイダーアカウントを読み取れませんでした。",
+      "fromNotOnAccount": "この番号はこの {provider} アカウントのものではありません。{provider} の Phone Numbers → Active numbers にある番号を使用してください。",
+      "unavailable": "{provider} に接続できませんでした。もう一度お試しください。"
+    },
+    "statusChecking": "確認中…",
+    "statusBroken": "動作していません",
+    "statusUnchecked": "確認できませんでした",
+    "cardMeta": "発信元 {number} · アカウント {account}",
+    "deploymentMeta": "発信元 {number}",
+    "uncheckedNow": "現在 {provider} に接続できません。",
+    "trial": "トライアルアカウント: SMS と通話は {provider} で認証済みの番号にのみ届きます。",
+    "cantText": "この番号は SMS を送信できません",
+    "cantCall": "この番号は通話を発信できません",
+    "deploymentOwner": "オペレーターによって設定されるため、ここで設定する項目はありません。",
+    "tokenNewAccount": "別のアカウントには専用の認証トークンが必要です"
   },
   "slackApp": {
     "prereq": {
@@ -26683,7 +26823,10 @@
       "managedBy": "インスタンス管理者が管理",
       "managedTitle": "インスタンス管理者が管理しています。",
       "managedDetail": "認証情報、リンク、および {team} を使用する組織は _meta で設定されます。",
-      "managedQuestions": "お問い合わせ: {contact}"
+      "managedQuestions": "お問い合わせ: {contact}",
+      "outboundQueue": "アラートメッセージ: {count} 件キュー中、最も古いものは {age} | アラートメッセージ: {count} 件キュー中、最も古いものは {age}",
+      "outboundEmpty": "キュー内のアラートメッセージはありません",
+      "ageSeconds": "{count} 秒"
     },
     "channels": {
       "title": "チャンネルのデフォルト",
@@ -26719,7 +26862,8 @@
       "instanceAdminOnly": "インスタンス管理者のみ",
       "ownOrgOnlyHint": "インスタンスワークスペースでは、チャンネルを自身の組織にマッピングします",
       "claimableHint": "未割り当てのチャンネルと {org} が所有するチャンネル",
-      "servedOrgsHint": "このワークスペースが対応する任意の組織"
+      "servedOrgsHint": "このワークスペースが対応する任意の組織",
+      "alertRoutes": "{count} 件の宛先 | {count} 件の宛先"
     },
     "people": {
       "title": "リンク済みのユーザー",
@@ -26873,6 +27017,83 @@
       "remove": "削除",
       "saved": "組織を保存しました",
       "saveFailed": "組織を保存できませんでした。"
+    },
+    "destination": {
+      "appTile": "{product} アプリ",
+      "webhookTile": "{product} Webhook",
+      "twoWay": "双方向",
+      "recommendedForAlertResponse": "アラート対応に推奨",
+      "choiceHint": "呼び出しとスーパークラスタは Webhook を使用します。Slack アプリ宛先からの手動送信とリアルタイム送信は別々の投稿になります。",
+      "unavailableReason": "シングルクラスタ上の Enterprise Slack アプリが必要です",
+      "unavailableFlag": "このサーバーでは無効になっています。管理者に {variable} の設定を依頼してください",
+      "unavailableMasterKey": "このサーバーには暗号化キーが必要です。管理者に {variable} の設定を依頼してください",
+      "unavailableCloud": "お使いのクラウドリージョンではまだ有効になっていません",
+      "unavailableNoAccess": "組織の管理者に Slack アプリの有効化を依頼してください",
+      "postOnly": "投稿のみ",
+      "switchToApp": "{product} アプリに切り替え",
+      "switchThis": "この宛先を切り替え",
+      "switchBack": "元に戻す",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "ワークスペース",
+      "channel": "チャンネル",
+      "mention": "メンション",
+      "mentionCritical": "{'@'}here はクリティカル時のみ、それ以外はなし",
+      "mentionNone": "なし",
+      "mentionHelp": "再発火時とレベル昇格時に使用されます",
+      "refireReuse": "再発火の再利用 (分)",
+      "refireReuseHelp": "この時間内の再発火は、新しいメッセージを投稿する代わりに以前のメッセージを編集します",
+      "buttons": "確認、ミュート、調査のボタン",
+      "buttonsHelp": "発火にインシデントまたは呼び出しがある場合は「解決」が追加されます",
+      "autoInvestigate": "クリティカルアラートを自動的に調査",
+      "autoInvestigateHelp": "組織の AI サービスアカウントとして、そのアクセス権で実行され、調査結果をアラートのスレッドに投稿します",
+      "templateDefault": "デフォルトの {product} テンプレート ({name})",
+      "sendTest": "テスト送信",
+      "setsDefault": "#{channel} のデフォルト組織を {org} に設定します",
+      "answersFor": "#{channel} は組織 {org} の質問に回答します。{thisOrg} からのアラートはここに投稿され、そのスレッドでは {thisOrg} として回答します。チャンネルのデフォルトは変更されません。",
+      "sharedTag": "共有 · {product} Connect",
+      "sharedTitle": "#{channel} は {workspace} 外のユーザーと共有されています。",
+      "sharedDetail": "彼らにはアラート名、値、グラフ、リンクが表示されます。ボタンをクリックしても拒否されます。",
+      "sharedConfirm": "理解しました。この共有チャンネルにアラートを投稿する",
+      "sharedRequired": "アラートをこの共有チャンネルに投稿してよいことを確認してください",
+      "versionMismatch": "ノードが異なるバージョンで動作しています。先にすべてのノードをアップグレードしてください。",
+      "oncallNotAllowed": "{product} アプリの宛先をオンコールチームのチャンネルにすることはできません",
+      "answersForAnother": "#{channel} は別の組織の質問に回答します。{thisOrg} からのアラートはここに投稿され、そのスレッドでは {thisOrg} として回答します。チャンネルのデフォルトは変更されません。",
+      "oncallTag": "オンコールルーム",
+      "oncallTitle": "チーム {team} の呼び出しも {destination} 経由で #{channel} に投稿されます。",
+      "oncallDetail": "ここへのアラートは別途投稿されます。",
+      "oncallConfirm": "理解しました。このオンコールルームにアラートを投稿する",
+      "oncallRequired": "アラートをこのオンコールルームに投稿してよいことを確認してください",
+      "workspaceRequired": "ワークスペースを選択",
+      "refireRange": "0 から {max} までの整数の分を入力してください",
+      "connectTitle": "アラートをボタン付きで投稿するために {product} を接続",
+      "connectDetail": "{product} の画面でチャンネルを選択して許可してください。OpenObserve がそのチャンネル用にこの宛先を作成します。",
+      "connected": "{name} が #{channel} 用に作成されました。設定を確認して保存してください。",
+      "saveFailed": "宛先を保存できませんでした。",
+      "switched": "{name} は {product} アプリ経由で投稿するようになりました",
+      "switchedBack": "{name} は再び Webhook 経由で投稿します",
+      "switchFailed": "{name} を切り替えられませんでした: {reason}",
+      "switchedAll": "{count} 件の宛先を切り替えました | {count} 件の宛先を切り替えました",
+      "switchThisDetail": "確認、ミュート、調査のボタンを使うため、{product} アプリに切り替えます。名前、テンプレート、アラートはそのままです。元に戻すと Webhook が復元されます。"
+    },
+    "switchAll": {
+      "title": "{count} 件の Webhook 宛先がこのワークスペースに投稿しています。 | {count} 件の Webhook 宛先がこのワークスペースに投稿しています。",
+      "detail": "「確認」「ミュート」「調査」ボタンを使えるように {product} アプリへ切り替えます。名前、テンプレート、アラートはそのままです。「元に戻す」で Webhook が復元されます。 | 「確認」「ミュート」「調査」ボタンを使えるように {product} アプリへ切り替えます。名前、テンプレート、アラートはそのままです。「元に戻す」で Webhook が復元されます。",
+      "review": "レビュー",
+      "action": "すべて切り替え",
+      "summary": "{switched} 件切り替え済み · {count} 件は切り替えできませんでした"
+    },
+    "oncallUnlinked": {
+      "title": "{product} に連携されていないオンコールメンバー",
+      "description": "呼び出しで本人に DM を送れず、アラートや呼び出しのボタンのクリックは連携が済むまで保留されます",
+      "remind": "リマインドする",
+      "columnPerson": "個人",
+      "columnTeam": "チーム",
+      "columnNextShift": "次のシフト",
+      "columnReminder": "リマインド",
+      "dmSent": "DM 送信済み {time}",
+      "notSent": "未送信",
+      "reminded": "{count} 人にリマインドを送信しました | {count} 人にリマインドを送信しました",
+      "remindFailed": "リマインドを送信できませんでした。"
     }
   },
   "fleet": {

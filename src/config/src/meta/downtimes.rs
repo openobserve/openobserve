@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -21,6 +21,8 @@ use utoipa::{IntoParams, ToSchema};
 use crate::meta::folder::DEFAULT_FOLDER;
 
 pub const DEFAULT_ENDING_SOON_LEAD_SECS: i64 = 600;
+/// The most alert groups one downtime can name (R-118).
+pub const MAX_ALERT_GROUPS: usize = 50;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Downtime {
@@ -35,6 +37,15 @@ pub struct Downtime {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub condition: Option<DimensionCondition>,
     pub targets: Vec<DowntimeTarget>,
+    /// Narrows targets to these groups; older nodes ignore it and mute the whole alert.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<AlertGroupRef>>,
+    /// Set by "Until it clears": the clear of the firing cancels the row (R-117).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_on_clear: Option<EndOnClear>,
+    /// Who made an alert-scoped quick mute; unset on rows made through the downtime routes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<MuteSource>,
     pub schedule: DowntimeSchedule,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cancelled_at: Option<i64>,
@@ -56,9 +67,11 @@ pub struct Downtime {
 }
 
 impl Downtime {
-    /// Same items covered: only the condition and the targets decide which items match.
+    /// Same items covered: only the condition, the targets and the alert groups decide.
     pub fn same_coverage(&self, other: &Downtime) -> bool {
-        self.condition == other.condition && self.targets == other.targets
+        self.condition == other.condition
+            && self.targets == other.targets
+            && group_keys(self.alert_groups.as_deref()) == group_keys(other.alert_groups.as_deref())
     }
 }
 
@@ -235,6 +248,47 @@ pub struct DowntimeRequest {
     /// The version the edit was loaded at; a newer stored row makes the edit a 409.
     #[serde(default)]
     pub version: Option<i64>,
+    #[serde(default)]
+    pub alert_groups: Option<Vec<AlertGroupRef>>,
+    #[serde(default)]
+    pub end_on_clear: Option<EndOnClear>,
+}
+
+impl DowntimeRequest {
+    /// Alert groups and the end-on-clear alert must be alerts this request names by id.
+    pub fn check_alert_targets(&self) -> Result<(), String> {
+        let ids: BTreeSet<&str> = self
+            .targets
+            .iter()
+            .filter(|t| t.module == TargetModule::Alerts)
+            .flat_map(|t| t.ids.iter().map(String::as_str))
+            .collect();
+        let groups = self.alert_groups.as_deref().unwrap_or_default();
+        if groups.len() > MAX_ALERT_GROUPS {
+            return Err(format!(
+                "A downtime can name at most {MAX_ALERT_GROUPS} alert groups."
+            ));
+        }
+        if let Some(g) = groups.iter().find(|g| !ids.contains(g.alert_id.as_str())) {
+            return Err(format!(
+                "Alert group {:?} is of alert {}, which the downtime does not name.",
+                g.group_key, g.alert_id
+            ));
+        }
+        let Some(end) = &self.end_on_clear else {
+            return Ok(());
+        };
+        if !ids.contains(end.alert_id.as_str()) {
+            return Err(format!(
+                "Until it clears names alert {}, which the downtime does not name.",
+                end.alert_id
+            ));
+        }
+        if self.schedule.repeat != Repeat::None || self.schedule.ends_at.is_none() {
+            return Err("An until-it-clears downtime is one-time and has an end.".to_string());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -443,13 +497,22 @@ pub struct PreviewResponse {
     pub undecidable: HashMap<String, Vec<PreviewMatch>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ActiveDowntime {
     pub id: String,
     pub name: String,
     pub ends_at: i64,
     #[serde(default, skip_serializing_if = "IncidentMode::is_muted")]
     pub incident_mode: IncidentMode,
+    /// The row's version, which an extend sends back; 0 from an older node.
+    #[serde(default)]
+    pub version: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<AlertGroupRef>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_on_clear: Option<EndOnClear>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<MuteSource>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -549,8 +612,135 @@ pub struct ExtendDowntimeResponse {
     pub created_id: Option<String>,
 }
 
+/// One alert group a downtime mutes; `group_key` is `""` for single-row and composite alerts.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct AlertGroupRef {
+    pub alert_id: String,
+    #[serde(default)]
+    pub group_key: String,
+    /// Captured at mute time because `group_key` is a hash the UI cannot show.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_labels: Option<BTreeMap<String, String>>,
+}
+
+/// Where a quick mute came from; the web app's own calls are `openobserve`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MuteSource {
+    Slack,
+    Openobserve,
+    Api,
+}
+
+impl MuteSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Slack => "slack",
+            Self::Openobserve => "openobserve",
+            Self::Api => "api",
+        }
+    }
+
+    /// A value a newer node wrote reads as unknown, not as an error.
+    pub fn parse(stored: &str) -> Option<Self> {
+        match stored {
+            "slack" => Some(Self::Slack),
+            "openobserve" => Some(Self::Openobserve),
+            "api" => Some(Self::Api),
+            _ => None,
+        }
+    }
+}
+
+/// "Until it clears": `group_key` null ends the downtime when no group of the alert is firing.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct EndOnClear {
+    pub alert_id: String,
+    #[serde(default)]
+    pub group_key: Option<String>,
+}
+
+/// `POST /v2/{org}/alerts/{alert_id}/mute`: exactly one of `until_clear`, `minutes` and `ends_at`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
+pub struct AlertMuteRequest {
+    pub until_clear: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minutes: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ends_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_keys: Option<Vec<String>>,
+    pub all_groups: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firing_started_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+}
+
+/// `POST .../mute/{downtime_id}/extend`: exactly one of `minutes`, `until_clear` and `ends_at`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AlertMuteExtendRequest {
+    pub version: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minutes: Option<u32>,
+    #[serde(default)]
+    pub until_clear: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends_at: Option<i64>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AlertMuteResponse {
+    pub downtime_id: String,
+    pub version: i64,
+    pub ends_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_on_clear: Option<EndOnClear>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<AlertGroupRef>>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AlertMuteExtendResponse {
+    pub version: i64,
+    pub ends_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_on_clear: Option<EndOnClear>,
+}
+
+/// The 409 bodies of the alert-scoped mute routes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "code", rename_all = "snake_case")]
+pub enum AlertMuteConflict {
+    DowntimeCap {
+        message: String,
+    },
+    AlreadyMuted {
+        downtime_id: String,
+        version: i64,
+        ends_at: i64,
+    },
+    VersionChanged {
+        version: i64,
+        ends_at: i64,
+    },
+    NotAQuickMute,
+}
+
 pub fn default_folder() -> String {
     DEFAULT_FOLDER.to_string()
+}
+
+/// Labels are display only, so two lists naming the same groups cover the same.
+fn group_keys(groups: Option<&[AlertGroupRef]>) -> BTreeSet<(&str, &str)> {
+    groups
+        .unwrap_or_default()
+        .iter()
+        .map(|g| (g.alert_id.as_str(), g.group_key.as_str()))
+        .collect()
 }
 
 fn default_true() -> bool {
@@ -567,6 +757,9 @@ mod tests {
 
     fn minimal() -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: "2f9KQe4b7Nq1vH3sT0mLzXpRcWd".to_string(),
             org: "default".to_string(),
             folder_id: DEFAULT_FOLDER.to_string(),
@@ -655,5 +848,185 @@ mod tests {
         let mut other_module = before.clone();
         other_module.targets[0].module = TargetModule::Synthetics;
         assert!(!before.same_coverage(&other_module));
+
+        let group = |key: &str, label: Option<&str>| AlertGroupRef {
+            alert_id: "a1".to_string(),
+            group_key: key.to_string(),
+            group_labels: label.map(|v| BTreeMap::from([("city".to_string(), v.to_string())])),
+        };
+        let one_group = Downtime {
+            alert_groups: Some(vec![group("k1", Some("pune"))]),
+            ..before.clone()
+        };
+        assert!(!before.same_coverage(&one_group));
+        let relabelled = Downtime {
+            alert_groups: Some(vec![group("k1", None)]),
+            ..before.clone()
+        };
+        assert!(
+            one_group.same_coverage(&relabelled),
+            "labels are display only"
+        );
+        let empty = Downtime {
+            alert_groups: Some(vec![]),
+            ..before.clone()
+        };
+        assert!(before.same_coverage(&empty));
+    }
+
+    #[test]
+    fn an_older_row_reads_without_the_mute_fields_and_a_newer_field_is_ignored() {
+        let mut json = serde_json::to_value(minimal()).unwrap();
+        for absent in ["alert_groups", "end_on_clear", "source"] {
+            assert!(
+                json.get(absent).is_none(),
+                "{absent} is not written when unset"
+            );
+        }
+        json["a_field_from_a_newer_node"] = serde_json::json!(1);
+        let old = serde_json::from_value::<Downtime>(json).unwrap();
+        assert!(old.alert_groups.is_none() && old.end_on_clear.is_none() && old.source.is_none());
+
+        let quick = Downtime {
+            alert_groups: Some(vec![AlertGroupRef {
+                alert_id: "a1".to_string(),
+                group_key: "k1".to_string(),
+                group_labels: None,
+            }]),
+            end_on_clear: Some(EndOnClear {
+                alert_id: "a1".to_string(),
+                group_key: Some("k1".to_string()),
+            }),
+            source: Some(MuteSource::Slack),
+            ..minimal()
+        };
+        let json = serde_json::to_value(&quick).unwrap();
+        assert_eq!(json["source"], "slack");
+        assert_eq!(json["end_on_clear"]["group_key"], "k1");
+        assert_eq!(serde_json::from_value::<Downtime>(json).unwrap(), quick);
+        assert_eq!(
+            MuteSource::parse("openobserve"),
+            Some(MuteSource::Openobserve)
+        );
+        assert_eq!(MuteSource::parse("later"), None);
+
+        let active: ActiveDowntime =
+            serde_json::from_str(r#"{"id":"d1","name":"n","ends_at":5}"#).unwrap();
+        assert_eq!(active.version, 0);
+        assert!(active.end_on_clear.is_none() && active.alert_groups.is_none());
+    }
+
+    #[test]
+    fn alert_groups_and_end_on_clear_must_name_targeted_alerts() {
+        let request = |groups: Vec<&str>, end: Option<&str>, ids: Vec<&str>| DowntimeRequest {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: None,
+            reason: None,
+            condition: None,
+            targets: vec![DowntimeTarget {
+                module: TargetModule::Alerts,
+                folders: TargetFolders::All,
+                tags: vec![],
+                ids: ids.into_iter().map(str::to_string).collect(),
+                slo_mode: None,
+                incident_mode: IncidentMode::Muted,
+            }],
+            schedule: minimal().schedule,
+            show_banner: false,
+            notifications: None,
+            version: None,
+            alert_groups: Some(
+                groups
+                    .into_iter()
+                    .map(|alert_id| AlertGroupRef {
+                        alert_id: alert_id.to_string(),
+                        group_key: "k".to_string(),
+                        group_labels: None,
+                    })
+                    .collect(),
+            ),
+            end_on_clear: end.map(|alert_id| EndOnClear {
+                alert_id: alert_id.to_string(),
+                group_key: None,
+            }),
+        };
+        assert!(
+            request(vec!["a1"], Some("a1"), vec!["a1"])
+                .check_alert_targets()
+                .is_ok()
+        );
+        assert!(
+            request(vec!["a2"], None, vec!["a1"])
+                .check_alert_targets()
+                .is_err()
+        );
+        assert!(
+            request(vec![], Some("a2"), vec!["a1"])
+                .check_alert_targets()
+                .is_err()
+        );
+        assert!(
+            request(vec!["a1"; 51], None, vec!["a1"])
+                .check_alert_targets()
+                .is_err()
+        );
+        let mut recurring = request(vec![], Some("a1"), vec!["a1"]);
+        recurring.schedule.repeat = Repeat::Daily;
+        assert!(recurring.check_alert_targets().is_err());
+    }
+
+    #[test]
+    fn mute_shapes_use_the_contract_json() {
+        let all_groups = EndOnClear {
+            alert_id: "a1".into(),
+            group_key: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&all_groups).unwrap(),
+            serde_json::json!({"alert_id": "a1", "group_key": null})
+        );
+        let old: EndOnClear = serde_json::from_str(r#"{"alert_id":"a1"}"#).unwrap();
+        assert_eq!(old, all_groups);
+        let group: AlertGroupRef =
+            serde_json::from_str(r#"{"alert_id":"a1","group_key":"k","later":1}"#).unwrap();
+        assert_eq!(group.group_key, "k");
+        assert!(group.group_labels.is_none());
+        let labelled = AlertGroupRef {
+            group_labels: Some(BTreeMap::from([(
+                "cluster".to_string(),
+                "prod-eu".to_string(),
+            )])),
+            ..group.clone()
+        };
+        assert_eq!(
+            serde_json::to_value(&labelled).unwrap(),
+            serde_json::json!({"alert_id": "a1", "group_key": "k", "group_labels": {"cluster": "prod-eu"}})
+        );
+        assert!(
+            serde_json::to_value(&group)
+                .unwrap()
+                .get("group_labels")
+                .is_none()
+        );
+        assert_eq!(
+            serde_json::to_value(AlertMuteConflict::NotAQuickMute).unwrap(),
+            serde_json::json!({"code": "not_a_quick_mute"})
+        );
+        assert_eq!(
+            serde_json::to_value(AlertMuteConflict::AlreadyMuted {
+                downtime_id: "d1".into(),
+                version: 2,
+                ends_at: 9,
+            })
+            .unwrap(),
+            serde_json::json!({"code": "already_muted", "downtime_id": "d1", "version": 2, "ends_at": 9})
+        );
+        let req: AlertMuteRequest =
+            serde_json::from_str(r#"{"minutes":30,"unknown_later":true}"#).unwrap();
+        assert_eq!(req.minutes, Some(30));
+        assert!(!req.until_clear && req.group_keys.is_none());
+        let extend: AlertMuteExtendRequest =
+            serde_json::from_str(r#"{"version":3,"until_clear":true}"#).unwrap();
+        assert!(extend.until_clear && extend.minutes.is_none());
     }
 }
