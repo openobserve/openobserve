@@ -2477,6 +2477,10 @@ fn oncall_routes(router: Router) -> Router {
                 .put(oncall::put_telephony)
                 .delete(oncall::delete_telephony),
         )
+        .route(
+            "/{org_id}/telephony/status",
+            get(oncall::get_telephony_status),
+        )
 }
 
 // Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.

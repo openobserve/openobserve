@@ -697,6 +697,7 @@
     "dateRangeCopied": "Đã sao chép khoảng thời gian",
     "dateRangePasted": "Đã dán khoảng thời gian",
     "dateRangePasteError": "Không thể phân tích khoảng thời gian",
+    "dateRangePasteBlocked": "Trình duyệt này đã chặn việc đọc clipboard. Nhấn {shortcut} khi trình chọn đang mở để dán.",
     "pastSecond": "Trong {count} giây qua | Trong {count} giây qua",
     "pastMinute": "Trong {count} phút qua | Trong {count} phút qua",
     "pastHour": "Trong {count} giờ qua | Trong {count} giờ qua",
@@ -11616,7 +11617,8 @@
         "dailySentence": "Hàng ngày · {time} trong {duration} · {zone}",
         "weeklySentence": "Hàng tuần vào {days} · {time} trong {duration} · {zone}",
         "fromNoEnd": "{schedule}, từ {start}, không có ngày kết thúc",
-        "fromUntil": "{schedule}, từ {start} đến {until}"
+        "fromUntil": "{schedule}, từ {start} đến {until}",
+        "onceFor": "Một lần, {duration}"
       },
       "validation": {
         "conditionRequired": "Thêm điều kiện hoặc xóa khối điều kiện.",
@@ -11957,8 +11959,8 @@
         "presets": {
           "30m": "30 phút",
           "1h": "1 giờ",
-          "2h": "2 giờ",
           "4h": "4 giờ",
+          "24h": "24 giờ",
           "custom": "Tùy chỉnh"
         },
         "endsAt": "Kết thúc vào",
@@ -11972,7 +11974,34 @@
         "mutedTooltip": "Đã tắt thông báo bởi {name} đến {end}",
         "exclude": "Loại trừ một khoảng thời gian…",
         "firingMuted": "Đang kích hoạt · đã tắt tiếng",
-        "firingMutedTooltip": "Vẫn đang kích hoạt. Thông báo đã bị {name} tắt tiếng."
+        "firingMutedTooltip": "Vẫn đang kích hoạt. Thông báo đã bị {name} tắt tiếng.",
+        "untilClear": "Cho đến khi hết",
+        "untilClearHint": "Kết thúc khi cảnh báo phục hồi, hoặc chậm nhất sau 24 giờ.",
+        "confirmUntilClear": "Tạm tắt cho đến khi hết",
+        "titleOne": "Tạm tắt {name}",
+        "subtitleOne": "Cảnh báo vẫn chạy và giữ nguyên lịch sử. Thông báo, thông báo trực và quy trình làm việc dừng lại cho đến khi cửa sổ kết thúc.",
+        "untilTime": "Cho đến {time}.",
+        "groups": "Nhóm",
+        "groupsThis": "Nhóm này",
+        "groupsAll": "Tất cả nhóm của cảnh báo này",
+        "addGroup": "Thêm nhóm đang kích hoạt",
+        "groupsHint": "Chỉ các nhóm này bị tạm tắt; các nhóm khác vẫn tiếp tục thông báo",
+        "confirm24h": {
+          "title": "Tạm tắt trong 24 giờ?",
+          "message": "Chế độ 'Cho đến khi hết' sẽ kết thúc tạm tắt ngay khi cảnh báo phục hồi.",
+          "useUntilClear": "Dùng cho đến khi hết",
+          "ok": "Tạm tắt 24 giờ"
+        },
+        "muteGroup": "Tạm tắt nhóm này",
+        "endNow": "Kết thúc tạm tắt ngay",
+        "endMute": "Kết thúc tạm tắt",
+        "mutedUntilClear": "Đã tạm tắt cho đến khi hết · tối đa 24 giờ",
+        "mutedUntilClearGroups": "Đã tạm tắt cho đến khi hết · {count} nhóm | Đã tạm tắt cho đến khi hết · {count} nhóm",
+        "mutedGroups": "Đã tạm tắt · {count} nhóm · kết thúc sau {duration} | Đã tạm tắt · {count} nhóm · kết thúc sau {duration}",
+        "mutedUntilClearTooltip": "Đã tạm tắt bởi {name} cho đến khi cảnh báo phục hồi, chậm nhất là {end}",
+        "mutedGroupsTooltip": "Đã tạm tắt bởi {name} cho đến {end}. Nhóm: {labels}",
+        "mutedUntilClearGroupsTooltip": "Đã tạm tắt bởi {name} cho đến khi cảnh báo phục hồi, chậm nhất là {end}. Nhóm: {labels}",
+        "untilTomorrow": "Cho đến {time} ngày mai."
       },
       "corrected": "Đã hiệu chỉnh",
       "correctedBy": "Điểm được hiệu chỉnh bởi {names}",
@@ -12058,7 +12087,66 @@
           "sent": "Đã gửi thử đến {count} đích | Đã gửi thử đến {count} đích",
           "failed": "Bản thử không đến được {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "Cho đến khi hết",
+        "atMost": "Tối đa 24 giờ",
+        "endsWhenClears": "kết thúc khi hết",
+        "byTime": "trước {time}",
+        "whenCleared": "khi đã hết",
+        "endedBy": "kết thúc bởi {product}",
+        "createdFrom": "từ {source}"
+      },
+      "groupTarget": "Nhóm: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Tạm tắt nhanh từ cảnh báo",
+      "endedLabel": "đã kết thúc"
+    },
+    "ack": {
+      "acknowledge": "Tiếp nhận",
+      "acknowledgeGroups": "Tiếp nhận {count} nhóm đang kích hoạt | Tiếp nhận {count} nhóm đang kích hoạt",
+      "unacknowledge": "Hủy tiếp nhận",
+      "takeOver": "Tiếp quản",
+      "chip": "Đã tiếp nhận bởi {who} qua {source} · {time}",
+      "chipTooltip": "Đã tiếp nhận bởi {who} lúc {time} từ {source}",
+      "firingAcknowledged": "Đang kích hoạt · đã tiếp nhận",
+      "tile": "Đã tiếp nhận",
+      "groupsAcknowledged": "{count} đã tiếp nhận",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "trực",
+        "incident": "sự cố"
+      },
+      "history": {
+        "dedupSuppressed": "bị chặn bởi xác nhận ({who})",
+        "acked": "Được xác nhận bởi {who} từ {source}",
+        "ackedViaPage": "Được xác nhận bởi {who} qua thông báo trực {page}",
+        "ackedViaIncident": "Được xác nhận bởi {who} qua sự cố {incident}",
+        "unacked": "Được bỏ xác nhận bởi {who} từ {source}",
+        "unackedResume": "Được bỏ xác nhận bởi {who} từ {source} · các lần lặp lại tiếp tục lúc {time}",
+        "takenOver": "Được tiếp quản bởi {who} từ {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Bạn không thể xác nhận cảnh báo này. Xác nhận và Tắt tiếng cần vai trò Admin hoặc Editor, hoặc phải là người trực của cảnh báo.",
+        "mute": "Bạn không thể tắt tiếng cảnh báo này. Xác nhận và Tắt tiếng cần vai trò Admin hoặc Editor, hoặc phải là người trực của cảnh báo.",
+        "onCall": "Đang trực: {people}",
+        "canAct": "Có thể xử lý: {people}",
+        "people": "Đang trực: {onCall}. Có thể xử lý: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Cảnh báo này không ở trạng thái đang kích hoạt nên không có gì để xác nhận.",
+        "firingChanged": "Cảnh báo đã kích hoạt lại kể từ khi trang này được tải. Hãy làm mới và thử lại."
       }
+    },
+    "groupActions": {
+      "menu": "Hành động nhóm",
+      "viewHistory": "Xem lịch sử của nhóm này"
+    },
+    "firingState": {
+      "level": "Mức độ",
+      "firingSince": "Kích hoạt từ",
+      "firingFor": "đang kích hoạt trong {duration}",
+      "incident": "Sự cố"
     }
   },
   "alert_dependencies": {
@@ -12587,13 +12675,14 @@
       "openSlackSettings": "Thiết lập trong Cài đặt › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Gửi thông báo đến các kênh Slack",
+      "slackDescription": "Đăng một tin nhắn mới bằng webhook và template của bạn. Dùng cho thông báo trực hoặc bố cục Slack tùy chỉnh.",
       "discordDescription": "Gửi thông báo đến các kênh Discord",
       "msteamsDescription": "Gửi thông báo đến các kênh Teams",
       "emailDescription": "Gửi email thông báo định dạng HTML",
       "pagerdutyDescription": "Tạo sự cố trong PagerDuty",
       "opsgenieDescription": "Tạo cảnh báo trong Opsgenie",
-      "servicenowDescription": "Tạo sự cố trong ServiceNow"
+      "servicenowDescription": "Tạo sự cố trong ServiceNow",
+      "slackAppDescription": "Cập nhật cảnh báo theo lịch ngay tại chỗ. Xác nhận, tắt tiếng và điều tra từ Slack. Cần một workspace đã kết nối."
     },
     "import": {
       "title": "Nhập đích",
@@ -12635,7 +12724,8 @@
     "severityCriticalDescription": "Sự cố ưu tiên cao nhất",
     "severityErrorDescription": "Sự cố lỗi tiêu chuẩn",
     "severityWarningDescription": "Sự cố mức cảnh báo",
-    "severityInfoDescription": "Sự cố thông tin"
+    "severityInfoDescription": "Sự cố thông tin",
+    "urlRecipientsChannel": "URL / người nhận / kênh"
   },
   "pipeline_destinations": {
     "header": "Đích Pipeline",
@@ -13158,7 +13248,7 @@
     "groupIntegrations": "Tích hợp",
     "groupAccount": "Tài khoản",
     "slackApp": "Slack",
-    "slackAppDesc": "Đặt câu hỏi cho OpenObserve từ Slack",
+    "slackAppDesc": "Đặt câu hỏi cho OpenObserve và xử lý cảnh báo từ Slack",
     "generalDesc": "Chủ đề, mặc định truy vấn và tùy chọn cốt lõi",
     "orgDesc": "Tham số và định danh tổ chức",
     "cipherKeysDesc": "Khóa mã hóa cho trường nhạy cảm",
@@ -20772,7 +20862,9 @@
         "succeeded": "Thành công",
         "failed": "Thất bại",
         "skipped": "Đã bỏ qua",
-        "pending": "Đang chờ"
+        "pending": "Đang chờ",
+        "acknowledged": "Đã xác nhận",
+        "ackevent": "Sự kiện xác nhận"
       },
       "alertLevel": {
         "ok": "OK",
@@ -21075,7 +21167,16 @@
       "alertSavedSuccessfully": "Đã lưu cảnh báo thành công.",
       "alertUpdatedSuccessfully": "Đã cập nhật cảnh báo thành công.",
       "openingDedupConfig": "Đang mở cấu hình khử trùng lặp cho: {name}",
-      "editingAlert": "Đang chỉnh sửa cảnh báo: {name}"
+      "editingAlert": "Đang chỉnh sửa cảnh báo: {name}",
+      "ack": {
+        "acked": "Đã xác nhận {name}",
+        "ackedGroups": "Đã xác nhận {count} nhóm của {name} | Đã xác nhận {count} nhóm của {name}",
+        "alreadyAcked": "Đã được xác nhận bởi {who}",
+        "unacked": "Đã bỏ xác nhận {name}",
+        "takenOver": "Bạn đã tiếp quản việc xác nhận {name}",
+        "failed": "Không thể xác nhận {name}",
+        "unackFailed": "Không thể bỏ xác nhận {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Đã cập nhật khóa mã hóa thành công",
@@ -21387,7 +21488,14 @@
       "muted": "Đã tắt tiếng {count} mục đến {time}. Đã lưu vào {folder}. | Đã tắt tiếng {count} mục đến {time}. Đã lưu vào {folder}.",
       "muteFailed": "Không thể tạo tắt tiếng",
       "viewDowntime": "Xem thời gian bảo trì",
-      "itemsDropped": "{count} mục đã chọn nằm ngoài các thư mục đã chọn và đã bị xóa. | {count} mục đã chọn nằm ngoài các thư mục đã chọn và đã bị xóa."
+      "itemsDropped": "{count} mục đã chọn nằm ngoài các thư mục đã chọn và đã bị xóa. | {count} mục đã chọn nằm ngoài các thư mục đã chọn và đã bị xóa.",
+      "mutedUntilClear": "Đã tắt tiếng {name} cho đến khi hết, muộn nhất là {time}",
+      "alreadyMuted": "{name} đã được tắt tiếng đến {time}",
+      "muteChanged": "Lệnh tắt tiếng này đã thay đổi kể từ khi trang được tải. Giờ nó kết thúc lúc {time}.",
+      "muteEnded": "Đã hết tắt tiếng. Thông báo tiếp tục.",
+      "mutedOne": "Đã tắt tiếng {name} đến {time}",
+      "timeTomorrow": "{time} ngày mai",
+      "notQuickMute": "Lệnh tắt tiếng này được đặt trên trang Thời gian bảo trì. Hãy thay đổi ở đó."
     }
   },
   "cipherKeys": {
@@ -24168,7 +24276,7 @@
     "deliveriesTitle": "Lần gửi",
     "deliveriesNone": "Chưa có gì được gửi đi.",
     "deliveriesRun": "Lần chạy thang {run} — một lần bàn giao đã khởi động lại quá trình leo thang dưới nhóm nhận",
-    "deliveryLanded": "Đã đến",
+    "deliveryLanded": "Đã gửi",
     "deliveryFailed": "Thất bại",
     "deliveriesTruncated": "Đang hiển thị {shown} trong {total} lần gửi.",
     "teamChannelTitle": "Kênh nhóm",
@@ -24761,7 +24869,7 @@
     "myDeliveriesPage": "Thông báo trực",
     "myDeliveriesLandedColumn": "Kênh gửi",
     "myDeliveriesSent": "Đã gửi",
-    "myDeliveriesLanded": "Đã tới được bạn qua {channel}",
+    "myDeliveriesLanded": "Đã gửi cho bạn qua {channel}",
     "myDeliveriesFailed": "{channel} không tới được bạn",
     "myDeliveriesNone": "Chưa có gì được gửi tới bạn.",
     "myDeliveriesNoUnread": "Không có gì chưa đọc.",
@@ -25385,7 +25493,7 @@
     "reachAlarmNoRetry": "Không còn lần thử nào — chuỗi leo thang đã kết thúc.",
     "reachAlarmNoTransport": "Nguyên nhân khả năng: chưa cấu hình kênh gửi nào trên triển khai này.",
     "reachAlarmCheckTransports": "Kiểm tra ai có thể liên lạc được",
-    "reachLanded": "đã đến",
+    "reachLanded": "đã gửi",
     "reachUnreached": "chưa đến",
     "onCallDetails": "Chi tiết trực",
     "shiftHandover": "Bàn giao",
@@ -25470,7 +25578,8 @@
     "scopeClaimServiceEverywhere": "{service} gọi nhóm này ở mọi cluster và namespace, bất kể ai sở hữu những thứ xung quanh.",
     "scopeClaimServiceHere": "{service} chỉ gọi nhóm này trong {scope}. Ở nơi khác, nó thuộc về ai sở hữu phạm vi xung quanh.",
     "scopeNothingDiscovered": "Chưa có gì được phát hiện, nên không có mục nào để chọn. Dùng Nâng cao để viết quy tắc theo trường, hoặc gửi telemetry trước.",
-    "scopeAdvancedHint": "Khớp trên bất kỳ trường và giá trị nào, kể cả những trường mà các cấp ở trên không bao phủ."
+    "scopeAdvancedHint": "Khớp trên bất kỳ trường và giá trị nào, kể cả những trường mà các cấp ở trên không bao phủ.",
+    "simulatorSendsNothing": "Mức ưu tiên này không gửi gì mà họ có thể nhận"
   },
   "paidUsage": {
     "consentTitle": "Bật sử dụng AI trả phí?",
@@ -26582,17 +26691,14 @@
     "saveFailed": "Không thể lưu tài khoản. Hãy thử lại.",
     "disconnectFailed": "Không thể ngắt kết nối tài khoản. Vui lòng thử lại.",
     "connected": "Đã kết nối",
-    "active": "Đang hoạt động",
-    "account": "Tài khoản",
     "fromNumber": "Số gọi đi",
-    "press4": "Phím cuộc gọi: 4 xác nhận, 6 giải quyết, 8 leo thang",
+    "press4": "Phím gọi (4 xác nhận, 6 giải quyết, 8 chuyển cấp)",
     "press4Available": "Khả dụng",
     "press4NotAvailable": "Không khả dụng",
     "press4NotAvailableHint": "Cuộc gọi yêu cầu mọi người xác nhận từ liên kết trong tin nhắn của họ.",
     "update": "Cập nhật",
     "disconnect": "Ngắt kết nối",
     "deploymentTitle": "Tài khoản {provider} của triển khai này",
-    "deploymentNote": "Tin nhắn và cuộc gọi đã hoạt động. Do quản trị viên thiết lập; không cần làm gì ở đây.",
     "useOwn": "Dùng tài khoản {provider} của riêng bạn thay thế",
     "connectTitle": "Kết nối {provider}",
     "updateTitle": "Cập nhật {provider}",
@@ -26600,7 +26706,7 @@
     "accountSid": "Account SID",
     "authToken": "Auth token",
     "tokenKeep": "Để trống để giữ token hiện tại",
-    "fromHelp": "Số {provider} có thể gửi SMS và thực hiện cuộc gọi, kèm mã quốc gia.",
+    "fromHelp": "Một số từ tài khoản {provider} này, kèm mã quốc gia.",
     "connect": "Kết nối",
     "checking": "Đang kiểm tra với {provider}…",
     "disconnectTitle": "Ngắt kết nối {provider}?",
@@ -26613,8 +26719,21 @@
       "tokenRequired": "Cần có auth token để kết nối.",
       "noMasterKey": "Yêu cầu quản trị viên của bạn đặt {variable}.",
       "accountRejected": "{provider} đã không chấp nhận tài khoản này. Kiểm tra Account SID và auth token, đồng thời đảm bảo tài khoản đang hoạt động.",
-      "unreadable": "Không thể đọc tài khoản nhà cung cấp điện thoại của tổ chức này."
-    }
+      "unreadable": "Không thể đọc tài khoản nhà cung cấp điện thoại của tổ chức này.",
+      "fromNotOnAccount": "Số này không thuộc tài khoản {provider} này. Hãy dùng một số trong Phone Numbers → Active numbers trên {provider}.",
+      "unavailable": "Không thể kết nối tới {provider}. Hãy thử lại."
+    },
+    "statusChecking": "Đang kiểm tra…",
+    "statusBroken": "Không hoạt động",
+    "statusUnchecked": "Không thể kiểm tra",
+    "cardMeta": "Từ {number} · Tài khoản {account}",
+    "deploymentMeta": "Từ {number}",
+    "uncheckedNow": "Hiện không thể kết nối tới {provider}.",
+    "trial": "Tài khoản dùng thử: tin nhắn và cuộc gọi chỉ đến được các số đã xác minh trong {provider}.",
+    "cantText": "Số này không thể gửi tin nhắn",
+    "cantCall": "Số này không thể thực hiện cuộc gọi",
+    "deploymentOwner": "Do nhà vận hành thiết lập, nên không có gì để cấu hình ở đây.",
+    "tokenNewAccount": "Tài khoản khác cần auth token riêng của nó"
   },
   "slackApp": {
     "prereq": {
@@ -26854,7 +26973,10 @@
       "managedBy": "được quản lý bởi quản trị viên instance của bạn",
       "managedTitle": "Được quản lý bởi quản trị viên instance của bạn.",
       "managedDetail": "Thông tin xác thực, liên kết và những tổ chức sử dụng {team} được đặt trong _meta.",
-      "managedQuestions": "Câu hỏi: {contact}"
+      "managedQuestions": "Câu hỏi: {contact}",
+      "outboundQueue": "Tin nhắn cảnh báo: {count} đang xếp hàng, cũ nhất {age} | Tin nhắn cảnh báo: {count} đang xếp hàng, cũ nhất {age}",
+      "outboundEmpty": "Không có tin nhắn cảnh báo nào đang xếp hàng",
+      "ageSeconds": "{count} giây"
     },
     "channels": {
       "title": "Mặc định kênh",
@@ -26890,7 +27012,8 @@
       "instanceAdminOnly": "Chỉ quản trị viên instance",
       "ownOrgOnlyHint": "Trên không gian làm việc instance, bạn gán kênh cho tổ chức của riêng bạn",
       "claimableHint": "Các kênh chưa được nhận và các kênh do {org} sở hữu",
-      "servedOrgsHint": "Mọi tổ chức mà không gian làm việc này phục vụ"
+      "servedOrgsHint": "Mọi tổ chức mà không gian làm việc này phục vụ",
+      "alertRoutes": "{count} đích | {count} đích"
     },
     "people": {
       "title": "Người dùng đã liên kết",
@@ -27044,6 +27167,83 @@
       "remove": "Xóa",
       "saved": "Đã lưu tổ chức",
       "saveFailed": "Không thể lưu các tổ chức."
+    },
+    "destination": {
+      "appTile": "ứng dụng {product}",
+      "webhookTile": "webhook {product}",
+      "twoWay": "Hai chiều",
+      "recommendedForAlertResponse": "Được khuyến nghị cho phản hồi cảnh báo",
+      "choiceHint": "Thông báo trực và super cluster dùng webhook. Gửi thủ công và gửi thời gian thực từ một đích ứng dụng Slack là các bài đăng riêng.",
+      "unavailableReason": "Cần ứng dụng Slack Enterprise trên một cụm duy nhất",
+      "unavailableFlag": "Đã tắt trên máy chủ này; hãy yêu cầu người vận hành đặt {variable}",
+      "unavailableMasterKey": "Cần khóa mã hóa trên máy chủ này; hãy yêu cầu người vận hành đặt {variable}",
+      "unavailableCloud": "Chưa được bật cho vùng Cloud của bạn",
+      "unavailableNoAccess": "Hãy yêu cầu quản trị viên tổ chức bật ứng dụng Slack",
+      "postOnly": "Chỉ gửi",
+      "switchToApp": "Chuyển sang ứng dụng {product}",
+      "switchThis": "Chuyển đích này",
+      "switchBack": "Chuyển lại",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Không gian làm việc",
+      "channel": "Kênh",
+      "mention": "Nhắc đến",
+      "mentionCritical": "{'@'}here cho mức nghiêm trọng, không ai cho các mức khác",
+      "mentionNone": "Không",
+      "mentionHelp": "Dùng khi lặp lại và tăng mức độ",
+      "refireReuse": "Tái sử dụng khi kích hoạt lại (phút)",
+      "refireReuseHelp": "Nếu cảnh báo kích hoạt lại trong khoảng thời gian này, tin nhắn trước đó sẽ được chỉnh sửa thay vì đăng tin mới",
+      "buttons": "Nút Tiếp nhận, Tạm tắt và Điều tra",
+      "buttonsHelp": "Nút Giải quyết được thêm khi lần kích hoạt có sự cố hoặc thông báo trực",
+      "autoInvestigate": "Tự động điều tra đối với cảnh báo nghiêm trọng",
+      "autoInvestigateHelp": "Chạy dưới tài khoản dịch vụ AI của tổ chức, với quyền truy cập của tài khoản đó; đăng kết quả phát hiện vào luồng cảnh báo",
+      "templateDefault": "Mẫu {product} mặc định ({name})",
+      "sendTest": "Gửi thử",
+      "setsDefault": "Đặt tổ chức mặc định của #{channel} thành {org}",
+      "answersFor": "#{channel} trả lời câu hỏi cho tổ chức {org}. Cảnh báo từ {thisOrg} được đăng tại đây và các luồng của chúng trả lời trong {thisOrg}; mặc định của kênh không thay đổi.",
+      "sharedTag": "Chia sẻ · {product} Connect",
+      "sharedTitle": "#{channel} được chia sẻ với những người bên ngoài {workspace}.",
+      "sharedDetail": "Họ sẽ thấy tên cảnh báo, giá trị, biểu đồ và liên kết. Các lần nhấp của họ vào nút sẽ bị từ chối.",
+      "sharedConfirm": "Tôi hiểu, hãy đăng cảnh báo vào kênh được chia sẻ này",
+      "sharedRequired": "Xác nhận rằng cảnh báo có thể đăng vào kênh được chia sẻ này",
+      "versionMismatch": "Các node chạy các phiên bản khác nhau. Hãy nâng cấp mọi node trước.",
+      "oncallNotAllowed": "Đích ứng dụng {product} không thể là kênh của nhóm trực",
+      "answersForAnother": "#{channel} trả lời câu hỏi cho một tổ chức khác. Cảnh báo từ {thisOrg} được đăng tại đây và các luồng của chúng trả lời trong {thisOrg}; mặc định của kênh không thay đổi.",
+      "oncallTag": "Phòng trực",
+      "oncallTitle": "Thông báo trực cho nhóm {team} cũng đăng vào #{channel} thông qua {destination}.",
+      "oncallDetail": "Cảnh báo ở đây được đăng riêng.",
+      "oncallConfirm": "Tôi hiểu, hãy đăng cảnh báo vào phòng trực này",
+      "oncallRequired": "Xác nhận rằng cảnh báo có thể đăng vào phòng trực này",
+      "workspaceRequired": "Chọn một không gian làm việc",
+      "refireRange": "Nhập số phút nguyên từ 0 đến {max}",
+      "connectTitle": "Kết nối {product} để đăng cảnh báo kèm nút",
+      "connectDetail": "Chọn một kênh trên màn hình của {product} và nhấn Cho phép. OpenObserve sẽ tạo đích này cho kênh đó.",
+      "connected": "{name} đã được tạo cho #{channel}. Hãy kiểm tra cài đặt của đích này và lưu.",
+      "saveFailed": "Không thể lưu đích.",
+      "switched": "{name} hiện đăng qua ứng dụng {product}",
+      "switchedBack": "{name} lại đăng qua webhook của nó",
+      "switchFailed": "Không thể chuyển {name}: {reason}",
+      "switchedAll": "{count} đích đã được chuyển | {count} đích đã được chuyển",
+      "switchThisDetail": "Chuyển đích này sang ứng dụng {product} để có nút Tiếp nhận, Tạm tắt và Điều tra. Tên, mẫu và cảnh báo của đích không thay đổi; Chuyển lại sẽ khôi phục webhook."
+    },
+    "switchAll": {
+      "title": "{count} đích webhook đăng vào không gian làm việc này. | {count} đích webhook đăng vào không gian làm việc này.",
+      "detail": "Chuyển sang ứng dụng {product} để có các nút Xác nhận, Tắt tiếng và Điều tra. Tên, mẫu và cảnh báo giữ nguyên; Chuyển lại sẽ khôi phục webhook. | Chuyển sang ứng dụng {product} để có các nút Xác nhận, Tắt tiếng và Điều tra. Tên, mẫu và cảnh báo giữ nguyên; Chuyển lại sẽ khôi phục webhook.",
+      "review": "Xem lại",
+      "action": "Chuyển tất cả",
+      "summary": "{switched} đã chuyển · {count} không thể chuyển"
+    },
+    "oncallUnlinked": {
+      "title": "Thành viên trực chưa liên kết với {product}",
+      "description": "Thông báo trực không thể nhắn tin trực tiếp cho họ và các lần nhấp của họ vào nút cảnh báo và nút thông báo trực sẽ chờ đến khi họ liên kết",
+      "remind": "Nhắc họ",
+      "columnPerson": "Người",
+      "columnTeam": "Nhóm",
+      "columnNextShift": "Ca tiếp theo",
+      "columnReminder": "Nhắc nhở",
+      "dmSent": "Đã gửi tin nhắn trực tiếp {time}",
+      "notSent": "Chưa gửi",
+      "reminded": "Đã gửi nhắc nhở đến {count} người | Đã gửi nhắc nhở đến {count} người",
+      "remindFailed": "Không thể gửi nhắc nhở."
     }
   },
   "fleet": {

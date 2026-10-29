@@ -287,6 +287,19 @@ export default class DashboardPanelConfigs {
     this.mapsNameLabel = page.locator('[data-test="dashboard-config-maps-name-label"]');
     this.promqlLegend = page.locator('[data-test="dashboard-config-promql-legend"]');
     this.addQueryBtn = page.locator('[data-test="dashboard-panel-query-tab-add"]');
+    this.promqlSeriesLimit = page.locator('[data-test="dashboard-config-promql-series-limit"]');
+    this.promqlSeriesLimitField = this.promqlSeriesLimit.locator('[data-test$="-field"]');
+    this.promqlQueryTypeTrigger = page.locator('[data-test="dashboard-promql-builder-query-type-trigger"]');
+    this.mapRoam = page.locator('[data-test="dashboard-config-map-roam"]');
+    this.mapRoamBtn = this.mapRoam.locator('[data-test$="-btn"]');
+    this.thresholdsShowAs = page.locator('[data-test="dashboard-config-thresholds-show-as"]');
+    this.thresholdsShowAsTrigger = page.locator('[data-test="dashboard-config-thresholds-show-as-trigger"]');
+    this.thresholdsAddStep = page.locator('[data-test="dashboard-config-thresholds-add-step"]');
+    this.thresholdStepValueFields = page.locator(
+      '[data-test^="dashboard-config-thresholds-step-"][data-test$="-value-field"]'
+    );
+    this.thresholdStepValueField = (index) =>
+      page.locator(`[data-test="dashboard-config-thresholds-step-${index}-value-field"]`);
 
     // Heatmap colour settings
     this.heatmapColorMin = page.locator('[data-test="dashboard-config-heatmap_color_min"]');
@@ -318,6 +331,42 @@ export default class DashboardPanelConfigs {
     this.heatmapYMax = page.locator('[data-test="dashboard-config-heatmap_y_max"]');
     this.heatmapYMaxField = page.locator('[data-test="dashboard-config-heatmap_y_max-field"]');
     this.heatmapYMaxError = page.locator('[data-test="dashboard-config-heatmap_y_max-error"]');
+  }
+
+  /** Types a PromQL series limit into the config sidebar input. */
+  async setPromqlSeriesLimit(limit) {
+    await this.scrollSidebarToElement(this.promqlSeriesLimit);
+    await this.promqlSeriesLimitField.fill(String(limit));
+  }
+
+  /** Picks Range or Instant in the PromQL custom-mode query type select. */
+  async selectPromqlQueryType(label) {
+    await this.selectConfigOption("dashboard-promql-builder-query-type", label);
+  }
+
+  /** Picks the reducer, e.g. "Max (maximum value)", in the aggregation select. */
+  async selectAggregation(label) {
+    await this.selectConfigOption("dashboard-config-aggregation", label);
+  }
+
+  /** Picks how thresholds draw, e.g. "Shaded band" or "Limit line only". */
+  async selectThresholdsShowAs(label) {
+    await this.scrollSidebarToElement(this.thresholdsShowAs);
+    await this.selectConfigOption("dashboard-config-thresholds-show-as", label);
+  }
+
+  /** Adds a threshold step and sets its value. */
+  async addThresholdStep(value) {
+    const index = await this.thresholdStepValueFields.count();
+    await this.thresholdsAddStep.click();
+    const field = this.thresholdStepValueField(index);
+    await field.fill(String(value));
+    await field.press("Tab");
+  }
+
+  async toggleMapRoam() {
+    await this.scrollSidebarToElement(this.mapRoam);
+    await this.mapRoam.click();
   }
   async _clickVirtualOption(dataTestParent, label) {
     const option = this.page.locator(
