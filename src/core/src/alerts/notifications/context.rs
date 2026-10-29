@@ -38,6 +38,8 @@ pub struct NotificationContext {
     pub stream_type: String,
     pub stream_name: String,
     pub alert_name: String,
+    /// The composite's id for a composite alert; empty when no alert stands behind the send.
+    pub alert_id: String,
     /// "realtime" | "scheduled"
     pub alert_type: String,
     pub alert_period: String,

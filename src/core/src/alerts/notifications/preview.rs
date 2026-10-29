@@ -200,6 +200,7 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         level,
         chart_url: None,
         chart_png: None,
+        alert_id: String::new(),
     }
 }
 

@@ -28,7 +28,7 @@ use openobserve_core::auth::check_permissions;
 use openobserve_core::{
     alerts::{
         destinations,
-        notifications::{TestSendError, check_rate_limit, test_send as core_test_send},
+        notifications::{TestSendError, check_rate_limit, jira, test_send as core_test_send},
     },
     auth::UserEmail,
     http::destination_error_response,
@@ -291,6 +291,41 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
             response_body: None,
             error: Some(format!("HTTP request failed: {}", e)),
         }),
+    }
+}
+
+/// JiraDestinationSetup
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/destinations/jira/setup",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "JiraDestinationSetup",
+    summary = "Look up Jira data for the destination form",
+    description = "Checks Jira credentials and returns the projects, issue types or create-screen fields \
+                   the Jira destination form needs, or creates one test issue. Nothing is stored.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    request_body(content = inline(jira::SetupRequest), description = "Jira credentials and the lookup to run", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"}))
+    )
+)]
+pub async fn jira_setup(
+    Path(org_id): Path<String>,
+    Json(req): Json<jira::SetupRequest>,
+) -> Response {
+    match jira::setup(&org_id, req).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
@@ -1055,6 +1090,18 @@ mod tests {
             status(DestinationError::PrebuiltTemplateNotFound(
                 "email".to_string()
             )),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_jira_token_refusals_are_bad_request() {
+        assert_eq!(
+            status(DestinationError::JiraTokenMissing),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(DestinationError::JiraTokenChanged),
             StatusCode::BAD_REQUEST
         );
     }

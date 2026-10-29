@@ -269,6 +269,7 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
         "webhook",
         "opsgenie",
         "servicenow",
+        "jira",
         "email",
     ];
 

@@ -1,5 +1,5 @@
 {
-  "revision": 2,
+  "revision": 3,
   "destinations": [
     {
       "id": "slack",
@@ -289,6 +289,58 @@
       "metadata": {
         "service": "servicenow",
         "description": "ServiceNow incident management"
+      }
+    },
+    {
+      "id": "jira",
+      "name": "Jira",
+      "description": "Create Jira issues and comment on them",
+      "type": "http",
+      "icon": "jira-icon",
+      "popular": true,
+      "category": "incident",
+      "endpoint": {
+        "url": "https://YOUR_SITE.atlassian.net",
+        "method": "POST",
+        "skip_tls_verify": false,
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": "Basic YOUR_AUTH_TOKEN"
+        },
+        "output_format": "JSON",
+        "destination_type": "jira"
+      },
+      "template": {
+        "name": "prebuilt_jira",
+        "body": "{\n  \"note\": \"The Jira destination builds the issue text from the alert data and does not render this template.\",\n  \"alert_name\": \"{alert_name}\",\n  \"alert_status\": \"{alert_status}\"\n}"
+      },
+      "credential_fields": [
+        {
+          "key": "url",
+          "label": "Jira URL",
+          "type": "text",
+          "required": true,
+          "hint": "https://your-site.atlassian.net"
+        },
+        {
+          "key": "email",
+          "label": "Email",
+          "type": "text",
+          "required": false,
+          "hint": "Account email, for Jira Cloud only"
+        },
+        {
+          "key": "token",
+          "label": "API Token",
+          "type": "password",
+          "required": true,
+          "hint": "API token (Jira Cloud) or personal access token (Jira Data Center)"
+        }
+      ],
+      "metadata": {
+        "service": "jira",
+        "description": "Jira issue tracking"
       }
     },
     {
