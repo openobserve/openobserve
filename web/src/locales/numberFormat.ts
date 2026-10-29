@@ -33,6 +33,7 @@ export const APP_LOCALE_TO_BCP47: Record<string, string> = {
   ru: "ru-RU",
   pl: "pl-PL",
   vi: "vi-VN",
+  th: "th-TH",
 };
 
 export const NUMBER_LOCALE_TAGS: readonly string[] = [
