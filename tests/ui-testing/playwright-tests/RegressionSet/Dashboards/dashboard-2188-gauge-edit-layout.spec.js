@@ -45,6 +45,8 @@ test.describe("Gauge keeps its layout when an existing panel is edited (#2188)",
       await pm.dashboardPanelConfigs.selectGuageMax("10");
       await pm.dashboardPanelActions.applyDashboardBtn();
       await expect(pm.dashboardPanelActions.dashboardErrorItems).toContainText([GAUGE_RANGE_PANEL_ERROR]);
+      // The renderer draws an inverted range as min..min+100, so 500..600 proves this is the new option, not a stale one.
+      await pm.dashboardPanelActions.expectGaugeWellFormed(expect, { min: 500, max: 600 });
 
       await pm.dashboardPanelConfigs.selectGuageMin("10");
       await pm.dashboardPanelConfigs.selectGuageMax("500");
