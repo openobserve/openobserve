@@ -42,13 +42,14 @@ use crate::common::{
 };
 
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 6] = [
+const OPTIONAL_HISTORY_COLUMNS: [&str; 7] = [
     "downtime_id",
     "acked_by",
     "ack_action",
     "ack_source",
     "taken_over_from",
     "repeat_suppressed",
+    "success_response",
 ];
 
 /// Every column the data query reads but [OPTIONAL_HISTORY_COLUMNS].
@@ -1851,5 +1852,19 @@ mod tests {
         assert!(!history_columns(&Schema::new(fields.clone())).contains("repeat_suppressed"));
         fields.push(Field::new("repeat_suppressed", DataType::Boolean, true));
         assert!(history_columns(&Schema::new(fields)).ends_with(", repeat_suppressed"));
+    }
+
+    #[test]
+    fn the_destination_send_result_is_read_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        assert!(!history_columns(&Schema::new(fields.clone())).contains("success_response"));
+        fields.push(field("success_response"));
+        assert!(
+            history_columns(&Schema::new(fields)).ends_with(", success_response"),
+            "a sent row such as `destination ops-jira created OPS-141;` must reach the history"
+        );
     }
 }
