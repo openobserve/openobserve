@@ -37,6 +37,10 @@ pub mod sqlite;
 
 const STREAM_SCAN_WINDOW_MICROS: i64 = 3600 * 1_000_000;
 const STREAMS_PER_QUERY: usize = 1000;
+/// Longest org id the PostgreSQL file_list and schema_history `org` columns hold.
+pub const ORG_ID_MAX_LEN: usize = 100;
+/// Longest `{org}/{stream_type}/{stream}` key the PostgreSQL file_list `stream` columns hold.
+pub const STREAM_KEY_MAX_LEN: usize = 256;
 
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
@@ -64,6 +68,19 @@ pub fn connect_default() -> Box<dyn FileList> {
 
 pub fn connect_local_cache() -> Box<dyn FileList> {
     Box::<sqlite::SqliteFileList>::default()
+}
+
+/// Why a stream's file_list key or its org cannot be stored, if it cannot.
+pub fn stream_key_violation(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<String> {
+    // only the PostgreSQL backend bounds these columns; Nats keeps file_list in SQLite
+    if MetaStore::from(get_config().common.meta_store.as_str()) != MetaStore::PostgreSQL {
+        return None;
+    }
+    stream_key_length_violation(org_id, stream_type, stream_name)
 }
 
 /// The two file tables an org deletion empties stream by stream.
@@ -848,6 +865,26 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
     Ok(())
 }
 
+fn stream_key_length_violation(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<String> {
+    // VARCHAR(n) counts characters, not bytes
+    let org_len = org_id.chars().count();
+    if org_len > ORG_ID_MAX_LEN {
+        return Some(format!(
+            "Organization id too long: {org_id} is {org_len} characters, only {ORG_ID_MAX_LEN} accepted"
+        ));
+    }
+    let len = org_len + stream_type.as_str().len() + stream_name.chars().count() + 2;
+    (len > STREAM_KEY_MAX_LEN).then(|| {
+        format!(
+            "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted"
+        )
+    })
+}
+
 /// Daily when the stream is dynamically merged (its files can span a day), else the type's level.
 pub async fn max_ts_bound_level(
     org_id: &str,
@@ -1056,6 +1093,45 @@ mod tests {
     use config::meta::stream::StreamStats;
 
     use super::*;
+
+    #[test]
+    fn test_stream_key_length_boundary() {
+        // "org/metrics/" is 12 characters
+        let fits = "m".repeat(STREAM_KEY_MAX_LEN - 12);
+        assert!(stream_key_length_violation("org", StreamType::Metrics, &fits).is_none());
+        let over = format!("{fits}m");
+        let violation = stream_key_length_violation("org", StreamType::Metrics, &over).unwrap();
+        assert!(violation.starts_with("Stream name too long"), "{violation}");
+        assert!(violation.contains("is 257 characters"), "{violation}");
+        // a multi-byte name is measured in characters, as the VARCHAR column is
+        let wide = "é".repeat(STREAM_KEY_MAX_LEN - 12);
+        assert!(stream_key_length_violation("org", StreamType::Metrics, &wide).is_none());
+    }
+
+    #[test]
+    fn test_stream_key_length_org_boundary() {
+        let org = "o".repeat(ORG_ID_MAX_LEN);
+        assert!(stream_key_length_violation(&org, StreamType::Logs, "s").is_none());
+        let org = format!("{org}o");
+        let violation = stream_key_length_violation(&org, StreamType::Logs, "s").unwrap();
+        assert!(
+            violation.starts_with("Organization id too long"),
+            "{violation}"
+        );
+    }
+
+    /// CI runs this under both meta stores; only PostgreSQL bounds the file_list key.
+    #[test]
+    fn test_stream_key_violation_follows_meta_store() {
+        let over = "s".repeat(STREAM_KEY_MAX_LEN);
+        let bounded =
+            MetaStore::from(get_config().common.meta_store.as_str()) == MetaStore::PostgreSQL;
+        assert_eq!(
+            stream_key_violation("org", StreamType::Logs, &over).is_some(),
+            bounded
+        );
+        assert!(stream_key_violation("org", StreamType::Logs, "s").is_none());
+    }
 
     // ── FileListJobStatus::from(i32) ──────────────────────────────────────────
 

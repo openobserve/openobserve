@@ -60,6 +60,7 @@ pub use watcher::{
 };
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
+const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
 /// Shared by both ingestion-window discard messages and the test for them.
 const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
 
@@ -140,6 +141,27 @@ impl std::error::Error for StreamSettingsError {}
 pub struct SavedStreamSettings {
     pub settings: StreamSettings,
     pub previous_settings: Option<StreamSettings>,
+}
+
+/// Rejects a stream whose file_list key or org cannot be stored, counting it as an ingest error.
+pub fn check_stream_key_len(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<()> {
+    let Some(violation) = infra::file_list::stream_key_violation(org_id, stream_type, stream_name)
+    else {
+        return Ok(());
+    };
+    metrics::INGEST_ERRORS
+        .with_label_values(&[
+            org_id,
+            stream_type.as_str(),
+            stream_name,
+            STREAM_NAME_TOO_LONG,
+        ])
+        .inc();
+    Err(anyhow::anyhow!("{violation}. Data discarded."))
 }
 
 /// Validate, normalize, and persist stream settings stored in schema metadata.
@@ -1057,6 +1079,20 @@ mod tests {
         assert!(!is_window_discard_error(&anyhow::anyhow!(
             "Record flattening error"
         )));
+    }
+
+    #[test]
+    fn test_check_stream_key_len_counts_and_discards() {
+        let over = "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let result = check_stream_key_len("org", StreamType::Logs, &over);
+        assert_eq!(
+            result.is_err(),
+            infra::file_list::stream_key_violation("org", StreamType::Logs, &over).is_some()
+        );
+        if let Err(err) = result {
+            assert!(err.to_string().ends_with("Data discarded."), "{err}");
+        }
+        assert!(check_stream_key_len("org", StreamType::Logs, "s").is_ok());
     }
 
     #[test]
