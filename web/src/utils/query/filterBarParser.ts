@@ -51,11 +51,15 @@ const FUNCTION_OPERATORS: Record<string, FilterOperatorId> = {
 const TOKEN_PATTERN =
   /\s*(?:('(?:[^']|'')*')|("(?:[^"]|"")*")|(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\b|(>=|<=|!=|<>|==|=|>|<)|(\()|(\))|(,)|([A-Za-z_@][\w.@-]*))/y;
 
+const WHITESPACE = /\s*/y;
+
 const tokenize = (text: string): Token[] | null => {
   const tokens: Token[] = [];
   TOKEN_PATTERN.lastIndex = 0;
   while (TOKEN_PATTERN.lastIndex < text.length) {
-    if (/^\s*$/.test(text.slice(TOKEN_PATTERN.lastIndex))) break;
+    WHITESPACE.lastIndex = TOKEN_PATTERN.lastIndex;
+    WHITESPACE.exec(text);
+    if (WHITESPACE.lastIndex >= text.length) break;
     const match = TOKEN_PATTERN.exec(text);
     if (!match) return null;
     const [, str, quoted, num, op, lparen, rparen, comma, ident] = match;
@@ -71,6 +75,24 @@ const tokenize = (text: string): Token[] | null => {
     else tokens.push({ kind: "ident", text: ident });
   }
   return tokens;
+};
+
+/** Splits a LIKE pattern into its literal text and edge `%`s; null when a wildcard or escape sits anywhere else. */
+const likeParts = (text: string): { starts: boolean; ends: boolean; inner: string } | null => {
+  const ends = text.startsWith("%");
+  let inner = "";
+  for (let i = ends ? 1 : 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === "\\") {
+      const next = text[++i];
+      if (next !== "\\" && next !== "%" && next !== "_") return null;
+      inner += next;
+    } else if (char === "%") {
+      return i === text.length - 1 ? { starts: true, ends, inner } : null;
+    } else if (char === "_") return null;
+    else inner += char;
+  }
+  return { starts: false, ends, inner };
 };
 
 class Parser {
@@ -194,11 +216,9 @@ class Parser {
     const pattern = this.peek();
     if (pattern?.kind !== "string") return null;
     this.pos++;
-    const text = pattern.text;
-    const starts = text.endsWith("%");
-    const ends = text.startsWith("%");
-    const inner = text.slice(ends ? 1 : 0, starts ? -1 : undefined);
-    if (inner.includes("%")) return null;
+    const parts = likeParts(pattern.text);
+    if (!parts) return null;
+    const { starts, ends, inner } = parts;
     if (negate) {
       if (starts && ends) return this.condition(connector, field, "not_contains", [inner]);
       if (starts) return this.condition(connector, field, "not_starts_with", [inner]);

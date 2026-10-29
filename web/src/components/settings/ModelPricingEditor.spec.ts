@@ -933,6 +933,27 @@ describe("ModelPricingEditor.vue", () => {
         },
       ]);
     });
+    it("keeps the rule chips mounted while other tier fields are typed", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Flex", rules: [flexRule()], prices: [row("input", 2)] }),
+      ]);
+      await nextTick();
+      const chip = () =>
+        wrapper.find(
+          '[data-test="model-pricing-tier-filter-builder-1-chip-openai.response.service_tier, openai.request.service_tier"]',
+        ).element;
+      const before = chip();
+      expect(before).toBeTruthy();
+      for (const name of ["F", "Fl", "Fle", "Flex2"]) {
+        getForm(wrapper).setFieldValue("tiers[1].name", name);
+        await nextTick();
+      }
+      expect(chip()).toBe(before);
+    });
+
     it("removing a middle rule chip keeps the other rules as they were", async () => {
       const wrapper = createWrapper();
       await flushPromises();

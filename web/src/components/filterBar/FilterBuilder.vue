@@ -52,19 +52,21 @@ const context = computed(() => ({ fields: props.fields }));
 const tree = shallowRef<FilterGroup>(profile.value.codec.parse(props.modelValue, context.value));
 // Chip highlights wait for the first edit or validate(), so a fresh form does not open in red.
 const showIssues = ref(false);
-// A text snapshot, since hosts may mutate the emitted object in place (the dashboard field list pushes into it).
-let lastEmitted: string | null = null;
+// Text of the value last parsed or emitted: hosts mutate emitted objects in place or rebuild equal ones every render.
+let snapshot = JSON.stringify(props.modelValue ?? null);
 
 const savedFor = (next: FilterGroup) => {
   const kept = profile.value.validation === "dropIncomplete" ? pruneIncomplete(next) : next;
   return profile.value.codec.serialize(kept, context.value);
 };
 
-// The value can change outside the builder (a reset, a loaded row); re-read it unless it is our own echo.
+// The value can change outside the builder (a reset, a loaded row); re-read it unless it is our own echo or unchanged.
 watch(
   () => props.modelValue,
   (value) => {
-    if (lastEmitted !== null && JSON.stringify(value ?? null) === lastEmitted) return;
+    const text = JSON.stringify(value ?? null);
+    if (text === snapshot) return;
+    snapshot = text;
     tree.value = profile.value.codec.parse(value, context.value);
   },
 );
@@ -96,7 +98,7 @@ function onTreeChange(next: FilterGroup) {
   tree.value = next;
   showIssues.value = true;
   const saved = savedFor(next);
-  lastEmitted = JSON.stringify(saved ?? null);
+  snapshot = JSON.stringify(saved ?? null);
   emit("update:modelValue", saved);
 }
 

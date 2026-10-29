@@ -721,4 +721,15 @@ describe("FilterBuilder", () => {
     expect(find("chip-status").exists()).toBe(true);
     expect(ids).toHaveLength(2);
   });
+
+  it("does not re-read a freshly built value equal to the one it holds", async () => {
+    mountBuilder("alert", v2(leaf("level", "error")));
+    await flushPromises();
+    const before = find("chip-level").element;
+    for (let i = 0; i < 3; i++) {
+      await wrapper!.setProps({ modelValue: v2(leaf("level", "error")) });
+      await flushPromises();
+    }
+    expect(find("chip-level").element).toBe(before);
+  });
 });

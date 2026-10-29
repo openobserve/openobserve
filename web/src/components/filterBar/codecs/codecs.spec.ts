@@ -214,6 +214,36 @@ describe("engine codec (alerts, pipelines, workflows, evals, annotations)", () =
     }
   });
 
+  it("keeps case_insensitive saved on a non-contains operator when the value or field is edited", () => {
+    const saved = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [
+        {
+          filterType: "condition",
+          column: "level",
+          operator: "=",
+          value: "Error",
+          case_insensitive: true,
+          logicalOperator: "AND",
+          id: "c1",
+        },
+      ],
+    };
+    expectRoundTrip(codec, saved as never);
+    const tree = codec.parse(clone(saved) as never, context);
+    expect(leaves(tree)[0].operator).toBe("eq");
+    const changes: Partial<FilterCondition>[] = [
+      { values: ["Warn"] },
+      { field: "k8s_namespace_name" },
+      { operator: "neq" },
+    ];
+    for (const change of changes) {
+      const out = codec.serialize(edit(tree, 0, change), context) as any;
+      expect(out.conditions[0].case_insensitive).toBe(true);
+    }
+  });
+
   it("keeps a legacy ignore_case as saved and does not read it as case-insensitive", () => {
     const saved = {
       filterType: "group",

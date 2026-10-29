@@ -881,6 +881,8 @@ const FLAME_SKELETON_WIDTHS = ["w-full", "w-11/12", "w-3/4", "w-7/12", "w-5/12",
 let metaRequestSeq = 0;
 let queryRequestSeq = 0;
 let tagValuesRequestSeq = 0;
+// The server ignores the typed search, so one full list per label and inputs is fetched and filtered here.
+const tagValuesCache = new Map<string, Promise<string[]>>();
 let initRunSeq = 0;
 // Holds the stream and date watchers off while a route seed is applied or dropped, so they cannot reset it or reload.
 let seeding = false;
@@ -1459,6 +1461,7 @@ const buildErrorMessage = (error: unknown): string => {
 
 const invalidateTagValuesRequest = () => {
   tagValuesRequestSeq += 1;
+  tagValuesCache.clear();
 };
 
 const resetProfilesState = () => {
@@ -1541,22 +1544,31 @@ const loadTagValues = async (tag: string, search: string): Promise<string[]> => 
   const range = resolveTimeRange();
   const profileType = currentProfileType.value;
   if (!org || !stream || !tag || !range) return [];
-  const requestSeq = ++tagValuesRequestSeq;
+  const requestSeq = tagValuesRequestSeq;
+  const body = {
+    service_name: selectedService.value || undefined,
+    profile_type: profileType?.type,
+    profile_unit: profileType?.unit,
+    filters: appliedFilters.value
+      .filter((filter) => filter.key !== tag)
+      .map((filter) => ({ ...filter })),
+    tag,
+  };
+  const { valueType, relativeTimePeriod, startTime, endTime } = dateState.value;
+  const period = valueType === "relative" ? relativeTimePeriod : [startTime, endTime];
+  const key = JSON.stringify([org, stream, period, body]);
+  let request = tagValuesCache.get(key);
+  if (!request) {
+    request = profilesService
+      .tagValues(org, stream, { start_time: range.startTime, end_time: range.endTime, ...body })
+      .then((response) => response.data.values ?? []);
+    tagValuesCache.set(key, request);
+    request.catch(() => tagValuesCache.delete(key));
+  }
   try {
-    const response = await profilesService.tagValues(org, stream, {
-      start_time: range.startTime,
-      end_time: range.endTime,
-      service_name: selectedService.value || undefined,
-      profile_type: profileType?.type,
-      profile_unit: profileType?.unit,
-      filters: appliedFilters.value
-        .filter((filter) => filter.key !== tag)
-        .map((filter) => ({ ...filter })),
-      tag,
-    });
+    const values = await request;
     if (requestSeq !== tagValuesRequestSeq) return [];
     const needle = search.trim().toLowerCase();
-    const values = response.data.values ?? [];
     return needle ? values.filter((value) => value.toLowerCase().includes(needle)) : values;
   } catch {
     // As the Metrics label filter does: the value list stays empty, and the results stay.
@@ -1683,6 +1695,7 @@ const setBreakdown = async (value: unknown) => {
 };
 
 const runQuery = async () => {
+  tagValuesCache.clear();
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
   const range = resolveTimeRange();

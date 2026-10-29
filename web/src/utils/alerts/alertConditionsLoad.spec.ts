@@ -170,6 +170,13 @@ describe("preview SQL for the new operators", () => {
     [c("env", "in", ["A", "B"], { case_insensitive: true }), "lower(env) IN ('a', 'b')"],
     [c("env", "in", ["A", "B"], { ignore_case: true }), "lower(env) IN ('a', 'b')"],
     [c("msg", "is_empty", ""), "(msg IS NULL OR msg = '')"],
+    [c("path", "starts_with", "50%_a\\"), "path LIKE '50\\%\\_a\\\\%'"],
+    [c("path", "ends_with", "_x"), "path LIKE '%\\_x'"],
+    [
+      c("msg", "NotContains", "5%_A", { case_insensitive: true }),
+      "lower(msg) NOT LIKE '%5\\%\\_a%'",
+    ],
+    [c("msg", "NotContains", "50%_x"), "msg NOT LIKE '%50%_x%'"],
   ])("%j", (item, expected) => {
     expect(sql(item)).toBe(expected);
   });

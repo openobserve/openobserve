@@ -109,6 +109,51 @@ describe("parseSqlFilter", () => {
     expect(tree.items.map((item) => item.connector)).toEqual(["AND", "OR"]);
   });
 
+  it("reads backslash-escaped LIKE wildcards back as the literal value", () => {
+    const value = "50%_o'k\\";
+    for (const operator of ["starts_with", "ends_with", "not_contains"] as const) {
+      const sql = filterTreeToSql(
+        {
+          kind: "group",
+          id: "root",
+          connector: "AND",
+          items: [
+            {
+              kind: "condition",
+              id: "c",
+              connector: "AND",
+              field: "level",
+              operator,
+              values: [value],
+            },
+          ],
+        },
+        fields,
+      );
+      const node = parseSqlFilter(sql)!.items[0] as FilterCondition;
+      expect(node).toMatchObject({ field: "level", operator, values: [value] });
+      expect(roundTrip(sql)).toBe(sql);
+    }
+  });
+
+  it("does not turn a LIKE wildcard or unknown escape into chip text", () => {
+    expect(parseSqlFilter("level LIKE 'user_service%'")).toBeNull();
+    expect(parseSqlFilter("level NOT LIKE '%a_b%'")).toBeNull();
+    expect(parseSqlFilter("level LIKE '\\a%'")).toBeNull();
+    expect(parseSqlFilter("level LIKE 'abc\\'")).toBeNull();
+  });
+
+  it("tokenizes a 5000-value IN list in linear time", () => {
+    const values = Array.from({ length: 5000 }, (_, i) => `'value-${i}'`);
+    const sql = `level IN (${values.join(", ")})`;
+    const start = performance.now();
+    const tree = parseSqlFilter(sql);
+    const elapsed = performance.now() - start;
+    expect((tree!.items[0] as FilterCondition).values).toEqual(values.map((v) => v.slice(1, -1)));
+    expect(roundTrip(sql)).toBe(sql);
+    expect(elapsed).toBeLessThan(200);
+  });
+
   it("returns null for anything the bar cannot draw", () => {
     expect(parseSqlFilter("level = upper(level)")).toBeNull();
     expect(parseSqlFilter("status + 1 > 2")).toBeNull();

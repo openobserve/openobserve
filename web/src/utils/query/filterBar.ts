@@ -356,15 +356,15 @@ const conditionToSql = (condition: FilterCondition, fieldTypes: Map<string, Filt
     case "contains_ci":
       return `str_match_ignore_case(${column}, ${sqlLiteral(first)})`;
     case "not_contains":
-      return sqlLike(column, first, "contains", true);
+      return sqlLike(column, first, "contains", true, true);
     case "starts_with":
-      return sqlLike(column, first, "start");
+      return sqlLike(column, first, "start", false, true);
     case "not_starts_with":
-      return sqlLike(column, first, "start", true);
+      return sqlLike(column, first, "start", true, true);
     case "ends_with":
-      return sqlLike(column, first, "end");
+      return sqlLike(column, first, "end", false, true);
     case "not_ends_with":
-      return sqlLike(column, first, "end", true);
+      return sqlLike(column, first, "end", true, true);
     case "in":
     case "not_in": {
       const list = condition.values.map((value) => sqlValue(value, type)).join(", ");

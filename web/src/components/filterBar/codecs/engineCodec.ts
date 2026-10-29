@@ -229,7 +229,9 @@ function serializeLeaf(
     out.id = node.id;
   }
   if (node.operator === "contains_ci") out.case_insensitive = true;
-  else delete out.case_insensitive;
+  // Only moving off contains_ci clears it; a flag saved on any other operator is not drawn but still applies.
+  else if (parsedOperator(node) === "contains_ci" || !base?.case_insensitive)
+    delete out.case_insensitive;
   return out;
 }
 

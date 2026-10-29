@@ -166,6 +166,8 @@ function extendedSql(
       target,
       fold ? text.toLowerCase() : text,
       op === "starts_with" ? "start" : "end",
+      false,
+      true,
     );
   }
   const pattern = ignoreCase ? `(?i)${text}` : text;
@@ -180,7 +182,7 @@ function ignoreCaseSql(column: string, operator: string, value: unknown): string
     return `str_match_ignore_case(${column}, ${sqlLiteral(text)})`;
   }
   if (op === "notcontains")
-    return sqlLike(`lower(${column})`, text.toLowerCase(), "contains", true);
+    return sqlLike(`lower(${column})`, text.toLowerCase(), "contains", true, true);
   if (["=", "!=", "<>", ">", ">=", "<", "<="].includes(op)) {
     return `lower(${column}) ${op} ${sqlLiteral(text.toLowerCase())}`;
   }

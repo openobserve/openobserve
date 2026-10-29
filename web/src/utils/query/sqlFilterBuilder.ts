@@ -31,8 +31,12 @@ export const sqlEquals = (fieldName: string, value: unknown, negate = false): st
 export const sqlIn = (fieldName: string, values: unknown[]): string =>
   values.length ? `${fieldName} IN (${values.map(sqlLiteral).join(",")})` : "1=0";
 
-const likePattern = (value: unknown, position: LikePosition): string => {
-  const escaped = escapeSingleQuotes(String(value ?? ""));
+/** Backslash-escapes the backslash and LIKE wildcards as the backend does (DataFusion's default escape, no ESCAPE clause). */
+export const escapeLikeWildcards = (value: string): string => value.replace(/[\\%_]/g, "\\$&");
+
+const likePattern = (value: unknown, position: LikePosition, escapeWildcards: boolean): string => {
+  const text = String(value ?? "");
+  const escaped = escapeSingleQuotes(escapeWildcards ? escapeLikeWildcards(text) : text);
   switch (position) {
     case "start":
       return `${escaped}%`;
@@ -48,7 +52,9 @@ export const sqlLike = (
   value: unknown,
   position: LikePosition = "contains",
   negate = false,
-): string => `${fieldName} ${negate ? "NOT LIKE" : "LIKE"} '${likePattern(value, position)}'`;
+  escapeWildcards = false,
+): string =>
+  `${fieldName} ${negate ? "NOT LIKE" : "LIKE"} '${likePattern(value, position, escapeWildcards)}'`;
 
 export const sqlIsNull = (fieldName: string, negate = false): string =>
   `${fieldName} ${negate ? "IS NOT" : "IS"} NULL`;

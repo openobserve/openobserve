@@ -110,6 +110,16 @@ describe("filterTreeToSql", () => {
     );
   });
 
+  it("backslash-escapes LIKE wildcards and backslashes in pattern operators like the backend", () => {
+    const sql = (operator: FilterCondition["operator"]) =>
+      filterTreeToSql(root(cond("level", operator, ["50%_o'k\\"])), fields);
+    expect(sql("starts_with")).toBe("level LIKE '50\\%\\_o''k\\\\%'");
+    expect(sql("ends_with")).toBe("level LIKE '%50\\%\\_o''k\\\\'");
+    expect(sql("not_contains")).toBe("level NOT LIKE '%50\\%\\_o''k\\\\%'");
+    expect(sql("not_starts_with")).toBe("level NOT LIKE '50\\%\\_o''k\\\\%'");
+    expect(sql("not_ends_with")).toBe("level NOT LIKE '%50\\%\\_o''k\\\\'");
+  });
+
   it("compiles every text operator", () => {
     const sql = (operator: FilterCondition["operator"], values: string[] = ["x"]) =>
       filterTreeToSql(root(cond("level", operator, values)), fields);

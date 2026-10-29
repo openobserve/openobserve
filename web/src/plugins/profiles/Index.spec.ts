@@ -485,6 +485,25 @@ describe("Profiles page", () => {
     ]);
   });
 
+  it("fetches a label's values once and filters later searches locally", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    mocks.tagValues.mockResolvedValue({
+      data: { tag: "k8s_pod_name", values: ["api-1", "api-2", "web-1"], took: 1 },
+    });
+    const wrapper = mountPage();
+    await settle();
+    mocks.tagValues.mockClear();
+
+    const load = filterBuilder(wrapper).props("loadValues");
+    expect(await load("k8s_pod_name", "")).toEqual(["api-1", "api-2", "web-1"]);
+    expect(await load("k8s_pod_name", "a")).toEqual(["api-1", "api-2"]);
+    expect(await load("k8s_pod_name", "WEB")).toEqual(["web-1"]);
+    expect(mocks.tagValues).toHaveBeenCalledTimes(1);
+
+    await load("service", "a");
+    expect(mocks.tagValues).toHaveBeenCalledTimes(2);
+  });
+
   it("does not narrow a label's value list by its own filter", async () => {
     mocks.merge.mockResolvedValue(mergeResponse);
     const wrapper = mountPage();
