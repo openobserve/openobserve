@@ -21,6 +21,7 @@ import {
   forbiddenState,
   licenseDeniedFeatures,
   menuState,
+  streamTypeFeature,
   withLicenseFeature,
 } from "./featureGate";
 
@@ -51,6 +52,25 @@ describe("menuState", () => {
     expect(menuState(undefined, "oncall", true)).toBe("enabled");
     expect(menuState(undefined, "oncall", false)).toBe("hidden");
     expect(menuState({ oncall: "enabled" }, "oncall", false)).toBe("hidden");
+  });
+});
+
+describe("streamTypeFeature", () => {
+  it("maps each signal stream type to its own license key", () => {
+    expect(streamTypeFeature("logs")).toBe("logs");
+    expect(streamTypeFeature("metrics")).toBe("metrics");
+    expect(streamTypeFeature("traces")).toBe("traces");
+  });
+
+  it("reads a missing stream type as logs, as the backend does", () => {
+    expect(streamTypeFeature(undefined)).toBe("logs");
+    expect(streamTypeFeature(null)).toBe("logs");
+    expect(streamTypeFeature("")).toBe("logs");
+  });
+
+  it("gives other stream types no license key", () => {
+    expect(streamTypeFeature("enrichment_tables")).toBeNull();
+    expect(streamTypeFeature("metadata")).toBeNull();
   });
 });
 

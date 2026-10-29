@@ -106,6 +106,15 @@ describe("groupNavLinks", () => {
     ]);
   });
 
+  it("gates every Traces flyout item on the traces license", () => {
+    expect(NAV_SUBNAV.traces.map((c) => c.feature)).toEqual([
+      "traces",
+      "traces",
+      "traces",
+      "traces",
+    ]);
+  });
+
   it("places the Data group right after the Reliability group it is anchored to", () => {
     const entries = groupNavLinks([
       link("home"),

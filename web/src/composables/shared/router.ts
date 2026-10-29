@@ -354,6 +354,7 @@ const useRoutes = () => {
         keepAlive: true,
         titleKey: "menu.search",
         allowOnEmptyData: true,
+        licenseFeatureFromStreamType: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         // Back-compat: Search History / Scheduler used to be `?action=…` overlays
@@ -377,6 +378,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "logs.searchJobInspector.title",
+        licenseFeatureFromStreamType: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -392,6 +394,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "search_history.title",
+        licenseFeatureFromStreamType: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -407,6 +410,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "routeTitles.searchScheduler",
+        licenseFeatureFromStreamType: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         if (config.isEnterprise !== "true") {
@@ -425,6 +429,7 @@ const useRoutes = () => {
         keepAlive: false,
         titleKey: "menu.metrics",
         allowOnEmptyData: true,
+        licenseFeature: "metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
         const overrides = hasMetricsOverrideParams(to.query);
@@ -464,6 +469,7 @@ const useRoutes = () => {
         keepAlive: true,
         titleKey: "menu.traces",
         allowOnEmptyData: true,
+        licenseFeature: "traces",
       },
       beforeEnter(to: any, from: any, next: any) {
         const tab = supportedTraceTab(to.query?.tab);
@@ -645,6 +651,7 @@ const useRoutes = () => {
       props: { showAskAi: true },
       meta: {
         titleKey: "routeTitles.traceDetails",
+        licenseFeature: "traces",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -656,6 +663,7 @@ const useRoutes = () => {
       component: SessionDetails,
       meta: {
         titleKey: "routeTitles.sessionDetails",
+        licenseFeature: "traces",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -673,6 +681,7 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "routeTitles.streamExplorer",
+        licenseFeatureFromStreamType: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

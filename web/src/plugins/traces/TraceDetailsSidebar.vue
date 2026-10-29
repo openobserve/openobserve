@@ -212,7 +212,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="h-full text-xs!"
                 :disabled="isViewLogsDisabled"
-                :loading="config.isEnterprise === 'true' && correlationLoading"
+                :loading="!logsLocked && config.isEnterprise === 'true' && correlationLoading"
+                :icon-left="logsLocked ? 'lock' : undefined"
                 @click.stop="viewSpanLogs"
                 data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
               >
@@ -1346,6 +1347,7 @@ export default defineComponent({
     );
     const { locked: profilingLocked, lockedReason: profilingLockedReason } =
       useLicenseLock("continuous_profiling");
+    const { locked: logsLocked, lockedReason: logsLockedReason } = useLicenseLock("logs");
 
     const activeTabModel = computed({
       get: () => props.activeTab,
@@ -1628,6 +1630,7 @@ export default defineComponent({
 
     // Check if View Logs button should be disabled
     const isViewLogsDisabled = computed(() => {
+      if (logsLocked.value) return true;
       // Enterprise loading state
       if (config.isEnterprise === "true" && correlationLoading.value) {
         return true;
@@ -1643,6 +1646,7 @@ export default defineComponent({
 
     // Get tooltip content based on disabled state
     const viewLogsTooltipContent = computed(() => {
+      if (logsLocked.value) return logsLockedReason.value;
       // Enterprise loading state
       if (config.isEnterprise === "true" && correlationLoading.value) {
         return t("correlation.loadingCorrelation");
@@ -2944,6 +2948,7 @@ export default defineComponent({
       isDarkMode,
       isViewLogsDisabled,
       viewLogsTooltipContent,
+      logsLocked,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,

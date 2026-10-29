@@ -167,8 +167,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSkeleton type="text" class="h-6 w-24" />
           <OSkeleton type="text" class="h-6 w-28" />
         </template>
+        <OTooltip
+          v-if="targetLocation && tracesLock.locked.value"
+          :content="tracesLock.lockedReason.value"
+        >
+          <span class="inline-flex">
+            <OButton
+              variant="outline"
+              size="xs"
+              disabled
+              data-test="quality-score-pane-open-target"
+            >
+              <template #icon-left>
+                <OIcon name="lock" size="sm" data-test="quality-score-pane-open-target-lock" />
+              </template>
+              {{ t(`onlineEvals.quality.pane.open.${score?.targetScope}`) }}
+            </OButton>
+          </span>
+        </OTooltip>
         <OButton
-          v-if="targetLocation"
+          v-else-if="targetLocation"
           variant="outline"
           size="xs"
           data-test="quality-score-pane-open-target"
@@ -176,8 +194,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t(`onlineEvals.quality.pane.open.${score?.targetScope}`) }}
         </OButton>
+        <OTooltip
+          v-if="evaluatorLocation && tracesLock.locked.value"
+          :content="tracesLock.lockedReason.value"
+        >
+          <span class="inline-flex">
+            <OButton
+              variant="outline"
+              size="xs"
+              disabled
+              data-test="quality-score-pane-open-evaluator"
+            >
+              <template #icon-left>
+                <OIcon name="lock" size="sm" data-test="quality-score-pane-open-evaluator-lock" />
+              </template>
+              {{ t("onlineEvals.quality.pane.evaluatorTrace") }}
+            </OButton>
+          </span>
+        </OTooltip>
         <OButton
-          v-if="evaluatorLocation"
+          v-else-if="evaluatorLocation"
           variant="outline"
           size="xs"
           data-test="quality-score-pane-open-evaluator"
@@ -231,6 +267,7 @@ import AddToDatasetDrawer from "@/enterprise/components/AIObservability/AddToDat
 import type { QualityScore } from "@/services/online-evals.service";
 import { evaluatorTraceLink, targetLink } from "../utils/qualityFormat";
 import { useScoreFullText } from "../composables/useScoreFullText";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const props = defineProps<{
   score: QualityScore | null;
@@ -249,6 +286,7 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const orgId = useOrgId();
+const tracesLock = useLicenseLock("traces");
 // Survives score changes, so a folded reasoning stays folded while reading on.
 const reasoningOpen = ref(true);
 

@@ -850,6 +850,24 @@ describe("DetailTable Component", () => {
       expect(traceWrapper.emitted()["view-trace"]).toHaveLength(1);
     });
 
+    it("disables the button with a lock and hides the picker while traces is locked", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: { traces: "locked" } };
+      try {
+        traceWrapper = mountDetailTable();
+        await flushPromises();
+
+        const button = traceWrapper.find(BUTTON);
+        expect(button.attributes("disabled")).toBeDefined();
+        expect(button.attributes("icon-left")).toBe("lock");
+        expect(traceWrapper.find(SELECT).exists()).toBe(false);
+        await button.trigger("click");
+        expect(traceWrapper.emitted()["view-trace"]).toBeUndefined();
+      } finally {
+        const { features: _features, ...rest } = store.state.zoConfig;
+        store.state.zoConfig = rest;
+      }
+    });
+
     // REGRESSION: the gate must read `props.modelValue`, which exists during
     // setup, and not `rowData`, which the async created() hook only fills a
     // microtask later. Reading rowData left the button permanently hidden.
