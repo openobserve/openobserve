@@ -267,7 +267,7 @@ pub struct EnrollmentToken {
     pub max_uses: Option<i64>,
     pub fleet: CollectorFleet,
     pub revoked: bool,
-    /// Readable by anyone who can see the fleet; `None` on tokens created before values were kept.
+    /// Only for callers who may change the fleet; tokens predating stored values have none.
     pub token: Option<String>,
 }
 
