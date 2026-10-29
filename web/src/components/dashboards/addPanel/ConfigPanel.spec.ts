@@ -114,6 +114,9 @@ const mockDashboardPanelData = {
   },
 };
 
+// Every test mounts the full config panel; on a loaded CI runner one mount can exceed the 5s default.
+vi.setConfig({ testTimeout: 20000 });
+
 describe("ConfigPanel", () => {
   let wrapper: any;
 
