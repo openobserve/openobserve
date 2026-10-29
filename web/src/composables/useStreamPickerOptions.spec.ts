@@ -250,6 +250,15 @@ describe("useStreamPickerOptions", () => {
     ]);
   });
 
+  it("keeps the same options array across selection changes while internal streams are shown", async () => {
+    const before = picker.options.value;
+    selected.value = ["default"];
+    await nextTick();
+    selected.value = ["default", "_rumdata"];
+    await nextTick();
+    expect(picker.options.value).toBe(before);
+  });
+
   it("keeps a stream deselected while the popover is open until it closes", async () => {
     picker.hideInternalStreams.value = true;
     selected.value = ["_rumdata", "default"];

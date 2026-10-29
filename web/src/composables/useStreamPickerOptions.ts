@@ -126,6 +126,9 @@ export function buildStreamPickerOptions(input: StreamPickerInput): StreamPicker
   return { options: [...user, header, ...internal] };
 }
 
+// Shown mode ignores the kept set, so selection changes must not produce a new options array.
+const NO_KEPT_STREAMS: ReadonlySet<string> = new Set();
+
 /** Reactive stream-picker options over the shared hide setting; the kept set is frozen while the popover is open. */
 export function useStreamPickerOptions(sources: StreamPickerSources) {
   const { t } = useI18nTyped();
@@ -164,7 +167,7 @@ export function useStreamPickerOptions(sources: StreamPickerSources) {
   const state = computed(() =>
     buildStreamPickerOptions({
       streams: toValue(sources.streams),
-      keep: keep.value,
+      keep: hideInternalStreams.value ? keep.value : NO_KEPT_STREAMS,
       hide: hideInternalStreams.value,
       search: toValue(sources.search),
       text: text.value,

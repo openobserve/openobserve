@@ -18,7 +18,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     META_ORG_ID, SIZE_IN_MB, get_config,
     meta::{
-        alerts::ack::{AckAction, AckSource},
+        alerts::{
+            ack::{AckAction, AckSource},
+            auto_investigate::AUTO_INVESTIGATE_DECISIONS_STREAM,
+        },
         dashboards::usage_report::DashboardInfo,
         search::{SearchEventContext, SearchEventType},
         slo::stream::SLO_SLICES_STREAM,
@@ -1037,7 +1040,7 @@ pub fn is_system_stream(org_id: &str, stream_name: &str) -> bool {
         | "synthetics_results"
         | "synthetics_step_results"
         | SLO_SLICES_STREAM => true,
-        "self_profiles" => org_id == META_ORG_ID,
+        "self_profiles" | AUTO_INVESTIGATE_DECISIONS_STREAM => org_id == META_ORG_ID,
         _ => false,
     }
 }
@@ -1760,6 +1763,7 @@ mod tests {
             DATA_RETENTION_USAGE_STREAM,
             "cloud_events",
             "self_profiles",
+            AUTO_INVESTIGATE_DECISIONS_STREAM,
         ] {
             assert!(is_system_stream(META_ORG_ID, name), "{name} in _meta");
             assert!(!is_system_stream("acme", name), "{name} in acme");

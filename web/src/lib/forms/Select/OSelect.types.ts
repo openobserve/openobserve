@@ -58,11 +58,11 @@ export interface SelectOption {
   header?: boolean;
   /** Header only, and only in listbox mode (searchable or multiple): secondary detail such as how many options the group holds. */
   headerCount?: I18nText;
-  /** Header only: label of an action on the header; activating it emits `header-action`, and an empty label means no action. */
+  /** Header only, listbox mode only: label of an action on the header; activating it emits `header-action`, and an empty label means no action. */
   headerAction?: I18nText;
   /** Header only: accessible name of the header action when its label alone is ambiguous. */
   headerActionAriaLabel?: I18nText;
-  /** Header only: stays listed while searching even when no option under it matches. */
+  /** Header only, listbox mode only: stays listed while searching even when no option under it matches. */
   keepOnSearch?: boolean;
   /** Makes this a non-selectable row that shows or hides the options whose `parentValue` is its `value`. */
   expandable?: boolean;
