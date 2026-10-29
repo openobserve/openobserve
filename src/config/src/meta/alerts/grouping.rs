@@ -26,7 +26,10 @@ use serde::{Deserialize, Serialize};
 use super::{
     Operator, TriggerCondition,
     level::{AlertLevel, evaluate_level},
-    recovery::{ClosedEpisode, ClosedGroupEpisode, EpisodeInput, RecoveryReason, apply_episode},
+    recovery::{
+        ClosedEpisode, ClosedGroupEpisode, EpisodeInput, RecoveryReason, apply_episode,
+        hold_firing_cycle,
+    },
     state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate, apply_outcome},
 };
 use crate::meta::self_reporting::usage::RunOutcome;
@@ -1216,14 +1219,18 @@ pub fn step_group_episode(
     value: Option<f64>,
 ) -> Option<ClosedGroupEpisode> {
     let input = EpisodeInput::undelivered(keep_firing_for_secs);
-    let closed = apply_episode(state, firing, &input, at, String::new)?;
-    Some(ClosedGroupEpisode::new(
+    let closed = apply_episode(state, firing, &input, at, String::new);
+    hold_firing_cycle(prev, state);
+    let mut close = ClosedGroupEpisode::new(
         state,
-        closed,
+        closed?,
         prev.and_then(|p| p.level_at),
         RecoveryReason::Cleared,
         value,
-    ))
+    );
+    // The write that closes the episode also ends the cycle, so only the prior row still holds it.
+    close.firing_started_at = prev.and_then(|p| p.firing_started_at);
+    Some(close)
 }
 
 /// The close an unobserved group's open episode is owed (M-7); `None` when nothing is open.
@@ -4637,6 +4644,7 @@ mod tests {
                 labels: BTreeMap::from([("host".to_string(), "web-2".to_string())]),
                 group_labels: Some("host=web-2".to_string()),
                 last_notified_level: Some(AlertLevel::Critical),
+                firing_started_at: Some(1_749_000_000_000_000),
             }],
             reaped: vec![crate::meta::alerts::grouping::ReapedGroup {
                 group_key: "host=web-3".to_string(),
@@ -4920,6 +4928,21 @@ mod tests {
             let plan = evaluate(&mut db, &[("a", 5.0)], 90 * SEC, 60);
             assert_eq!(plan.closed_episodes.len(), 1);
             assert_eq!(plan.closed_episodes[0].recovered_at, 30 * SEC);
+        }
+
+        #[test]
+        fn the_hold_keeps_the_firing_cycle_and_the_close_names_it() {
+            let mut db = HashMap::new();
+            evaluate(&mut db, &[("a", 0.0)], 0, 60);
+            deliver(&mut db, "a", "ep-a", SEC);
+            let started = db[&key("a")].firing_started_at;
+            assert!(started.is_some());
+
+            evaluate(&mut db, &[("a", 5.0)], 10 * SEC, 60);
+            assert_eq!(db[&key("a")].firing_started_at, started, "held");
+            let plan = evaluate(&mut db, &[("a", 5.0)], 80 * SEC, 60);
+            assert_eq!(plan.closed_episodes[0].firing_started_at, started);
+            assert_eq!(db[&key("a")].firing_started_at, None);
         }
 
         #[test]

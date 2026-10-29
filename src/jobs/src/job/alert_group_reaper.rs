@@ -251,7 +251,11 @@ async fn sweep_alert(
     // simply stopped being evaluated (D26). This is the backstop for the
     // cleanup that the save path performs directly.
     if !still_multi(alert) {
-        log_orphaned_episodes(alert_id, &groups);
+        openobserve_core::alerts::recovery::log_orphaned_episodes(
+            alert_id,
+            &groups,
+            "deleted on opt-out",
+        );
         let tracked: HashMap<String, AlertState> = groups
             .into_iter()
             .map(|s| (s.group_key.clone(), s))
@@ -380,20 +384,6 @@ fn resolve_clears(
             )
         })
         .collect()
-}
-
-/// Rows deleted without an emit take their open episode's ticket with them (D11).
-fn log_orphaned_episodes(alert_id: &str, groups: &[AlertState]) {
-    for state in groups {
-        if let Some(episode_id) = state.episode_id.as_deref() {
-            log::warn!(
-                "[ALERT_GROUP_REAPER] alert {alert_id} group {} ({}) deleted with open episode \
-                 {episode_id}; its recovery will not be sent",
-                state.group_key,
-                state.group_labels.as_deref().unwrap_or_default()
-            );
-        }
-    }
 }
 
 /// Deletes the acks of firings that are no longer current, once the reap grace has passed.
@@ -561,6 +551,7 @@ mod tests {
             labels: Default::default(),
             group_labels: None,
             last_notified_level: None,
+            firing_started_at: None,
         }
     }
 

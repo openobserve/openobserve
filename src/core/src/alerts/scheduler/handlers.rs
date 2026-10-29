@@ -361,7 +361,11 @@ async fn persist_group_run_state(
             alert.keep_firing_for,
         )
     };
-    log_orphaned_evictions(alert_id, &plan.evicted, &prev);
+    crate::alerts::recovery::log_orphaned_episodes(
+        alert_id,
+        plan.evicted.iter().filter_map(|key| prev.get(key)),
+        "evicted",
+    );
     let write = match db::alerts::alert_states::persist_group_plan(
         &plan,
         alert_id,
@@ -417,23 +421,6 @@ async fn persist_group_run_state(
             .map(|close| close.recovery_event(&alert.org_id, alert_id, at))
             .collect(),
     )
-}
-
-/// An evicted row takes its open episode with it, so the vendor ticket it keys stays open (D11).
-fn log_orphaned_evictions(
-    alert_id: &str,
-    evicted: &[String],
-    prev: &HashMap<String, config::meta::alerts::state::AlertState>,
-) {
-    for (key, state) in evicted.iter().filter_map(|k| prev.get(k).map(|s| (k, s))) {
-        if let Some(episode_id) = state.episode_id.as_deref() {
-            log::warn!(
-                "[SCHEDULER] alert {alert_id} group {key} ({}) evicted with open episode \
-                 {episode_id}; its recovery will not be sent",
-                state.group_labels.as_deref().unwrap_or_default()
-            );
-        }
-    }
 }
 
 /// Whether the alert's firing cycle lives on its rollup row: every alert but a multi-alert,

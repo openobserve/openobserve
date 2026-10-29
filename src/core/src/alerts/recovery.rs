@@ -19,7 +19,7 @@
 #[cfg(feature = "enterprise")]
 use config::meta::downtimes::TargetModule;
 use config::meta::{
-    alerts::{alert::Alert, recovery::RecoveryEvent},
+    alerts::{alert::Alert, recovery::RecoveryEvent, state::AlertState},
     self_reporting::usage::{TriggerData, TriggerDataType},
 };
 
@@ -89,6 +89,24 @@ pub async fn dispatch_group_recoveries(alert: &Alert, events: Vec<RecoveryEvent>
             deliver_recovery(alert, &event, downtime_id).await;
         })
         .await;
+}
+
+/// A group row deleted with an open episode strands the vendor ticket its key opened (D11).
+pub fn log_orphaned_episodes<'a>(
+    alert_id: &str,
+    rows: impl IntoIterator<Item = &'a AlertState>,
+    cause: &str,
+) {
+    for state in rows {
+        if let Some(episode_id) = state.episode_id.as_deref() {
+            log::warn!(
+                "[RECOVERY] alert {alert_id} group {} ({}) {cause} with open episode \
+                 {episode_id}; its recovery will not be sent",
+                state.group_key,
+                state.group_labels.as_deref().unwrap_or_default()
+            );
+        }
+    }
 }
 
 /// Every consumer of one recovery, given the downtime that mutes it.
@@ -456,7 +474,8 @@ mod tests {
             recovery_route(&alert, &event, false),
             RecoveryRoute {
                 oncall: false,
-                destinations: true
+                destinations: true,
+                slack: true,
             }
         );
     }

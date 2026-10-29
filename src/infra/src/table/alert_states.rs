@@ -310,11 +310,13 @@ pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
 /// same reason — a cap overflow that upserted the winners but failed to delete
 /// the displaced rows would leave stored rows above the cap.
 ///
-/// Returns `false` when the plan was dropped by the opt-out gate below rather
-/// than written. The caller needs to be able to tell the two apart: the
-/// super-cluster wrapper must not broadcast a plan this region refused, or a
-/// region that has not yet seen the opt-out would materialise exactly the rows
-/// the toggle promised to remove.
+/// `written` is false when the opt-out gate below, or a sweep resolve whose
+/// guarded close missed, dropped the plan. The caller needs to be able to tell
+/// the two apart: the super-cluster wrapper must not broadcast a plan this
+/// region refused, or a region that has not yet seen the opt-out would
+/// materialise exactly the rows the toggle promised to remove. `closed` and
+/// `reaped` list only the closes and reaps whose guards matched, so callers emit
+/// and replicate exactly those.
 pub async fn persist_group_plan(
     plan: &GroupPlan,
     alert_id: &str,
@@ -1982,9 +1984,11 @@ mod tests {
                 ROLLUP_GROUP_KEY,
                 episode,
                 DeliveryOutcome::Failed { at: 1_500 },
+                None,
             )
             .await
             .unwrap()
+            .applied
         );
         let failed = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
             .await
@@ -2024,8 +2028,9 @@ mod tests {
         let plan = GroupPlan {
             updates: vec![firing_update("host=web-1", 1_000, Some(1_000))],
             evicted: vec!["host=web-8".to_string(), "host=web-9".to_string()],
+            ..Default::default()
         };
-        let write = persist_group_plan_with(&db, &plan, "alert-1")
+        let write = persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Evaluation)
             .await
             .unwrap();
         assert!(write.written);
@@ -2448,6 +2453,7 @@ mod tests {
             labels: Default::default(),
             group_labels: None,
             last_notified_level: None,
+            firing_started_at: None,
         }
     }
 

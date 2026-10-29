@@ -76,9 +76,8 @@ async fn process_msg(msg: AlertStateMessage) -> Result<()> {
             outcome,
             mint_episode_id,
         } => {
-            // The return value says whether the episode guard still matched.
-            // `false` is not an error here: it means this region's row had
-            // already moved on, which is exactly what the guard is for.
+            // A refused guard is not an error here: this region's row had already
+            // moved on, which is what the guard is for. The mint still lands.
             table::alert_states::advance_delivery_state(
                 &alert_id,
                 &group_key,

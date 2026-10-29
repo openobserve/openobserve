@@ -113,8 +113,7 @@ pub async fn advance_delivery_state(
     )
     .await?;
 
-    // A callback whose episode had already moved on wrote nothing here, and the
-    // same guard would reject it everywhere else too.
+    // A refused delivery write is still published when it minted, so every region records the key.
     #[cfg(feature = "enterprise")]
     if advance.applied || advance.mint == infra::table::alert_states::MintOutcome::Minted {
         publish(AlertStateMessage::AdvanceDeliveryState {

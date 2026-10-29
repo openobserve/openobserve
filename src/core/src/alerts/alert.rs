@@ -617,9 +617,17 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     let firing = infra::table::alert_states::firing_groups(&alert_id, None)
         .await
         .unwrap_or_default();
+    let groups = infra::table::alert_states::list_groups(&alert_id)
+        .await
+        .unwrap_or_default();
     match db::alerts::alert_states::delete_all_groups(&alert_id).await {
         Ok(0) => {}
         Ok(n) => {
+            crate::alerts::recovery::log_orphaned_episodes(
+                &alert_id,
+                &groups,
+                "deleted on opt-out",
+            );
             log::info!(
                 "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
                  without transitions"
@@ -1630,6 +1638,14 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
             let firing = crate::alerts::lifecycle::firing_rows(&alert_id_str).await;
+            let groups = infra::table::alert_states::list_groups(&alert_id_str)
+                .await
+                .unwrap_or_default();
+            crate::alerts::recovery::log_orphaned_episodes(
+                &alert_id_str,
+                &groups,
+                "deleted with its alert",
+            );
             // Alert run state is owned by the alert's lifecycle (Part IV of
             // alerts.md), so it goes when the alert does. Best-effort: a
             // leftover state row must not fail the delete.

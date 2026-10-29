@@ -155,6 +155,9 @@ pub struct ClosedGroupEpisode {
     pub group_labels: Option<String>,
     #[serde(default)]
     pub last_notified_level: Option<AlertLevel>,
+    /// The firing cycle the episode belonged to, the key of its Slack messages.
+    #[serde(default)]
+    pub firing_started_at: Option<i64>,
 }
 
 impl ClosedGroupEpisode {
@@ -178,6 +181,7 @@ impl ClosedGroupEpisode {
             labels: state.group_label_set.clone().unwrap_or_default(),
             group_labels: state.group_labels.clone(),
             last_notified_level: state.last_notified_level,
+            firing_started_at: state.firing_started_at,
         }
     }
 
@@ -193,6 +197,7 @@ impl ClosedGroupEpisode {
             emitted_at,
             last_notified_level: self.last_notified_level,
             group_labels: self.group_labels.clone(),
+            firing_started_at: self.firing_started_at,
             reason: self.reason,
             group_label_set: Some(self.labels.clone()),
             value: self.value,
