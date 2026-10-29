@@ -63,6 +63,8 @@ pub struct NotificationContext {
     pub alert_tags: String,
     pub alert_threshold_crit: String,
     pub alert_threshold_warn: String,
+    /// Operator the crit/warn thresholds were compared with (family-aware).
+    pub alert_threshold_operator: String,
     /// Formatted local time; "N/A" when unknown.
     pub alert_start_time: String,
     pub alert_end_time: String,
