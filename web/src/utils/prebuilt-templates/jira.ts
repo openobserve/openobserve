@@ -245,6 +245,7 @@ export const jiraDestinationType: PrebuiltType = {
   id: "jira",
   name: raw("Jira"),
   descriptionKey: "alerts.prebuiltDestinations.jiraDescription",
+  shortKey: "alert_destinations.prebuilt.jiraShort",
   icon: "jira",
   image: jiraLogo,
   popular: true,

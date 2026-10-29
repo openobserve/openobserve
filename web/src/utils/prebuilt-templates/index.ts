@@ -37,7 +37,7 @@ import { pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
 import { servicenowConfig, servicenowDestinationType } from "./servicenow";
 import { emailConfig, emailDestinationType } from "./email";
 import { opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
-import { gt } from "@/types/i18n";
+import type { I18nKey } from "@/types/i18n";
 import {
   jiraAuthorization,
   jiraBaseUrl,
@@ -63,19 +63,28 @@ export const PREBUILT_DESTINATION_TYPES: PrebuiltType[] = [
   jiraDestinationType,
 ];
 
+const SHORT_KEYS: Record<PrebuiltTypeId, I18nKey> = {
+  slack: "slackApp.destination.postOnly",
+  discord: "alert_destinations.prebuilt.chatPostsShort",
+  msteams: "alert_destinations.prebuilt.chatPostsShort",
+  email: "alert_destinations.prebuilt.emailShort",
+  pagerduty: "alert_destinations.prebuilt.pageOnCallShort",
+  opsgenie: "alert_destinations.prebuilt.pageOnCallShort",
+  servicenow: "alert_destinations.prebuilt.servicenowShort",
+  jira: "alert_destinations.prebuilt.jiraShort",
+};
+
 /** Unavailable Slack apps remain discoverable beside the selectable webhook. */
 export function destinationTypeTiles(slackApp: boolean): DestinationTile[] {
   const prebuilt: DestinationTile[] = PREBUILT_DESTINATION_TYPES.map((type) => ({
     id: type.id,
     name: type.name,
     descriptionKey: type.descriptionKey,
+    shortKey: type.shortKey ?? SHORT_KEYS[type.id],
     icon: type.icon,
     image: type.image,
   }));
   const webhook = prebuilt.find((tile) => tile.id === "slack");
-  if (webhook) {
-    webhook.tag = { label: gt("slackApp.destination.postOnly"), variant: "default-soft" };
-  }
   return webhook ? [{ ...slackAppDestinationTile, disabled: !slackApp }, ...prebuilt] : prebuilt;
 }
 

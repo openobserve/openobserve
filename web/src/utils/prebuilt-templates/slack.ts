@@ -146,12 +146,7 @@ export const slackAppDestinationTile: DestinationTile = {
     return gt("slackApp.destination.appTile", { product: raw("Slack") });
   },
   descriptionKey: "alert_destinations.prebuilt.slackAppDescription",
+  shortKey: "alert_destinations.prebuilt.slackAppShort",
   icon: "slack",
   image: slackLogo,
-  get tag() {
-    return {
-      label: gt("slackApp.destination.recommendedForAlertResponse"),
-      variant: "success-soft" as const,
-    };
-  },
 };
