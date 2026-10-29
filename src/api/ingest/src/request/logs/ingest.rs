@@ -522,7 +522,7 @@ pub async fn otlp_logs_write(
             }
         }
         Some(OtlpRequestType::HttpJson) => {
-            match config::utils::json::from_slice_lenient_floats::<ExportLogsServiceRequest>(
+            match config::utils::json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(
                 body.as_ref(),
             ) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
