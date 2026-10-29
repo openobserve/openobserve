@@ -13544,7 +13544,14 @@
       "pagerdutyDescription": "Create incidents in PagerDuty",
       "opsgenieDescription": "Create alerts in Opsgenie",
       "servicenowDescription": "Create incidents in ServiceNow",
-      "slackAppDescription": "Updates scheduled alerts in place. Acknowledge, mute and investigate from Slack. Needs a connected workspace."
+      "slackAppDescription": "Updates scheduled alerts in place. Acknowledge, mute and investigate from Slack. Needs a connected workspace.",
+      "slackAppShort": "Act on alerts",
+      "chatPostsShort": "Chat posts",
+      "emailShort": "HTML email",
+      "pageOnCallShort": "Page on-call",
+      "servicenowShort": "IT incidents",
+      "jiraShort": "Issue tickets",
+      "customShort": "URL or email"
     },
     "import": {
       "title": "Import Destination",
@@ -28218,6 +28225,7 @@
       "unavailableCloud": "Not turned on for your Cloud region yet",
       "unavailableNoAccess": "Ask an org admin to turn on the Slack app",
       "postOnly": "Post only",
+      "off": "Off",
       "switchToApp": "Switch to {product} app",
       "switchThis": "Switch this destination",
       "switchBack": "Switch back",

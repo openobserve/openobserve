@@ -13,167 +13,124 @@ See the License for the specific language governing permissions and
 limitations under the License. -->
 
 <template>
-  <div data-test="prebuilt-destination-selector">
-    <div
-      class="selector-grid mb-4 grid [grid-template-columns:repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-3"
-    >
-      <!-- A disabled tile's actions sit beside its role="button", never inside it. -->
+  <div data-test="prebuilt-destination-selector" class="@container/dest-picker">
+    <div class="mb-4">
       <div
-        v-for="type in filteredDestinationTypes"
-        :key="type.id"
-        :class="
-          type.disabled
-            ? 'border-card-glass-border rounded-default bg-card-glass-bg flex [min-height:7.5rem] min-w-0 flex-col border-2 px-3 py-5'
-            : 'contents'
-        "
+        class="selector-grid grid auto-cols-fr grid-flow-col gap-2 @max-[54rem]/dest-picker:auto-cols-auto @max-[54rem]/dest-picker:grid-flow-row @max-[54rem]/dest-picker:grid-cols-5 @max-[27rem]/dest-picker:grid-cols-2"
       >
-        <div
-          data-test="destination-type-card"
-          :data-type="type.id"
-          class="destination-card group/dest-card relative flex min-w-0 flex-col"
-          :class="[
-            type.disabled
-              ? 'grow cursor-not-allowed'
-              : 'border-card-glass-border rounded-default hover:border-accent hover:shadow-status-info-text/15 [min-height:7.5rem] cursor-pointer border-2 px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md',
-            !type.disabled && selectedType === type.id
-              ? 'selected border-accent shadow-status-info-text/20 bg-card-glass-tint shadow-lg'
-              : !type.disabled && 'bg-card-glass-bg',
-          ]"
-          role="button"
-          :tabindex="type.disabled ? -1 : 0"
-          :aria-disabled="type.disabled || undefined"
-          :aria-describedby="type.disabled ? unavailableReasonId : undefined"
-          @click="selectType(type.id)"
-          @keydown.enter.prevent="selectType(type.id)"
-          @keydown.space.prevent="selectType(type.id)"
-        >
+        <OTooltip v-for="tile in tiles" :key="tile.id" :content="tile.tip" :delay="300">
           <div
-            class="card-content relative flex h-full min-w-0 flex-col items-center text-center"
-            :class="{ 'opacity-40': type.disabled }"
+            data-test="destination-type-card"
+            :data-type="tile.id"
+            class="destination-card group/dest-card border-card-glass-border rounded-default hover:border-accent relative flex min-h-24 min-w-0 flex-col items-center border-2 px-2 py-3 text-center"
+            :class="[
+              tile.id === 'custom' && 'custom-card border-dashed',
+              tile.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+              !tile.disabled && selectedType === tile.id
+                ? 'selected border-accent shadow-status-info-text/20 bg-card-glass-tint shadow-lg'
+                : 'bg-card-glass-bg',
+            ]"
+            role="button"
+            :tabindex="tile.disabled ? -1 : 0"
+            :aria-disabled="tile.disabled || undefined"
+            :aria-describedby="`${uid}-${tile.id}`"
+            @click="selectType(tile.id)"
+            @keydown.enter.prevent="selectType(tile.id)"
+            @keydown.space.prevent="selectType(tile.id)"
           >
-            <div
-              data-test="destination-type-icon"
-              class="text-icon-color group-[.selected]/dest-card:text-accent mb-2"
+            <span
+              :id="`${uid}-${tile.id}`"
+              data-test="destination-type-description"
+              class="sr-only"
+              >{{ tile.tip }}</span
             >
-              <img
-                v-if="type.image"
-                :src="type.image"
-                :alt="type.name"
-                class="destination-logo h-6 w-6 [object-fit:contain]"
-              />
-              <OIcon v-else :name="getIconName(type.icon)" size="md" />
-            </div>
-
             <div
-              data-test="destination-type-name"
-              class="card-title text-compact text-text-heading mt-1 mb-0 text-center [line-height:1.3] font-medium"
+              class="card-content flex min-w-0 flex-1 flex-col items-center"
+              :class="{ 'opacity-40': tile.disabled }"
             >
-              {{ type.name }}
+              <div
+                data-test="destination-type-icon"
+                class="text-icon-color group-[.selected]/dest-card:text-accent mb-1"
+              >
+                <img
+                  v-if="tile.image"
+                  :src="tile.image"
+                  :alt="tile.name"
+                  class="destination-logo h-6 w-6 [object-fit:contain]"
+                  :class="{ 'dark:invert': tile.id === 'opsgenie' }"
+                />
+                <OIcon v-else :name="getIconName(tile.icon)" size="md" />
+              </div>
+              <div
+                data-test="destination-type-name"
+                class="card-title text-compact text-text-heading mb-0 text-center [line-height:1.3] font-medium"
+              >
+                {{ tile.name }}
+              </div>
+              <div
+                data-test="destination-type-short"
+                class="text-2xs text-text-secondary mt-auto pt-1 text-center [line-height:1.2]"
+              >
+                {{ tile.short }}
+              </div>
             </div>
 
             <OTag
-              v-if="type.tag"
-              data-test="destination-type-tag"
-              :variant="type.tag.variant"
+              v-if="tile.disabled"
+              data-test="destination-type-off"
+              variant="default-soft"
               size="sm"
-              class="mt-1 max-w-full max-[35rem]:[overflow-wrap:anywhere] max-[35rem]:whitespace-normal"
-              :label="type.tag.label"
+              class="absolute top-1 right-1"
+              :label="t('slackApp.destination.off')"
             />
-
             <div
-              data-test="destination-type-description"
-              class="text-2xs text-text-secondary mt-1 mb-0 grow text-center [line-height:1.2]"
-              :class="{
-                'hidden min-[75rem]:block': type.id !== 'slack' && type.id !== 'slack_app',
-              }"
+              v-if="!tile.disabled && selectedType === tile.id"
+              class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
             >
-              {{ t(type.descriptionKey) }}
+              <OIcon name="check" size="xs" />
             </div>
           </div>
-
-          <div
-            v-if="!type.disabled && selectedType === type.id"
-            class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
-          >
-            <OIcon name="check" size="xs" />
-          </div>
-        </div>
-        <div v-if="type.disabled" class="mt-3 flex flex-col items-center gap-2 text-center">
-          <p class="text-text-secondary mb-0 text-center text-xs [line-height:1.3]">
-            <!-- The copy button sits outside the described span so it is not read as part of the reason. -->
-            <span :id="unavailableReasonId"
-              ><i18n-t v-if="operatorSetting" :keypath="unavailableKey" tag="span">
-                <template #variable>
-                  <span class="inline-flex items-center align-middle">
-                    <OCode data-test="slack-app-unavailable-variable">{{ operatorSetting }}</OCode>
-                  </span>
-                </template>
-              </i18n-t>
-              <template v-else>{{ t(unavailableKey) }}</template></span
-            ><template v-if="operatorSetting"
-              >{{ WORD_JOINER
-              }}<OTooltip :content="t('common.copyToClipboard')">
-                <OButton
-                  variant="ghost-muted"
-                  size="icon"
-                  class="-my-1 ms-0.5 align-middle"
-                  :aria-label="t('common.copyToClipboard')"
-                  data-test="slack-app-unavailable-copy"
-                  @click="copyOperatorSetting"
-                >
-                  <template #icon-left><OIcon name="content-copy" size="xs" /></template>
-                </OButton> </OTooltip
-            ></template>
-          </p>
-          <OButton
-            v-if="isCloud"
-            variant="outline"
-            size="xs"
-            data-test="slack-app-contact-support"
-            @click="contactSupport"
-            >{{ t("billing.trialStrip.contactSupport") }}</OButton
-          >
-        </div>
+        </OTooltip>
       </div>
-
       <div
-        data-test="destination-type-card"
-        data-type="custom"
-        class="destination-card custom-card group/dest-card border-card-glass-border rounded-default hover:border-accent hover:shadow-status-info-text/15 relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 border-dashed px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-        :class="
-          selectedType === 'custom'
-            ? 'selected border-accent shadow-status-info-text/20 bg-card-glass-tint shadow-lg'
-            : 'bg-card-glass-bg'
-        "
-        @click="selectType('custom')"
+        v-if="appUnavailable"
+        data-test="slack-app-unavailable"
+        class="mt-3 flex flex-wrap items-center gap-2"
       >
-        <div class="card-content relative flex h-full flex-col items-center text-center">
-          <div
-            data-test="destination-type-icon"
-            class="text-icon-color group-[.selected]/dest-card:text-accent mb-2"
-          >
-            <OIcon name="settings" size="md" />
-          </div>
-          <div
-            data-test="destination-type-name"
-            class="card-title text-compact text-text-heading mt-1 mb-0 text-center [line-height:1.3] font-medium"
-          >
-            {{ t("alerts.customDestination") }}
-          </div>
-          <div
-            data-test="destination-type-description"
-            class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
-          >
-            {{ t("alerts.customDestinationDescription") }}
-          </div>
-        </div>
-
-        <div
-          v-if="selectedType === 'custom'"
-          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
+        <p class="text-text-secondary mb-0 text-xs [line-height:1.3]">
+          <!-- The copy button sits outside the reason so it is not read as part of it. -->
+          <span data-test="slack-app-unavailable-reason"
+            ><i18n-t v-if="operatorSetting" :keypath="unavailableKey" tag="span">
+              <template #variable>
+                <span class="inline-flex items-center align-middle">
+                  <OCode data-test="slack-app-unavailable-variable">{{ operatorSetting }}</OCode>
+                </span>
+              </template>
+            </i18n-t>
+            <template v-else>{{ t(unavailableKey) }}</template></span
+          ><template v-if="operatorSetting"
+            >{{ WORD_JOINER
+            }}<OTooltip :content="t('common.copyToClipboard')">
+              <OButton
+                variant="ghost-muted"
+                size="icon"
+                class="-my-1 ms-0.5 align-middle"
+                :aria-label="t('common.copyToClipboard')"
+                data-test="slack-app-unavailable-copy"
+                @click="copyOperatorSetting"
+              >
+                <template #icon-left><OIcon name="content-copy" size="xs" /></template>
+              </OButton> </OTooltip
+          ></template>
+        </p>
+        <OButton
+          v-if="isCloud"
+          variant="outline"
+          size="xs"
+          data-test="slack-app-contact-support"
+          @click="contactSupport"
+          >{{ t("billing.trialStrip.contactSupport") }}</OButton
         >
-          <OIcon name="check" size="xs" />
-        </div>
       </div>
     </div>
     <p
@@ -190,7 +147,7 @@ limitations under the License. -->
 import { computed, useId } from "vue";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { SlackDisabledReason } from "@/types/slack";
 import { copyToClipboard } from "@/utils/clipboard";
 import { destinationTypeTiles } from "@/utils/prebuilt-templates";
@@ -227,7 +184,7 @@ const emit = defineEmits<Emits>();
 const { t } = useI18nTyped();
 // Keeps the copy button on the chip's line without adding any announced text.
 const WORD_JOINER = "\u2060";
-const unavailableReasonId = useId();
+const uid = useId();
 const isCloud = computed(() => config.isCloud === "true");
 const serverReason = computed(() =>
   props.unavailableReason === "flag" || props.unavailableReason === "master_key"
@@ -264,6 +221,36 @@ const selectedType = computed({
 });
 
 const filteredDestinationTypes = computed(() => destinationTypeTiles(props.slackApp));
+const appUnavailable = computed(() =>
+  filteredDestinationTypes.value.some((type) => type.id === "slack_app" && type.disabled),
+);
+
+const unavailableText = computed(() =>
+  operatorSetting.value
+    ? t(unavailableKey.value, { variable: raw(operatorSetting.value) })
+    : t(unavailableKey.value),
+);
+
+const tiles = computed(() => [
+  ...filteredDestinationTypes.value.map((tile) => {
+    const description = t(tile.descriptionKey);
+    const tip = tile.disabled
+      ? unavailableText.value
+      : tile.id === "slack_app"
+        ? `${t("slackApp.destination.recommendedForAlertResponse")}. ${description}`
+        : description;
+    return { ...tile, short: t(tile.shortKey), tip: raw(tip) };
+  }),
+  {
+    id: "custom" as const,
+    name: t("alerts.customDestination"),
+    short: t("alert_destinations.prebuilt.customShort"),
+    tip: t("alerts.customDestinationDescription"),
+    icon: "settings",
+    image: undefined,
+    disabled: false,
+  },
+]);
 
 function selectType(typeId: DestinationTileId | "custom") {
   if (filteredDestinationTypes.value.find((type) => type.id === typeId)?.disabled) return;

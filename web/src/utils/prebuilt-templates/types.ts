@@ -27,10 +27,10 @@ export interface DestinationTile {
   id: DestinationTileId;
   name: string;
   descriptionKey: I18nKey;
+  /** One short line shown under the name; the full description is the tooltip. */
+  shortKey: I18nKey;
   icon: string;
   image?: string;
-  /** Tells the two Slack tiles apart. */
-  tag?: { label: I18nText; variant: "success-soft" | "default-soft" };
 }
 
 /**
@@ -103,6 +103,8 @@ export interface PrebuiltType {
    * this at render time instead.
    */
   descriptionKey: I18nKey;
+  /** Overrides the short line the picker maps from the type id. */
+  shortKey?: I18nKey;
   icon: string; // Icon name or component reference
   image?: string; // Image URL for logo
   popular?: boolean;
