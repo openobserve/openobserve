@@ -59,12 +59,13 @@ test("response content and provider-reported usage use standard attributes", () 
   ]);
   assert.deepEqual(attributes["gen_ai.response.finish_reasons"], ["stop"]);
   assert.equal(attributes["gen_ai.usage.input_tokens"], 1234);
-  assert.equal(attributes["gen_ai.usage.output_tokens"], 56);
-  assert.equal(attributes["gen_ai.usage.total_tokens"], 1290);
+  assert.equal(attributes["gen_ai.usage.output_tokens"], 68);
+  assert.equal(attributes["gen_ai.usage.total_tokens"], 1302);
   assert.equal(attributes["gen_ai.usage.cache_read_tokens"], 78);
   assert.equal(attributes["gen_ai.usage.cache_write_tokens"], 9);
   assert.equal(attributes["gen_ai.usage.cost"], 0.42);
   assert.equal(attributes["ai.review.usage.reasoning_tokens"], 12);
+  assert.equal(attributes["ai.review.usage.visible_output_tokens"], 56);
   assert.equal(
     Object.keys(attributes).some(key => key.startsWith("gen_ai.completion.")),
     false,

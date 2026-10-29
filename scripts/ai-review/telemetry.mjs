@@ -61,10 +61,12 @@ function tokenCount(value) {
 export function genAiResponseAttributes(data, text, requestedModel) {
   const info = data?.info || {};
   const inputTokens = tokenCount(info.tokens?.input);
-  const outputTokens = tokenCount(info.tokens?.output);
+  const reasoningTokens = tokenCount(info.tokens?.reasoning);
+  // opencode's output is the visible text only; GenAI semconv output_tokens includes reasoning, which is billed as output.
+  const visibleOutputTokens = tokenCount(info.tokens?.output);
+  const outputTokens = visibleOutputTokens === undefined ? undefined : visibleOutputTokens + (reasoningTokens ?? 0);
   const cacheReadTokens = tokenCount(info.tokens?.cache?.read);
   const cacheWriteTokens = tokenCount(info.tokens?.cache?.write);
-  const reasoningTokens = tokenCount(info.tokens?.reasoning);
   const responseModel = info.modelID || requestedModel;
 
   const attributes = {
@@ -86,6 +88,7 @@ export function genAiResponseAttributes(data, text, requestedModel) {
     "gen_ai.usage.cache_write_tokens": cacheWriteTokens,
     "gen_ai.usage.cost": Number.isFinite(info.cost) && info.cost >= 0 ? info.cost : undefined,
     "ai.review.usage.reasoning_tokens": reasoningTokens,
+    "ai.review.usage.visible_output_tokens": visibleOutputTokens,
     "ai.review.output.chars": text.length,
     "ai.review.output.sha256": sha256(text),
   };
