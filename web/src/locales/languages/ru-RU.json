@@ -968,19 +968,43 @@
     "browserTimeWithZone": "Время браузера ({zone})",
     "poweredBy": "Работает на",
     "editorDraft": {
+      "restoreTitle": "Несохранённый черновик",
+      "fleetRestoreTitle": "Несохранённые локальные изменения",
+      "restoreMessage": "У вас есть несохранённые изменения объекта «{entity}» от {date}.",
+      "changedOnServer": "Объект «{entity}» был изменён после сохранения черновика. Сохранение черновика заменит эти изменения.",
+      "credentialsNotSaved": "Пароли, токены и другие секреты не сохраняются в черновиках. Введите их повторно перед сохранением.",
       "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
       "envVarField": "environment variable {name}",
       "credentialFileField": "credential file {name}",
+      "continueDraft": "Продолжить черновик",
+      "startFresh": "Начать заново",
+      "itemDeleted": "Объект «{entity}» больше не существует, поэтому его несохранённый черновик удалён.",
+      "leaveTitle": "Выйти с несохранёнными изменениями?",
+      "leaveMessage": "Сохраните объект «{entity}», оставьте изменения как черновик в этом браузере до выхода из системы или отмените их.",
+      "keepDraft": "Оставить черновик",
+      "keepFailed": "Не удалось сохранить черновик: хранилище браузера заполнено или недоступно. Сохраните объект «{entity}» или отмените изменения.",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
-      "signOutTitle": "Sign out and discard drafts?",
-      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out",
+      "rowDot": "Несохранённый черновик · {date}",
+      "newDot": "{label} · несохранённый черновик",
+      "newDotDated": "{label} · unsaved draft from {date}",
       "entities": {
+        "alert": "оповещение",
+        "alert_template": "шаблон оповещения",
+        "alert_destination": "получатель оповещений",
+        "downtime": "окно обслуживания",
+        "pipeline": "конвейер",
+        "function": "функция",
+        "report": "отчёт",
+        "slo": "SLO",
+        "synthetic_check": "синтетическая проверка",
+        "synthetic_browser": "браузерный тест",
+        "prompt": "промпт",
+        "experiment": "эксперимент",
         "dashboard_settings": "dashboard settings",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
@@ -996,11 +1020,13 @@
         "eval_job": "evaluation job",
         "eval_scorer": "scorer"
       },
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
-      "dotUndated": "Unsaved draft",
-      "newDotDated": "{label} · unsaved draft from {date}"
+      "dotUndated": "Unsaved draft"
     }
   },
   "flow": {
@@ -11605,7 +11631,8 @@
         "dailySentence": "Ежедневно · {time} на {duration} · {zone}",
         "weeklySentence": "Еженедельно в {days} · {time} на {duration} · {zone}",
         "fromNoEnd": "{schedule}, с {start} без даты окончания",
-        "fromUntil": "{schedule}, с {start} по {until}"
+        "fromUntil": "{schedule}, с {start} по {until}",
+        "onceFor": "Однократно, {duration}"
       },
       "validation": {
         "conditionRequired": "Добавьте условие или удалите блок условий.",
@@ -11946,8 +11973,8 @@
         "presets": {
           "30m": "30 мин",
           "1h": "1 ч",
-          "2h": "2 ч",
           "4h": "4 ч",
+          "24h": "24 ч",
           "custom": "Другой"
         },
         "endsAt": "Окончание",
@@ -11961,7 +11988,34 @@
         "mutedTooltip": "Заглушено окном обслуживания {name} до {end}",
         "exclude": "Исключить окно…",
         "firingMuted": "Срабатывает · заглушено",
-        "firingMutedTooltip": "Всё ещё срабатывает. Уведомления заглушены окном обслуживания {name}."
+        "firingMutedTooltip": "Всё ещё срабатывает. Уведомления заглушены окном обслуживания {name}.",
+        "untilClear": "До восстановления",
+        "untilClearHint": "Завершится при восстановлении оповещения или не позднее чем через 24 ч.",
+        "confirmUntilClear": "Заглушить до восстановления",
+        "titleOne": "Заглушить {name}",
+        "subtitleOne": "Оно продолжает работать и сохраняет историю. Уведомления, вызовы дежурных и рабочие процессы прекращаются до окончания окна обслуживания.",
+        "untilTime": "До {time}.",
+        "groups": "Группы",
+        "groupsThis": "Эта группа",
+        "groupsAll": "Все группы этого оповещения",
+        "addGroup": "Добавить срабатывающую группу",
+        "groupsHint": "Заглушены только эти группы; остальные продолжают отправлять уведомления",
+        "confirm24h": {
+          "title": "Заглушить на 24 часа?",
+          "message": "Вариант «До восстановления» завершит заглушение сразу после восстановления оповещения.",
+          "useUntilClear": "Использовать «До восстановления»",
+          "ok": "Заглушить на 24 ч"
+        },
+        "muteGroup": "Заглушить эту группу",
+        "endNow": "Завершить заглушение сейчас",
+        "endMute": "Завершить заглушение",
+        "mutedUntilClear": "Заглушено до восстановления · не более 24 ч",
+        "mutedUntilClearGroups": "Заглушено до восстановления · групп: {count} | Заглушено до восстановления · групп: {count}",
+        "mutedGroups": "Заглушено · групп: {count} · завершится через {duration} | Заглушено · групп: {count} · завершится через {duration}",
+        "mutedUntilClearTooltip": "Заглушено пользователем {name} до восстановления оповещения, но не позднее {end}",
+        "mutedGroupsTooltip": "Заглушено пользователем {name} до {end}. Группы: {labels}",
+        "mutedUntilClearGroupsTooltip": "Заглушено пользователем {name} до восстановления оповещения, но не позднее {end}. Группы: {labels}",
+        "untilTomorrow": "До {time} завтра."
       },
       "corrected": "Скорректировано",
       "correctedBy": "Оценка скорректирована: {names}",
@@ -12047,7 +12101,66 @@
           "sent": "Тест отправлен {count} получателю | Тест отправлен получателям ({count})",
           "failed": "Тест не дошёл до {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "До восстановления",
+        "atMost": "Не более 24 ч",
+        "endsWhenClears": "завершается при восстановлении",
+        "byTime": "к {time}",
+        "whenCleared": "когда восстановилось",
+        "endedBy": "завершено {product}",
+        "createdFrom": "из {source}"
+      },
+      "groupTarget": "Группа: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Быстрое заглушение из оповещения",
+      "endedLabel": "завершено"
+    },
+    "ack": {
+      "acknowledge": "Подтвердить",
+      "acknowledgeGroups": "Подтвердить {count} срабатывающую группу | Подтвердить {count} срабатывающих групп",
+      "unacknowledge": "Снять подтверждение",
+      "takeOver": "Перехватить",
+      "chip": "Подтверждено: {who} через {source} · {time}",
+      "chipTooltip": "Подтверждено: {who} в {time} из {source}",
+      "firingAcknowledged": "Срабатывает · подтверждено",
+      "tile": "Подтверждено",
+      "groupsAcknowledged": "{count} подтверждено",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "дежурство",
+        "incident": "инцидент"
+      },
+      "history": {
+        "dedupSuppressed": "подавлено подтверждением ({who})",
+        "acked": "Подтверждено: {who}, источник: {source}",
+        "ackedViaPage": "Подтверждено: {who} через вызов {page}",
+        "ackedViaIncident": "Подтверждено: {who} через инцидент {incident}",
+        "unacked": "Подтверждение снято: {who}, источник: {source}",
+        "unackedResume": "Подтверждение снято: {who}, источник: {source} · повторы возобновятся в {time}",
+        "takenOver": "Перехвачено пользователем {who} у {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Вы не можете подтвердить это оповещение. Для подтверждения и заглушения нужна роль администратора или редактора либо статус дежурного по этому оповещению.",
+        "mute": "Вы не можете заглушить это оповещение. Для подтверждения и заглушения нужна роль администратора или редактора либо статус дежурного по этому оповещению.",
+        "onCall": "На дежурстве: {people}",
+        "canAct": "Могут действовать: {people}",
+        "people": "На дежурстве: {onCall}. Могут действовать: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Это оповещение не срабатывает, поэтому подтверждать нечего.",
+        "firingChanged": "Оповещение снова сработало после загрузки этой страницы. Обновите страницу и повторите попытку."
       }
+    },
+    "groupActions": {
+      "menu": "Действия с группой",
+      "viewHistory": "Просмотреть историю этой группы"
+    },
+    "firingState": {
+      "level": "Уровень",
+      "firingSince": "Срабатывает с",
+      "firingFor": "срабатывает уже {duration}",
+      "incident": "Инцидент"
     }
   },
   "alert_dependencies": {
@@ -12576,13 +12689,14 @@
       "openSlackSettings": "Настройте в разделе «Настройки» › «Slack»"
     },
     "prebuilt": {
-      "slackDescription": "Отправлять уведомления в каналы Slack",
+      "slackDescription": "Отправляет новое сообщение через ваш вебхук и шаблон. Используйте для вызовов дежурных или пользовательских макетов Slack.",
       "discordDescription": "Отправлять уведомления в каналы Discord",
       "msteamsDescription": "Отправлять уведомления в каналы Teams",
       "emailDescription": "Отправлять уведомления по электронной почте в формате HTML",
       "pagerdutyDescription": "Создавать инциденты в PagerDuty",
       "opsgenieDescription": "Создавать оповещения в Opsgenie",
-      "servicenowDescription": "Создавать инциденты в ServiceNow"
+      "servicenowDescription": "Создавать инциденты в ServiceNow",
+      "slackAppDescription": "Обновляет запланированные оповещения на месте. Подтверждайте, заглушайте и анализируйте прямо из Slack. Требуется подключённое рабочее пространство."
     },
     "import": {
       "title": "Импорт получателя",
@@ -12624,7 +12738,8 @@
     "severityCriticalDescription": "Инциденты наивысшего приоритета",
     "severityErrorDescription": "Стандартные инциденты ошибок",
     "severityWarningDescription": "Инциденты уровня предупреждения",
-    "severityInfoDescription": "Информационные инциденты"
+    "severityInfoDescription": "Информационные инциденты",
+    "urlRecipientsChannel": "URL / получатели / канал"
   },
   "pipeline_destinations": {
     "header": "Получатели конвейера",
@@ -13147,7 +13262,7 @@
     "groupIntegrations": "Интеграции",
     "groupAccount": "Аккаунт",
     "slackApp": "Slack",
-    "slackAppDesc": "Задавайте вопросы OpenObserve из Slack",
+    "slackAppDesc": "Задавайте вопросы OpenObserve и работайте с оповещениями из Slack",
     "generalDesc": "Тема, настройки запросов по умолчанию и основные предпочтения",
     "orgDesc": "Параметры организации и идентификаторы",
     "cipherKeysDesc": "Ключи шифрования для конфиденциальных полей",
@@ -20641,7 +20756,9 @@
         "succeeded": "Успешно",
         "failed": "Ошибка",
         "skipped": "Пропущено",
-        "pending": "Ожидание"
+        "pending": "Ожидание",
+        "acknowledged": "Подтверждено",
+        "ackevent": "Событие подтверждения"
       },
       "alertLevel": {
         "ok": "ОК",
@@ -20944,7 +21061,16 @@
       "alertSavedSuccessfully": "Оповещение успешно сохранено.",
       "alertUpdatedSuccessfully": "Оповещение успешно обновлено.",
       "openingDedupConfig": "Открытие конфигурации дедупликации для: {name}",
-      "editingAlert": "Редактирование оповещения: {name}"
+      "editingAlert": "Редактирование оповещения: {name}",
+      "ack": {
+        "acked": "Подтверждено: {name}",
+        "ackedGroups": "Подтверждена {count} группа {name} | Подтверждено {count} групп {name}",
+        "alreadyAcked": "Уже подтверждено пользователем {who}",
+        "unacked": "Подтверждение снято: {name}",
+        "takenOver": "Вы перехватили подтверждение {name}",
+        "failed": "Не удалось подтвердить {name}",
+        "unackFailed": "Не удалось снять подтверждение {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Ключ шифрования успешно обновлён",
@@ -21256,7 +21382,14 @@
       "muted": "Заглушен {count} элемент до {time}. Сохранён в {folder}. | Заглушено элементов: {count} до {time}. Сохранено в {folder}.",
       "muteFailed": "Не удалось создать заглушение",
       "viewDowntime": "Открыть окно обслуживания",
-      "itemsDropped": "{count} выбранный элемент находится вне выбранных папок и был удалён. | Выбранных элементов вне выбранных папок: {count}; они были удалены."
+      "itemsDropped": "{count} выбранный элемент находится вне выбранных папок и был удалён. | Выбранных элементов вне выбранных папок: {count}; они были удалены.",
+      "mutedUntilClear": "{name} заглушено до прекращения срабатывания, но не позднее {time}",
+      "alreadyMuted": "{name} уже заглушено до {time}",
+      "muteChanged": "Настройка заглушения изменилась с момента загрузки страницы. Теперь она заканчивается {time}.",
+      "muteEnded": "Заглушение завершено. Уведомления возобновлены.",
+      "mutedOne": "{name} заглушено до {time}",
+      "timeTomorrow": "завтра в {time}",
+      "notQuickMute": "Это заглушение установлено на странице «Окна обслуживания». Измените его там."
     }
   },
   "cipherKeys": {
@@ -26723,7 +26856,10 @@
       "managedBy": "управляется администратором вашего экземпляра",
       "managedTitle": "Управляется администратором вашего экземпляра.",
       "managedDetail": "Учётные данные, привязка и организации, использующие {team}, задаются в _meta.",
-      "managedQuestions": "Вопросы: {contact}"
+      "managedQuestions": "Вопросы: {contact}",
+      "outboundQueue": "Сообщения оповещений: {count} в очереди, самое старое — {age} | Сообщения оповещений: {count} в очереди, самое старое — {age}",
+      "outboundEmpty": "В очереди нет сообщений оповещений",
+      "ageSeconds": "{count} с"
     },
     "channels": {
       "title": "Значения по умолчанию для каналов",
@@ -26759,7 +26895,8 @@
       "instanceAdminOnly": "Только для администратора экземпляра",
       "ownOrgOnlyHint": "В рабочей области экземпляра каналы привязываются к вашей собственной организации",
       "claimableHint": "Непривязанные каналы и каналы, принадлежащие {org}",
-      "servedOrgsHint": "Любая организация, которую обслуживает эта рабочая область"
+      "servedOrgsHint": "Любая организация, которую обслуживает эта рабочая область",
+      "alertRoutes": "{count} получатель | {count} получателей"
     },
     "people": {
       "title": "Привязанные пользователи",
@@ -26913,6 +27050,83 @@
       "remove": "Удалить",
       "saved": "Организации сохранены",
       "saveFailed": "Не удалось сохранить организации."
+    },
+    "destination": {
+      "appTile": "Приложение {product}",
+      "webhookTile": "Вебхук {product}",
+      "twoWay": "Двусторонний",
+      "recommendedForAlertResponse": "Рекомендуется для реагирования на оповещения",
+      "choiceHint": "Вызовы дежурных и суперкластеры используют вебхук. Ручная отправка и отправка в реальном времени из получателя «приложение Slack» создают отдельные сообщения.",
+      "unavailableReason": "Требуется корпоративное приложение Slack на одном кластере",
+      "unavailableFlag": "Отключено на этом сервере; попросите оператора задать {variable}",
+      "unavailableMasterKey": "Требуется ключ шифрования на этом сервере; попросите оператора задать {variable}",
+      "unavailableCloud": "Ещё не включено в вашем регионе Cloud",
+      "unavailableNoAccess": "Попросите администратора организации включить приложение Slack",
+      "postOnly": "Только публикация",
+      "switchToApp": "Переключиться на приложение {product}",
+      "switchThis": "Переключить получателя",
+      "switchBack": "Переключить обратно",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Рабочее пространство",
+      "channel": "Канал",
+      "mention": "Упоминание",
+      "mentionCritical": "{'@'}here для критических, для остальных — без упоминания",
+      "mentionNone": "Без упоминания",
+      "mentionHelp": "Используется при повторных срабатываниях и повышении уровня",
+      "refireReuse": "Повторное использование при повторном срабатывании (минуты)",
+      "refireReuseHelp": "Повторное срабатывание в течение этого времени редактирует предыдущее сообщение вместо публикации нового",
+      "buttons": "Кнопки «Подтвердить», «Заглушить» и «Исследовать»",
+      "buttonsHelp": "Кнопка «Решить» добавляется, когда у срабатывания есть инцидент или вызов дежурного",
+      "autoInvestigate": "Автоматически исследовать критические оповещения",
+      "autoInvestigateHelp": "Запускается от имени сервисного аккаунта ИИ организации с его правами доступа; публикует результаты в ветке оповещения",
+      "templateDefault": "Шаблон {product} по умолчанию ({name})",
+      "sendTest": "Отправить тест",
+      "setsDefault": "Устанавливает для #{channel} организацию по умолчанию: {org}",
+      "answersFor": "#{channel} отвечает на вопросы для организации {org}. Оповещения из {thisOrg} публикуются здесь, а ответы в их ветках — в {thisOrg}; настройка канала по умолчанию не меняется.",
+      "sharedTag": "Общий доступ · {product} Connect",
+      "sharedTitle": "#{channel} доступен людям за пределами {workspace}.",
+      "sharedDetail": "Они увидят названия оповещений, значения, графики и ссылки. Их нажатия на кнопки отклоняются.",
+      "sharedConfirm": "Я понимаю, что оповещения будут публиковаться в этот общий канал",
+      "sharedRequired": "Подтвердите, что оповещения могут публиковаться в этом общем канале",
+      "versionMismatch": "Узлы работают с разными версиями. Сначала обновите каждый узел.",
+      "oncallNotAllowed": "Получатель приложения {product} не может быть каналом дежурной команды",
+      "answersForAnother": "#{channel} отвечает на вопросы для другой организации. Оповещения из {thisOrg} публикуются здесь, а ответы в их ветках — в {thisOrg}; настройка канала по умолчанию не меняется.",
+      "oncallTag": "Комната дежурных",
+      "oncallTitle": "Вызовы дежурных для команды {team} также публикуются в #{channel} через {destination}.",
+      "oncallDetail": "Оповещения здесь публикуются отдельно.",
+      "oncallConfirm": "Я понимаю, что оповещения будут публиковаться в эту комнату дежурных",
+      "oncallRequired": "Подтвердите, что оповещения могут публиковаться в этой комнате дежурных",
+      "workspaceRequired": "Выберите рабочее пространство",
+      "refireRange": "Введите целые минуты от 0 до {max}",
+      "connectTitle": "Подключите {product}, чтобы публиковать оповещения с кнопками",
+      "connectDetail": "Выберите канал на экране {product} и нажмите «Разрешить». OpenObserve создаст получателя для этого канала.",
+      "connected": "{name} создан для #{channel}. Проверьте его настройки и сохраните.",
+      "saveFailed": "Не удалось сохранить получателя.",
+      "switched": "Теперь {name} отправляет через приложение {product}",
+      "switchedBack": "{name} снова отправляет через свой вебхук",
+      "switchFailed": "Не удалось переключить {name}: {reason}",
+      "switchedAll": "{count} получатель переключён | {count} получателей переключено",
+      "switchThisDetail": "Переключите его на приложение {product}, чтобы появились кнопки «Принять», «Заглушить» и «Исследовать». Его название, шаблон и оповещения остаются прежними; «Переключить обратно» восстанавливает вебхук."
+    },
+    "switchAll": {
+      "title": "{count} вебхук-получатель публикует в это рабочее пространство. | {count} вебхук-получателей публикуют в это рабочее пространство.",
+      "detail": "Переключите его на приложение {product}, чтобы появились кнопки «Принять», «Заглушить» и «Исследовать». Его название, шаблон и оповещения остаются прежними; «Переключить обратно» восстанавливает вебхук. | Переключите их на приложение {product}, чтобы появились кнопки «Принять», «Заглушить» и «Исследовать». Названия, шаблоны и оповещения остаются прежними; «Переключить обратно» восстанавливает вебхук.",
+      "review": "Просмотреть",
+      "action": "Переключить все",
+      "summary": "{switched} переключено · {count} не удалось переключить"
+    },
+    "oncallUnlinked": {
+      "title": "Участники дежурств не привязаны к {product}",
+      "description": "Вызовы не могут отправлять им личные сообщения, а их нажатия на кнопки оповещений и вызовов не обрабатываются, пока они не привяжут аккаунт",
+      "remind": "Напомнить им",
+      "columnPerson": "Человек",
+      "columnTeam": "Команда",
+      "columnNextShift": "Следующая смена",
+      "columnReminder": "Напоминание",
+      "dmSent": "Личное сообщение отправлено {time}",
+      "notSent": "Не отправлено",
+      "reminded": "Напоминание отправлено {count} человеку | Напоминание отправлено {count} людям",
+      "remindFailed": "Не удалось отправить напоминания."
     }
   },
   "fleet": {

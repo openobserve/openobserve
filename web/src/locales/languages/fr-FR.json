@@ -968,19 +968,43 @@
     "browserTimeWithZone": "Heure du navigateur ({zone})",
     "poweredBy": "Propulsé par",
     "editorDraft": {
+      "restoreTitle": "Brouillon non enregistré",
+      "fleetRestoreTitle": "Modifications locales non enregistrées",
+      "restoreMessage": "Vous avez des modifications non enregistrées de ce {entity} datant du {date}.",
+      "changedOnServer": "Ce {entity} a été modifié après l'enregistrement de votre brouillon. Enregistrer le brouillon remplacera ces modifications.",
+      "credentialsNotSaved": "Les mots de passe, jetons et autres secrets ne sont pas conservés dans les brouillons. Saisissez-les à nouveau avant d'enregistrer.",
       "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
       "envVarField": "environment variable {name}",
       "credentialFileField": "credential file {name}",
+      "continueDraft": "Reprendre le brouillon",
+      "startFresh": "Repartir de zéro",
+      "itemDeleted": "Ce {entity} n'existe plus, son brouillon non enregistré a donc été supprimé.",
+      "leaveTitle": "Quitter avec des modifications non enregistrées ?",
+      "leaveMessage": "Enregistrez le {entity}, conservez vos modifications sous forme de brouillon dans ce navigateur jusqu'à votre déconnexion, ou supprimez-les.",
+      "keepDraft": "Conserver le brouillon",
+      "keepFailed": "Le brouillon n'a pas pu être conservé car le stockage de ce navigateur est plein ou indisponible. Enregistrez le {entity} ou supprimez vos modifications.",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
-      "signOutTitle": "Sign out and discard drafts?",
-      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out",
+      "rowDot": "Brouillon non enregistré · {date}",
+      "newDot": "{label} · brouillon non enregistré",
+      "newDotDated": "{label} · unsaved draft from {date}",
       "entities": {
+        "alert": "alerte",
+        "alert_template": "modèle d'alerte",
+        "alert_destination": "destination d'alerte",
+        "downtime": "période de maintenance",
+        "pipeline": "pipeline",
+        "function": "fonction",
+        "report": "rapport",
+        "slo": "SLO",
+        "synthetic_check": "contrôle synthétique",
+        "synthetic_browser": "test navigateur",
+        "prompt": "prompt",
+        "experiment": "expérience",
         "dashboard_settings": "dashboard settings",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
@@ -996,11 +1020,13 @@
         "eval_job": "evaluation job",
         "eval_scorer": "scorer"
       },
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
-      "dotUndated": "Unsaved draft",
-      "newDotDated": "{label} · unsaved draft from {date}"
+      "dotUndated": "Unsaved draft"
     }
   },
   "flow": {
@@ -11605,7 +11631,8 @@
         "dailySentence": "Tous les jours · {time} pendant {duration} · {zone}",
         "weeklySentence": "Chaque semaine le {days} · {time} pendant {duration} · {zone}",
         "fromNoEnd": "{schedule}, à partir du {start} sans date de fin",
-        "fromUntil": "{schedule}, du {start} au {until}"
+        "fromUntil": "{schedule}, du {start} au {until}",
+        "onceFor": "Une fois, {duration}"
       },
       "validation": {
         "conditionRequired": "Ajoutez une condition ou supprimez le bloc de conditions.",
@@ -11946,8 +11973,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 h",
-          "2h": "2 h",
           "4h": "4 h",
+          "24h": "24 h",
           "custom": "Personnalisé"
         },
         "endsAt": "Se termine le",
@@ -11961,7 +11988,34 @@
         "mutedTooltip": "Mis en sourdine par {name} jusqu'à {end}",
         "exclude": "Exclure une fenêtre…",
         "firingMuted": "Déclenchée · en sourdine",
-        "firingMutedTooltip": "Toujours déclenchée. Les notifications sont mises en sourdine par {name}."
+        "firingMutedTooltip": "Toujours déclenchée. Les notifications sont mises en sourdine par {name}.",
+        "untilClear": "Jusqu'au rétablissement",
+        "untilClearHint": "Se termine lorsque l'alerte se rétablit, ou après 24 h au plus tard.",
+        "confirmUntilClear": "Mettre en sourdine jusqu'au rétablissement",
+        "titleOne": "Mettre {name} en sourdine",
+        "subtitleOne": "Elle continue de s'exécuter et conserve son historique. Les notifications, les notifications d'astreinte et les workflows s'arrêtent jusqu'à la fin de la fenêtre.",
+        "untilTime": "Jusqu'à {time}.",
+        "groups": "Groupes",
+        "groupsThis": "Ce groupe",
+        "groupsAll": "Tous les groupes de cette alerte",
+        "addGroup": "Ajouter un groupe en alerte",
+        "groupsHint": "Seuls ces groupes sont mis en sourdine ; les autres continuent de notifier",
+        "confirm24h": {
+          "title": "Mettre en sourdine pendant 24 heures ?",
+          "message": "L'option « Jusqu'au rétablissement » met fin à la sourdine dès que l'alerte se rétablit.",
+          "useUntilClear": "Utiliser « Jusqu'au rétablissement »",
+          "ok": "Mettre en sourdine 24 h"
+        },
+        "muteGroup": "Mettre ce groupe en sourdine",
+        "endNow": "Terminer la sourdine maintenant",
+        "endMute": "Terminer la sourdine",
+        "mutedUntilClear": "En sourdine jusqu'au rétablissement · 24 h au maximum",
+        "mutedUntilClearGroups": "En sourdine jusqu'au rétablissement · {count} groupe | En sourdine jusqu'au rétablissement · {count} groupes",
+        "mutedGroups": "En sourdine · {count} groupe · se termine dans {duration} | En sourdine · {count} groupes · se terminent dans {duration}",
+        "mutedUntilClearTooltip": "Mis en sourdine par {name} jusqu'au rétablissement de l'alerte, {end} au plus tard",
+        "mutedGroupsTooltip": "Mis en sourdine par {name} jusqu'à {end}. Groupes : {labels}",
+        "mutedUntilClearGroupsTooltip": "Mis en sourdine par {name} jusqu'à ce que l'alerte se rétablisse, au plus tard {end}. Groupes : {labels}",
+        "untilTomorrow": "Jusqu'à {time} demain."
       },
       "corrected": "Corrigé",
       "correctedBy": "Score corrigé par {names}",
@@ -12047,7 +12101,66 @@
           "sent": "Test envoyé à {count} destination | Test envoyé à {count} destinations",
           "failed": "Le test n'a pas atteint {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "Jusqu'à ce qu'elle se rétablisse",
+        "atMost": "24 h au maximum",
+        "endsWhenClears": "se termine au rétablissement",
+        "byTime": "à {time}",
+        "whenCleared": "au moment du rétablissement",
+        "endedBy": "terminé par {product}",
+        "createdFrom": "depuis {source}"
+      },
+      "groupTarget": "Groupe : {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Mise en sourdine rapide depuis une alerte",
+      "endedLabel": "terminé"
+    },
+    "ack": {
+      "acknowledge": "Prendre en charge",
+      "acknowledgeGroups": "Prendre en charge {count} groupe en alerte | Prendre en charge {count} groupes en alerte",
+      "unacknowledge": "Annuler la prise en charge",
+      "takeOver": "Reprendre la main",
+      "chip": "Pris en charge par {who} via {source} · {time}",
+      "chipTooltip": "Pris en charge par {who} à {time} depuis {source}",
+      "firingAcknowledged": "En alerte · pris en charge",
+      "tile": "Pris en charge",
+      "groupsAcknowledged": "{count} pris en charge",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "astreinte",
+        "incident": "incident"
+      },
+      "history": {
+        "dedupSuppressed": "supprimé par la prise en charge ({who})",
+        "acked": "Pris en charge par {who} depuis {source}",
+        "ackedViaPage": "Pris en charge par {who} via la notification {page}",
+        "ackedViaIncident": "Pris en charge par {who} via l'incident {incident}",
+        "unacked": "Prise en charge annulée par {who} depuis {source}",
+        "unackedResume": "Prise en charge annulée par {who} depuis {source} · les répétitions reprennent à {time}",
+        "takenOver": "Repris par {who} de {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Vous ne pouvez pas prendre en charge cette alerte. Prendre en charge et Mettre en sourdine nécessitent le rôle Admin ou Editor, ou d'être le répondant d'astreinte de l'alerte.",
+        "mute": "Vous ne pouvez pas mettre cette alerte en sourdine. Prendre en charge et Mettre en sourdine nécessitent le rôle Admin ou Editor, ou d'être le répondant d'astreinte de l'alerte.",
+        "onCall": "D'astreinte : {people}",
+        "canAct": "Peuvent agir : {people}",
+        "people": "D'astreinte : {onCall}. Peuvent agir : {canAct}"
+      },
+      "errors": {
+        "notFiring": "Cette alerte n'est pas en alerte, il n'y a donc rien à prendre en charge.",
+        "firingChanged": "L'alerte s'est déclenchée à nouveau depuis le chargement de cette page. Actualisez et réessayez."
       }
+    },
+    "groupActions": {
+      "menu": "Actions du groupe",
+      "viewHistory": "Voir l'historique de ce groupe"
+    },
+    "firingState": {
+      "level": "Niveau",
+      "firingSince": "En alerte depuis",
+      "firingFor": "en alerte depuis {duration}",
+      "incident": "Incident"
     }
   },
   "alert_dependencies": {
@@ -12576,13 +12689,14 @@
       "openSlackSettings": "Configurez-la dans Réglages › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Envoyer des notifications aux canaux Slack",
+      "slackDescription": "Publie un nouveau message avec votre webhook et votre modèle. À utiliser pour les notifications d'astreinte ou des mises en page Slack personnalisées.",
       "discordDescription": "Envoyer des notifications aux canaux Discord",
       "msteamsDescription": "Envoyer des notifications aux canaux Teams",
       "emailDescription": "Envoyer des notifications par e-mail au format HTML",
       "pagerdutyDescription": "Créer des incidents dans PagerDuty",
       "opsgenieDescription": "Créer des alertes dans Opsgenie",
-      "servicenowDescription": "Créer des incidents dans ServiceNow"
+      "servicenowDescription": "Créer des incidents dans ServiceNow",
+      "slackAppDescription": "Met à jour les alertes planifiées sur place. Prenez en charge, mettez en sourdine et enquêtez depuis Slack. Nécessite un espace de travail connecté."
     },
     "import": {
       "title": "Importer une destination",
@@ -12624,7 +12738,8 @@
     "severityCriticalDescription": "Incidents de priorité la plus élevée",
     "severityErrorDescription": "Incidents d'erreur standard",
     "severityWarningDescription": "Incidents de niveau d'avertissement",
-    "severityInfoDescription": "Incidents informatifs"
+    "severityInfoDescription": "Incidents informatifs",
+    "urlRecipientsChannel": "URL / destinataires / canal"
   },
   "pipeline_destinations": {
     "header": "Destinations des pipelines",
@@ -13147,7 +13262,7 @@
     "groupIntegrations": "Intégrations",
     "groupAccount": "Compte",
     "slackApp": "Slack",
-    "slackAppDesc": "Posez des questions à OpenObserve depuis Slack",
+    "slackAppDesc": "Posez des questions à OpenObserve et agissez sur les alertes depuis Slack",
     "generalDesc": "Thème, valeurs par défaut des requêtes et préférences principales",
     "orgDesc": "Paramètres et identifiants de l'organisation",
     "cipherKeysDesc": "Clés de chiffrement pour les champs sensibles",
@@ -20641,7 +20756,9 @@
         "succeeded": "Réussi",
         "failed": "Échoué",
         "skipped": "Ignoré",
-        "pending": "En attente"
+        "pending": "En attente",
+        "acknowledged": "Acquitté",
+        "ackevent": "Événement d'acquittement"
       },
       "alertLevel": {
         "ok": "OK",
@@ -20944,7 +21061,16 @@
       "alertSavedSuccessfully": "Alerte enregistrée avec succès.",
       "alertUpdatedSuccessfully": "Alerte mise à jour avec succès.",
       "openingDedupConfig": "Ouverture de la configuration de déduplication pour : {name}",
-      "editingAlert": "Modification de l'alerte : {name}"
+      "editingAlert": "Modification de l'alerte : {name}",
+      "ack": {
+        "acked": "{name} acquitté",
+        "ackedGroups": "{count} groupe de {name} acquitté | {count} groupes de {name} acquittés",
+        "alreadyAcked": "Déjà acquitté par {who}",
+        "unacked": "{name} désacquitté",
+        "takenOver": "Vous avez repris l'acquittement de {name}",
+        "failed": "Impossible d'acquitter {name}",
+        "unackFailed": "Impossible de retirer l'acquittement de {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Clé de chiffrement mise à jour avec succès",
@@ -21256,7 +21382,14 @@
       "muted": "Mise en sourdine de {count} élément jusqu'à {time}. Classé dans {folder}. | Mise en sourdine de {count} éléments jusqu'à {time}. Classés dans {folder}.",
       "muteFailed": "Impossible de créer la sourdine",
       "viewDowntime": "Voir la période de maintenance",
-      "itemsDropped": "{count} élément choisi est en dehors des dossiers choisis et a été supprimé. | {count} éléments choisis sont en dehors des dossiers choisis et ont été supprimés."
+      "itemsDropped": "{count} élément choisi est en dehors des dossiers choisis et a été supprimé. | {count} éléments choisis sont en dehors des dossiers choisis et ont été supprimés.",
+      "mutedUntilClear": "{name} mis en sourdine jusqu'à sa résolution, au plus tard {time}",
+      "alreadyMuted": "{name} est déjà en sourdine jusqu'à {time}",
+      "muteChanged": "Cette mise en sourdine a changé depuis le chargement de la page. Elle se termine désormais à {time}.",
+      "muteEnded": "La mise en sourdine est terminée. Les notifications reprennent.",
+      "mutedOne": "{name} mis en sourdine jusqu'à {time}",
+      "timeTomorrow": "{time} demain",
+      "notQuickMute": "Cette mise en sourdine a été définie depuis la page Périodes de maintenance. Modifiez-la à cet endroit."
     }
   },
   "cipherKeys": {
@@ -26723,7 +26856,10 @@
       "managedBy": "géré par l'administrateur de votre instance",
       "managedTitle": "Géré par l'administrateur de votre instance.",
       "managedDetail": "Les identifiants, la liaison et les organisations qui utilisent {team} sont définis dans _meta.",
-      "managedQuestions": "Questions : {contact}"
+      "managedQuestions": "Questions : {contact}",
+      "outboundQueue": "Messages d'alerte : {count} en attente, plus ancien {age} | Messages d'alerte : {count} en attente, plus ancien {age}",
+      "outboundEmpty": "Aucun message d'alerte en attente",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Valeurs par défaut des canaux",
@@ -26759,7 +26895,8 @@
       "instanceAdminOnly": "Administrateur d'instance uniquement",
       "ownOrgOnlyHint": "Sur un espace de travail d'instance, vous associez les canaux à votre propre organisation",
       "claimableHint": "Canaux non revendiqués et canaux détenus par {org}",
-      "servedOrgsHint": "Toute organisation desservie par cet espace de travail"
+      "servedOrgsHint": "Toute organisation desservie par cet espace de travail",
+      "alertRoutes": "{count} destination | {count} destinations"
     },
     "people": {
       "title": "Personnes liées",
@@ -26913,6 +27050,83 @@
       "remove": "Retirer",
       "saved": "Organisations enregistrées",
       "saveFailed": "Les organisations n'ont pas pu être enregistrées."
+    },
+    "destination": {
+      "appTile": "Application {product}",
+      "webhookTile": "Webhook {product}",
+      "twoWay": "Bidirectionnel",
+      "recommendedForAlertResponse": "Recommandé pour la réponse aux alertes",
+      "choiceHint": "Les notifications d'astreinte et les super clusters utilisent le webhook. Les envois manuels et en temps réel depuis une destination Application Slack sont des publications distinctes.",
+      "unavailableReason": "Nécessite l'application Slack Enterprise sur un cluster unique",
+      "unavailableFlag": "Désactivé sur ce serveur ; demandez à votre opérateur de définir {variable}",
+      "unavailableMasterKey": "Nécessite une clé de chiffrement sur ce serveur ; demandez à votre opérateur de définir {variable}",
+      "unavailableCloud": "Pas encore activé pour votre région Cloud",
+      "unavailableNoAccess": "Demandez à un administrateur de l'organisation d'activer l'application Slack",
+      "postOnly": "Publication uniquement",
+      "switchToApp": "Passer à l'application {product}",
+      "switchThis": "Changer cette destination",
+      "switchBack": "Revenir",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Espace de travail",
+      "channel": "Canal",
+      "mention": "Mention",
+      "mentionCritical": "{'@'}here pour les alertes critiques, aucune pour les autres",
+      "mentionNone": "Aucune",
+      "mentionHelp": "Utilisé lors des répétitions et des passages à un niveau supérieur",
+      "refireReuse": "Réutilisation en cas de nouvelle alerte (minutes)",
+      "refireReuseHelp": "Une nouvelle alerte survenant dans ce délai modifie le message précédent au lieu d'en publier un nouveau",
+      "buttons": "Boutons Acquitter, Mettre en sourdine et Investiguer",
+      "buttonsHelp": "Le bouton Résoudre est ajouté lorsque l'alerte déclenchée a un incident ou une notification d'astreinte",
+      "autoInvestigate": "Investiguer automatiquement pour les alertes critiques",
+      "autoInvestigateHelp": "S'exécute en tant que compte de service IA de l'organisation, avec ses accès ; publie les résultats dans le fil de l'alerte",
+      "templateDefault": "Modèle {product} par défaut ({name})",
+      "sendTest": "Envoyer un test",
+      "setsDefault": "Définit l'organisation par défaut de #{channel} sur {org}",
+      "answersFor": "#{channel} répond aux questions pour l'organisation {org}. Les alertes de {thisOrg} sont publiées ici et leurs fils de discussion reçoivent les réponses dans {thisOrg} ; la valeur par défaut du canal reste inchangée.",
+      "sharedTag": "Partagé · {product} Connect",
+      "sharedTitle": "#{channel} est partagé avec des personnes extérieures à {workspace}.",
+      "sharedDetail": "Elles verront les noms d'alertes, les valeurs, les graphiques et les liens. Leurs clics sur les boutons sont refusés.",
+      "sharedConfirm": "Je comprends, publier les alertes dans ce canal partagé",
+      "sharedRequired": "Confirmez que les alertes peuvent être publiées dans ce canal partagé",
+      "versionMismatch": "Les nœuds exécutent des versions différentes. Mettez d'abord à niveau tous les nœuds.",
+      "oncallNotAllowed": "Une destination de l'application {product} ne peut pas être un canal d'équipe d'astreinte",
+      "answersForAnother": "#{channel} répond aux questions pour une autre organisation. Les alertes de {thisOrg} sont publiées ici et leurs fils de discussion reçoivent les réponses dans {thisOrg} ; la valeur par défaut du canal reste inchangée.",
+      "oncallTag": "Salle d'astreinte",
+      "oncallTitle": "Les notifications d'astreinte de l'équipe {team} sont aussi publiées dans #{channel} via {destination}.",
+      "oncallDetail": "Les alertes ici sont publiées séparément.",
+      "oncallConfirm": "Je comprends, publier les alertes dans cette salle d'astreinte",
+      "oncallRequired": "Confirmez que les alertes peuvent être publiées dans cette salle d'astreinte",
+      "workspaceRequired": "Sélectionnez un espace de travail",
+      "refireRange": "Saisissez un nombre entier de minutes de 0 à {max}",
+      "connectTitle": "Connectez {product} pour publier des alertes avec des boutons",
+      "connectDetail": "Choisissez un canal sur l'écran de {product} et autorisez. OpenObserve crée cette destination pour ce canal.",
+      "connected": "{name} a été créé pour #{channel}. Vérifiez ses réglages et enregistrez.",
+      "saveFailed": "La destination n'a pas pu être enregistrée.",
+      "switched": "{name} publie désormais via l'application {product}",
+      "switchedBack": "{name} publie de nouveau via son webhook",
+      "switchFailed": "Impossible de basculer {name} : {reason}",
+      "switchedAll": "{count} destination basculée | {count} destinations basculées",
+      "switchThisDetail": "Basculez-la vers l'application {product} pour les boutons Accuser réception, Mettre en sourdine et Examiner. Son nom, son modèle et ses alertes restent identiques ; Revenir en arrière restaure le webhook."
+    },
+    "switchAll": {
+      "title": "{count} destination webhook publie dans cet espace de travail. | {count} destinations webhook publient dans cet espace de travail.",
+      "detail": "Basculez-la vers l'application {product} pour les boutons Accuser réception, Mettre en sourdine et Examiner. Son nom, son modèle et ses alertes restent identiques ; Revenir en arrière restaure le webhook. | Basculez-les vers l'application {product} pour les boutons Accuser réception, Mettre en sourdine et Examiner. Les noms, les modèles et les alertes restent identiques ; Revenir en arrière restaure le webhook.",
+      "review": "Vérifier",
+      "action": "Tout basculer",
+      "summary": "{switched} basculée(s) · {count} n'ont pas pu être basculées"
+    },
+    "oncallUnlinked": {
+      "title": "Membres d'astreinte non liés à {product}",
+      "description": "Les notifications ne peuvent pas leur envoyer de message privé, et leurs clics sur les boutons d'alerte et de notification restent en attente jusqu'à ce qu'ils se lient",
+      "remind": "Leur rappeler",
+      "columnPerson": "Personne",
+      "columnTeam": "Équipe",
+      "columnNextShift": "Prochaine astreinte",
+      "columnReminder": "Rappel",
+      "dmSent": "MP envoyé {time}",
+      "notSent": "Non envoyé",
+      "reminded": "Rappel envoyé à {count} personne | Rappel envoyé à {count} personnes",
+      "remindFailed": "Les rappels n'ont pas pu être envoyés."
     }
   },
   "fleet": {

@@ -968,19 +968,43 @@
     "browserTimeWithZone": "浏览器时间（{zone}）",
     "poweredBy": "技术支持",
     "editorDraft": {
+      "restoreTitle": "未保存的草稿",
+      "fleetRestoreTitle": "未保存的本地更改",
+      "restoreMessage": "您对此{entity}有来自 {date} 的未保存更改。",
+      "changedOnServer": "此{entity}在您的草稿保存之后被更改。保存草稿将替换这些更改。",
+      "credentialsNotSaved": "密码、令牌和其他密钥不会保存在草稿中。保存前请重新输入。",
       "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
       "envVarField": "environment variable {name}",
       "credentialFileField": "credential file {name}",
+      "continueDraft": "继续草稿",
+      "startFresh": "重新开始",
+      "itemDeleted": "此{entity}已不存在，因此其未保存的草稿已被丢弃。",
+      "leaveTitle": "带着未保存的更改离开？",
+      "leaveMessage": "保存{entity}，将更改作为草稿保留在此浏览器中直到您退出，或丢弃它们。",
+      "keepDraft": "保留草稿",
+      "keepFailed": "由于此浏览器的存储已满或不可用，无法保留草稿。请保存{entity}或丢弃您的更改。",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
-      "signOutTitle": "Sign out and discard drafts?",
-      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out",
+      "rowDot": "未保存的草稿 · {date}",
+      "newDot": "{label} · 未保存的草稿",
+      "newDotDated": "{label} · unsaved draft from {date}",
       "entities": {
+        "alert": "告警",
+        "alert_template": "告警模板",
+        "alert_destination": "告警目标",
+        "downtime": "静默期",
+        "pipeline": "流水线",
+        "function": "函数",
+        "report": "报表",
+        "slo": "SLO",
+        "synthetic_check": "合成监控检查",
+        "synthetic_browser": "浏览器测试",
+        "prompt": "提示词",
+        "experiment": "实验",
         "dashboard_settings": "dashboard settings",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
@@ -996,11 +1020,13 @@
         "eval_job": "evaluation job",
         "eval_scorer": "scorer"
       },
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
-      "dotUndated": "Unsaved draft",
-      "newDotDated": "{label} · unsaved draft from {date}"
+      "dotUndated": "Unsaved draft"
     }
   },
   "flow": {
@@ -11605,7 +11631,8 @@
         "dailySentence": "每天 · {time} 持续 {duration} · {zone}",
         "weeklySentence": "每周 {days} · {time} 持续 {duration} · {zone}",
         "fromNoEnd": "{schedule}，自 {start} 起，无结束日期",
-        "fromUntil": "{schedule}，自 {start} 至 {until}"
+        "fromUntil": "{schedule}，自 {start} 至 {until}",
+        "onceFor": "一次，{duration}"
       },
       "validation": {
         "conditionRequired": "请添加条件，或移除条件块。",
@@ -11946,8 +11973,8 @@
         "presets": {
           "30m": "30 分钟",
           "1h": "1 小时",
-          "2h": "2 小时",
           "4h": "4 小时",
+          "24h": "24 小时",
           "custom": "自定义"
         },
         "endsAt": "结束于",
@@ -11961,7 +11988,34 @@
         "mutedTooltip": "由 {name} 静音，至 {end}",
         "exclude": "排除一个时间窗口…",
         "firingMuted": "触发中 · 已静音",
-        "firingMutedTooltip": "仍在触发。通知已被 {name} 静音。"
+        "firingMutedTooltip": "仍在触发。通知已被 {name} 静音。",
+        "untilClear": "直到解除",
+        "untilClearHint": "在告警恢复时结束，最迟 24 小时后结束。",
+        "confirmUntilClear": "静默直到解除",
+        "titleOne": "静默 {name}",
+        "subtitleOne": "它继续运行并保留其历史记录。通知、寻呼和工作流在窗口结束前停止。",
+        "untilTime": "直到 {time}。",
+        "groups": "分组",
+        "groupsThis": "此分组",
+        "groupsAll": "此告警的所有分组",
+        "addGroup": "添加一个触发中分组",
+        "groupsHint": "仅这些分组被静默；其他分组继续通知",
+        "confirm24h": {
+          "title": "静默 24 小时？",
+          "message": "“直到解除”会在告警恢复后立即结束静默。",
+          "useUntilClear": "使用“直到解除”",
+          "ok": "静默 24 小时"
+        },
+        "muteGroup": "静默此分组",
+        "endNow": "立即结束静默",
+        "endMute": "结束静默",
+        "mutedUntilClear": "静默直到解除 · 最多 24 小时",
+        "mutedUntilClearGroups": "静默直到解除 · {count} 个分组 | 静默直到解除 · {count} 个分组",
+        "mutedGroups": "静默中 · {count} 个分组 · {duration} 后结束 | 静默中 · {count} 个分组 · {duration} 后结束",
+        "mutedUntilClearTooltip": "由 {name} 静默，直到告警恢复，最迟 {end}",
+        "mutedGroupsTooltip": "由 {name} 静默至 {end}。分组：{labels}",
+        "mutedUntilClearGroupsTooltip": "由 {name} 静默，直到告警恢复，最晚至 {end}。分组：{labels}",
+        "untilTomorrow": "直到明天 {time}。"
       },
       "corrected": "已修正",
       "correctedBy": "评分已由 {names} 修正",
@@ -12047,7 +12101,66 @@
           "sent": "已向 {count} 个目标发送测试 | 已向 {count} 个目标发送测试",
           "failed": "测试未送达 {names}。"
         }
+      },
+      "untilClear": {
+        "schedule": "直到恢复",
+        "atMost": "最多 24 小时",
+        "endsWhenClears": "恢复时结束",
+        "byTime": "最晚 {time}",
+        "whenCleared": "恢复时间",
+        "endedBy": "由 {product} 结束",
+        "createdFrom": "创建自 {source}"
+      },
+      "groupTarget": "分组：{labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "从告警快速静默",
+      "endedLabel": "已结束"
+    },
+    "ack": {
+      "acknowledge": "认领",
+      "acknowledgeGroups": "认领 {count} 个触发中分组 | 认领 {count} 个触发中分组",
+      "unacknowledge": "取消认领",
+      "takeOver": "接管",
+      "chip": "由 {who} 通过 {source} 认领 · {time}",
+      "chipTooltip": "由 {who} 于 {time} 通过 {source} 认领",
+      "firingAcknowledged": "触发中 · 已认领",
+      "tile": "已认领",
+      "groupsAcknowledged": "已认领 {count} 个",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "值班",
+        "incident": "事件"
+      },
+      "history": {
+        "dedupSuppressed": "因认领而抑制（{who}）",
+        "acked": "由 {who} 通过 {source} 认领",
+        "ackedViaPage": "由 {who} 通过值班呼叫 {page} 认领",
+        "ackedViaIncident": "由 {who} 通过事件 {incident} 认领",
+        "unacked": "由 {who} 通过 {source} 取消认领",
+        "unackedResume": "由 {who} 通过 {source} 取消认领 · 重复通知将于 {time} 恢复",
+        "takenOver": "由 {who} 从 {previous} 接管（{source}）"
+      },
+      "refused": {
+        "ack": "您无法认领此告警。认领和静默需要管理员或编辑者角色，或需为该告警的值班响应者。",
+        "mute": "您无法静默此告警。认领和静默需要管理员或编辑者角色，或需为该告警的值班响应者。",
+        "onCall": "值班：{people}",
+        "canAct": "可操作：{people}",
+        "people": "值班：{onCall}。可操作：{canAct}"
+      },
+      "errors": {
+        "notFiring": "此告警未处于触发中，因此没有可认领的内容。",
+        "firingChanged": "自该页面加载以来，告警再次触发。请刷新后重试。"
       }
+    },
+    "groupActions": {
+      "menu": "分组操作",
+      "viewHistory": "查看此分组的历史记录"
+    },
+    "firingState": {
+      "level": "级别",
+      "firingSince": "触发时间",
+      "firingFor": "已触发 {duration}",
+      "incident": "事件"
     }
   },
   "alert_dependencies": {
@@ -12576,13 +12689,14 @@
       "openSlackSettings": "在设置 › Slack 中配置"
     },
     "prebuilt": {
-      "slackDescription": "发送通知到 Slack 频道",
+      "slackDescription": "使用您的 Webhook 和模板发布新消息。适用于值班呼叫或自定义 Slack 布局。",
       "discordDescription": "发送通知到 Discord 频道",
       "msteamsDescription": "发送通知到 Teams 频道",
       "emailDescription": "发送 HTML 格式的邮件通知",
       "pagerdutyDescription": "在 PagerDuty 中创建事件",
       "opsgenieDescription": "在 Opsgenie 中创建告警",
-      "servicenowDescription": "在 ServiceNow 中创建事件"
+      "servicenowDescription": "在 ServiceNow 中创建事件",
+      "slackAppDescription": "就地更新定时告警。可在 Slack 中认领、静默和调查。需要已连接的工作区。"
     },
     "import": {
       "title": "导入目标",
@@ -12624,7 +12738,8 @@
     "severityCriticalDescription": "最高优先级事件",
     "severityErrorDescription": "标准错误事件",
     "severityWarningDescription": "警告级事件",
-    "severityInfoDescription": "信息级事件"
+    "severityInfoDescription": "信息级事件",
+    "urlRecipientsChannel": "URL / 收件人 / 频道"
   },
   "pipeline_destinations": {
     "header": "流水线目标",
@@ -13147,7 +13262,7 @@
     "groupIntegrations": "集成",
     "groupAccount": "账户",
     "slackApp": "Slack",
-    "slackAppDesc": "从 Slack 向 OpenObserve 提问",
+    "slackAppDesc": "在 Slack 中向 OpenObserve 提问并对告警执行操作",
     "generalDesc": "主题、查询默认值和核心首选项",
     "orgDesc": "组织参数和标识符",
     "cipherKeysDesc": "用于敏感字段的加密密钥",
@@ -20641,7 +20756,9 @@
         "succeeded": "成功",
         "failed": "失败",
         "skipped": "已跳过",
-        "pending": "待处理"
+        "pending": "待处理",
+        "acknowledged": "已确认",
+        "ackevent": "确认事件"
       },
       "alertLevel": {
         "ok": "正常",
@@ -20944,7 +21061,16 @@
       "alertSavedSuccessfully": "告警保存成功。",
       "alertUpdatedSuccessfully": "告警更新成功。",
       "openingDedupConfig": "正在为 {name} 打开去重配置",
-      "editingAlert": "正在编辑告警：{name}"
+      "editingAlert": "正在编辑告警：{name}",
+      "ack": {
+        "acked": "已确认 {name}",
+        "ackedGroups": "已确认 {name} 的 {count} 个分组 | 已确认 {name} 的 {count} 个分组",
+        "alreadyAcked": "已由 {who} 确认",
+        "unacked": "已取消确认 {name}",
+        "takenOver": "您已接管 {name} 的确认",
+        "failed": "无法确认 {name}",
+        "unackFailed": "无法取消确认 {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "加密密钥更新成功",
@@ -21256,7 +21382,14 @@
       "muted": "已将 {count} 个项目静音，直到 {time}。已归档到 {folder}。 | 已将 {count} 个项目静音，直到 {time}。已归档到 {folder}。",
       "muteFailed": "无法创建静音",
       "viewDowntime": "查看停机",
-      "itemsDropped": "{count} 个所选项目不在所选文件夹内，已被移除。 | {count} 个所选项目不在所选文件夹内，已被移除。"
+      "itemsDropped": "{count} 个所选项目不在所选文件夹内，已被移除。 | {count} 个所选项目不在所选文件夹内，已被移除。",
+      "mutedUntilClear": "已将 {name} 静默，直至其恢复，最晚到 {time}",
+      "alreadyMuted": "{name} 已静默至 {time}",
+      "muteChanged": "此静默自页面加载后已变更。现在将于 {time} 结束。",
+      "muteEnded": "静默已结束。通知已恢复。",
+      "mutedOne": "已将 {name} 静默至 {time}",
+      "timeTomorrow": "明天 {time}",
+      "notQuickMute": "此静默是在静默期页面设置的。请在那里修改。"
     }
   },
   "cipherKeys": {
@@ -26723,7 +26856,10 @@
       "managedBy": "由您的实例管理员管理",
       "managedTitle": "由您的实例管理员管理。",
       "managedDetail": "凭据、关联以及哪些组织使用 {team} 均在 _meta 中设置。",
-      "managedQuestions": "疑问：{contact}"
+      "managedQuestions": "疑问：{contact}",
+      "outboundQueue": "告警消息：排队 {count} 条，最久等待 {age} | 告警消息：排队 {count} 条，最久等待 {age}",
+      "outboundEmpty": "没有排队的告警消息",
+      "ageSeconds": "{count} 秒"
     },
     "channels": {
       "title": "频道默认设置",
@@ -26759,7 +26895,8 @@
       "instanceAdminOnly": "仅实例管理员",
       "ownOrgOnlyHint": "在实例工作区中，您可以将频道映射到自己的组织",
       "claimableHint": "未认领的频道以及 {org} 拥有的频道",
-      "servedOrgsHint": "此工作区服务的任何组织"
+      "servedOrgsHint": "此工作区服务的任何组织",
+      "alertRoutes": "{count} 个目标 | {count} 个目标"
     },
     "people": {
       "title": "已关联人员",
@@ -26913,6 +27050,83 @@
       "remove": "移除",
       "saved": "组织已保存",
       "saveFailed": "无法保存组织。"
+    },
+    "destination": {
+      "appTile": "{product} 应用",
+      "webhookTile": "{product} Webhook",
+      "twoWay": "双向",
+      "recommendedForAlertResponse": "推荐用于告警响应",
+      "choiceHint": "值班呼叫和超级集群使用 Webhook。从 Slack 应用目标进行的手动发送和实时发送会作为独立消息发布。",
+      "unavailableReason": "需要单集群上的 Enterprise Slack 应用",
+      "unavailableFlag": "此服务器上已关闭；请让运维人员设置 {variable}",
+      "unavailableMasterKey": "此服务器需要加密密钥；请让运维人员设置 {variable}",
+      "unavailableCloud": "您的 Cloud 区域尚未启用",
+      "unavailableNoAccess": "请让组织管理员启用 Slack 应用",
+      "postOnly": "仅发布",
+      "switchToApp": "切换到 {product} 应用",
+      "switchThis": "切换此目标",
+      "switchBack": "切换回去",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "工作区",
+      "channel": "频道",
+      "mention": "提及",
+      "mentionCritical": "对严重告警使用 {'@'}here，其他情况不提及",
+      "mentionNone": "无",
+      "mentionHelp": "用于重复告警和级别升级时",
+      "refireReuse": "重复触发复用（分钟）",
+      "refireReuseHelp": "在此时间内重新触发会编辑先前的消息，而不是发布新消息",
+      "buttons": "确认、静默和调查按钮",
+      "buttonsHelp": "当触发中的告警存在事件或值班呼叫时，会添加解决按钮",
+      "autoInvestigate": "对严重告警自动调查",
+      "autoInvestigateHelp": "以组织的 AI 服务账户身份运行，并使用其访问权限；将调查结果发布到告警线程中",
+      "templateDefault": "默认 {product} 模板（{name}）",
+      "sendTest": "发送测试",
+      "setsDefault": "将 #{channel} 的默认组织设置为 {org}",
+      "answersFor": "#{channel} 为组织 {org} 回答问题。来自 {thisOrg} 的告警会发布到这里，其线程在 {thisOrg} 中回复；频道默认设置保持不变。",
+      "sharedTag": "共享 · {product} Connect",
+      "sharedTitle": "#{channel} 已与 {workspace} 外部人员共享。",
+      "sharedDetail": "他们将看到告警名称、值、图表和链接。他们对按钮的点击将被拒绝。",
+      "sharedConfirm": "我了解，请将告警发布到此共享频道",
+      "sharedRequired": "请确认允许告警发布到此共享频道",
+      "versionMismatch": "各节点运行的版本不同。请先升级所有节点。",
+      "oncallNotAllowed": "{product} 应用目标不能作为值班团队频道",
+      "answersForAnother": "#{channel} 为另一个组织回答问题。来自 {thisOrg} 的告警会发布到这里，其线程在 {thisOrg} 中回复；频道默认设置保持不变。",
+      "oncallTag": "值班频道",
+      "oncallTitle": "团队 {team} 的值班寻呼也会通过 {destination} 发布到 #{channel}。",
+      "oncallDetail": "此处的告警会单独发布。",
+      "oncallConfirm": "我了解，请将告警发布到此值班频道",
+      "oncallRequired": "请确认允许告警发布到此值班频道",
+      "workspaceRequired": "请选择工作区",
+      "refireRange": "请输入 0 到 {max} 之间的整数分钟",
+      "connectTitle": "连接 {product} 以发布带按钮的告警",
+      "connectDetail": "在 {product} 的界面上选择一个频道并允许。OpenObserve 会为该频道创建此目标。",
+      "connected": "已为 #{channel} 创建 {name}。请检查其设置并保存。",
+      "saveFailed": "无法保存该目标。",
+      "switched": "{name} 现在通过 {product} 应用发布",
+      "switchedBack": "{name} 再次通过其 webhook 发布",
+      "switchFailed": "无法切换 {name}：{reason}",
+      "switchedAll": "{count} 个目标已切换 | {count} 个目标已切换",
+      "switchThisDetail": "将其切换到 {product} 应用以获得认领、静默和调查按钮。其名称、模板和告警保持不变；切回后会恢复 webhook。"
+    },
+    "switchAll": {
+      "title": "此工作区有 {count} 个 webhook 目标。 | 此工作区有 {count} 个 webhook 目标。",
+      "detail": "将其切换到 {product} 应用以获得认领、静默和调查按钮。其名称、模板和告警保持不变；切回后会恢复 webhook。 | 将其切换到 {product} 应用以获得认领、静默和调查按钮。其名称、模板和告警保持不变；切回后会恢复 webhook。",
+      "review": "查看",
+      "action": "全部切换",
+      "summary": "{switched} 个已切换 · {count} 个未能切换"
+    },
+    "oncallUnlinked": {
+      "title": "未关联 {product} 的值班成员",
+      "description": "值班寻呼无法向他们发送私信，他们对告警和寻呼按钮的点击也会等到关联后才生效",
+      "remind": "提醒他们",
+      "columnPerson": "人员",
+      "columnTeam": "团队",
+      "columnNextShift": "下一班次",
+      "columnReminder": "提醒",
+      "dmSent": "已于 {time} 发送私信",
+      "notSent": "未发送",
+      "reminded": "已向 {count} 人发送提醒 | 已向 {count} 人发送提醒",
+      "remindFailed": "无法发送提醒。"
     }
   },
   "fleet": {

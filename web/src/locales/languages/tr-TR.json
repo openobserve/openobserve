@@ -968,19 +968,43 @@
     "browserTimeWithZone": "Tarayıcı Zamanı ({zone})",
     "poweredBy": "Destekleyen",
     "editorDraft": {
+      "restoreTitle": "Kaydedilmemiş taslak",
+      "fleetRestoreTitle": "Kaydedilmemiş yerel değişiklikler",
+      "restoreMessage": "Bu {entity} üzerinde {date} tarihinden kalma kaydedilmemiş değişiklikleriniz var.",
+      "changedOnServer": "Taslağınız kaydedildikten sonra bu {entity} değiştirildi. Taslağı kaydetmek bu değişikliklerin yerine geçecektir.",
+      "credentialsNotSaved": "Parolalar, token'lar ve diğer gizli bilgiler taslaklarda tutulmaz. Kaydetmeden önce bunları yeniden girin.",
       "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
       "envVarField": "environment variable {name}",
       "credentialFileField": "credential file {name}",
+      "continueDraft": "Taslağa devam et",
+      "startFresh": "Sıfırdan başla",
+      "itemDeleted": "Bu {entity} artık mevcut değil; bu nedenle kaydedilmemiş taslağı atıldı.",
+      "leaveTitle": "Kaydedilmemiş değişikliklerle ayrılmak istiyor musunuz?",
+      "leaveMessage": "{entity} öğesini kaydedin, oturumu kapatana kadar değişikliklerinizi bu tarayıcıda taslak olarak tutun veya bunları atın.",
+      "keepDraft": "Taslağı tut",
+      "keepFailed": "Bu tarayıcının depolama alanı dolu veya kullanılamıyor olduğundan taslak tutulamadı. {entity} öğesini kaydedin veya değişikliklerinizi atın.",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
-      "signOutTitle": "Sign out and discard drafts?",
-      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out",
+      "rowDot": "Kaydedilmemiş taslak · {date}",
+      "newDot": "{label} · kaydedilmemiş taslak",
+      "newDotDated": "{label} · unsaved draft from {date}",
       "entities": {
+        "alert": "uyarı",
+        "alert_template": "uyarı şablonu",
+        "alert_destination": "uyarı hedefi",
+        "downtime": "bakım penceresi",
+        "pipeline": "işlem hattı",
+        "function": "fonksiyon",
+        "report": "rapor",
+        "slo": "SLO",
+        "synthetic_check": "sentetik kontrol",
+        "synthetic_browser": "tarayıcı testi",
+        "prompt": "istem",
+        "experiment": "deney",
         "dashboard_settings": "dashboard settings",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
@@ -996,11 +1020,13 @@
         "eval_job": "evaluation job",
         "eval_scorer": "scorer"
       },
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
-      "dotUndated": "Unsaved draft",
-      "newDotDated": "{label} · unsaved draft from {date}"
+      "dotUndated": "Unsaved draft"
     }
   },
   "flow": {
@@ -11605,7 +11631,8 @@
         "dailySentence": "Günlük · {time}, {duration} boyunca · {zone}",
         "weeklySentence": "Haftalık {days} · {time}, {duration} boyunca · {zone}",
         "fromNoEnd": "{schedule}, {start} tarihinden itibaren, bitiş tarihi yok",
-        "fromUntil": "{schedule}, {start} ile {until} arasında"
+        "fromUntil": "{schedule}, {start} ile {until} arasında",
+        "onceFor": "Bir kez, {duration}"
       },
       "validation": {
         "conditionRequired": "Bir koşul ekleyin veya koşul bloğunu kaldırın.",
@@ -11946,8 +11973,8 @@
         "presets": {
           "30m": "30 dk",
           "1h": "1 sa",
-          "2h": "2 sa",
           "4h": "4 sa",
+          "24h": "24 sa",
           "custom": "Özel"
         },
         "endsAt": "Bitiş",
@@ -11961,7 +11988,34 @@
         "mutedTooltip": "{name} tarafından {end} zamanına kadar susturuldu",
         "exclude": "Bir zaman aralığını hariç tut…",
         "firingMuted": "Tetikleniyor · sessize alındı",
-        "firingMutedTooltip": "Hâlâ tetikleniyor. Bildirimler {name} tarafından sessize alındı."
+        "firingMutedTooltip": "Hâlâ tetikleniyor. Bildirimler {name} tarafından sessize alındı.",
+        "untilClear": "Temizlenene kadar",
+        "untilClearHint": "Uyarı düzeldiğinde veya en geç 24 sa sonra sona erer.",
+        "confirmUntilClear": "Temizlenene kadar sessize al",
+        "titleOne": "{name} öğesini sessize al",
+        "subtitleOne": "Çalışmaya devam eder ve geçmişini korur. Pencere bitene kadar bildirimler, çağrılar ve iş akışları durur.",
+        "untilTime": "{time} zamanına kadar.",
+        "groups": "Gruplar",
+        "groupsThis": "Bu grup",
+        "groupsAll": "Bu uyarının tüm grupları",
+        "addGroup": "Tetiklenmiş bir grup ekle",
+        "groupsHint": "Yalnızca bu gruplar sessize alınır; diğer gruplar bildirim göndermeye devam eder",
+        "confirm24h": {
+          "title": "24 saat sessize alınsın mı?",
+          "message": "Temizlenene kadar seçeneği, uyarı düzelir düzelmez sessize almayı sona erdirir.",
+          "useUntilClear": "Temizlenene kadar kullan",
+          "ok": "24 sa sessize al"
+        },
+        "muteGroup": "Bu grubu sessize al",
+        "endNow": "Sessize almayı şimdi sonlandır",
+        "endMute": "Sessize almayı sonlandır",
+        "mutedUntilClear": "Temizlenene kadar sessize alındı · en fazla 24 sa",
+        "mutedUntilClearGroups": "Temizlenene kadar sessize alındı · {count} grup | Temizlenene kadar sessize alındı · {count} grup",
+        "mutedGroups": "Sessize alındı · {count} grup · {duration} sonra sona erer | Sessize alındı · {count} grup · {duration} sonra sona erer",
+        "mutedUntilClearTooltip": "{name} tarafından sessize alındı; uyarı düzelene kadar sürer, en geç {end} zamanına kadar.",
+        "mutedGroupsTooltip": "{name} tarafından {end} tarihine kadar sessize alındı. Gruplar: {labels}",
+        "mutedUntilClearGroupsTooltip": "{name} tarafından uyarı düzelene kadar, en geç {end} olmak üzere sessize alındı. Gruplar: {labels}",
+        "untilTomorrow": "Yarın {time} saatine kadar."
       },
       "corrected": "Düzeltildi",
       "correctedBy": "Puan {names} tarafından düzeltildi",
@@ -12047,7 +12101,66 @@
           "sent": "Test {count} hedefe gönderildi | Test {count} hedefe gönderildi",
           "failed": "Test {names} hedefine ulaşmadı."
         }
+      },
+      "untilClear": {
+        "schedule": "Çözülene kadar",
+        "atMost": "En fazla 24 saat",
+        "endsWhenClears": "Çözüldüğünde sona erer",
+        "byTime": "{time} itibarıyla",
+        "whenCleared": "Çözüldüğünde",
+        "endedBy": "{product} tarafından sona erdirildi",
+        "createdFrom": "{source} kaynağından"
+      },
+      "groupTarget": "Grup: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Uyarıdan hızlı sessize alma",
+      "endedLabel": "sona erdi"
+    },
+    "ack": {
+      "acknowledge": "Sahiplen",
+      "acknowledgeGroups": "{count} tetiklenmiş grubu sahiplen | {count} tetiklenmiş grubu sahiplen",
+      "unacknowledge": "Sahiplenmeyi bırak",
+      "takeOver": "Devral",
+      "chip": "{who} tarafından {source} üzerinden sahiplenildi · {time}",
+      "chipTooltip": "{who} tarafından {time} tarihinde {source} kaynağından sahiplenildi",
+      "firingAcknowledged": "Tetiklenmiş · sahiplenildi",
+      "tile": "Sahiplenildi",
+      "groupsAcknowledged": "{count} sahiplenildi",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "nöbet",
+        "incident": "vaka"
+      },
+      "history": {
+        "dedupSuppressed": "sahiplenme nedeniyle bastırıldı ({who})",
+        "acked": "{who} tarafından {source} kaynağından sahiplenildi",
+        "ackedViaPage": "{who} tarafından çağrı {page} üzerinden sahiplenildi",
+        "ackedViaIncident": "{who} tarafından vaka {incident} üzerinden sahiplenildi",
+        "unacked": "{who} tarafından {source} kaynağından sahiplenme kaldırıldı",
+        "unackedResume": "{who} tarafından {source} kaynağından sahiplenme kaldırıldı · tekrarlar {time} tarihinde devam eder",
+        "takenOver": "{who} tarafından {previous} kişisinden devralındı ({source})"
+      },
+      "refused": {
+        "ack": "Bu uyarıyı sahiplenemezsiniz. Sahiplenme ve Sessize Alma için Yönetici veya Düzenleyici rolü ya da uyarının nöbetçi yanıtlayıcısı olmanız gerekir.",
+        "mute": "Bu uyarıyı sessize alamazsınız. Sahiplenme ve Sessize Alma için Yönetici veya Düzenleyici rolü ya da uyarının nöbetçi yanıtlayıcısı olmanız gerekir.",
+        "onCall": "Nöbette: {people}",
+        "canAct": "İşlem yapabilenler: {people}",
+        "people": "Nöbette: {onCall}. İşlem yapabilenler: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Bu uyarı tetiklenmiş durumda değil, sahiplenilecek bir şey yok.",
+        "firingChanged": "Bu sayfa yüklendikten sonra uyarı yeniden tetiklendi. Yenileyip tekrar deneyin."
       }
+    },
+    "groupActions": {
+      "menu": "Grup işlemleri",
+      "viewHistory": "Bu grubun geçmişini görüntüle"
+    },
+    "firingState": {
+      "level": "Seviye",
+      "firingSince": "Tetiklenme başlangıcı",
+      "firingFor": "{duration} süredir tetiklenmiş",
+      "incident": "Vaka"
     }
   },
   "alert_dependencies": {
@@ -12576,13 +12689,14 @@
       "openSlackSettings": "Ayarlar › Slack bölümünde kurun"
     },
     "prebuilt": {
-      "slackDescription": "Bildirimleri Slack kanallarına gönder",
+      "slackDescription": "Webhook ve şablonunuzla yeni bir mesaj gönderir. Çağrılar veya özel Slack düzenleri için kullanın.",
       "discordDescription": "Bildirimleri Discord kanallarına gönder",
       "msteamsDescription": "Bildirimleri Teams kanallarına gönder",
       "emailDescription": "HTML biçimli e-posta bildirimleri gönder",
       "pagerdutyDescription": "PagerDuty'de vakalar oluştur",
       "opsgenieDescription": "Opsgenie'de uyarılar oluştur",
-      "servicenowDescription": "ServiceNow'da vakalar oluştur"
+      "servicenowDescription": "ServiceNow'da vakalar oluştur",
+      "slackAppDescription": "Zamanlanmış uyarıları yerinde günceller. Slack üzerinden sahiplenin, sessize alın ve inceleyin. Bağlı bir çalışma alanı gerektirir."
     },
     "import": {
       "title": "Hedefi İçe Aktar",
@@ -12624,7 +12738,8 @@
     "severityCriticalDescription": "En yüksek öncelikli vakalar",
     "severityErrorDescription": "Standart hata vakaları",
     "severityWarningDescription": "Uyarı düzeyi vakaları",
-    "severityInfoDescription": "Bilgilendirme vakaları"
+    "severityInfoDescription": "Bilgilendirme vakaları",
+    "urlRecipientsChannel": "URL / alıcılar / kanal"
   },
   "pipeline_destinations": {
     "header": "İşlem Hattı Hedefleri",
@@ -13147,7 +13262,7 @@
     "groupIntegrations": "Entegrasyonlar",
     "groupAccount": "Hesap",
     "slackApp": "Slack",
-    "slackAppDesc": "Slack'ten OpenObserve'a sorular sorun",
+    "slackAppDesc": "Slack üzerinden OpenObserve'a sorular sorun ve uyarılar üzerinde işlem yapın",
     "generalDesc": "Tema, sorgu varsayılanları ve temel tercihler",
     "orgDesc": "Kuruluş parametreleri ve tanımlayıcıları",
     "cipherKeysDesc": "Hassas alanlar için şifreleme anahtarları",
@@ -20641,7 +20756,9 @@
         "succeeded": "Başarılı",
         "failed": "Başarısız",
         "skipped": "Atlandı",
-        "pending": "Beklemede"
+        "pending": "Beklemede",
+        "acknowledged": "Üstlenildi",
+        "ackevent": "Üstlenme olayı"
       },
       "alertLevel": {
         "ok": "Tamam",
@@ -20944,7 +21061,16 @@
       "alertSavedSuccessfully": "Uyarı başarıyla kaydedildi.",
       "alertUpdatedSuccessfully": "Uyarı başarıyla güncellendi.",
       "openingDedupConfig": "{name} için tekilleştirme yapılandırması açılıyor",
-      "editingAlert": "Uyarı düzenleniyor: {name}"
+      "editingAlert": "Uyarı düzenleniyor: {name}",
+      "ack": {
+        "acked": "{name} üstlenildi",
+        "ackedGroups": "{name} için {count} grup üstlenildi | {name} için {count} grup üstlenildi",
+        "alreadyAcked": "{who} tarafından zaten üstlenildi",
+        "unacked": "{name} üstlenimi kaldırıldı",
+        "takenOver": "{name} üstlenimini devraldınız",
+        "failed": "{name} üstlenilemedi",
+        "unackFailed": "{name} üstlenimi kaldırılamadı"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Şifre anahtarı başarıyla güncellendi",
@@ -21256,7 +21382,14 @@
       "muted": "{count} öğe {time} zamanına kadar sessize alındı. {folder} klasörüne kaydedildi. | {count} öğe {time} zamanına kadar sessize alındı. {folder} klasörüne kaydedildi.",
       "muteFailed": "Sessize alma oluşturulamadı",
       "viewDowntime": "Bakım penceresini görüntüle",
-      "itemsDropped": "{count} seçilen öğe, seçilen klasörlerin dışında olduğu için kaldırıldı. | {count} seçilen öğe, seçilen klasörlerin dışında olduğu için kaldırıldı."
+      "itemsDropped": "{count} seçilen öğe, seçilen klasörlerin dışında olduğu için kaldırıldı. | {count} seçilen öğe, seçilen klasörlerin dışında olduğu için kaldırıldı.",
+      "mutedUntilClear": "{name}, temizlenene kadar en geç {time} zamanına kadar sessize alındı",
+      "alreadyMuted": "{name} zaten {time} zamanına kadar sessize alınmış",
+      "muteChanged": "Sayfa yüklendiğinden beri bu sessize alma değişti. Artık {time} zamanında sona eriyor.",
+      "muteEnded": "Sessize alma sona erdi. Bildirimler yeniden başlar.",
+      "mutedOne": "{name}, {time} zamanına kadar sessize alındı",
+      "timeTomorrow": "yarın {time}",
+      "notQuickMute": "Bu sessize alma Bakım pencereleri sayfasında ayarlanmış. Orada değiştirin."
     }
   },
   "cipherKeys": {
@@ -26723,7 +26856,10 @@
       "managedBy": "örnek yöneticiniz tarafından yönetilir",
       "managedTitle": "Örnek yöneticiniz tarafından yönetilir.",
       "managedDetail": "Kimlik bilgileri, bağlantı ve hangi kuruluşların {team} kullandığı _meta içinde ayarlanır.",
-      "managedQuestions": "Sorular: {contact}"
+      "managedQuestions": "Sorular: {contact}",
+      "outboundQueue": "Uyarı iletileri: {count} kuyrukta, en eskisi {age} | Uyarı iletileri: {count} kuyrukta, en eskisi {age}",
+      "outboundEmpty": "Kuyrukta uyarı iletisi yok",
+      "ageSeconds": "{count} sn"
     },
     "channels": {
       "title": "Kanal varsayılanları",
@@ -26759,7 +26895,8 @@
       "instanceAdminOnly": "Yalnızca örnek yöneticisi",
       "ownOrgOnlyHint": "Bir örnek çalışma alanında kanalları kendi kuruluşunuza eşlersiniz",
       "claimableHint": "Sahiplenilmemiş kanallar ve {org} kuruluşunun sahip olduğu kanallar",
-      "servedOrgsHint": "Bu çalışma alanının hizmet verdiği herhangi bir kuruluş"
+      "servedOrgsHint": "Bu çalışma alanının hizmet verdiği herhangi bir kuruluş",
+      "alertRoutes": "{count} hedef | {count} hedef"
     },
     "people": {
       "title": "Bağlantılı kişiler",
@@ -26913,6 +27050,83 @@
       "remove": "Kaldır",
       "saved": "Kuruluşlar kaydedildi",
       "saveFailed": "Kuruluşlar kaydedilemedi."
+    },
+    "destination": {
+      "appTile": "{product} uygulaması",
+      "webhookTile": "{product} webhook",
+      "twoWay": "Çift yönlü",
+      "recommendedForAlertResponse": "Uyarı yanıtı için önerilir",
+      "choiceHint": "Çağrılar ve süper kümeler webhook'u kullanır. Slack uygulaması hedefinden yapılan manuel ve gerçek zamanlı gönderimler ayrı gönderimlerdir.",
+      "unavailableReason": "Tek bir kümede Enterprise Slack uygulaması gerektirir",
+      "unavailableFlag": "Bu sunucuda kapalı; {variable} ayarlaması için operatörünüze başvurun",
+      "unavailableMasterKey": "Bu sunucuda bir şifreleme anahtarı gerekiyor; {variable} ayarlaması için operatörünüze başvurun",
+      "unavailableCloud": "Cloud bölgeniz için henüz etkinleştirilmedi",
+      "unavailableNoAccess": "Kuruluş yöneticinizden Slack uygulamasını etkinleştirmesini isteyin",
+      "postOnly": "Yalnızca gönderim",
+      "switchToApp": "{product} uygulamasına geç",
+      "switchThis": "Bu hedefi değiştir",
+      "switchBack": "Geri dön",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Çalışma alanı",
+      "channel": "Kanal",
+      "mention": "Bahsetme",
+      "mentionCritical": "{'@'}here kritik olanlar için, diğerleri için hiçbiri",
+      "mentionNone": "Yok",
+      "mentionHelp": "Tekrarlarda ve seviye yükseltmelerinde kullanılır",
+      "refireReuse": "Yeniden tetiklemede yeniden kullanım (dakika)",
+      "refireReuseHelp": "Bu süre içindeki bir yeniden tetikleme, yeni bir gönderi paylaşmak yerine önceki iletiyi düzenler",
+      "buttons": "Üstlen, Sessize al ve İncele düğmeleri",
+      "buttonsHelp": "Tetiklenmiş uyarının bir vakası veya çağrısı varsa Çöz eklenir",
+      "autoInvestigate": "Kritik uyarılar için otomatik incele",
+      "autoInvestigateHelp": "Kuruluşun Yapay Zeka hizmet hesabı olarak, onun erişimiyle çalışır; bulguları uyarı ileti dizisinde paylaşır",
+      "templateDefault": "Varsayılan {product} şablonu ({name})",
+      "sendTest": "Test gönder",
+      "setsDefault": "#{channel} kanalının varsayılan kuruluşunu {org} olarak ayarlar",
+      "answersFor": "#{channel}, {org} kuruluşu için soruları yanıtlar. {thisOrg} uyarıları buraya gönderilir ve bunların konuları {thisOrg} içinde yanıtlanır; kanal varsayılanı değişmez.",
+      "sharedTag": "Paylaşılan · {product} Connect",
+      "sharedTitle": "#{channel}, {workspace} dışındaki kişilerle paylaşılıyor.",
+      "sharedDetail": "Bu kişiler uyarı adlarını, değerlerini, grafiklerini ve bağlantılarını görecek. Düğmelere yaptıkları tıklamalar reddedilecek.",
+      "sharedConfirm": "Anladım, uyarıları bu paylaşılan kanala gönder",
+      "sharedRequired": "Uyarıların bu paylaşılan kanala gönderilebileceğini onaylayın",
+      "versionMismatch": "Düğümler farklı sürümlerde çalışıyor. Önce her düğümü yükseltin.",
+      "oncallNotAllowed": "Bir {product} uygulaması hedefi, nöbet ekibi kanalı olamaz",
+      "answersForAnother": "#{channel} başka bir kuruluş için soruları yanıtlar. {thisOrg} uyarıları buraya gönderilir ve bunların konuları {thisOrg} içinde yanıtlanır; kanal varsayılanı değişmez.",
+      "oncallTag": "Nöbet odası",
+      "oncallTitle": "{team} ekibi için nöbet çağrıları ayrıca {destination} aracılığıyla #{channel} kanalına gönderilir.",
+      "oncallDetail": "Buradaki uyarılar ayrı olarak gönderilir.",
+      "oncallConfirm": "Anladım, uyarıları bu nöbet odasına gönder",
+      "oncallRequired": "Uyarıların bu nöbet odasına gönderilebileceğini onaylayın",
+      "workspaceRequired": "Bir çalışma alanı seçin",
+      "refireRange": "0 ile {max} arasında tam dakika girin",
+      "connectTitle": "Düğmelerle uyarı göndermek için {product} uygulamasını bağlayın",
+      "connectDetail": "{product} ekranında bir kanal seçin ve İzin Ver'e tıklayın. OpenObserve bu hedefi o kanal için oluşturur.",
+      "connected": "{name}, #{channel} için oluşturuldu. Ayarlarını kontrol edin ve kaydedin.",
+      "saveFailed": "Hedef kaydedilemedi.",
+      "switched": "{name} artık {product} uygulaması üzerinden gönderim yapıyor",
+      "switchedBack": "{name} yeniden kendi webhook'u üzerinden gönderim yapıyor",
+      "switchFailed": "{name} geçirilemedi: {reason}",
+      "switchedAll": "{count} hedef geçirildi | {count} hedef geçirildi",
+      "switchThisDetail": "Kabul Et, Sessize Al ve İncele düğmeleri için bunu {product} uygulamasına geçirin. Adı, şablonu ve uyarıları aynı kalır; Geri geçiş webhook'u geri yükler."
+    },
+    "switchAll": {
+      "title": "{count} webhook hedefi bu çalışma alanına gönderim yapıyor. | {count} webhook hedefi bu çalışma alanına gönderim yapıyor.",
+      "detail": "Kabul Et, Sessize Al ve İncele düğmeleri için bunu {product} uygulamasına geçirin. Adı, şablonu ve uyarıları aynı kalır; Geri geçiş webhook'u geri yükler. | Kabul Et, Sessize Al ve İncele düğmeleri için bunları {product} uygulamasına geçirin. Adları, şablonları ve uyarıları aynı kalır; Geri geçiş webhook'u geri yükler.",
+      "review": "İncele",
+      "action": "Tümünü geçir",
+      "summary": "{switched} geçirildi · {count} geçirilemedi"
+    },
+    "oncallUnlinked": {
+      "title": "{product} ile bağlantılı olmayan nöbet üyeleri",
+      "description": "Çağrılar onlara DM gönderemez; uyarı ve çağrı düğmelerine tıklamaları, bağlantı kurana kadar bekler.",
+      "remind": "Onlara hatırlat",
+      "columnPerson": "Kişi",
+      "columnTeam": "Ekip",
+      "columnNextShift": "Sonraki vardiya",
+      "columnReminder": "Hatırlatma",
+      "dmSent": "{time} DM gönderildi",
+      "notSent": "Gönderilmedi",
+      "reminded": "{count} kişiye hatırlatma gönderildi | {count} kişiye hatırlatma gönderildi",
+      "remindFailed": "Hatırlatmalar gönderilemedi."
     }
   },
   "fleet": {

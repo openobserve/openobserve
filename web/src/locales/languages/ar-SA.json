@@ -968,19 +968,43 @@
     "browserTimeWithZone": "وقت المتصفح ({zone})",
     "poweredBy": "بدعم من",
     "editorDraft": {
+      "restoreTitle": "مسودة غير محفوظة",
+      "fleetRestoreTitle": "تغييرات محلية غير محفوظة",
+      "restoreMessage": "لديك تغييرات غير محفوظة على {entity} بتاريخ {date}.",
+      "changedOnServer": "تم تغيير {entity} بعد حفظ مسودتك. سيؤدي حفظ المسودة إلى استبدال تلك التغييرات.",
+      "credentialsNotSaved": "لا تُحفظ كلمات المرور والرموز وغيرها من البيانات السرية في المسودات. أعد إدخالها قبل الحفظ.",
       "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
       "envVarField": "environment variable {name}",
       "credentialFileField": "credential file {name}",
+      "continueDraft": "متابعة المسودة",
+      "startFresh": "البدء من جديد",
+      "itemDeleted": "لم يعد {entity} موجودًا، لذا تم تجاهل مسودته غير المحفوظة.",
+      "leaveTitle": "المغادرة مع وجود تغييرات غير محفوظة؟",
+      "leaveMessage": "احفظ {entity}، أو أبقِ تغييراتك كمسودة في هذا المتصفح حتى تسجيل الخروج، أو تجاهلها.",
+      "keepDraft": "الإبقاء على المسودة",
+      "keepFailed": "تعذّر الإبقاء على المسودة لأن مساحة تخزين هذا المتصفح ممتلئة أو غير متاحة. احفظ {entity} أو تجاهل تغييراتك.",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
-      "signOutTitle": "Sign out and discard drafts?",
-      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out",
+      "rowDot": "مسودة غير محفوظة · {date}",
+      "newDot": "{label} · مسودة غير محفوظة",
+      "newDotDated": "{label} · unsaved draft from {date}",
       "entities": {
+        "alert": "التنبيه",
+        "alert_template": "قالب التنبيه",
+        "alert_destination": "وجهة التنبيه",
+        "downtime": "فترة الصيانة",
+        "pipeline": "مسار المعالجة",
+        "function": "الدالة",
+        "report": "التقرير",
+        "slo": "SLO",
+        "synthetic_check": "الفحص الاصطناعي",
+        "synthetic_browser": "اختبار المتصفح",
+        "prompt": "الموجّه",
+        "experiment": "التجربة",
         "dashboard_settings": "dashboard settings",
         "cipher_key": "cipher key",
         "ai_toolset": "AI toolset",
@@ -996,11 +1020,13 @@
         "eval_job": "evaluation job",
         "eval_scorer": "scorer"
       },
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out",
       "continueEditing": "Continue editing",
       "keepInBrowser": "Keep in this browser",
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
-      "dotUndated": "Unsaved draft",
-      "newDotDated": "{label} · unsaved draft from {date}"
+      "dotUndated": "Unsaved draft"
     }
   },
   "flow": {
@@ -11605,7 +11631,8 @@
         "dailySentence": "يوميًا · {time} لمدة {duration} · {zone}",
         "weeklySentence": "أسبوعيًا في {days} · {time} لمدة {duration} · {zone}",
         "fromNoEnd": "{schedule}، من {start} بدون تاريخ انتهاء",
-        "fromUntil": "{schedule}، من {start} حتى {until}"
+        "fromUntil": "{schedule}، من {start} حتى {until}",
+        "onceFor": "مرة واحدة، {duration}"
       },
       "validation": {
         "conditionRequired": "أضف شرطًا، أو أزل كتلة الشرط.",
@@ -11946,8 +11973,8 @@
         "presets": {
           "30m": "30 دقيقة",
           "1h": "ساعة واحدة",
-          "2h": "ساعتان",
           "4h": "4 ساعات",
+          "24h": "24 ساعة",
           "custom": "مخصص"
         },
         "endsAt": "ينتهي في",
@@ -11961,7 +11988,34 @@
         "mutedTooltip": "مكتوم بواسطة {name} حتى {end}",
         "exclude": "استبعاد نافذة…",
         "firingMuted": "قيد الإطلاق · مكتوم",
-        "firingMutedTooltip": "لا يزال قيد الإطلاق. الإشعارات مكتومة بواسطة {name}."
+        "firingMutedTooltip": "لا يزال قيد الإطلاق. الإشعارات مكتومة بواسطة {name}.",
+        "untilClear": "حتى يزول",
+        "untilClearHint": "ينتهي عند تعافي التنبيه، أو بعد 24 ساعة كحد أقصى.",
+        "confirmUntilClear": "كتم حتى يزول",
+        "titleOne": "كتم {name}",
+        "subtitleOne": "يستمر في العمل ويحتفظ بسجله. تتوقف الإشعارات ونداءات المناوبة وسير العمل حتى انتهاء الفترة.",
+        "untilTime": "حتى {time}.",
+        "groups": "المجموعات",
+        "groupsThis": "هذه المجموعة",
+        "groupsAll": "كل مجموعات هذا التنبيه",
+        "addGroup": "إضافة مجموعة قيد الإطلاق",
+        "groupsHint": "تُكتم هذه المجموعات فقط؛ وتستمر المجموعات الأخرى في الإشعار",
+        "confirm24h": {
+          "title": "كتم لمدة 24 ساعة؟",
+          "message": "«حتى يزول» ينهي الكتم بمجرد تعافي التنبيه.",
+          "useUntilClear": "استخدام «حتى يزول»",
+          "ok": "كتم لمدة 24 ساعة"
+        },
+        "muteGroup": "كتم هذه المجموعة",
+        "endNow": "إنهاء الكتم الآن",
+        "endMute": "إنهاء الكتم",
+        "mutedUntilClear": "مكتوم حتى يزول · 24 ساعة كحد أقصى",
+        "mutedUntilClearGroups": "مكتوم حتى يزول · {count} مجموعة | مكتوم حتى يزول · {count} مجموعات",
+        "mutedGroups": "مكتوم · {count} مجموعة · ينتهي خلال {duration} | مكتوم · {count} مجموعات · ينتهي خلال {duration}",
+        "mutedUntilClearTooltip": "مكتوم بواسطة {name} حتى تعافي التنبيه، و{end} كحد أقصى",
+        "mutedGroupsTooltip": "تم كتم الإشعارات بواسطة {name} حتى {end}. المجموعات: {labels}",
+        "mutedUntilClearGroupsTooltip": "تم كتم الإشعارات بواسطة {name} حتى يتعافى التنبيه، على أقصى تقدير {end}. المجموعات: {labels}",
+        "untilTomorrow": "حتى {time} غدًا."
       },
       "corrected": "تم التصحيح",
       "correctedBy": "تم تصحيح النتيجة بواسطة {names}",
@@ -12047,7 +12101,66 @@
           "sent": "أُرسل الاختبار إلى {count} وجهة | أُرسل الاختبار إلى {count} من الوجهات",
           "failed": "لم يصل الاختبار إلى {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "حتى يزول",
+        "atMost": "24 ساعة كحد أقصى",
+        "endsWhenClears": "ينتهي عندما يزول",
+        "byTime": "بحلول {time}",
+        "whenCleared": "عندما زال",
+        "endedBy": "انتهى بواسطة {product}",
+        "createdFrom": "من {source}"
+      },
+      "groupTarget": "المجموعة: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "كتم سريع من التنبيه",
+      "endedLabel": "انتهى"
+    },
+    "ack": {
+      "acknowledge": "تأكيد الاستلام",
+      "acknowledgeGroups": "تأكيد استلام {count} مجموعة قيد الإطلاق | تأكيد استلام {count} مجموعات قيد الإطلاق",
+      "unacknowledge": "إلغاء تأكيد الاستلام",
+      "takeOver": "تولّي المسؤولية",
+      "chip": "تم تأكيد الاستلام بواسطة {who} عبر {source} · {time}",
+      "chipTooltip": "تم تأكيد الاستلام بواسطة {who} في {time} من {source}",
+      "firingAcknowledged": "قيد الإطلاق · تم تأكيد الاستلام",
+      "tile": "تم تأكيد الاستلام",
+      "groupsAcknowledged": "{count} مؤكدة الاستلام",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "المناوبة",
+        "incident": "الحادث"
+      },
+      "history": {
+        "dedupSuppressed": "تم كتمه بسبب تأكيد الاستلام ({who})",
+        "acked": "تم تأكيد الاستلام بواسطة {who} من {source}",
+        "ackedViaPage": "تم تأكيد الاستلام بواسطة {who} عبر نداء المناوبة {page}",
+        "ackedViaIncident": "تم تأكيد الاستلام بواسطة {who} عبر الحادث {incident}",
+        "unacked": "تم إلغاء تأكيد الاستلام بواسطة {who} من {source}",
+        "unackedResume": "تم إلغاء تأكيد الاستلام بواسطة {who} من {source} · تستأنف التكرارات عند {time}",
+        "takenOver": "تم تولّي المسؤولية بواسطة {who} من {previous} ({source})"
+      },
+      "refused": {
+        "ack": "لا يمكنك تأكيد استلام هذا التنبيه. يتطلب تأكيد الاستلام والكتم دور المسؤول أو المحرر، أو أن تكون مستجيب المناوبة لهذا التنبيه.",
+        "mute": "لا يمكنك كتم هذا التنبيه. يتطلب تأكيد الاستلام والكتم دور المسؤول أو المحرر، أو أن تكون مستجيب المناوبة لهذا التنبيه.",
+        "onCall": "المناوبة: {people}",
+        "canAct": "يمكنهم التصرف: {people}",
+        "people": "المناوبة: {onCall}. يمكنهم التصرف: {canAct}"
+      },
+      "errors": {
+        "notFiring": "هذا التنبيه ليس قيد الإطلاق، لذا لا يوجد ما يمكن تأكيد استلامه.",
+        "firingChanged": "أُطلق التنبيه مرة أخرى منذ تحميل هذه الصفحة. حدّث الصفحة وحاول مجددًا."
       }
+    },
+    "groupActions": {
+      "menu": "إجراءات المجموعة",
+      "viewHistory": "عرض سجل هذه المجموعة"
+    },
+    "firingState": {
+      "level": "المستوى",
+      "firingSince": "قيد الإطلاق منذ",
+      "firingFor": "قيد الإطلاق منذ {duration}",
+      "incident": "الحادث"
     }
   },
   "alert_dependencies": {
@@ -12576,13 +12689,14 @@
       "openSlackSettings": "قم بإعداده في الإعدادات › Slack"
     },
     "prebuilt": {
-      "slackDescription": "إرسال إشعارات إلى قنوات Slack",
+      "slackDescription": "ينشر رسالة جديدة باستخدام Webhook والقالب الخاص بك. استخدمه لنداءات المناوبة أو تخطيطات Slack المخصصة.",
       "discordDescription": "إرسال الإشعارات إلى قنوات ديسكورد",
       "msteamsDescription": "إرسال الإشعارات إلى قنوات Teams",
       "emailDescription": "إرسال إشعارات البريد الإلكتروني بتنسيق HTML",
       "pagerdutyDescription": "إنشاء حوادث في PagerDuty",
       "opsgenieDescription": "إنشاء تنبيهات في Opsgenie",
-      "servicenowDescription": "إنشاء حوادث في ServiceNow"
+      "servicenowDescription": "إنشاء حوادث في ServiceNow",
+      "slackAppDescription": "يحدّث التنبيهات المجدولة في موضعها. أكّد الاستلام، واكتم الإشعارات، وحقّق من Slack. يتطلب مساحة عمل متصلة."
     },
     "import": {
       "title": "استيراد الوجهة",
@@ -12624,7 +12738,8 @@
     "severityCriticalDescription": "الحوادث ذات الأولوية الأعلى",
     "severityErrorDescription": "حوادث الأخطاء القياسية",
     "severityWarningDescription": "حوادث مستوى التحذير",
-    "severityInfoDescription": "الحوادث الإعلامية"
+    "severityInfoDescription": "الحوادث الإعلامية",
+    "urlRecipientsChannel": "URL / المستلمون / القناة"
   },
   "pipeline_destinations": {
     "header": "وجهات مسارات المعالجة",
@@ -13147,7 +13262,7 @@
     "groupIntegrations": "التكاملات",
     "groupAccount": "الحساب",
     "slackApp": "Slack",
-    "slackAppDesc": "اطرح أسئلة على OpenObserve من Slack",
+    "slackAppDesc": "اطرح أسئلة على OpenObserve واتخذ إجراءات بشأن التنبيهات من Slack",
     "generalDesc": "الموضوع، الإعدادات الافتراضية للاستعلام، والتفضيلات الأساسية",
     "orgDesc": "معايير المؤسسة والمعرفات",
     "cipherKeysDesc": "مفاتيح التشفير للحقول الحساسة",
@@ -20641,7 +20756,9 @@
         "succeeded": "نجح",
         "failed": "فشل",
         "skipped": "تم تخطيها",
-        "pending": "قيد الانتظار"
+        "pending": "قيد الانتظار",
+        "acknowledged": "تم الإقرار",
+        "ackevent": "حدث الإقرار"
       },
       "alertLevel": {
         "ok": "حسنا",
@@ -20944,7 +21061,16 @@
       "alertSavedSuccessfully": "تم حفظ التنبيه بنجاح.",
       "alertUpdatedSuccessfully": "تم تحديث التنبيه بنجاح.",
       "openingDedupConfig": "فتح إعدادات إزالة التكرار لـ: {name}",
-      "editingAlert": "تحرير التنبيه: {name}"
+      "editingAlert": "تحرير التنبيه: {name}",
+      "ack": {
+        "acked": "تم إقرار {name}",
+        "ackedGroups": "تم إقرار {count} مجموعة من {name} | تم إقرار {count} مجموعات من {name}",
+        "alreadyAcked": "تم الإقرار به بالفعل من {who}",
+        "unacked": "أُلغي الإقرار بـ {name}",
+        "takenOver": "تولّيت الإقرار بـ {name}",
+        "failed": "تعذّر الإقرار بـ {name}",
+        "unackFailed": "تعذّر إلغاء الإقرار بـ {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "تم تحديث مفتاح التشفير بنجاح",
@@ -21256,7 +21382,14 @@
       "muted": "تم كتم {count} عنصر حتى {time}. حُفظ في {folder}. | تم كتم {count} من العناصر حتى {time}. حُفظت في {folder}.",
       "muteFailed": "تعذر إنشاء الكتم",
       "viewDowntime": "عرض فترة الصيانة",
-      "itemsDropped": "{count} عنصر محدد خارج المجلدات المحددة وتمت إزالته. | {count} من العناصر المحددة خارج المجلدات المحددة وتمت إزالتها."
+      "itemsDropped": "{count} عنصر محدد خارج المجلدات المحددة وتمت إزالته. | {count} من العناصر المحددة خارج المجلدات المحددة وتمت إزالتها.",
+      "mutedUntilClear": "تم كتم {name} حتى يزول، في {time} على أبعد تقدير",
+      "alreadyMuted": "{name} مكتوم بالفعل حتى {time}",
+      "muteChanged": "تغيّر هذا الكتم منذ تحميل الصفحة. ينتهي الآن في {time}.",
+      "muteEnded": "انتهى الكتم. تُستأنف الإشعارات.",
+      "mutedOne": "تم كتم {name} حتى {time}",
+      "timeTomorrow": "{time} غدًا",
+      "notQuickMute": "تم ضبط هذا الكتم في صفحة فترات الصيانة. غيّره من هناك."
     }
   },
   "cipherKeys": {
@@ -26723,7 +26856,10 @@
       "managedBy": "مُدار بواسطة مسؤول المثيل لديك",
       "managedTitle": "مُدار بواسطة مسؤول المثيل لديك.",
       "managedDetail": "تُضبط بيانات الاعتماد والربط والمؤسسات التي تستخدم {team} في _meta.",
-      "managedQuestions": "الأسئلة: {contact}"
+      "managedQuestions": "الأسئلة: {contact}",
+      "outboundQueue": "رسائل التنبيه: {count} في قائمة الانتظار، الأقدم {age} | رسائل التنبيه: {count} في قائمة الانتظار، الأقدم {age}",
+      "outboundEmpty": "لا توجد رسائل تنبيه في قائمة الانتظار",
+      "ageSeconds": "{count} ث"
     },
     "channels": {
       "title": "الإعدادات الافتراضية للقنوات",
@@ -26759,7 +26895,8 @@
       "instanceAdminOnly": "لمسؤول المثيل فقط",
       "ownOrgOnlyHint": "في مساحة عمل المثيل، تربط القنوات بمؤسستك الخاصة",
       "claimableHint": "القنوات غير المطالب بها والقنوات التي تملكها {org}",
-      "servedOrgsHint": "أي مؤسسة تخدمها مساحة العمل هذه"
+      "servedOrgsHint": "أي مؤسسة تخدمها مساحة العمل هذه",
+      "alertRoutes": "{count} وجهة | {count} وجهات"
     },
     "people": {
       "title": "الأشخاص المرتبطون",
@@ -26913,6 +27050,83 @@
       "remove": "إزالة",
       "saved": "تم حفظ المؤسسات",
       "saveFailed": "تعذّر حفظ المؤسسات."
+    },
+    "destination": {
+      "appTile": "تطبيق {product}",
+      "webhookTile": "ويب هوك {product}",
+      "twoWay": "ثنائي الاتجاه",
+      "recommendedForAlertResponse": "موصى به للاستجابة للتنبيهات",
+      "choiceHint": "تستخدم نداءات المناوبة والعناقيد الفائقة ويب هوك. الإرسال اليدوي والفوري من وجهة تطبيق Slack منشوران منفصلان.",
+      "unavailableReason": "يتطلب تطبيق Slack للمؤسسات على عنقود واحد",
+      "unavailableFlag": "معطّل على هذا الخادم؛ اطلب من مشغّلك ضبط {variable}",
+      "unavailableMasterKey": "يتطلب مفتاح تشفير على هذا الخادم؛ اطلب من مشغّلك ضبط {variable}",
+      "unavailableCloud": "لم يُفعّل بعد لمنطقة السحابة الخاصة بك",
+      "unavailableNoAccess": "اطلب من مسؤول المؤسسة تفعيل تطبيق Slack",
+      "postOnly": "نشر فقط",
+      "switchToApp": "التبديل إلى تطبيق {product}",
+      "switchThis": "تبديل هذه الوجهة",
+      "switchBack": "التبديل مرة أخرى",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "مساحة العمل",
+      "channel": "القناة",
+      "mention": "الإشارة",
+      "mentionCritical": "{'@'}here للحرجة، وبدون لغيرها",
+      "mentionNone": "بدون",
+      "mentionHelp": "يُستخدم عند التكرار وترقية المستوى",
+      "refireReuse": "إعادة استخدام إعادة الإطلاق (بالدقائق)",
+      "refireReuseHelp": "إعادة الإطلاق خلال هذه المدة تُعدّل الرسالة السابقة بدلًا من نشر رسالة جديدة",
+      "buttons": "أزرار الإقرار والكتم والتحقيق",
+      "buttonsHelp": "يُضاف زر الحل عندما يكون لقيد الإطلاق حادث أو نداء مناوبة",
+      "autoInvestigate": "التحقيق تلقائيًا في التنبيهات الحرجة",
+      "autoInvestigateHelp": "يعمل بحساب خدمة الذكاء الاصطناعي الخاص بالمؤسسة وبصلاحياته؛ وينشر النتائج في سلسلة التنبيه",
+      "templateDefault": "قالب {product} الافتراضي ({name})",
+      "sendTest": "إرسال اختبار",
+      "setsDefault": "يعيّن المؤسسة الافتراضية لـ #{channel} إلى {org}",
+      "answersFor": "تُجيب #{channel} عن الأسئلة الخاصة بالمؤسسة {org}. تُنشر تنبيهات {thisOrg} هنا، وتُجاب سلاسل محادثاتها في {thisOrg}؛ ولا يتغير الإعداد الافتراضي للقناة.",
+      "sharedTag": "مشترك · {product} Connect",
+      "sharedTitle": "#{channel} مشتركة مع أشخاص خارج {workspace}.",
+      "sharedDetail": "سيرون أسماء التنبيهات والقيم والمخططات والروابط. وستُرفض نقراتهم على الأزرار.",
+      "sharedConfirm": "أتفهم ذلك، انشر التنبيهات في هذه القناة المشتركة.",
+      "sharedRequired": "أكّد أنه يمكن نشر التنبيهات في هذه القناة المشتركة.",
+      "versionMismatch": "تعمل العُقد بإصدارات مختلفة. رقِّ كل عقدة أولًا.",
+      "oncallNotAllowed": "لا يمكن أن تكون وجهة تطبيق {product} قناة لفريق المناوبة.",
+      "answersForAnother": "تُجيب #{channel} عن الأسئلة الخاصة بمؤسسة أخرى. تُنشر تنبيهات {thisOrg} هنا، وتُجاب سلاسل محادثاتها في {thisOrg}؛ ولا يتغير الإعداد الافتراضي للقناة.",
+      "oncallTag": "غرفة المناوبة",
+      "oncallTitle": "تُنشر أيضًا نداءات المناوبة الخاصة بالفريق {team} إلى #{channel} عبر {destination}.",
+      "oncallDetail": "تُنشر التنبيهات هنا بشكل منفصل.",
+      "oncallConfirm": "أتفهم ذلك، انشر التنبيهات في غرفة المناوبة هذه.",
+      "oncallRequired": "أكّد أنه يمكن نشر التنبيهات في غرفة المناوبة هذه.",
+      "workspaceRequired": "اختر مساحة عمل",
+      "refireRange": "أدخل عددًا صحيحًا من الدقائق من 0 إلى {max}.",
+      "connectTitle": "اربط {product} لنشر التنبيهات بأزرار.",
+      "connectDetail": "اختر قناة في شاشة {product} واضغط على السماح. تُنشئ OpenObserve هذه الوجهة لتلك القناة.",
+      "connected": "تم إنشاء {name} للقناة #{channel}. راجع إعداداته واحفظها.",
+      "saveFailed": "تعذر حفظ الوجهة.",
+      "switched": "أصبح {name} ينشر الآن عبر تطبيق {product}.",
+      "switchedBack": "أصبح {name} ينشر عبر الويب هوك الخاص به مجددًا.",
+      "switchFailed": "تعذر تبديل {name}: {reason}",
+      "switchedAll": "تم تبديل {count} وجهة | تم تبديل {count} وجهات",
+      "switchThisDetail": "بدّله إلى تطبيق {product} لأزرار الإقرار والكتم والتحقيق. يبقى اسمه وقالبه وتنبيهاته على حالها؛ ويعيد «التبديل للخلف» الويب هوك."
+    },
+    "switchAll": {
+      "title": "تنشر {count} وجهة ويب هوك في مساحة العمل هذه. | تنشر {count} وجهات ويب هوك في مساحة العمل هذه.",
+      "detail": "بدّل هذه الوجهة إلى تطبيق {product} لأزرار الإقرار والكتم والتحقيق. يبقى اسمها وقالبها وتنبيهاتها على حالها؛ ويعيد «التبديل للخلف» الويب هوك. | بدّل هذه الوجهات إلى تطبيق {product} لأزرار الإقرار والكتم والتحقيق. تبقى الأسماء والقوالب والتنبيهات على حالها؛ ويعيد «التبديل للخلف» الويب هوك.",
+      "review": "مراجعة",
+      "action": "تبديل الكل",
+      "summary": "تم تبديل {switched} · تعذر تبديل {count}"
+    },
+    "oncallUnlinked": {
+      "title": "أعضاء المناوبة غير المرتبطين بـ {product}",
+      "description": "لا تستطيع نداءات المناوبة مراسلتهم مباشرة، ولا تُعالج نقراتهم على أزرار التنبيه ونداء المناوبة حتى يربطوا حساباتهم.",
+      "remind": "ذكّرهم",
+      "columnPerson": "الشخص",
+      "columnTeam": "الفريق",
+      "columnNextShift": "الوردية التالية",
+      "columnReminder": "التذكير",
+      "dmSent": "تم إرسال رسالة مباشرة {time}",
+      "notSent": "لم تُرسل",
+      "reminded": "أُرسل تذكير إلى {count} شخص | أُرسل تذكير إلى {count} أشخاص",
+      "remindFailed": "تعذر إرسال التذكيرات."
     }
   },
   "fleet": {
