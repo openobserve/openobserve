@@ -41,37 +41,26 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { switchThemeMode } from "@/utils/theme";
+import { savedThemeMode, switchThemeMode } from "@/utils/theme";
 
 export default defineComponent({
   components: { OButton, OIcon, OTooltip },
   props: {
     // Outlined 32px square, for headers whose other controls are outlined buttons.
     bordered: { type: Boolean, default: false },
+    // A page whose choice must not carry to the signed-in app saves it under its own key.
+    storageKey: { type: String, default: "theme" },
+    // With no saved choice, start from the OS preference instead of light.
+    followSystem: { type: Boolean, default: false },
   },
-  setup() {
+  setup(props) {
     const store = useStore();
     const { t } = useI18nTyped();
     // eslint-disable-next-line no-restricted-syntax -- this component IS the theme seam's UI: darkMode is the toggle's own bound state, not a private copy of the app theme it should be reading from useTheme().
-    const darkMode = ref(false);
+    const darkMode = ref(savedThemeMode(props.storageKey, props.followSystem) === "dark");
 
-    onMounted(() => {
-      try {
-        const savedTheme = localStorage.getItem("theme");
-        if (savedTheme !== null) {
-          darkMode.value = savedTheme == "dark";
-        } else {
-          // Default to light theme if no saved theme is found
-          darkMode.value = false;
-        }
-        setTheme(darkMode.value ? "dark" : "light");
-      } catch (error) {
-        // Handle localStorage not available
-        console.warn("localStorage not available:", error);
-        darkMode.value = false;
-        setTheme("light");
-      }
-    });
+    // An OS-derived default is not a choice, so it is applied without being saved.
+    onMounted(() => setTheme(darkMode.value ? "dark" : "light", !props.followSystem));
 
     // Whole sentence per target theme: "Switch to" + mode glued two translated
     // fragments together, which breaks wherever the word order differs.
@@ -95,10 +84,10 @@ export default defineComponent({
       },
     );
 
-    const setTheme = (theme: any) => {
+    const setTheme = (theme: "light" | "dark", persist = true) => {
       try {
         // A kiosk ?theme= is for that screen only and must not become the saved preference.
-        if (!store.state.themeOverride) localStorage.setItem("theme", theme);
+        if (persist && !store.state.themeOverride) localStorage.setItem(props.storageKey, theme);
       } catch (error) {
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);

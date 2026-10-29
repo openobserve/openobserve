@@ -25,9 +25,10 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+const routeMock = vi.hoisted(() => ({ query: {} as Record<string, string>, replace: vi.fn() }));
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { slug: "abc" }, query: {} }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRoute: () => ({ params: { slug: "abc" }, query: routeMock.query }),
+  useRouter: () => ({ push: vi.fn(), replace: routeMock.replace }),
 }));
 vi.mock("@/services/public_dashboards", () => ({
   default: { getConfig: vi.fn(), getData: vi.fn() },
@@ -40,6 +41,8 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import OButton from "@/lib/core/Button/OButton.vue";
 import KioskCountdownRing from "@/components/dashboards/kiosk/KioskCountdownRing.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
+import { getPanelDisplayTitle } from "@/utils/dashboard/panelTitle";
 
 const CONFIG = {
   title: "My Dashboard",
@@ -147,6 +150,7 @@ const panelsConfig = (panels: Array<Record<string, unknown>>) => ({
 describe("PublicDashboard viewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routeMock.query = {};
     // Lifecycle jitter off, so every cadence below is exact.
     vi.spyOn(Math, "random").mockReturnValue(0);
   });
@@ -809,6 +813,123 @@ describe("PublicDashboard viewer", () => {
     await flushPromises();
     const list = grid(w).props("dashboardData").variables.list;
     expect(list.map((v: { value: string }) => v.value)).toEqual(["default-env"]);
+  });
+
+  it("names each frozen variable as the dashboard does, so a panel title resolves its value", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: {
+        ...panelsConfig([{ id: "p1", title: "A ($level)" }]),
+        variables: [{ name: "level", label: "Level", value: "error" }],
+      },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const { tabs, variables } = grid(w).props("dashboardData");
+    expect(variables.list[0].name).toBe("level");
+    const title = getPanelDisplayTitle(
+      tabs[0].panels[0].title,
+      { values: variables.list },
+      { tabId: "t1", panelId: "p1" },
+      "All",
+    );
+    expect(title).toBe("A (error)");
+  });
+
+  it("shows a typed-in value without the picker's custom marker", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: {
+        ...CONFIG,
+        variables: [
+          { name: "ns", label: "Namespace", value: "ziox::_o2_custom" },
+          { name: "pods", label: "Pods", value: ["a::_o2_custom", "b"] },
+        ],
+      },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const list = grid(w).props("dashboardData").variables.list;
+    expect(list.map((v: { value: string }) => v.value)).toEqual(["ziox", "a, b"]);
+  });
+
+  it("opens on the range and tab in the URL, and replaces unknown ones with the defaults", async () => {
+    const twoTabs = {
+      ...CONFIG,
+      layout: [...CONFIG.layout, { tabId: "t2", name: "Errors", panels: [] }],
+    };
+    vi.mocked(service.getConfig).mockResolvedValue({ data: twoTabs, status: 200 } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    routeMock.query = { range: "r86400", tab: "t2" };
+    buildWrapper();
+    await flushPromises();
+    expect(service.getData).toHaveBeenCalledWith("abc", "r86400", undefined);
+    expect(routeMock.replace).not.toHaveBeenCalled();
+
+    vi.mocked(service.getData).mockClear();
+    routeMock.query = { range: "r1", tab: "gone" };
+    buildWrapper();
+    await flushPromises();
+    expect(service.getData).toHaveBeenCalledWith("abc", "r3600", undefined);
+    expect(routeMock.replace).toHaveBeenCalledWith({ query: { range: "r3600", tab: "t1" } });
+  });
+
+  it("puts a range switch in the URL without adding a history entry", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    const w = mountWithPicker();
+    await flushPromises();
+    pickRange(w, "r86400");
+    await flushPromises();
+    expect(routeMock.replace).toHaveBeenLastCalledWith({ query: { range: "r86400", tab: "t1" } });
+  });
+
+  it("says Powered by OpenObserve once, in the footer", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    const w = shallowMount(PublicDashboard, {
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: {
+          OPageHeader: {
+            template: "<div><slot name='title-trail' /><slot name='actions' /></div>",
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const powered = w.findAllComponents(PoweredByOpenObserve);
+    expect(powered).toHaveLength(1);
+    expect(
+      find(w, "dashboards-public-dashboard-footer").findComponent(PoweredByOpenObserve).exists(),
+    ).toBe(true);
+  });
+
+  it("opens in the OS theme under its own key, leaving the app's saved theme alone", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) => ({ matches: query === "(prefers-color-scheme: dark)" }) as MediaQueryList,
+    );
+    localStorage.setItem("theme", "light");
+    localStorage.removeItem("publicDashboardTheme");
+    vi.mocked(service.getConfig).mockReturnValue(new Promise(() => {}));
+    const before = store.state.theme;
+    store.state.theme = "light";
+    try {
+      buildWrapper();
+      expect(store.state.theme).toBe("dark");
+      expect(localStorage.getItem("theme")).toBe("light");
+
+      localStorage.setItem("publicDashboardTheme", "light");
+      buildWrapper();
+      expect(store.state.theme).toBe("light");
+    } finally {
+      localStorage.removeItem("theme");
+      localStorage.removeItem("publicDashboardTheme");
+      store.state.theme = before;
+    }
   });
 
   it("falls back to the default range when the author removes the viewer's range", async () => {

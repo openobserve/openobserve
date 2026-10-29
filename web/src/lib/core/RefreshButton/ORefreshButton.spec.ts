@@ -123,6 +123,19 @@ describe("ORefreshButton", () => {
     expect(wrapper.emitted("click")).toBeUndefined();
   });
 
+  // --- accessible name ---
+
+  it("names the button Refresh, with the age once it has run", () => {
+    const never = mount(ORefreshButton, { global: globalConfig });
+    expect(never.find("button").attributes("aria-label")).toBe("Refresh");
+
+    const ran = mount(ORefreshButton, {
+      props: { layout: "inline", lastRunAt: Date.now() - 57_000 },
+      global: globalConfig,
+    });
+    expect(ran.find("button").attributes("aria-label")).toBe("Refresh, last refreshed 57s ago");
+  });
+
   // --- layout="inline" ---
 
   describe("layout=inline", () => {

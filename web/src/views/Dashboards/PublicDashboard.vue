@@ -46,12 +46,6 @@
         icon="dashboard"
         title-data-test="dashboards-public-dashboard-title"
       >
-        <template #title-trail>
-          <div class="flex h-8 self-center max-md:hidden">
-            <OSeparator vertical />
-          </div>
-          <PoweredByOpenObserve size="md" class="max-md:hidden" />
-        </template>
         <template #actions>
           <span
             v-if="windowLabel && !pickerShowsWindow"
@@ -144,7 +138,7 @@
               </div>
             </div>
           </OPopover>
-          <ThemeSwitcher bordered />
+          <ThemeSwitcher bordered :storage-key="PUBLIC_THEME_KEY" follow-system />
         </template>
       </OPageHeader>
 
@@ -226,7 +220,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, provide } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
@@ -245,6 +239,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
+import { savedThemeMode } from "@/utils/theme";
+import { CUSTOM_VALUE } from "@/utils/dashboard/constants";
 import publicDashboardsService from "@/services/public_dashboards";
 import { formatInTimeZone } from "date-fns-tz";
 import { durationFormatter } from "@/utils/formatters";
@@ -298,7 +294,13 @@ interface DataBody {
 }
 
 /** A frozen value as the public config lists it; scoped ones name their tab or panel. */
-type PublicVariable = { label: string; value: unknown; tab_id?: string; panel_id?: string };
+type PublicVariable = {
+  name?: string;
+  label: string;
+  value: unknown;
+  tab_id?: string;
+  panel_id?: string;
+};
 
 type ViewState =
   | "loading"
@@ -312,16 +314,28 @@ type ViewState =
   | "offline";
 
 const route = useRoute();
+const router = useRouter();
 const store = useStore();
 const { t } = useI18nTyped();
 const slug = String(route.params.slug || "");
+
+// Its own key, so a viewer's choice here never flips the signed-in app's theme.
+const PUBLIC_THEME_KEY = "publicDashboardTheme";
+// Applied before the header mounts, so the loading and error screens open in it too.
+store.dispatch("appTheme", savedThemeMode(PUBLIC_THEME_KEY, true));
+
+// A shared or reloaded link reopens on its range and tab; an unknown value falls back once the config loads.
+const queryParam = (name: string): string | null => {
+  const value = route.query[name];
+  return typeof value === "string" && value ? value : null;
+};
 
 const state = ref<ViewState>("loading");
 const config = ref<Record<string, any>>({});
 // The body on screen and the range it belongs to; its rev is sent back as If-None-Match.
 const body = ref<DataBody | null>(null);
 const bodyKey = ref<string | null>(null);
-const selectedKey = ref<string | null>(null);
+const selectedKey = ref<string | null>(queryParam("range"));
 // Server clock minus local clock, from the last response's Date header.
 const clockOffset = ref(0);
 // Local time a 429 or a temporary 503 ends, for its countdown; `holdKind` says which one.
@@ -349,7 +363,7 @@ const setTimezone = (tz: unknown) => {
   store.dispatch("setTimezone", tz);
 };
 // RenderDashboardCharts and TabList read and switch the active tab through this.
-const selectedTabId = ref<string>("");
+const selectedTabId = ref<string>(queryParam("tab") ?? "");
 provide("selectedTabId", selectedTabId);
 
 // Date.now() isn't reactive, so countdowns read this ticking copy.
@@ -371,7 +385,9 @@ const variableValue = (value: unknown): string => {
   if (value === null || value === undefined || value === "") {
     return t("dashboard.publicDashboard.variableUnset");
   }
-  return Array.isArray(value) ? value.join(", ") : String(value);
+  // A typed-in value is saved with the picker's custom marker, which only the search strips.
+  const shown = (v: unknown) => String(v).replace(new RegExp(`${CUSTOM_VALUE}$`), "");
+  return Array.isArray(value) ? value.map(shown).join(", ") : shown(value);
 };
 
 // Constants are read-only and query nothing, and the grid places each by scope as the live page does.
@@ -383,8 +399,8 @@ const frozenVariables = computed(() => {
       ? config.value.variables
       : [];
   return all.map((v, i) => ({
-    // Scoped entries repeat a label, and the grid keys variables by name.
-    name: `public_var_${i}`,
+    // Panel titles substitute by name; a result stored before names were sent falls back to a unique one.
+    name: v.name || `public_var_${i}`,
     label: v.label,
     type: "constant",
     value: variableValue(v.value),
@@ -711,6 +727,16 @@ const loadConfig = async () => {
     selectedKey.value = pickDefaultRange();
   }
 };
+
+// Replaced, not pushed, so switching range or tab adds no history entry.
+watch([selectedKey, selectedTabId, configLoaded], () => {
+  if (!configLoaded.value || !selectedKey.value) return;
+  const query: LocationQueryRaw = { ...route.query, range: selectedKey.value };
+  if (selectedTabId.value) query.tab = selectedTabId.value;
+  else delete query.tab;
+  if (route.query.range === query.range && route.query.tab === query.tab) return;
+  router.replace({ query });
+});
 
 const responseOf = (e: unknown) =>
   (e as { response?: { status?: number; headers?: Record<string, unknown>; data?: any } })

@@ -8256,6 +8256,8 @@
       "urlHidden": "No access",
       "urlHiddenHint": "You can't view this link's dashboard, so its public URL is hidden.",
       "orgDisabledHint": "Public links are turned off for this organization",
+      "orgDisabledBanner": "Public links are turned off for this organization, so no link is served. An admin can turn them back on.",
+      "disabledPaused": "Disabled · Paused",
       "takeOver": "Take over",
       "takeOverTitle": "Take over this link?",
       "takeOverBody": "You become the publisher. The public page will show what you are allowed to see, which may be more or less than before. Anyone who has the URL keeps access to it, and the link goes live now.",
@@ -18502,7 +18504,9 @@
     "dataFresh": "Data is fresh",
     "dataGettingStale": "Data is getting stale",
     "dataStale": "Data is stale",
-    "lastRefreshed": "Last refreshed: {time}"
+    "lastRefreshed": "Last refreshed: {time}",
+    "refresh": "Refresh",
+    "refreshWithAge": "Refresh, last refreshed {age}"
   },
   "synthetics": {
     "variables": {

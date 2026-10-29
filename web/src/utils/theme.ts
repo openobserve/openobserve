@@ -72,6 +72,19 @@ export const switchThemeMode = (mode: "light" | "dark", applyChanges: () => void
   transition.finished.then(unfreeze, unfreeze);
 };
 
+/** The mode saved under `storageKey`; with none saved, the OS preference when `followSystem`, else light. */
+export const savedThemeMode = (storageKey: string, followSystem: boolean): "light" | "dark" => {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved !== null) return saved === "dark" ? "dark" : "light";
+  } catch (error) {
+    console.warn("localStorage not available:", error);
+  }
+  return followSystem && window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+};
+
 /**
  * Resolve a design-token CSS custom property to its concrete value at runtime.
  *

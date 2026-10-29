@@ -175,6 +175,50 @@ describe("ThemeSwitcher", () => {
     });
   });
 
+  describe("own storage key and OS default", () => {
+    const prefersDark = () =>
+      vi
+        .spyOn(window, "matchMedia")
+        .mockImplementation(
+          (query: string) =>
+            ({ matches: query === "(prefers-color-scheme: dark)" }) as MediaQueryList,
+        );
+
+    it("keeps the app on light when the OS prefers dark", () => {
+      prefersDark();
+      localStorageMock.getItem.mockReturnValue(null);
+      wrapper = mountComponent();
+      expect(wrapper.vm.darkMode).toBe(false);
+    });
+
+    it("opens on the OS preference, renders its icon at once and saves only a toggle, under its own key", async () => {
+      prefersDark();
+      localStorageMock.getItem.mockReturnValue(null);
+      wrapper = mount(ThemeSwitcher, {
+        props: { storageKey: "publicDashboardTheme", followSystem: true },
+        global: { plugins: [mockStore, i18n], stubs: { Transition: false } },
+      });
+      expect(localStorageMock.getItem).toHaveBeenCalledWith("publicDashboardTheme");
+      expect(wrapper.findComponent({ name: "OIcon" }).props("name")).toBe("dark-mode");
+      expect(localStorageMock.setItem).not.toHaveBeenCalled();
+
+      wrapper.vm.toggleDarkMode();
+      await wrapper.vm.$nextTick();
+      expect(localStorageMock.setItem).toHaveBeenCalledWith("publicDashboardTheme", "light");
+      expect(localStorageMock.setItem).not.toHaveBeenCalledWith("theme", expect.anything());
+    });
+
+    it("prefers a saved choice over the OS preference", () => {
+      prefersDark();
+      localStorageMock.getItem.mockReturnValue("light");
+      wrapper = mount(ThemeSwitcher, {
+        props: { storageKey: "publicDashboardTheme", followSystem: true },
+        global: { plugins: [mockStore, i18n] },
+      });
+      expect(wrapper.vm.darkMode).toBe(false);
+    });
+  });
+
   describe("kiosk theme override", () => {
     it("follows a forced theme without saving it as the preference", async () => {
       localStorageMock.getItem.mockReturnValue("light");
