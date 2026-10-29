@@ -31,6 +31,7 @@ import { TABLE_DENSITIES, TABLE_FOOTER_CALCS } from "@/utils/dashboard/tableOpti
 import { SPECIAL_VALUE_MATCHES } from "@/utils/dashboard/tableConfigUtils";
 import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/convertBarGaugeData";
 import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionData";
+import { FUNNEL_ORIENTS, FUNNEL_SORTS } from "@/utils/dashboard/convertFunnelData";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { STATE_TIMELINE_DISPLAYS } from "@/utils/dashboard/convertStateTimelineData";
 import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/convertTreemapData";
@@ -599,6 +600,23 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "funnel": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      break;
+    }
     case "hostmap": {
       if (fields?.y?.length !== 1) {
         const errorMsg =
@@ -997,6 +1015,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "distribution",
     "treemap",
     "sunburst",
+    "funnel",
     "hostmap",
     "metric",
     "gauge",
@@ -1187,6 +1206,8 @@ const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[
   ["bar_gauge_orientation", ["bar-gauge"], BAR_GAUGE_ORIENTATIONS],
   ["state_timeline_display", ["state-timeline"], STATE_TIMELINE_DISPLAYS],
   ["sort_order", ["pie", "donut"], SORT_ORDERS],
+  ["funnel_sort", ["funnel"], FUNNEL_SORTS],
+  ["funnel_orient", ["funnel"], FUNNEL_ORIENTS],
 ];
 
 const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [

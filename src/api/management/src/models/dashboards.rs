@@ -547,6 +547,9 @@ mod tests {
             "state_timeline_display": "cells",
             "treemap_show_breadcrumb": true,
             "sunburst_show_labels": false,
+            "funnel_sort": "none",
+            "funnel_orient": "vertical",
+            "funnel_show_percent": false,
             "override_config": [{
                 "field": {"matchBy": "series", "value": "errors"},
                 "config": [

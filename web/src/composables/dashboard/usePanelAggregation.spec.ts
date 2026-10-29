@@ -729,6 +729,24 @@ describe("usePanelAggregation", () => {
         expect(ring.y[0].args[0].value.field).toBe("_timestamp");
       });
     });
+    describe("funnel chart type", () => {
+      const yField = (functionName: string | null) => ({
+        functionName,
+        args: [{ type: "field" }, { type: "extra" }],
+      });
+
+      it("funnel resets like a pie", () => {
+        const funnel = makePanelData("funnel");
+        const stages = funnel.data.queries[0].fields;
+        stages.x = [{ alias: "x1" }, { alias: "x2" }];
+        stages.y = [yField(null), yField("sum")];
+        stages.breakdown = [{ alias: "b1" }];
+        makeAggregation(funnel).resetAggregationFunction();
+        expect(stages.x).toHaveLength(1);
+        expect(stages.y.map((item: any) => item.functionName)).toEqual(["count"]);
+        expect(stages.breakdown).toEqual([]);
+      });
+    });
 
     describe("starter queries", () => {
       it("leaves hand-written SQL in custom mode on a switch to a builder chart", () => {

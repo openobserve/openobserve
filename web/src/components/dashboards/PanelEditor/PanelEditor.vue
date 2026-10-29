@@ -206,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'bar-gauge',
                           'treemap',
                           'sunburst',
+                          'funnel',
                           'geomap',
                           'maps',
                         ].includes(dashboardPanelData.data.type)

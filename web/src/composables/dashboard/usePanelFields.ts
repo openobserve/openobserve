@@ -83,6 +83,7 @@ export const usePanelFields = ({
       case "gauge":
       case "bar-gauge":
       case "state-timeline":
+      case "funnel":
       case "hostmap":
       case "area":
       case "bar":
@@ -142,6 +143,8 @@ export const usePanelFields = ({
           (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length ?? 0) >= 1 || sunburstLevelCount() >= SUNBURST_MAX_LEVELS
         );
+      case "funnel":
+        return true;
       case "hostmap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
@@ -166,6 +169,7 @@ export const usePanelFields = ({
       case "bar-gauge":
       case "treemap":
       case "sunburst":
+      case "funnel":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1

@@ -1188,6 +1188,7 @@ export default defineComponent({
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
+        case "funnel":
           return t("dashboard.oneLabelFieldMessage");
         case "treemap":
           return t("dashboard.treemapLevelsHint", { count: TREEMAP_MAX_LEVELS });
@@ -1240,6 +1241,7 @@ export default defineComponent({
         case "bar-gauge":
         case "treemap":
         case "sunburst":
+        case "funnel":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");
