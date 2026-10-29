@@ -25,19 +25,29 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v5
+      - name: Initialize proof budget
         timeout-minutes: 1
+        run: |
+          printf 'PROOF_EVIDENCE=%s\nPROOF_ARTIFACT=%s\n' "$RUNNER_TEMP/alertlist-evidence" "$RUNNER_TEMP/alertlist-artifact" >> "$GITHUB_ENV"
+          printf 'PROOF_JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/alertlist-evidence"
+
+      - uses: actions/checkout@v5
+        id: checkout
+        timeout-minutes: 4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+
+      - name: Fetch pinned baseline
+        timeout-minutes: 2
+        run: |
+          timeout --signal=TERM --kill-after=10s 90s git fetch --no-tags --depth=1 --no-recurse-submodules origin 3960df0f12760f4e8628a5a9104fef65048ff369
+          test "$(git rev-parse FETCH_HEAD)" = 3960df0f12760f4e8628a5a9104fef65048ff369
 
       - name: Verify pinned source and record runner
         timeout-minutes: 1
         run: |
-          export PROOF_EVIDENCE="$RUNNER_TEMP/alertlist-evidence"
-          printf 'PROOF_EVIDENCE=%s\nPROOF_ARTIFACT=%s\n' "$PROOF_EVIDENCE" "$RUNNER_TEMP/alertlist-artifact" >> "$GITHUB_ENV"
-          printf 'PROOF_JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
-          mkdir -p "$PROOF_EVIDENCE"
           test "$(git rev-parse HEAD:web)" = d51379f81d6f4521be4ae1bfe69fc6c5dba4a17d
           test -z "$(git status --porcelain -- web)"
           {
@@ -84,7 +94,7 @@ jobs:
             2>&1 | tee "$PROOF_EVIDENCE/proof-driver.log"
 
       - name: Verify fixture restoration
-        if: always()
+        if: always() && steps.checkout.outcome == 'success'
         timeout-minutes: 1
         run: |
           mkdir -p "$PROOF_EVIDENCE"
@@ -92,12 +102,12 @@ jobs:
           test -z "$(git status --porcelain -- web)"
 
       - name: Package bounded evidence
-        if: always()
+        if: always() && steps.checkout.outcome == 'success'
         timeout-minutes: 1
         run: python3 .github/ui-alertlist-proof/package-evidence.py "$PROOF_EVIDENCE" "$PROOF_ARTIFACT"
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.checkout.outcome == 'success'
         timeout-minutes: 2
         with:
           name: isolated-alertlist-proof-${{ github.run_id }}-${{ github.run_attempt }}
