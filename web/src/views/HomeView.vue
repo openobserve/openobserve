@@ -62,23 +62,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`home-tab-${tab.id}`"
           >
             <span class="o-tab__label truncate">{{ tab.label }}</span>
-            <button
-              v-if="tab.id.startsWith('dash:')"
-              type="button"
-              class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-body ms-1 inline-flex h-4 w-4 cursor-pointer items-center justify-center border-none bg-transparent text-sm leading-none opacity-60 transition-all duration-200 ease-[ease] hover:opacity-100"
-              :data-test="`home-tab-close-${tab.id}`"
-              :aria-label="t('home.removeHomeDashboard')"
-              @mousedown.stop.prevent
-              @pointerdown.stop.prevent
-              @click.stop.prevent="onCloseTab(tab.id)"
-            >
-              {{ "×" }}
-            </button>
-            <OTooltip
-              v-if="tab.id.startsWith('dash:')"
-              side="bottom"
-              :content="t('home.removeHomeDashboard')"
-            />
+            <template v-if="tab.id.startsWith('dash:')" #trailing>
+              <button
+                type="button"
+                class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-body inline-flex h-4 w-4 cursor-pointer items-center justify-center border-none bg-transparent text-sm leading-none opacity-60 transition-all duration-200 ease-[ease] hover:opacity-100 max-md:h-6 max-md:w-6"
+                :data-test="`home-tab-close-${tab.id}`"
+                :aria-label="t('home.removeHomeDashboard')"
+                @mousedown.stop.prevent
+                @pointerdown.stop.prevent
+                @click.stop.prevent="onCloseTab(tab.id)"
+              >
+                {{ "×" }}
+              </button>
+              <OTooltip side="bottom" :content="t('home.removeHomeDashboard')" />
+            </template>
           </OTab>
         </OTabs>
       </template>
