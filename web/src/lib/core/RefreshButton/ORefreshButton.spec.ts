@@ -138,6 +138,22 @@ describe("ORefreshButton", () => {
 
   // --- layout="inline" ---
 
+  describe("size", () => {
+    const button = (props = {}) =>
+      mount(ORefreshButton, { props, global: globalConfig }).find('[data-test="refresh-button"]');
+
+    it("uses the toolbar icon size by default", () => {
+      expect(button().attributes("size")).toBe("icon-toolbar");
+      expect(button().classes()).not.toContain("size-5.5!");
+    });
+
+    it("inset renders the icon size with size-5.5", () => {
+      const inset = button({ size: "inset" });
+      expect(inset.attributes("size")).toBe("icon");
+      expect(inset.classes()).toContain("size-5.5!");
+    });
+  });
+
   describe("layout=inline", () => {
     const inline = (props: Record<string, unknown> = {}) =>
       mount(ORefreshButton, {

@@ -510,6 +510,27 @@ describe("OnCallScheduleEditor", () => {
     expect(wrapper.find('[data-test="oncall-rotation-needs-people-0"]').exists()).toBe(true);
   });
 
+  // People edited on one rotation never reach another, even its form-made pair.
+  it("removing somebody from one rotation leaves its pair alone", async () => {
+    const pair = ["ana@o2.ai", "bob@o2.ai"];
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [rule({ members: [...pair] })]),
+        rota("Secondary", [rule({ members: [...pair], anchor_micros: ANCHOR - MICROS_PER_WEEK })]),
+      ]),
+    });
+    await flushPromises();
+
+    await openRotation(wrapper, 1);
+    await removePerson(wrapper, 0, 0);
+    await wrapper.find('[data-test="oncall-schedule-save"]').trigger("click");
+    await flushPromises();
+
+    const sent = (service.setSchedule.mock.calls.at(-1)![0] as any).data.rotations;
+    expect(sent[0].shift_rules[0].members).toEqual(pair);
+    expect(sent[1].shift_rules[0].members).toHaveLength(1);
+  });
+
   /// The drawer's Save is the one a new rotation is saved from, and a new
   /// rotation starts with nobody in it — so it has to be out of reach until
   /// somebody is picked, not merely refused after the click.

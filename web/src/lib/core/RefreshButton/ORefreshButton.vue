@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
   layout: "split",
   dataTest: "refresh-button",
   shortcutId: undefined,
+  size: "toolbar",
 });
 
 const emit = defineEmits<RefreshButtonEmits>();
@@ -138,7 +139,8 @@ function handleClick(e: MouseEvent) {
     </span>
     <OButton
       :variant="variant"
-      size="icon-toolbar"
+      :size="size === 'inset' ? 'icon' : 'icon-toolbar'"
+      :class="size === 'inset' ? 'size-5.5!' : undefined"
       icon-left="refresh"
       :loading="loading"
       :disabled="disabled"

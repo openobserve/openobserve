@@ -29,7 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              (not `flex-1`) keeps this sized to its content so the More button
              sits right after the pinned items instead of being pushed to the
              far right; it still shrinks + clips when content overflows. -->
-        <div class="flex min-w-0 flex-initial flex-nowrap items-center gap-1 overflow-hidden">
+        <div
+          class="-my-1 flex min-w-0 flex-initial flex-nowrap items-center gap-1 overflow-hidden py-1"
+        >
           <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
           <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
             <template #trigger>
@@ -1003,7 +1005,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.meta.logsVisualizeToggle === 'build'
               "
             >
-              <div v-if="config.isEnterprise == 'true'" class="flex items-center">
+              <div
+                v-if="config.isEnterprise == 'true'"
+                class="flex items-center [&_button:focus-visible]:z-1"
+              >
                 <OButton
                   v-if="visualizeSearchRequestTraceIds.length > 0"
                   data-test="logs-search-bar-visualize-cancel-btn"
@@ -1059,7 +1064,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                 </ODropdown>
               </div>
-              <div v-else class="flex items-center">
+              <div v-else class="flex items-center [&_button:focus-visible]:z-1">
                 <!-- Cancel button when query is running -->
                 <OButton
                   v-if="visualizeSearchRequestTraceIds.length > 0 && config.isEnterprise == 'true'"
@@ -1118,7 +1123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdown>
               </div>
             </div>
-            <div v-else class="flex items-center">
+            <div v-else class="flex items-center [&_button:focus-visible]:z-1">
+              <!-- Lift the focused half so its offset outline paints over the joined twin. -->
               <!-- Cancel button for patterns tab -->
               <OButton
                 v-if="searchObj.meta.logsVisualizeToggle === 'patterns' && patternsState.loading"
