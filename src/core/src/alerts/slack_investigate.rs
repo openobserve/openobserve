@@ -805,6 +805,7 @@ mod tests {
                 episode_incident_id: None,
                 recovering_since: None,
                 firing_started_at: to.is_firing().then_some(at),
+                group_label_set: None,
             }),
             transition: Some(StateTransition {
                 alert_id: alert_id.into(),
