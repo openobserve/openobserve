@@ -32,8 +32,13 @@ The coordinator also lists the findings it kept in a hidden JSON block, which th
 from the comment. Kept blockers and warnings whose `file:line` is an added or context line of the
 diff are posted as one `COMMENT` review with inline threads (at most 10, never approve or request
 changes). Each thread carries a hidden fingerprint of file and title, so a re-run skips findings
-already posted by `REVIEW_BOT_LOGIN`. A failed inline post only logs a warning. Set the variable
-`AI_REVIEW_INLINE` to `false` to turn the threads off. Every reviewer's parsed findings and the
+already posted by `REVIEW_BOT_LOGIN`. A failed inline post only logs a warning. The threads are
+off by default; set the variable `AI_REVIEW_INLINE` to `true` to turn them on.
+
+Each PR gets at most `AI_REVIEW_MAX_PASSES` automatic reviews (default 2). The count is a hidden
+`o2-review-pass` tag in the review comment, so later pushes skip before any model call; a run in
+which every reviewer failed does not count. To review again, dispatch the workflow with
+`ignore_pass_limit`, or delete the review comment to reset the count. Every reviewer's parsed findings and the
 coordinator's kept list are also uploaded as the `ai-review-findings-*` artifact (7 days,
 scrubbed like the comment). Full engine details live in the code;
 the rest of this README covers **trusted execution, setup, activation, and rollback**.
