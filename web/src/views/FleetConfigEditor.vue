@@ -372,33 +372,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
-    <EditorDraftLeaveDialog
-      :open="leaveOpen"
-      :entity-label="t('fleet.editor.leaveEntity')"
-      :saving="leaveSaving"
-      :can-keep-draft="false"
-      :can-save="leaveCanSave"
-      :forced="draftSignOutForced"
-      :signing-out="draftSigningOut"
-      :other-draft-count="signOutDrafts"
-      :message="leaveMessage"
-      :save-label="t('fleet.editor.saveDraft')"
-      @choose="chooseLeave"
-    />
+    <EditorDraftDialogs :draft="configDraft" />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import {
-  onBeforeRouteLeave,
-  onBeforeRouteUpdate,
-  useRoute,
-  useRouter,
-  type RouteLocationNormalized,
-} from "vue-router";
-import { useMutation } from "@tanstack/vue-query";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useMutation } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -424,6 +406,7 @@ import FleetComponentProperties from "@/components/fleet/editor/FleetComponentPr
 import FleetConfigHistory from "@/components/fleet/editor/FleetConfigHistory.vue";
 import FleetConfigVariables from "@/components/fleet/editor/FleetConfigVariables.vue";
 import FleetAddPipelineDialog from "@/components/fleet/editor/FleetAddPipelineDialog.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import type { GroupIssue } from "@/components/fleet/editor/FleetEditorGroupNode.vue";
 import FleetCodeEditor from "@/components/fleet/FleetCodeEditor.vue";
 import FleetCreateConfigDialog from "@/components/fleet/FleetCreateConfigDialog.vue";
@@ -453,15 +436,8 @@ import {
   useFleetConfigVersion,
 } from "@/components/fleet/useFleetApi";
 import { useOrgId } from "@/composables/query/useOrgId";
-import type { EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
-import EditorDraftLeaveDialog from "@/components/common/drafts/EditorDraftLeaveDialog.vue";
-import {
-  draftSigningOut,
-  draftSignOutDiscardOnly,
-  draftSignOutForced,
-  registerSignOutLeaveAsker,
-} from "@/utils/drafts/draftSession";
-import { countAllDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
   deleteFleetConfigMutation,
@@ -472,10 +448,10 @@ import {
 import type { FleetConfigIssues, FleetConfigReferences } from "@/services/fleet";
 
 const { t } = useI18nTyped();
-const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = useOrgId();
+const store = useStore();
 
 const backTo = fleetLocation("configurations", {}, route.query);
 
@@ -556,8 +532,8 @@ const name = computed(() => (isNew.value ? "untitled-config" : id.value));
 const unsaved = computed(
   () => loaded.value && yamlText.value.trimEnd() !== savedText.value.trimEnd(),
 );
-// The one target a Discard or delete let through; any other navigation asks again.
-let leaveAllowedTo: string | null = null;
+// Taken off the list page at load and applied only once the draft baseline is the seed.
+let pendingImport: string | null = null;
 const subtitle = computed(() =>
   isNew.value ? t("fleet.editor.newDescription") : (detail.value?.description ?? ""),
 );
@@ -767,6 +743,7 @@ function onCreated(newId: string) {
   if (createReplaces.value) {
     // Saving a new config creates it from this text, so moving to its page loses nothing.
     savedText.value = yamlText.value;
+    configDraft.markSaved();
     router.replace(target);
   } else router.push(target);
 }
@@ -957,6 +934,7 @@ async function confirmPublish() {
     if (yamlText.value === sent) {
       if (fresh) dirty.value = false;
       issues.value = warnings;
+      if (id.value === sentId) configDraft.markSaved();
     }
     toast({
       variant: count ? "warning" : "success",
@@ -996,10 +974,13 @@ async function save(): Promise<boolean> {
     const sentId = id.value;
     await saveDraftMutation.mutateAsync({ id: sentId, yaml: sent });
     // A reply for a config the user has since left must not mark this one saved.
-    if (id.value === sentId) savedText.value = sent;
+    if (id.value !== sentId) return false;
+    savedText.value = sent;
     // Until the refetch lands, the cached detail may have no draft and the chip would read published.
     const fresh = (await config.refetch()).isSuccess;
     if (fresh && yamlText.value === sent) dirty.value = false;
+    // An edit typed during the request is still unsaved, so only a matching text clears the browser draft.
+    if (yamlText.value === sent) configDraft.markSaved();
     toast({ variant: "success", message: t("fleet.editor.draftSaved") });
     return true;
   } catch (err) {
@@ -1015,7 +996,8 @@ async function deleteConfig() {
     await deleteMutation.mutateAsync(id.value);
     deleteOpen.value = false;
     toast({ variant: "success", message: t("fleet.editor.deleted", { name: raw(name.value) }) });
-    leaveAllowedTo = router.resolve(backTo).fullPath;
+    configDraft.discard();
+    dropDrafts();
     router.push(backTo);
   } catch (err) {
     // A 409 names what still references the configuration, which the counts ignore permissions for.
@@ -1032,10 +1014,8 @@ watch(
   () => {
     loadedFor.value = null;
     if (isNew.value) {
-      const imported = takePendingImport();
-      loadText(imported ?? graphToYaml(seedGraph()));
-      // An imported file exists nowhere else yet, so leaving would lose it.
-      if (imported !== null) savedText.value = "";
+      pendingImport = takePendingImport();
+      loadText(graphToYaml(seedGraph()));
       loadedFor.value = "new";
     }
   },
@@ -1058,6 +1038,7 @@ watch(config.error, (err) => {
   const status = (err as { response?: { status?: number } } | null)?.response?.status;
   if (status === 404) {
     toast({ variant: "error", message: t("fleet.editor.notFound", { name: raw(id.value) }) });
+    dropDrafts();
     router.push(backTo);
   } else if (err && !isForbidden(err)) toastFailure(err);
 });
@@ -1072,87 +1053,89 @@ watch([panelOpen, paletteCollapsed], ([open, collapsed], [wasOpen, wasCollapsed]
   if (narrowed && selection.value) canvasRef.value?.reveal(selection.value.nodeId);
 });
 
-const leaveOpen = ref(false);
-const leaveSaving = ref(false);
-// A new configuration's Save opens the create dialog, which a leave dialog must not chain into.
-const leaveCanSave = computed(() => !draftSignOutDiscardOnly.value && !isNew.value);
-const leaveMessage = computed<I18nText | null>(() => {
-  if (draftSignOutForced.value) return null;
-  if (isNew.value) return t("fleet.editor.leaveMessageNew");
-  return draftSigningOut.value ? null : t("fleet.editor.leaveMessage");
+interface FleetConfigDraft {
+  yamlText: string;
+  mode: "visual" | "yaml";
+  selectedPipeline: string | null;
+  selection: { nodeId: string; pipelineId: string | null; key: string } | null;
+}
+
+function applyDraft(data: FleetConfigDraft) {
+  yamlText.value = data.yamlText;
+  graph.value = yamlToGraph(data.yamlText);
+  const g = graph.value;
+  mode.value = g && data.mode === "visual" ? "visual" : "yaml";
+  leavePropertiesWithoutGraph();
+  past.value = [];
+  future.value = [];
+  dirty.value = true;
+  issues.value = null;
+  selectedPipeline.value =
+    g && g.pipelines.some((p) => p.id === data.selectedPipeline) ? data.selectedPipeline : null;
+  selection.value = g && data.selection && g.components[data.selection.key] ? data.selection : null;
+  if (selection.value) openPanel("properties");
+}
+
+const configDraft = useEditorDraft<FleetConfigDraft>({
+  kind: "fleet_config",
+  entityLabel: () => t("common.editorDraft.entities.fleet_config"),
+  entityId: () => (isNew.value ? null : id.value),
+  snapshot: () => ({
+    yamlText: yamlText.value,
+    mode: mode.value,
+    selectedPipeline: selectedPipeline.value,
+    selection: selection.value,
+  }),
+  apply: applyDraft,
+  base: () => (isNew.value ? null : savedYaml.value),
+  hasChanges: () => unsaved.value,
+  save,
+  // Another config's page reuses this view, so only an id change leaves the draft.
+  leaveOnRouteUpdate: (to, from) => to.params.id !== from.params.id,
 });
-// The YAML is never kept in this browser, so every draft the user has is one the sign-out discards.
-const signOutDrafts = computed(() =>
-  draftSigningOut.value ? countAllDraftsFor(String(store.state.userInfo?.email ?? "")) : 0,
-);
-let leaveResolver: ((allowed: boolean) => void) | null = null;
-let leaveTarget: string | null = null;
 
-function settleLeave(allowed: boolean) {
-  const resolve = leaveResolver;
-  leaveResolver = null;
-  leaveTarget = null;
-  leaveOpen.value = false;
-  resolve?.(allowed);
-}
-
-async function chooseLeave(requested: EditorDraftLeaveChoice) {
-  // Escape reports a second "stay" once the dialog has closed, which must not clear the first answer's allowance.
-  if (leaveSaving.value || !leaveResolver) return;
-  // A forced sign-out cannot be cancelled, so closing the dialog discards and the sign-out goes on.
-  const choice = requested === "stay" && draftSignOutForced.value ? "discard" : requested;
-  if (choice === "discard") leaveAllowedTo = leaveTarget;
-  if (choice !== "save") return settleLeave(choice === "discard");
-  if (!leaveCanSave.value) return;
-  leaveSaving.value = true;
-  const saved = await save().catch(() => false);
-  leaveSaving.value = false;
-  settleLeave(saved);
-}
-
-// Unsaved YAML is never written to browser storage, so leaving offers only the server draft or Discard.
-function guardLeave(to: RouteLocationNormalized): boolean | Promise<boolean> {
-  // A guard redirect is the same leave, and keeps the first target in redirectedFrom.
-  const target = to.redirectedFrom?.fullPath ?? to.fullPath;
-  if (leaveAllowedTo !== null && leaveAllowedTo === target) return true;
-  leaveAllowedTo = null;
-  if (!unsaved.value) return true;
-  if (leaveSaving.value) return false;
-  // The router has already cancelled the earlier navigation, so the open dialog now answers for this one.
-  leaveResolver?.(false);
-  leaveTarget = target;
-  return new Promise<boolean>((resolve) => {
-    leaveResolver = resolve;
-    leaveOpen.value = true;
+/** Drops every draft of this config once it no longer exists. */
+function dropDrafts() {
+  deleteEditorDraftsFor({
+    kind: "fleet_config",
+    org: String(store.state.selectedOrganization?.identifier ?? ""),
+    entityId: id.value,
   });
 }
+
+async function startDraft() {
+  await configDraft.start();
+  const imported = pendingImport;
+  pendingImport = null;
+  if (imported === null) return;
+  // A continued draft is what the user chose to keep, so it is not overwritten by the import.
+  if (configDraft.hasUnsavedChanges()) {
+    toast({ variant: "info", message: t("fleet.editor.importNotApplied") });
+    return;
+  }
+  // Baselines on the seed, so the imported file counts as unsaved until it is saved.
+  configDraft.discard();
+  loadText(imported);
+  savedText.value = "";
+}
+
+const draftKey = computed(() => (loaded.value ? id.value : null));
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (unsaved.value) e.preventDefault();
 }
 
-onBeforeRouteLeave(guardLeave);
-// A sign-out skips its own draft count when this editor's leave dialog will tell it.
-onBeforeUnmount(registerSignOutLeaveAsker(() => unsaved.value));
-// Another config's page reuses this view, so only an id change leaves the draft.
-onBeforeRouteUpdate((to: RouteLocationNormalized, from: RouteLocationNormalized) =>
-  to.params.id === from.params.id ? true : guardLeave(to),
-);
-onMounted(() => window.addEventListener("beforeunload", onBeforeUnload));
-// A navigation that throws runs no afterEach, so the allowance is also dropped on error.
-const resetLeaveAllowed = () => {
-  leaveAllowedTo = null;
-};
-const removeLeaveReset = router.afterEach(resetLeaveAllowed);
-const removeLeaveErrorReset = router.onError(resetLeaveAllowed);
-
-onBeforeUnmount(() => {
-  removeLeaveReset();
-  removeLeaveErrorReset();
-  window.removeEventListener("beforeunload", onBeforeUnload);
-  leaveSaving.value = false;
-  settleLeave(false);
+onMounted(() => {
+  window.addEventListener("beforeunload", onBeforeUnload);
+  watch(
+    draftKey,
+    (key) => {
+      if (key !== null) void startDraft();
+    },
+    { immediate: true },
+  );
 });
+onBeforeUnmount(() => window.removeEventListener("beforeunload", onBeforeUnload));
 
 useShortcuts([
   {

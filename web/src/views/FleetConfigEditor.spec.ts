@@ -476,11 +476,13 @@ describe("FleetConfigEditor", () => {
       if (!guard) throw new Error("The editor registered no route guard");
       return guard;
     };
-    interface LeaveVm {
-      leaveOpen: boolean;
-      chooseLeave: (choice: "stay" | "discard") => Promise<void>;
+    interface DraftVm {
+      configDraft: {
+        state: { leaveOpen: boolean };
+        chooseLeave: (choice: "stay" | "discard") => void;
+      };
     }
-    const leaveVm = () => wrapper.vm as unknown as LeaveVm;
+    const controller = () => (wrapper.vm as unknown as DraftVm).configDraft;
     /** Runs a guard and answers the leave dialog when it opens. */
     const run = async (
       guard: CapturedGuard,
@@ -490,24 +492,26 @@ describe("FleetConfigEditor", () => {
     ) => {
       const pending = guard(to, from);
       await flushPromises();
-      const asked = leaveVm().leaveOpen;
-      if (asked) await leaveVm().chooseLeave(answer);
+      const asked = controller().state.leaveOpen;
+      if (asked) controller().chooseLeave(answer);
       return { asked, allowed: await pending };
     };
-    const leave = (answer?: "stay" | "discard") =>
-      run(last(routeGuards.leave), answer, { fullPath: "/fleet" }, { fullPath: "/fleet/edge" });
+    const leave = (answer?: "stay" | "discard") => run(last(routeGuards.leave), answer);
     const unload = () => {
       const e = new Event("beforeunload", { cancelable: true });
       window.dispatchEvent(e);
       return e.defaultPrevented;
     };
+    // The draft baseline is the editor as it was at the first input, as in the browser.
     const edit = async (w: VueWrapper, text: string) => {
+      window.dispatchEvent(new Event("pointerdown"));
       await toYaml(w);
       w.findComponent({ name: "FleetCodeEditor" }).vm.$emit("update:code", text);
       await flushPromises();
     };
 
     beforeEach(() => {
+      localStorage.clear();
       routeGuards.leave.length = 0;
       routeGuards.update.length = 0;
     });
@@ -561,8 +565,8 @@ describe("FleetConfigEditor", () => {
       wrapper = await mountEditor("edge");
       await edit(wrapper, "first: 1\n");
       let result: unknown;
-      const push = vi.spyOn(router, "push").mockImplementation(async (target) => {
-        result = await run(last(routeGuards.leave), "stay", router.resolve(target));
+      const push = vi.spyOn(router, "push").mockImplementation(async () => {
+        result = await leave();
       });
       await wrapper.find('[data-test="fleet-config-editor-delete"]').trigger("click");
       await flushPromises();
@@ -573,11 +577,6 @@ describe("FleetConfigEditor", () => {
       expect(push).toHaveBeenCalled();
       push.mockRestore();
       await vi.waitFor(() => expect(result).toEqual({ asked: false, allowed: true }));
-      // The allowance was for the list only, so another target still asks.
-      expect(await run(last(routeGuards.leave), "stay", { fullPath: "/elsewhere" })).toEqual({
-        asked: true,
-        allowed: false,
-      });
     });
 
     it("moves to a newly saved config without a prompt", async () => {

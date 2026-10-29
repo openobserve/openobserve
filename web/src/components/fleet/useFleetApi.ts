@@ -130,8 +130,6 @@ export interface ConfigRow {
   fleetsHidden: number;
   updatedAt: number;
   updatedBy: string;
-  /** The unpublished draft's author and save time in ms; null when the list does not report one. */
-  draft: { by: string; at: number } | null;
 }
 
 export interface RolloutRow {
@@ -306,7 +304,6 @@ export function toConfigRow(c: FleetConfigItem): ConfigRow {
     fleetsHidden: c.fleets_hidden ?? 0,
     updatedAt: c.updated_at,
     updatedBy: c.updated_by ?? "",
-    draft: c.draft_at ? { by: c.draft_by ?? "", at: c.draft_at } : null,
   };
 }
 

@@ -23,15 +23,26 @@ import fleet from "@/services/fleet";
 import { queryClient } from "@/composables/query/queryClient";
 import { graphToYaml } from "@/components/fleet/editor/editorGraph";
 import { SEEDS } from "@/components/fleet/editor/editorGraph.fixtures";
+import { setPendingImport } from "@/components/fleet/useFleetApi";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { resumeDraftSession } from "@/utils/drafts/draftSession";
 import {
-  DRAFT_SIGNED_OUT_KEY,
-  draftSessionEnded,
-  resumeDraftSession,
-} from "@/utils/drafts/draftSession";
-import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+  EDITOR_DRAFT_PREFIX,
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import { stopSessionServices } from "@/utils/sessionServices";
-import { byTest, leaveButton, clickLeave } from "@/test/unit/helpers/draftDom";
+import { fillField } from "@/test/unit/helpers/fillField";
+import {
+  byTest,
+  click,
+  clickLeave,
+  clickRestore,
+  leaveButton,
+  pressEscape,
+} from "@/test/unit/helpers/draftDom";
 import FleetConfigEditor from "./FleetConfigEditor.vue";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
@@ -59,15 +70,47 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   invalidateLoginData: vi.fn(),
 }));
 
+interface FleetDraft {
+  yamlText: string;
+  mode: "visual" | "yaml";
+  selectedPipeline: string | null;
+  selection: { nodeId: string; pipelineId: string | null; key: string } | null;
+}
+
+interface EditorVm {
+  yamlText: string;
+  mode: "visual" | "yaml";
+  setMode: (mode: "visual" | "yaml") => void;
+  deleteConfig: () => Promise<void>;
+}
+
+const EMAIL = "example@gmail.com";
 const VALID = graphToYaml(SEEDS["edge-minimal"]());
-const SECRET = "c2VjcmV0";
+const SECRET = "Basic c2VjcmV0";
 const SECRET_YAML = [
   "exporters:",
   "  otlphttp:",
   "    headers:",
-  `      Authorization: Basic ${SECRET}`,
+  `      Authorization: ${SECRET}`,
+  "      X-Env-Token: ${env:O2_TOKEN}",
   "",
 ].join("\n");
+const EXPORTER = "exporter:otlphttp/openobserve";
+
+const scope = (entityId: string | null, userEmail = EMAIL): EditorDraftScope => ({
+  kind: "fleet_config",
+  org: "default",
+  entityId,
+  userEmail,
+});
+
+const draftOf = (yamlText: string, over: Partial<FleetDraft> = {}): FleetDraft => ({
+  yamlText,
+  mode: "yaml",
+  selectedPipeline: null,
+  selection: null,
+  ...over,
+});
 
 const detail = (id: string, yaml: string) => ({
   id,
@@ -81,6 +124,14 @@ const detail = (id: string, yaml: string) => ({
   draft: { yaml, by: "ana@acme.io", at: 1 },
   versions: [],
 });
+
+const CanvasStub = {
+  name: "FleetEditorCanvas",
+  props: ["graph", "selectedNode", "selectedPipeline", "issues", "dirty"],
+  emits: ["select-node", "select-pipeline", "drop", "add-pipeline", "clear"],
+  methods: { reveal: () => undefined },
+  template: '<div data-test="canvas-stub" />',
+};
 
 const CodeEditorStub = {
   name: "FleetCodeEditor",
@@ -112,7 +163,7 @@ const mountEditor = async (id: string) => {
       global: {
         plugins: [i18n, router, store],
         stubs: {
-          FleetEditorCanvas: { template: "<div />" },
+          FleetEditorCanvas: CanvasStub,
           FleetCodeEditor: CodeEditorStub,
           FleetComponentPalette: { template: "<div />" },
           FleetNewRolloutDialog: { template: "<div />" },
@@ -124,36 +175,31 @@ const mountEditor = async (id: string) => {
   return wrapper;
 };
 
+const unmount = () => {
+  wrapper?.unmount();
+  wrapper = null;
+  document.body.innerHTML = "";
+};
+
+const editor = () => wrapper!.findComponent(FleetConfigEditor).vm as unknown as EditorVm;
+
 const editYaml = async (text: string) => {
   window.dispatchEvent(new Event("pointerdown"));
-  const editor = wrapper!.findComponent(FleetConfigEditor);
-  (editor.vm as unknown as { setMode: (m: "yaml") => void }).setMode("yaml");
+  editor().setMode("yaml");
   await flushPromises();
   wrapper!.findComponent({ name: "FleetCodeEditor" }).vm.$emit("update:code", text);
   await flushPromises();
 };
 
-const pressEscape = () =>
-  document.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
-  );
+/** Opens the OpenObserve exporter's properties, as a click on its canvas node does. */
+const selectExporter = async () => {
+  wrapper!
+    .findComponent({ name: "FleetEditorCanvas" })
+    .vm.$emit("select-node", "n1", "metrics", EXPORTER);
+  await flushPromises();
+};
 
-const traces = (storage: Storage, fleetRelated: (key: string, value: string) => boolean) =>
-  Object.keys(storage).filter((key) => fleetRelated(key, storage.getItem(key) ?? ""));
-
-/** Every key the draft store could have written, or that holds the YAML secret; in sessionStorage, anything Fleet's. */
-const storedYamlTraces = () => [
-  ...traces(
-    localStorage,
-    (key, value) =>
-      (key.startsWith("o2_draft") && key !== DRAFT_SIGNED_OUT_KEY) || value.includes(SECRET),
-  ),
-  ...traces(
-    sessionStorage,
-    (key, value) =>
-      /draft|fleet/i.test(key) || /fleet|otlphttp/i.test(value) || value.includes(SECRET),
-  ),
-];
+const storedDraft = (id: string | null) => readEditorDraft<FleetDraft>(scope(id));
 
 /** Starts a move to another config and waits for its leave guard, without awaiting the move itself. */
 const goToOtherConfig = async () => {
@@ -162,280 +208,307 @@ const goToOtherConfig = async () => {
   return { navigation };
 };
 
-describe("FleetConfigEditor leave guard", () => {
+describe("FleetConfigEditor drafts", () => {
   beforeEach(() => {
     localStorage.clear();
-    sessionStorage.clear();
     vi.mocked(fleet.getConfig).mockImplementation(
       async (_org: string, id: string) => ({ data: detail(id, VALID) }) as never,
     );
     vi.mocked(fleet.saveConfigDraft).mockResolvedValue({ data: { at: 2 } } as never);
+    vi.mocked(fleet.deleteConfig).mockResolvedValue({ status: 204 } as never);
   });
 
   afterEach(() => {
-    wrapper?.unmount();
-    wrapper = null;
+    unmount();
     queryClient.clear();
     vi.clearAllMocks();
-    vi.unstubAllGlobals();
     resumeDraftSession();
     localStorage.clear();
-    sessionStorage.clear();
   });
 
-  it("never writes the YAML to browser storage while editing, on reload or after leaving", async () => {
-    await mountEditor("edge");
-    await editYaml(SECRET_YAML);
-    window.dispatchEvent(new Event("pagehide"));
-    document.dispatchEvent(new Event("visibilitychange"));
-    expect(storedYamlTraces()).toEqual([]);
+  describe("storing", () => {
+    it("keeps a setting filled with no key or pointer event, credentials included, verbatim", async () => {
+      await mountEditor("edge");
+      await selectExporter();
+      await fillField("fleet-component-properties-field-headers.Authorization", SECRET);
+      window.dispatchEvent(new Event("pagehide"));
 
-    const unload = new Event("beforeunload", { cancelable: true });
-    window.dispatchEvent(unload);
-    expect(unload.defaultPrevented).toBe(true);
-    wrapper!.unmount();
-    wrapper = null;
-    expect(storedYamlTraces()).toEqual([]);
-
-    await mountEditor("edge");
-    expect(byTest("editor-draft-restore-dialog")).toBeNull();
-    expect(
-      (wrapper!.findComponent(FleetConfigEditor).vm as unknown as { yamlText: string }).yamlText,
-    ).toBe(VALID);
-    await editYaml(SECRET_YAML);
-    const { navigation } = await goToOtherConfig();
-    clickLeave("o-dialog-neutral-btn");
-    await navigation;
-    await flushPromises();
-    expect(storedYamlTraces()).toEqual([]);
-  });
-
-  it("offers Save draft and Discard only, with no browser-kept option", async () => {
-    await mountEditor("edge");
-    await editYaml(SECRET_YAML);
-    const { navigation } = await goToOtherConfig();
-
-    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    expect(leaveButton("editor-draft-leave-save")?.textContent).toContain("Save draft");
-    expect(leaveButton("o-dialog-neutral-btn")?.textContent).toContain("Discard");
-    expect(leaveButton("o-dialog-secondary-btn")).toBeNull();
-    expect(byTest("editor-draft-leave-message")?.textContent?.trim()).toBe(
-      "Save your changes as a draft of this configuration, or discard them.",
-    );
-    pressEscape();
-    await navigation;
-  });
-
-  it("a new configuration offers only Discard or Stay, and never opens the create dialog", async () => {
-    await mountEditor("new");
-    await editYaml(SECRET_YAML);
-    const first = await goToOtherConfig();
-
-    expect(leaveButton("editor-draft-leave-save")).toBeNull();
-    expect(byTest("editor-draft-leave-message")?.textContent?.trim()).toBe(
-      "This collector configuration is not created yet. Discard it to leave, or stay on this page.",
-    );
-    const stay = leaveButton("o-dialog-secondary-btn");
-    expect(stay?.textContent?.trim()).toBe("Stay");
-    stay!.click();
-    await first.navigation;
-    expect(router.currentRoute.value.params.id).toBe("new");
-    expect(wrapper!.findComponent({ name: "FleetCreateConfigDialog" }).props("open")).toBe(false);
-
-    const second = await goToOtherConfig();
-    clickLeave("o-dialog-neutral-btn");
-    await second.navigation;
-    expect(router.currentRoute.value.params.id).toBe("other");
-    expect(fleet.createConfig).not.toHaveBeenCalled();
-  });
-
-  it("Save draft saves the server draft, then continues the navigation", async () => {
-    await mountEditor("edge");
-    await editYaml(SECRET_YAML);
-    const { navigation } = await goToOtherConfig();
-    clickLeave("editor-draft-leave-save");
-    await navigation;
-    await flushPromises();
-
-    expect(fleet.saveConfigDraft).toHaveBeenCalledWith(
-      expect.any(String),
-      "edge",
-      expect.objectContaining({ yaml: SECRET_YAML }),
-    );
-    expect(router.currentRoute.value.params.id).toBe("other");
-    expect(byTest("editor-draft-leave-dialog")).toBeNull();
-    expect(storedYamlTraces()).toEqual([]);
-  });
-
-  it("stays with the edits when the server save fails", async () => {
-    vi.mocked(fleet.saveConfigDraft).mockRejectedValue(new Error("down"));
-    await mountEditor("edge");
-    await editYaml(SECRET_YAML);
-    const { navigation } = await goToOtherConfig();
-    clickLeave("editor-draft-leave-save");
-    await navigation;
-    await flushPromises();
-
-    expect(router.currentRoute.value.params.id).toBe("edge");
-    expect(wrapper!.findComponent({ name: "FleetCodeEditor" }).props("code")).toBe(SECRET_YAML);
-    expect(byTest("editor-draft-leave-dialog")).toBeNull();
-  });
-
-  it("Discard leaves without saving", async () => {
-    await mountEditor("edge");
-    await editYaml(SECRET_YAML);
-    const navigation = router.push({ name: "fleet" });
-    await flushPromises();
-    clickLeave("o-dialog-neutral-btn");
-    await navigation;
-    await flushPromises();
-
-    expect(router.currentRoute.value.name).toBe("fleet");
-    expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
-    expect(storedYamlTraces()).toEqual([]);
-  });
-
-  it("Escape stays on the editor with the edits", async () => {
-    await mountEditor("edge");
-    await editYaml(SECRET_YAML);
-    const navigation = router.push({ name: "fleet" });
-    await flushPromises();
-    pressEscape();
-    await navigation;
-    await flushPromises();
-
-    expect(router.currentRoute.value.params.id).toBe("edge");
-    expect(byTest("editor-draft-leave-dialog")).toBeNull();
-    expect(wrapper!.findComponent({ name: "FleetCodeEditor" }).props("code")).toBe(SECRET_YAML);
-    expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
-  });
-
-  it("a second navigation while the dialog is open takes over the dialog", async () => {
-    await mountEditor("edge");
-    await editYaml(SECRET_YAML);
-    const first = router.push({ name: "fleet" });
-    await flushPromises();
-    const { navigation: second } = await goToOtherConfig();
-
-    expect(await first).toBeTruthy();
-    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    clickLeave("o-dialog-neutral-btn");
-    expect(await second).toBeUndefined();
-    await flushPromises();
-
-    expect(router.currentRoute.value.params.id).toBe("other");
-    expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
-  });
-
-  it("a Discard holds only for its own target, and not past a navigation that throws", async () => {
-    await mountEditor("edge");
-    await editYaml(SECRET_YAML);
-    let throwOnce = true;
-    router.beforeEach((to) => {
-      if (to.name === "fleet" && throwOnce) {
-        throwOnce = false;
-        throw new Error("chunk failed");
-      }
+      const draft = storedDraft("edge");
+      expect(draft?.data.yamlText).toBe(editor().yamlText);
+      expect(draft?.data.yamlText).toContain(SECRET);
+      expect(draft?.data.selection).toMatchObject({ key: EXPORTER, pipelineId: "metrics" });
+      expect(draft?.redactedPaths ?? []).toEqual([]);
     });
-    const failed = router.push({ name: "fleet" }).catch((err: Error) => err);
-    await flushPromises();
-    clickLeave("o-dialog-neutral-btn");
-    expect(await failed).toBeInstanceOf(Error);
-    await flushPromises();
-    expect(router.currentRoute.value.params.id).toBe("edge");
 
-    const { navigation } = await goToOtherConfig();
-    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    pressEscape();
-    await navigation;
-    await flushPromises();
+    it("stores YAML typed in the code editor exactly as typed", async () => {
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      window.dispatchEvent(new Event("pagehide"));
 
-    const again = router.push({ name: "fleet" });
-    await flushPromises();
-    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    pressEscape();
-    await again;
-    await flushPromises();
-    expect(router.currentRoute.value.params.id).toBe("edge");
+      const draft = storedDraft("edge");
+      expect(draft?.data).toEqual(draftOf(SECRET_YAML));
+      expect(draft?.redactedPaths ?? []).toEqual([]);
+    });
+
+    it("keys a new configuration's draft apart from saved ones", async () => {
+      await mountEditor("new");
+      await editYaml("receivers:\n  otlp: {}\n");
+      window.dispatchEvent(new Event("pagehide"));
+
+      expect(storedDraft(null)?.data.yamlText).toBe("receivers:\n  otlp: {}\n");
+      expect(storedDraft("edge")).toBeNull();
+    });
+  });
+
+  describe("restore", () => {
+    it("offers the draft in the standard wording, and Escape keeps it for later", async () => {
+      writeEditorDraft(scope("edge"), { data: draftOf(SECRET_YAML) });
+      await mountEditor("edge");
+
+      const dialog = byTest("editor-draft-restore-dialog");
+      expect(dialog?.textContent).toContain("Unsaved draft");
+      expect(dialog?.textContent).not.toContain("local changes");
+      expect(byTest("editor-draft-restore-message")?.textContent).toContain(
+        "unsaved changes to this collector configuration",
+      );
+      expect(byTest("editor-draft-credentials-not-saved")).toBeNull();
+
+      pressEscape();
+      await flushPromises();
+      expect(byTest("editor-draft-restore-dialog")).toBeNull();
+      expect(editor().yamlText).toBe(VALID);
+      expect(storedDraft("edge")?.data.yamlText).toBe(SECRET_YAML);
+    });
+
+    it("Continue brings back the YAML, its credentials and the open component", async () => {
+      writeEditorDraft(scope("edge"), {
+        data: draftOf(VALID.replace("${env:O2_TOKEN}", SECRET), {
+          mode: "visual",
+          selectedPipeline: "metrics",
+          selection: { nodeId: "n1", pipelineId: "metrics", key: EXPORTER },
+        }),
+      });
+      await mountEditor("edge");
+      click("editor-draft-continue");
+      await flushPromises();
+
+      expect(editor().yamlText).toContain(SECRET);
+      expect(editor().mode).toBe("visual");
+      const field = document.querySelector<HTMLInputElement>(
+        '[data-test="fleet-component-properties-field-headers.Authorization"] input',
+      );
+      expect(field?.value).toBe(SECRET);
+      const unload = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(unload);
+      expect(unload.defaultPrevented).toBe(true);
+    });
+
+    it("Start fresh drops the draft and keeps the saved YAML", async () => {
+      writeEditorDraft(scope("edge"), { data: draftOf(SECRET_YAML) });
+      await mountEditor("edge");
+      clickRestore("o-dialog-secondary-btn");
+      await flushPromises();
+
+      expect(storedDraft("edge")).toBeNull();
+      expect(editor().yamlText).toBe(VALID);
+      unmount();
+
+      await mountEditor("edge");
+      expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    });
+
+    it("applies an imported file to a new configuration once no draft is continued", async () => {
+      setPendingImport("receivers:\n  imported: {}\n");
+      await mountEditor("new");
+
+      expect(byTest("editor-draft-restore-dialog")).toBeNull();
+      expect(editor().yamlText).toBe("receivers:\n  imported: {}\n");
+      const unload = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(unload);
+      expect(unload.defaultPrevented).toBe(true);
+    });
+
+    it("tells the user an import was not applied when they continue an earlier new-config draft", async () => {
+      writeEditorDraft(scope(null), { data: draftOf("receivers:\n  earlier: {}\n") });
+      setPendingImport("receivers:\n  imported: {}\n");
+      await mountEditor("new");
+      click("editor-draft-continue");
+      await flushPromises();
+
+      expect(editor().yamlText).toBe("receivers:\n  earlier: {}\n");
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "info",
+          message: expect.stringContaining("imported file was not applied"),
+        }),
+      );
+    });
+  });
+
+  describe("leave", () => {
+    it("Save saves the server draft without the browser one, then goes to the other config", async () => {
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      window.dispatchEvent(new Event("pagehide"));
+      expect(storedDraft("edge")).not.toBeNull();
+
+      const { navigation } = await goToOtherConfig();
+      expect(leaveButton("o-dialog-secondary-btn")).not.toBeNull();
+      clickLeave("editor-draft-leave-save");
+      await navigation;
+      await flushPromises();
+
+      expect(fleet.saveConfigDraft).toHaveBeenCalledWith(
+        expect.any(String),
+        "edge",
+        expect.objectContaining({ yaml: SECRET_YAML }),
+      );
+      expect(router.currentRoute.value.params.id).toBe("other");
+      expect(storedDraft("edge")).toBeNull();
+    });
+
+    it("stays with the edits and the browser draft when the server save fails", async () => {
+      vi.mocked(fleet.saveConfigDraft).mockRejectedValue(new Error("down"));
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      const { navigation } = await goToOtherConfig();
+      clickLeave("editor-draft-leave-save");
+      await navigation;
+      await flushPromises();
+
+      expect(router.currentRoute.value.params.id).toBe("edge");
+      expect(editor().yamlText).toBe(SECRET_YAML);
+      window.dispatchEvent(new Event("pagehide"));
+      expect(storedDraft("edge")?.data.yamlText).toBe(SECRET_YAML);
+    });
+
+    it("Keep draft leaves with the YAML kept and offers it on return", async () => {
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      const { navigation } = await goToOtherConfig();
+      clickLeave("o-dialog-secondary-btn");
+      await navigation;
+      await flushPromises();
+
+      expect(router.currentRoute.value.params.id).toBe("other");
+      expect(storedDraft("edge")?.data.yamlText).toBe(SECRET_YAML);
+      expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
+      unmount();
+
+      await mountEditor("edge");
+      expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
+    });
+
+    it("Discard leaves and drops the draft", async () => {
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      window.dispatchEvent(new Event("pagehide"));
+      const navigation = router.push({ name: "fleet" });
+      await flushPromises();
+      clickLeave("o-dialog-neutral-btn");
+      await navigation;
+      await flushPromises();
+
+      expect(router.currentRoute.value.name).toBe("fleet");
+      expect(storedDraft("edge")).toBeNull();
+      expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
+    });
+
+    it("Escape stays on the editor with the edits", async () => {
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      const navigation = router.push({ name: "fleet" });
+      await flushPromises();
+      pressEscape();
+      await navigation;
+      await flushPromises();
+
+      expect(router.currentRoute.value.params.id).toBe("edge");
+      expect(byTest("editor-draft-leave-dialog")).toBeNull();
+      expect(editor().yamlText).toBe(SECRET_YAML);
+    });
+
+    it("a route update on the same config never asks", async () => {
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      await router.push({ name: "fleetConfigEditor", params: { id: "edge" }, query: { tab: "x" } });
+      await flushPromises();
+
+      expect(byTest("editor-draft-leave-dialog")).toBeNull();
+      expect(router.currentRoute.value.query.tab).toBe("x");
+    });
+
+    it("deleting the config drops every user's draft of it and leaves without asking", async () => {
+      writeEditorDraft(scope("edge", "someone@else.io"), { data: draftOf("x: 1\n") });
+      writeEditorDraft(scope("other"), { data: draftOf("y: 1\n") });
+      await mountEditor("edge");
+      await editYaml(SECRET_YAML);
+      window.dispatchEvent(new Event("pagehide"));
+
+      await editor().deleteConfig();
+      await flushPromises();
+
+      expect(router.currentRoute.value.name).toBe("fleet");
+      expect(byTest("editor-draft-leave-dialog")).toBeNull();
+      expect(storedDraft("edge")).toBeNull();
+      expect(readEditorDraft(scope("edge", "someone@else.io"))).toBeNull();
+      expect(storedDraft("other")).not.toBeNull();
+    });
   });
 
   describe("sign-out", () => {
     const signOutStore = () => ({
-      state: { userInfo: { email: "example@gmail.com" }, zoConfig: { rum: { enabled: true } } },
+      state: { userInfo: { email: EMAIL }, zoConfig: { rum: { enabled: true } } },
       dispatch: vi.fn(),
     });
+    const fleetKeys = () =>
+      Object.keys(localStorage).filter((key) =>
+        key.startsWith(`${EDITOR_DRAFT_PREFIX}fleet_config`),
+      );
 
+    const realLocation = window.location;
+
+    // unstubAllGlobals would also drop the ResizeObserver the test setup stubs, which the properties panel needs.
     beforeEach(() => {
-      vi.stubGlobal("location", { ...window.location, assign: vi.fn() });
+      vi.stubGlobal("location", { ...realLocation, assign: vi.fn() });
     });
 
-    it("asks before the session ends, and Save draft still has the session", async () => {
+    afterEach(() => {
+      vi.stubGlobal("location", realLocation);
+    });
+
+    it("names the other drafts in the dialog, then discards every collector configuration draft of the user", async () => {
+      writeEditorDraft(scope("other"), { data: draftOf("y: 1\n") });
       await mountEditor("edge");
       await editYaml(SECRET_YAML);
+      window.dispatchEvent(new Event("pagehide"));
+      expect(fleetKeys()).toHaveLength(2);
+
       const signingOut = signOutThroughLeaveGuards(router, signOutStore());
       await flushPromises();
-
-      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-      expect(draftSessionEnded.value).toBe(false);
-      expect(stopSessionServices).not.toHaveBeenCalled();
-      clickLeave("editor-draft-leave-save");
-      await vi.waitFor(() => expect(fleet.saveConfigDraft).toHaveBeenCalled());
+      expect(leaveButton("o-dialog-secondary-btn")).toBeNull();
+      expect(byTest("editor-draft-leave-sign-out-others")?.textContent?.trim()).toBe(
+        "Signing out also discards 1 other unsaved draft in this browser.",
+      );
+      clickLeave("o-dialog-neutral-btn");
 
       expect(await signingOut).toBe(true);
       expect(stopSessionServices).toHaveBeenCalled();
-      expect(vi.mocked(fleet.saveConfigDraft).mock.invocationCallOrder[0]).toBeLessThan(
-        vi.mocked(stopSessionServices).mock.invocationCallOrder[0],
-      );
-      expect(storedYamlTraces()).toEqual([]);
+      expect(fleetKeys()).toEqual([]);
+      expect(JSON.stringify({ ...localStorage })).not.toContain(SECRET);
     });
 
-    it("cancels the sign-out when the user stays", async () => {
+    it("Escape cancels the sign-out and keeps the draft", async () => {
       await mountEditor("edge");
       await editYaml(SECRET_YAML);
+      window.dispatchEvent(new Event("pagehide"));
       const signingOut = signOutThroughLeaveGuards(router, signOutStore());
       await flushPromises();
       pressEscape();
 
       expect(await signingOut).toBe(false);
       expect(stopSessionServices).not.toHaveBeenCalled();
-      expect(router.currentRoute.value.params.id).toBe("edge");
-    });
-
-    it("names the other drafts the sign-out discards behind the info icon", async () => {
-      writeEditorDraft(
-        { kind: "slo", org: "o1", entityId: null, userEmail: "example@gmail.com" },
-        { data: {} },
-      );
-      await mountEditor("edge");
-      await editYaml(SECRET_YAML);
-      const signingOut = signOutThroughLeaveGuards(router, signOutStore());
-      await flushPromises();
-
-      expect(byTest("editor-draft-leave-sign-out")?.getAttribute("aria-label")).toBe(
-        "Signing out also discards 1 other unsaved draft in this browser.",
-      );
-      clickLeave("o-dialog-neutral-btn");
-      expect(await signingOut).toBe(true);
-    });
-
-    it("a forced sign-out offers Discard only, and the dialog cannot be closed", async () => {
-      await mountEditor("edge");
-      await editYaml(SECRET_YAML);
-      const signingOut = signOutThroughLeaveGuards(router, signOutStore(), { forced: true });
-      await flushPromises();
-
-      expect(leaveButton("editor-draft-leave-save")).toBeNull();
-      expect(leaveButton("o-dialog-secondary-btn")).toBeNull();
-      expect(leaveButton("o-dialog-close-btn")).toBeNull();
-      pressEscape();
-      await flushPromises();
-      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-      clickLeave("o-dialog-neutral-btn");
-
-      expect(await signingOut).toBe(true);
-      expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
-      expect(stopSessionServices).toHaveBeenCalled();
-      expect(storedYamlTraces()).toEqual([]);
+      expect(storedDraft("edge")?.data.yamlText).toBe(SECRET_YAML);
     });
   });
 });

@@ -420,8 +420,7 @@ export const saveFleetConfigDraftMutation = (org: string) =>
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: fleetKeys.config(org, vars.id) });
     },
-    // The list shows each config's draft state, so it is stale too.
-    meta: { invalidates: [fleetKeys.configs(org)], silentError: true },
+    meta: { silentError: true },
   });
 
 export const publishFleetConfigVersionMutation = (org: string) =>

@@ -23,6 +23,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import OTable from "@/lib/core/Table/OTable.vue";
 import FleetConfigurations from "./FleetConfigurations.vue";
 import { takePendingImport } from "./useFleetApi";
+import { deleteEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -119,6 +120,27 @@ describe("FleetConfigurations", () => {
     expect(wrapper.text()).toContain("Used by fleets");
   });
 
+  it("marks a row with an unsaved draft and drops the mark once the draft is gone", async () => {
+    localStorage.clear();
+    const scope = {
+      kind: "fleet_config" as const,
+      org: "default",
+      entityId: "org-baseline",
+      userEmail: "example@gmail.com",
+    };
+    writeEditorDraft(scope, { data: { yamlText: "x: 1\n" } });
+    wrapper = await mountList();
+    const dot = () => wrapper.find('[data-test="fleet-configurations-draft-dot-org-baseline"]');
+    expect(dot().exists()).toBe(true);
+    expect(wrapper.find('[data-test="fleet-configurations-draft-dot-edge-minimal"]').exists()).toBe(
+      false,
+    );
+
+    deleteEditorDraft(scope);
+    await flushPromises();
+    expect(dot().exists()).toBe(false);
+  });
+
   it("renders the rows the API returns", async () => {
     wrapper = await mountList();
     expect(fleet.listConfigs).toHaveBeenCalledWith(
@@ -164,63 +186,14 @@ describe("FleetConfigurations", () => {
     push.mockRestore();
   });
 
-  describe("publish state", () => {
-    const draftAt = new Date(2026, 9, 28, 14, 5).getTime();
-    const cell = (w: VueWrapper, id: string) =>
-      w.find(`[data-test="fleet-configurations-version-${id}"]`);
-    const state = (w: VueWrapper, id: string) =>
-      w.find(`[data-test="fleet-configurations-state-${id}"]`);
-
-    beforeEach(() => {
-      vi.mocked(fleet.listConfigs).mockResolvedValue({
-        data: {
-          items: [
-            config({ id: "published", latest_version: 3 }),
-            config({
-              id: "edited",
-              latest_version: 2,
-              draft_by: "bo@acme.io",
-              draft_at: draftAt,
-            }),
-            config({ id: "unpublished", latest_version: 0 }),
-          ],
-        },
-      } as never);
-    });
-
-    it("shows a never-published config as a draft instead of a version", async () => {
-      wrapper = await mountList();
-      expect(cell(wrapper, "unpublished").text()).toBe("Draft");
-      const tag = state(wrapper, "unpublished").findComponent({ name: "OTag" });
-      expect(tag.props()).toMatchObject({ type: "fleetConfigState", value: "draft" });
-    });
-
-    it("shows the version and draft changes when a published config has an unpublished draft", async () => {
-      wrapper = await mountList();
-      const text = cell(wrapper, "edited").text();
-      expect(text).toContain("v2");
-      expect(text).toContain("Draft changes");
-    });
-
-    it("shows only the version for a published config without a draft", async () => {
-      wrapper = await mountList();
-      expect(cell(wrapper, "published").text()).toBe("v3");
-      expect(state(wrapper, "published").exists()).toBe(false);
-    });
-
-    it("names who saved the draft and when in the chip's tooltip", async () => {
-      wrapper = await mountList();
-      const tooltip = state(wrapper, "edited").findComponent({ name: "OTooltip" });
-      expect(tooltip.exists()).toBe(true);
-      const content = String(tooltip.props("content"));
-      expect(content).toContain("bo@acme.io");
-      expect(content).toContain(
-        new Date(draftAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
-      );
-      expect(state(wrapper, "unpublished").findComponent({ name: "OTooltip" }).exists()).toBe(
-        false,
-      );
-    });
+  it("shows a dash for a config that was never published", async () => {
+    wrapper = await mountList();
+    expect(wrapper.find('[data-test="fleet-configurations-version-org-baseline"]').text()).toBe(
+      "—",
+    );
+    expect(wrapper.find('[data-test="fleet-configurations-version-edge-minimal"]').text()).toBe(
+      "v3",
+    );
   });
 
   it("shows an error state with a retry when the list fails to load", async () => {

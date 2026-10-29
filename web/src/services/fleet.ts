@@ -198,10 +198,6 @@ export interface FleetConfigItem {
   fleets_hidden?: number;
   updated_at: number;
   updated_by: string;
-  /** Author of the unpublished draft; absent from servers that do not list drafts. */
-  draft_by?: string | null;
-  /** When the unpublished draft was last saved, in ms; null or absent when there is none. */
-  draft_at?: number | null;
 }
 
 export interface FleetConfigDraft {

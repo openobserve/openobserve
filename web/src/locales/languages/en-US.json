@@ -1032,7 +1032,8 @@
         "model_pricing": "model price",
         "remote_task": "remote task",
         "eval_job": "evaluation job",
-        "eval_scorer": "scorer"
+        "eval_scorer": "scorer",
+        "fleet_config": "collector configuration"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -27403,10 +27404,7 @@
       "descriptionTooLong": "Use at most 1024 characters",
       "created": "Created {name}",
       "hiddenFleets": "+{count} you cannot view",
-      "usedByFleets": "Used by fleets",
-      "stateDraft": "Draft",
-      "stateDraftChanges": "Draft changes",
-      "draftSaved": "Saved by {by} on {date}"
+      "usedByFleets": "Used by fleets"
     },
     "rollouts": {
       "progress": "Progress",
@@ -27766,9 +27764,7 @@
       "visualUnavailable": "The visual editor cannot show this YAML without losing parts of it",
       "publishedWithWarnings": "Published v{version} with {count} warning | Published v{version} with {count} warnings",
       "notFound": "Configuration {name} was not found",
-      "leaveEntity": "collector configuration",
-      "leaveMessage": "Save your changes as a draft of this configuration, or discard them.",
-      "leaveMessageNew": "This collector configuration is not created yet. Discard it to leave, or stay on this page.",
+      "importNotApplied": "The imported file was not applied because you continued your earlier draft. Import it again to use it.",
       "deleteInUse": "Still referenced by fleets: {fleets}, collectors: {collectors}, active rollouts: {rollouts}. Change those fleets to another configuration first."
     },
     "history": {
