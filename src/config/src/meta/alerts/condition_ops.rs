@@ -17,7 +17,8 @@
 
 use std::{borrow::Cow, sync::LazyLock};
 
-use dashmap::DashMap;
+use hashbrown::HashMap;
+use parking_lot::RwLock;
 use regex::{Regex, RegexBuilder};
 
 use super::Operator;
@@ -28,25 +29,20 @@ pub const MAX_IN_LIST_VALUES: usize = 1000;
 const REGEX_CACHE_CAPACITY: usize = 1024;
 const REGEX_SIZE_LIMIT: usize = 256 * 1024;
 
-// Indexed by case-insensitivity; invalid patterns are cached as None so a bad saved regex is
-// not recompiled per record.
-static REGEX_CACHE: LazyLock<[DashMap<String, Option<Regex>>; 2]> =
-    LazyLock::new(|| [DashMap::new(), DashMap::new()]);
+// Index = case flag; None caches a bad pattern so it is not recompiled per record.
+static REGEX_CACHE: LazyLock<[RegexCache; 2]> =
+    LazyLock::new(|| [RwLock::new(HashMap::new()), RwLock::new(HashMap::new())]);
+
+type RegexCache = RwLock<HashMap<String, Option<Regex>>>;
 
 /// Whether `text` matches `pattern`, compiled once per pattern; `None` when it does not compile.
 pub fn regex_is_match(pattern: &str, case_insensitive: bool, text: &str) -> Option<bool> {
-    let cache = &REGEX_CACHE[usize::from(case_insensitive)];
-    if let Some(entry) = cache.get(pattern) {
-        return entry.as_ref().map(|re| re.is_match(text));
-    }
-    let compiled = compile_regex(pattern, case_insensitive).ok();
-    let result = compiled.as_ref().map(|re| re.is_match(text));
-    // Clearing is cheap and rare; it only bounds memory when many distinct patterns appear.
-    if cache.len() >= REGEX_CACHE_CAPACITY {
-        cache.clear();
-    }
-    cache.insert(pattern.to_string(), compiled);
-    result
+    cached_is_match(
+        &REGEX_CACHE[usize::from(case_insensitive)],
+        pattern,
+        case_insensitive,
+        text,
+    )
 }
 
 /// Items of an `in`/`not_in` value: a JSON array, or a single scalar as a one-item list.
@@ -129,7 +125,7 @@ pub fn validate_condition_value(
                     "Condition on '{column}': operator '{operator}' needs a string pattern"
                 ));
             };
-            if pattern.len() > MAX_REGEX_PATTERN_LEN {
+            if pattern.chars().count() > MAX_REGEX_PATTERN_LEN {
                 return Err(format!(
                     "Condition on '{column}': regex is longer than {MAX_REGEX_PATTERN_LEN} characters"
                 ));
@@ -157,6 +153,26 @@ fn compile_regex(pattern: &str, case_insensitive: bool) -> Result<Regex, regex::
         .case_insensitive(case_insensitive)
         .size_limit(REGEX_SIZE_LIMIT)
         .build()
+}
+
+fn cached_is_match(
+    cache: &RegexCache,
+    pattern: &str,
+    case_insensitive: bool,
+    text: &str,
+) -> Option<bool> {
+    if let Some(entry) = cache.read().get(pattern) {
+        return entry.as_ref().map(|re| re.is_match(text));
+    }
+    let compiled = compile_regex(pattern, case_insensitive).ok();
+    let result = compiled.as_ref().map(|re| re.is_match(text));
+    let mut cache = cache.write();
+    // Clearing is cheap and rare; it only bounds memory when many distinct patterns appear.
+    if cache.len() >= REGEX_CACHE_CAPACITY && !cache.contains_key(pattern) {
+        cache.clear();
+    }
+    cache.insert(pattern.to_string(), compiled);
+    result
 }
 
 /// `None` when the field type cannot be compared with list items (null, array, object).
@@ -383,8 +399,62 @@ mod tests {
             Some(true)
         );
         assert_eq!(regex_is_match("cache-test-(", false, "x"), None);
-        assert!(REGEX_CACHE[0].contains_key("^cache-test-[0-9]+$"));
-        assert!(REGEX_CACHE[1].contains_key("^cache-test-[0-9]+$"));
+        assert!(REGEX_CACHE[0].read().contains_key("^cache-test-[0-9]+$"));
+        assert!(REGEX_CACHE[1].read().contains_key("^cache-test-[0-9]+$"));
+    }
+
+    #[test]
+    fn test_regex_cache_hit_reuses_the_compiled_regex() {
+        assert_eq!(regex_is_match("^hit-[a-z]+$", false, "hit-abc"), Some(true));
+        let first = REGEX_CACHE[0]
+            .read()
+            .get("^hit-[a-z]+$")
+            .and_then(|re| re.as_ref().map(|re| re.as_str().to_string()));
+        assert_eq!(first.as_deref(), Some("^hit-[a-z]+$"));
+        assert_eq!(regex_is_match("^hit-[a-z]+$", false, "hit-1"), Some(false));
+    }
+
+    #[test]
+    fn test_invalid_pattern_is_cached_as_none() {
+        assert_eq!(regex_is_match("invalid-cached-(", true, "x"), None);
+        assert!(matches!(
+            REGEX_CACHE[1].read().get("invalid-cached-("),
+            Some(None)
+        ));
+        assert_eq!(regex_is_match("invalid-cached-(", true, "y"), None);
+    }
+
+    #[test]
+    fn test_regex_cache_stays_bounded() {
+        let cache = RwLock::new(HashMap::new());
+        for n in 0..(REGEX_CACHE_CAPACITY * 2 + 10) {
+            let pattern = format!("^bound-{n}$");
+            assert_eq!(
+                cached_is_match(&cache, &pattern, true, &format!("BOUND-{n}")),
+                Some(true)
+            );
+            assert!(cache.read().len() <= REGEX_CACHE_CAPACITY);
+            assert!(cache.read().contains_key(&pattern));
+        }
+    }
+
+    #[test]
+    fn test_regex_cache_concurrent_access() {
+        let handles: Vec<_> = (0..8)
+            .map(|t| {
+                std::thread::spawn(move || {
+                    for n in 0..500 {
+                        let pattern = format!("^conc-{}$", n % 50);
+                        let text = format!("conc-{}", n % 50);
+                        assert_eq!(regex_is_match(&pattern, t % 2 == 0, &text), Some(true));
+                        assert_eq!(regex_is_match("conc-(", t % 2 == 0, &text), None);
+                    }
+                })
+            })
+            .collect();
+        for handle in handles {
+            handle.join().expect("thread panicked");
+        }
     }
 
     #[test]
@@ -425,5 +495,16 @@ mod tests {
         assert!(validate_condition_value("c", &Operator::ReMatch, &json!(5), false).is_err());
         let long = "a".repeat(MAX_REGEX_PATTERN_LEN + 1);
         assert!(validate_condition_value("c", &Operator::ReMatch, &json!(long), false).is_err());
+    }
+
+    #[test]
+    fn test_regex_length_limit_counts_characters_not_bytes() {
+        let at_limit = "é".repeat(MAX_REGEX_PATTERN_LEN);
+        assert!(at_limit.len() > MAX_REGEX_PATTERN_LEN);
+        assert!(validate_condition_value("c", &Operator::ReMatch, &json!(at_limit), false).is_ok());
+        let over = "é".repeat(MAX_REGEX_PATTERN_LEN + 1);
+        let err = validate_condition_value("c", &Operator::ReMatch, &json!(over), false)
+            .expect_err("over the limit");
+        assert!(err.contains("characters"));
     }
 }

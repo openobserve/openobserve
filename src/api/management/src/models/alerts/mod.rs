@@ -544,6 +544,7 @@ pub struct Condition {
     pub case_insensitive: Option<bool>,
 }
 
+/// Comparison operator; `In` to `ReNotMatch` are only valid in condition trees, not thresholds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 pub enum Operator {
     #[serde(rename = "=")]
