@@ -18873,6 +18873,7 @@
       "probeError": "Probe-fout"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "klik",
       "actionType": "type",
       "all": "Alle",
@@ -19741,7 +19742,7 @@
       "retriesMaxHint": "Maximum {max}. Retries worden binnen dezelfde taak uitgevoerd, dus de hele reeks moet in het checkbudget passen.",
       "retriesMaxBrowserHint": "Maximum {max} voor browserchecks. Elke poging doorloopt het traject opnieuw op elk apparaat, dus meer zou de probe-time-out overschrijden en een fout melden die uw site nooit had.",
       "retryDelay": "Wacht tot",
-      "retryDelaySuffix": "Ik zit tussen de nieuwe pogingen.",
+      "retryDelaySuffix": "seconden tussen de nieuwe pogingen.",
       "schedule": "Schema",
       "scheduleLater": "Later plannen",
       "scheduleLaterTooltip": "Kies een toekomstige datum en tijd om de cheque te activeren.",
@@ -19965,6 +19966,8 @@
         "restartConfig": "Configuratie opnieuw starten — kopieer het installatiecommando van deze agent om de installatie opnieuw uit te voeren / docker opnieuw te starten (bijv. na een tokenrotatie)",
         "noAgents": "Er hebben zich nog geen agenten geregistreerd voor deze locatie.",
         "agentsUnavailable": "De agents van deze locatie zijn geregistreerd bij een ander cluster en zijn hier niet zichtbaar.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Controles die vanaf deze locatie worden uitgevoerd",
         "checkName": "Naam",
         "noChecks": "Er zijn nog geen controles toegewezen aan deze locatie.",
@@ -20855,6 +20858,7 @@
         "system": "systeem"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Beschikbaar",
         "passed": "Geslaagd",
         "healthy": "Gezond",

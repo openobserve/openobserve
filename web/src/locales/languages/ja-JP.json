@@ -18873,6 +18873,7 @@
       "probeError": "プローブエラー"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "クリック",
       "actionType": "タイプ",
       "all": "すべて",
@@ -19741,7 +19742,7 @@
       "retriesMaxHint": "最大 {max}。再試行は同じジョブ内で実行されるため、シーケンス全体がチェック予算内に収まる必要があります。",
       "retriesMaxBrowserHint": "ブラウザチェックの最大値は {max} です。各試行はすべてのデバイスでジャーニーを再実行するため、これ以上増やすとプローブのタイムアウトを超え、サイトには実際にはなかった障害が報告されます。",
       "retryDelay": "お待ちください",
-      "retryDelaySuffix": "再試行の間隔はミリ秒です。",
+      "retryDelaySuffix": "再試行の間隔は秒単位です。",
       "schedule": "スケジュール",
       "scheduleLater": "後でスケジュールする",
       "scheduleLaterTooltip": "チェックを有効にする将来の日付と時刻を選択してください。",
@@ -19965,6 +19966,8 @@
         "restartConfig": "再起動設定 — このエージェントのセットアップコマンドをコピーして、インストール / Docker 再起動を再実行します (例: トークンローテーション後)",
         "noAgents": "このロケーションにまだエージェントが登録されていません。",
         "agentsUnavailable": "このロケーションのエージェントは別のクラスターに登録されているため、ここでは表示されません。",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "このロケーションから実行されるチェック",
         "checkName": "名前",
         "noChecks": "このロケーションにまだチェックが割り当てられていません。",
@@ -20855,6 +20858,7 @@
         "system": "システム"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "稼働中",
         "passed": "成功",
         "healthy": "正常",

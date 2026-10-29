@@ -18873,6 +18873,7 @@
       "probeError": "Error de sonda"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "clic",
       "actionType": "escribir",
       "all": "Todos",
@@ -19741,7 +19742,7 @@
       "retriesMaxHint": "Máximo {max}. Los reintentos se ejecutan dentro del mismo trabajo, por lo que toda la secuencia debe caber en el presupuesto de la verificación.",
       "retriesMaxBrowserHint": "Máximo {max} para verificaciones de navegador. Cada intento vuelve a ejecutar el recorrido en cada dispositivo, por lo que más excedería el tiempo de espera de la sonda e informaría de un fallo que su sitio nunca tuvo.",
       "retryDelay": "Espera a",
-      "retryDelaySuffix": "ms entre reintentos.",
+      "retryDelaySuffix": "segundos entre reintentos.",
       "schedule": "Programación",
       "scheduleLater": "Programe más tarde",
       "scheduleLaterTooltip": "Elija una fecha y hora futuras para activar el cheque.",
@@ -19965,6 +19966,8 @@
         "restartConfig": "Reiniciar configuración — copie el comando de configuración de este agente para volver a ejecutar la instalación / reinicio de Docker (p. ej., después de una rotación de token)",
         "noAgents": "Aún no se han registrado agentes para esta ubicación.",
         "agentsUnavailable": "Los agentes de esta ubicación se registraron en otro clúster y no son visibles aquí.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Verificaciones ejecutándose desde esta ubicación",
         "checkName": "Nombre",
         "noChecks": "Aún no se asignan verificaciones a esta ubicación.",
@@ -20855,6 +20858,7 @@
         "system": "sistema"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Activo",
         "passed": "Aprobado",
         "healthy": "Saludable",

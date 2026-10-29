@@ -18868,6 +18868,7 @@
       "probeError": "探測錯誤"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "點擊",
       "actionType": "輸入",
       "all": "全部",
@@ -19736,7 +19737,7 @@
       "retriesMaxHint": "上限 {max}。重試在同一作業內執行，因此整個序列必須符合檢查預算。",
       "retriesMaxBrowserHint": "瀏覽器檢查的上限為 {max}。每次嘗試都會在每個裝置上重新執行旅程，因此更多嘗試會超出探查逾時，並回報您的網站從未發生的失敗。",
       "retryDelay": "等待",
-      "retryDelaySuffix": "毫秒（重試間隔）。",
+      "retryDelaySuffix": "秒（重試間隔）。",
       "schedule": "排程",
       "scheduleLater": "稍後排程",
       "scheduleLaterTooltip": "選擇未來的日期和時間以啟用檢查。",
@@ -19960,6 +19961,8 @@
         "restartConfig": "重新啟動設定 — 複製此代理程式的設定命令，以重新執行安裝 / docker restart（例如在 Token 輪替之後）",
         "noAgents": "此位置尚未有代理程式註冊。",
         "agentsUnavailable": "此位置的代理程式已向另一個叢集註冊，因此在此處看不到它們。",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "從此位置執行的檢查",
         "checkName": "名稱",
         "noChecks": "此位置尚未分配任何檢查。",
@@ -20850,6 +20853,7 @@
         "system": "系統"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "運行中",
         "passed": "已通過",
         "healthy": "健康",

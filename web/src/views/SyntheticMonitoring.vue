@@ -624,6 +624,25 @@ function formatTimeAgo(microseconds: number): string {
   return t("synthetics.daysAgo", { count: Math.floor(h / 24) });
 }
 
+/**
+ * Backend check status -> UI status key. The API sends strings, but the
+ * numeric enum (0 unknown, 1 passed, 2 warning, 3 failed, 4 error) may also
+ * reach us; anything unmapped becomes "unknown" so it never renders blank.
+ */
+const MONITOR_STATUS_BY_NUMBER: Record<number, string> = {
+  0: "unknown",
+  1: "passed",
+  2: "warning",
+  3: "failed",
+  4: "error",
+};
+const KNOWN_MONITOR_STATUSES = new Set(["passed", "warning", "failed", "error", "unknown"]);
+function normalizeMonitorStatus(status: unknown): string {
+  if (typeof status === "number") return MONITOR_STATUS_BY_NUMBER[status] ?? "unknown";
+  const s = String(status ?? "").toLowerCase();
+  return KNOWN_MONITOR_STATUSES.has(s) ? s : "unknown";
+}
+
 function mapMonitor(m: ApiMonitor) {
   return {
     id: m.id,
@@ -633,7 +652,7 @@ function mapMonitor(m: ApiMonitor) {
     url: m.target,
     type: m.type.toUpperCase(),
     interval: formatFrequency(m.frequency),
-    status: m.status,
+    status: normalizeMonitorStatus(m.status),
     responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
@@ -1292,6 +1311,15 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "error",
       max: share,
       dataTest: "synthetics-summary-failed",
+    },
+    {
+      key: "error",
+      label: t("synthetics.filters.error"),
+      value: v(count("error")),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "synthetics-summary-error",
     },
     {
       key: "warning",

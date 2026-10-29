@@ -18873,6 +18873,7 @@
       "probeError": "Errore probe"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "clic",
       "actionType": "digita",
       "all": "Tutti",
@@ -19741,7 +19742,7 @@
       "retriesMaxHint": "Massimo {max}. I tentativi vengono eseguiti nello stesso job, quindi l'intera sequenza deve rientrare nel budget del controllo.",
       "retriesMaxBrowserHint": "Massimo {max} per i controlli browser. Ogni tentativo riesegue il percorso su ogni dispositivo, quindi un numero maggiore supererebbe il timeout della sonda e segnalerebbe un guasto che il tuo sito non ha mai avuto.",
       "retryDelay": "Aspetta",
-      "retryDelaySuffix": "ms tra un tentativo e l'altro.",
+      "retryDelaySuffix": "secondi tra un tentativo e l'altro.",
       "schedule": "Programmazione",
       "scheduleLater": "Pianifica più tardi",
       "scheduleLaterTooltip": "Scegli una data e un'ora future per attivare il controllo.",
@@ -19965,6 +19966,8 @@
         "restartConfig": "Riavvio configurazione — copia il comando di configurazione di questo agente per rieseguire l'installazione / il riavvio di docker (ad es. dopo una rotazione del token)",
         "noAgents": "Nessun agente si è ancora registrato per questa posizione.",
         "agentsUnavailable": "Gli agenti di questa posizione sono registrati con un altro cluster e non sono visibili qui.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Controlli in esecuzione da questa posizione",
         "checkName": "Nome",
         "noChecks": "Nessun controllo è ancora assegnato a questa posizione.",
@@ -20855,6 +20858,7 @@
         "system": "sistema"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Operativo",
         "passed": "Superato",
         "healthy": "Sano",
