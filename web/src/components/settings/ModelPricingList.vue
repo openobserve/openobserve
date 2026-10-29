@@ -808,7 +808,7 @@ const dropPricingDrafts = (ids: string[]) => {
 
 // ── Built-in price list status (header note) ────────────────────────────────
 const builtInQuery = useQuery(() =>
-  Object.assign(builtInPricingQuery(orgIdentifier.value), { enabled: !!orgIdentifier.value }),
+  Object.assign(builtInPricingQuery(orgIdentifier.value, true), { enabled: !!orgIdentifier.value }),
 );
 
 /** How old the built-in prices are, and whether this server has synced them online. */

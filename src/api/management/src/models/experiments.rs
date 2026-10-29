@@ -1420,8 +1420,8 @@ pub struct ExperimentAggregateSummaryBody {
 #[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentFailureCauseBody {
-    /// Shared failure taxonomy (`provider_auth`, `timeout`, `execution_error`, …); absent on
-    /// records written before executions carried a kind.
+    /// Shared failure taxonomy (`provider_auth`, `timeout`, `execution_error`, …); absent
+    /// when the producer did not classify the failure, including current SDK/client paths.
     pub kind: Option<String>,
     /// The group's most common first error line.
     pub message: String,

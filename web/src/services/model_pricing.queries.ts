@@ -29,11 +29,11 @@ export const modelPricingQuery = (org: string) =>
   });
 
 /** The built-in price list with its seed date and last online sync time. */
-export const builtInPricingQuery = (org: string) =>
+export const builtInPricingQuery = (org: string, metadataOnly = false) =>
   queryOptions({
-    queryKey: modelPricingKeys.builtIn(org),
+    queryKey: modelPricingKeys.builtIn(org, metadataOnly),
     queryFn: async (): Promise<BuiltInPricingResponse | null> =>
-      (await modelPricing.getBuiltIn(org))?.data ?? null,
+      (await modelPricing.getBuiltIn(org, undefined, metadataOnly))?.data ?? null,
     staleTime: NORMAL_STALE_TIME,
   });
 

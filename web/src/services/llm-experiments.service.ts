@@ -355,14 +355,14 @@ export interface ExperimentAggregateSummary {
   incompleteTaskSlots: number;
   incompleteScoreDimensions: number;
   errorTaskSlots: number;
-  /** Errored slots grouped by error kind + first message line, largest first (top 3). */
+  /** Errored slots grouped by kind (or first message line when kindless), largest first (top 3). */
   failureCauses: ExperimentFailureCause[];
   /** Distinct causes across every errored slot, including those beyond the top 3. */
   failureCauseCount: number;
 }
 
 export interface ExperimentFailureCause {
-  /** Shared failure taxonomy (`provider_auth`, `timeout`, …); null on older records. */
+  /** Shared taxonomy (`provider_auth`, `timeout`, …); null when the producer did not classify the failure. */
   kind: string | null;
   /** First line of the error message. */
   message: string;

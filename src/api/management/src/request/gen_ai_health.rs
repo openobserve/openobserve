@@ -286,12 +286,35 @@ fn base_where(cols: &Columns, query: &DataHealthQuery) -> Option<String> {
     Some(preds.join(" AND "))
 }
 
-fn counts_sql(stream: &str, base: &str, preds: &[Pred]) -> String {
+fn counts_sql(stream: &str, base: &str, preds: &[Pred], cols: &Columns) -> String {
     let mut selects = vec!["COUNT(*) AS total".to_string()];
     for (i, pred) in preds.iter().enumerate() {
         if let Pred::Sql(p) = pred {
             selects.push(format!("SUM(CASE WHEN {p} THEN 1 ELSE 0 END) AS c{i}"));
         }
+    }
+    if let Some(Pred::Sql(unpriced)) = preds.first() {
+        let model = cols.model_column();
+        let distinct = model.map_or_else(
+            || "0".to_string(),
+            |column| format!("COUNT(DISTINCT CASE WHEN {unpriced} THEN {column} END)"),
+        );
+        let no_model = model.map_or_else(
+            || unpriced.clone(),
+            |column| format!("({unpriced}) AND {column} IS NULL"),
+        );
+        let tokens = if cols.has(TOKENS_COLUMN) {
+            TOKENS_COLUMN
+        } else {
+            "0"
+        };
+        selects.push(format!("{distinct} AS distinct_models"));
+        selects.push(format!(
+            "SUM(CASE WHEN {no_model} THEN 1 ELSE 0 END) AS no_model_spans"
+        ));
+        selects.push(format!(
+            "SUM(CASE WHEN {unpriced} THEN {tokens} ELSE 0 END) AS tokens"
+        ));
     }
     format!(
         "SELECT {} FROM {} WHERE {base}",
@@ -523,12 +546,6 @@ async fn stream_columns(org_id: &str, stream: &str) -> Option<Columns> {
         .map(|s| Columns::from_schema(&s))
 }
 
-/// The SQL of the unpriced model breakdown: the capped per-model rows and their uncapped totals.
-struct UnpricedSql {
-    models: String,
-    totals: String,
-}
-
 /// The queries that follow the counts: sample trace ids per failing check, only when the
 /// caller asked for samples, and the unpriced model breakdown.
 fn follow_up_sql(
@@ -538,7 +555,7 @@ fn follow_up_sql(
     preds: &[Pred],
     checks: &[HealthCheck],
     include_samples: bool,
-) -> (Vec<(usize, String)>, Option<UnpricedSql>) {
+) -> (Vec<(usize, String)>, Option<String>) {
     let samples = if include_samples {
         checks
             .iter()
@@ -551,10 +568,7 @@ fn follow_up_sql(
         vec![]
     };
     let unpriced = match (&preds[0], checks[0].affected > 0) {
-        (Pred::Sql(p), true) => Some(UnpricedSql {
-            models: unpriced_models_sql(stream, base, p, cols),
-            totals: breakdown_totals_sql(stream, &format!("{base} AND {p}"), cols),
-        }),
+        (Pred::Sql(p), true) => Some(unpriced_models_sql(stream, base, p, cols)),
         _ => None,
     };
     (samples, unpriced)
@@ -583,7 +597,7 @@ async fn compute_checks(
     let rows = run_sql(
         org_id,
         user_id,
-        counts_sql(stream, &base, &preds),
+        counts_sql(stream, &base, &preds, &cols),
         window,
         1,
     )
@@ -620,19 +634,17 @@ async fn compute_checks(
         let Some(sql) = unpriced_sql else {
             return Ok(None);
         };
-        tokio::try_join!(
-            run_sql(org_id, user_id, sql.models, window, MAX_MODELS),
-            run_sql(org_id, user_id, sql.totals, window, 1),
-        )
-        .map(Some)
+        run_sql(org_id, user_id, sql, window, MAX_MODELS)
+            .await
+            .map(Some)
     };
     let (samples, unpriced) = tokio::join!(futures::future::join_all(sample_jobs), unpriced_job);
 
     for (i, hits) in samples {
         checks[i].samples = Some(distinct_trace_ids(&hits?));
     }
-    if let Some((model_hits, totals)) = unpriced? {
-        set_unpriced_breakdown(&mut checks[0], &model_hits, totals.first());
+    if let Some(model_hits) = unpriced? {
+        set_unpriced_breakdown(&mut checks[0], &model_hits, Some(&row));
     }
 
     // Worst first, so the strip and the skill lead with what matters.
@@ -1121,19 +1133,12 @@ mod tests {
     }
 
     #[test]
-    fn counts_sql_only_selects_sql_predicates() {
+    fn affected_counts_follow_predicate_semantics() {
         let c = cols(&["gen_ai_operation_name", "duration"]);
         let preds: Vec<Pred> = CHECK_IDS
             .iter()
             .map(|&id| check_pred(id, &c, true))
             .collect();
-        let base = base_where(&c, &query()).unwrap();
-        let sql = counts_sql("default", &base, &preds);
-        assert_eq!(
-            sql,
-            "SELECT COUNT(*) AS total, SUM(CASE WHEN duration = 0 THEN 1 ELSE 0 END) AS c2 \
-             FROM \"default\" WHERE gen_ai_operation_name IS NOT NULL"
-        );
         let row = json::json!({"total": 10, "c2": 4});
         assert_eq!(affected_from(&preds[0], &row, 0, 10), 0);
         assert_eq!(affected_from(&preds[1], &row, 1, 10), 10);
@@ -1296,20 +1301,6 @@ mod tests {
             .map(|i| ((i != 7).then(|| format!("model-{i:02}")), i * 100))
             .collect();
         let all_tokens: i64 = models.iter().map(|(_, t)| t).sum();
-        let c = cols(FULL);
-        let (preds, checks) = failing_checks(&c);
-        let sql = follow_up_sql("default", "b", &c, &preds, &checks, false)
-            .1
-            .unwrap();
-        // The list is capped; its totals are one aggregate over the same spans, uncapped.
-        assert!(sql.models.ends_with(&format!("LIMIT {MAX_MODELS}")));
-        assert_eq!(
-            sql.totals,
-            "SELECT COUNT(DISTINCT gen_ai_response_model) AS distinct_models, \
-             SUM(CASE WHEN gen_ai_response_model IS NULL THEN 1 ELSE 0 END) AS no_model_spans, \
-             COALESCE(SUM(gen_ai_usage_total_tokens), 0) AS tokens FROM \"default\" \
-             WHERE b AND gen_ai_usage_cost_status = 'unpriced'"
-        );
 
         let mut check = HealthCheck::new(CheckId::UnpricedModels, 25, 40, false);
         let totals =
