@@ -360,7 +360,7 @@ jobs:
       needs.generate_matrix.result == 'success' &&
       (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
     runs-on:
-      labels: eks-openobserve-standard-8
+      labels: eks-openobserve-standard-16
     permissions:
       contents: read
       actions: read
