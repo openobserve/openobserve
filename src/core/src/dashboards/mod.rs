@@ -59,7 +59,7 @@ use crate::auth::{check_folder_write_permissions, check_permissions};
 /// dashboard is moved or deleted so the pin never goes stale.
 const HOME_DASHBOARD_SETTING_KEY: &str = "home_dashboard";
 
-/// Mirrors `ALL_CONDITION_OPERATOR_VALUES` in `web/src/components/alerts/conditionOperators.ts`.
+/// Mirrors `ANNOTATION_FILTER_OPERATORS` in `web/src/utils/dashboard/validateAnnotationSources.ts`.
 const ANNOTATION_FILTER_OPERATORS: &[&str] = &[
     "=",
     "!=",
@@ -69,10 +69,18 @@ const ANNOTATION_FILTER_OPERATORS: &[&str] = &[
     "<",
     "Contains",
     "NotContains",
+    "contains",
+    "not_contains",
     "is_null",
     "is_not_null",
     "is_empty",
     "is_not_empty",
+    "in",
+    "not_in",
+    "starts_with",
+    "ends_with",
+    "re_match",
+    "re_not_match",
 ];
 
 /// An error that occurs interacting with dashboards.
@@ -1775,6 +1783,7 @@ mod tests {
                         column: "col".to_string(),
                         operator: "bogus".to_string(),
                         value: "x".to_string(),
+                        case_insensitive: None,
                         logical_operator: v8::AnnotationLogicalOperator::And,
                     },
                 )],
@@ -1792,8 +1801,55 @@ mod tests {
             column: column.to_string(),
             operator: "=".to_string(),
             value: "x".to_string(),
+            case_insensitive: None,
             logical_operator: v8::AnnotationLogicalOperator::And,
         })
+    }
+
+    #[test]
+    fn checked_annotation_sources_accepts_the_filter_builder_operators() {
+        for operator in [
+            "in",
+            "not_in",
+            "starts_with",
+            "ends_with",
+            "re_match",
+            "re_not_match",
+            "contains",
+            "not_contains",
+        ] {
+            let mut source = valid_source("s1");
+            let mut leaf = single_condition_leaf("col");
+            if let v8::AnnotationConditionItem::Condition(ref mut c) = leaf {
+                c.operator = operator.to_string();
+                c.case_insensitive = Some(true);
+            }
+            source.filters.conditions = vec![leaf];
+            let mut dashboard = dashboard_from_sources(vec![source]);
+            assert!(
+                checked_annotation_sources(&mut dashboard).is_ok(),
+                "{operator} must be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn annotation_leaf_without_case_insensitive_round_trips_unchanged() {
+        let json =
+            r#"{"column":"level","operator":"Contains","value":"err","logicalOperator":"AND"}"#;
+        let leaf: v8::AnnotationConditionLeaf = serde_json::from_str(json).unwrap();
+        assert_eq!(leaf.case_insensitive, None);
+        assert_eq!(serde_json::to_string(&leaf).unwrap(), json);
+
+        use std::hash::{Hash, Hasher};
+        let mut actual = std::hash::DefaultHasher::new();
+        leaf.hash(&mut actual);
+        let mut derived = std::hash::DefaultHasher::new();
+        "level".to_string().hash(&mut derived);
+        "Contains".to_string().hash(&mut derived);
+        "err".to_string().hash(&mut derived);
+        v8::AnnotationLogicalOperator::And.hash(&mut derived);
+        assert_eq!(actual.finish(), derived.finish());
     }
 
     #[test]
