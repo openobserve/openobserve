@@ -49,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :activeTab="activeTab"
             :added-users="addedUsers"
             :removed-users="removedUsers"
-            :disabled="isSaving"
             context="role"
           />
           <GroupServiceAccounts
@@ -60,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :activeTab="activeTab"
             :added-users="addedServiceAccounts"
             :removed-users="removedServiceAccounts"
-            :disabled="isSaving"
           />
 
           <div

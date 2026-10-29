@@ -4096,37 +4096,3 @@ describe("EditRole - nothing stages while a save is in flight", () => {
     expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([streamsList]);
   });
 });
-
-describe("EditRole - members while a save is in flight", () => {
-  // The save clears every staged member once the PUT lands; GroupUsers.spec covers the real tabs under this lock.
-  it("locks both member tabs until the PUT settles", async () => {
-    const { updateRole } = await import("@/services/iam");
-    const memberTab = (name) => ({ name, props: ["disabled"], template: "<div />" });
-    const wrapper = await mountEditRole({
-      GroupUsers: memberTab("GroupUsers"),
-      GroupServiceAccounts: memberTab("GroupServiceAccounts"),
-    });
-    const locked = () =>
-      ["GroupUsers", "GroupServiceAccounts"].map((name) =>
-        wrapper.findComponent({ name }).props("disabled"),
-      );
-    let finish;
-    vi.mocked(updateRole).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
-    wrapper.vm.addedUsers.add("alice@example.com");
-    expect(locked()).toEqual([false, false]);
-
-    const saving = wrapper.vm.saveRole();
-    await flushPromises();
-    expect(locked()).toEqual([true, true]);
-
-    finish({ data: { code: 200 } });
-    await saving;
-    await flushPromises();
-    expect(locked()).toEqual([false, false]);
-  });
-});

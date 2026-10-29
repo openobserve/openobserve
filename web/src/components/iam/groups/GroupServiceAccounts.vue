@@ -73,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             :data-test="`iam-service-accounts-selection-table-body-row-${row.email}-checkbox`"
             :model-value="row.isInGroup"
-            :disabled="disabled"
             class="filter-check-box cursor-pointer"
             @update:model-value="toggleUserSelection(row)"
           />
@@ -129,11 +128,6 @@ const props = defineProps({
     default: () => new Set(),
   },
   loading: {
-    type: Boolean,
-    default: false,
-  },
-  // Edit Role clears the staged members once its save lands, so a change made while it is in flight would be lost.
-  disabled: {
     type: Boolean,
     default: false,
   },

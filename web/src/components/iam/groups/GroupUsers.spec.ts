@@ -15,15 +15,9 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { defineComponent, ref } from "vue";
 import GroupUsers from "@/components/iam/groups/GroupUsers.vue";
-import GroupServiceAccounts from "@/components/iam/groups/GroupServiceAccounts.vue";
-import { useRoleSave } from "@/composables/iam/useRoleSave";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
-vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 // ── Mock usePermissions composable ──────────────────────────────────
 vi.mock("@/composables/iam/usePermissions", () => ({
@@ -67,8 +61,8 @@ const o2Stubs = {
     ],
   },
   OCheckbox: {
-    template: `<input type="checkbox" :data-test="dataTest" :disabled="disabled" @click="$emit('update:model-value', !modelValue)" />`,
-    props: ["modelValue", "dataTest", "disabled"],
+    template: `<input type="checkbox" :data-test="dataTest" @click="$emit('update:model-value', !modelValue)" />`,
+    props: ["modelValue", "dataTest"],
     emits: ["update:model-value"],
   },
   OInput: {
@@ -523,16 +517,6 @@ describe("GroupUsers Component", () => {
   });
 
   describe("User Selection", () => {
-    // Edit Role locks membership while its save is in flight; every other caller leaves the boxes live.
-    it("disables the checkboxes only when asked", async () => {
-      const box = '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]';
-      expect(wrapper.find(box).attributes("disabled")).toBeUndefined();
-
-      await wrapper.setProps({ disabled: true });
-
-      expect(wrapper.find(box).attributes("disabled")).toBeDefined();
-    });
-
     it("renders checkboxes for user selection", () => {
       // After mount, rows have user1@example.com and admin@example.com (isInGroup users)
       const checkbox = wrapper.find(
@@ -1064,131 +1048,5 @@ describe("GroupUsers Component", () => {
       );
       expect(checkbox.exists()).toBe(true);
     });
-  });
-});
-
-// Edit Role's members and save, with the real tabs, table and checkboxes; EditRole.spec checks the page binds `disabled` to the save.
-describe("GroupUsers and GroupServiceAccounts while a role save is in flight", () => {
-  const userBox = (wrapper: any, email: string) =>
-    wrapper
-      .find(`[data-test="iam-users-selection-table-body-row-${email}-checkbox"]`)
-      .find("button");
-  const accountBox = (wrapper: any, email: string) =>
-    wrapper
-      .find(`[data-test="iam-service-accounts-selection-table-body-row-${email}-checkbox"]`)
-      .find("button");
-  const shownUsers = (wrapper: any) =>
-    wrapper
-      .findAll('[data-test^="iam-users-selection-table-body-row-"]')
-      .map((label: any) => [
-        label
-          .attributes("data-test")
-          .replace("iam-users-selection-table-body-row-", "")
-          .replace("-checkbox", ""),
-        label.find("button").attributes("aria-checked"),
-      ]);
-
-  const mountRolePage = () => {
-    let finish!: (value: unknown) => void;
-    const mutateAsync = vi.fn(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
-    const RolePage = defineComponent({
-      components: { GroupUsers, GroupServiceAccounts },
-      setup() {
-        const members = {
-          addedUsers: ref(new Set<unknown>()),
-          removedUsers: ref(new Set<unknown>()),
-          addedServiceAccounts: ref(new Set<unknown>()),
-          removedServiceAccounts: ref(new Set<unknown>()),
-          roleUsers: ref<string[]>(["user1@example.com"]),
-        };
-        const { saveRole, isSaving } = useRoleSave({
-          ...members,
-          editingRole: ref("r1"),
-          permissionsUiType: ref("table"),
-          updateJsonInTable: () => {},
-          grants: { payload: () => ({ add: [], remove: [] }), commit: () => {} },
-          updateRoleOne: { mutateAsync },
-          pendingCounts: () => ({ changes: 0, modules: 0 }),
-          presetSettled: () => Promise.resolve(),
-          t: i18n.global.t as any,
-        });
-        return { ...members, saveRole, isSaving };
-      },
-      template: `<div>
-        <GroupUsers :group-users="roleUsers" :added-users="addedUsers" :removed-users="removedUsers" :disabled="isSaving" context="role" />
-        <GroupServiceAccounts :group-users="roleUsers" :added-users="addedServiceAccounts" :removed-users="removedServiceAccounts" :disabled="isSaving" />
-      </div>`,
-    });
-    const wrapper = mount(RolePage, {
-      global: { provide: { store: enhancedStore }, plugins: [i18n] },
-    });
-    return { wrapper, mutateAsync, finish: (value: unknown) => finish(value) };
-  };
-
-  beforeEach(() => {
-    vi.mocked(usePermissions).mockReturnValue({
-      usersState: {
-        users: [],
-        getOrgUsers: vi
-          .fn()
-          .mockResolvedValue([{ email: "user1@example.com" }, { email: "alice@example.com" }]),
-      },
-      serviceAccountsState: {
-        service_accounts_users: [],
-        getServiceAccounts: vi.fn().mockResolvedValue([{ email: "svc1@example.com" }]),
-      },
-    } as any);
-  });
-
-  // Alice selected, saved, then deselected before the PUT lands: the click must not reach the staged set.
-  it("locks every member checkbox until the PUT settles, then shows the saved membership", async () => {
-    const { wrapper, mutateAsync, finish } = mountRolePage();
-    await flushPromises();
-    await wrapper.findComponent(GroupUsers).vm.updateUserTable("all");
-    await wrapper.findComponent(GroupServiceAccounts).vm.updateUserTable("all");
-    await flushPromises();
-
-    expect(userBox(wrapper, "alice@example.com").attributes("disabled")).toBeUndefined();
-    await userBox(wrapper, "alice@example.com").trigger("click");
-    expect([...wrapper.vm.addedUsers]).toEqual(["alice@example.com"]);
-
-    const saving = wrapper.vm.saveRole();
-    await flushPromises();
-    ["alice@example.com", "user1@example.com"].forEach((email) =>
-      expect(userBox(wrapper, email).attributes("disabled"), email).toBeDefined(),
-    );
-    expect(accountBox(wrapper, "svc1@example.com").attributes("disabled")).toBeDefined();
-    await userBox(wrapper, "alice@example.com").trigger("click");
-    await userBox(wrapper, "user1@example.com").trigger("click");
-    await accountBox(wrapper, "svc1@example.com").trigger("click");
-    expect([...wrapper.vm.addedUsers]).toEqual(["alice@example.com"]);
-    expect(wrapper.vm.removedUsers.size + wrapper.vm.addedServiceAccounts.size).toBe(0);
-
-    finish({});
-    await saving;
-    await flushPromises();
-
-    expect(mutateAsync).toHaveBeenCalledWith({
-      role_id: "r1",
-      payload: expect.objectContaining({ add_users: ["alice@example.com"], remove_users: [] }),
-    });
-    expect(wrapper.vm.roleUsers).toEqual(["user1@example.com", "alice@example.com"]);
-    expect(
-      wrapper.vm.addedUsers.size +
-        wrapper.vm.removedUsers.size +
-        wrapper.vm.addedServiceAccounts.size +
-        wrapper.vm.removedServiceAccounts.size,
-    ).toBe(0);
-    expect(shownUsers(wrapper)).toEqual([
-      ["user1@example.com", "true"],
-      ["alice@example.com", "true"],
-    ]);
-    expect(userBox(wrapper, "alice@example.com").attributes("disabled")).toBeUndefined();
-    expect(accountBox(wrapper, "svc1@example.com").attributes("disabled")).toBeUndefined();
   });
 });
