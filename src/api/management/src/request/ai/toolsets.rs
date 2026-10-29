@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::ai::toolsets::{
     validate_data,
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
+use openobserve_core::auth::{UserEmail, check_permissions};
 use serde::Deserialize;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
@@ -128,10 +128,18 @@ pub async fn create(
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
-pub async fn get(Path(path): Path<(String, String)>) -> Response {
+pub async fn get(
+    Path(path): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let (org_id, id) = path;
     match infra::table::org_ai_toolsets::get(&org_id, &id).await {
-        Ok(Some(t)) => Json(ToolsetResponse::from_toolset(t)).into_response(),
+        Ok(Some(t)) => {
+            let mut toolsets = [ToolsetResponse::from_toolset(t)];
+            hide_mcp_urls(&org_id, &user_email.user_id, &mut toolsets).await;
+            let [toolset] = toolsets;
+            Json(toolset).into_response()
+        }
         Ok(None) => MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -172,19 +180,24 @@ pub struct ListQuery {
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
-pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -> Response {
+pub async fn list(
+    Path(org_id): Path<String>,
+    Query(params): Query<ListQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let filter = infra::table::org_ai_toolsets::ListFilter {
         name: params.name,
         kind: params.kind,
     };
     match infra::table::org_ai_toolsets::list(&org_id, filter, params.limit).await {
         Ok(toolsets) => {
-            let res = ToolsetListResponse {
+            let mut res = ToolsetListResponse {
                 toolsets: toolsets
                     .into_iter()
                     .map(ToolsetResponse::from_toolset)
                     .collect(),
             };
+            hide_mcp_urls(&org_id, &user_email.user_id, &mut res.toolsets).await;
             Json(res).into_response()
         }
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -311,4 +324,31 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
         )),
     )
         .into_response()
+}
+
+/// An MCP URL can carry its key in the userinfo, path or query; only toolset writers see it whole.
+async fn hide_mcp_urls(org_id: &str, user_id: &str, toolsets: &mut [ToolsetResponse]) {
+    if !toolsets.iter().any(|t| t.kind == ToolsetKind::Mcp)
+        || check_permissions(
+            org_id,
+            org_id,
+            user_id,
+            "ai_toolsets",
+            "PUT",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+    {
+        return;
+    }
+    for toolset in toolsets.iter_mut().filter(|t| t.kind == ToolsetKind::Mcp) {
+        if let Some(url) = toolset.data.as_mut().and_then(|d| d.get_mut("url"))
+            && let Some(raw) = url.as_str()
+        {
+            *url = serde_json::Value::String(config::utils::str::url_origin(raw));
+        }
+    }
 }
