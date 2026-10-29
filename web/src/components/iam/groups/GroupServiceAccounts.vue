@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="email"
         :loading="props.loading"
+        :forbidden="forbidden"
         :global-filter="userSearchKey"
         pagination="client"
         :page-size="100"
@@ -158,6 +159,9 @@ const userSearchKey = ref("");
 
 const hasFetchedOrgServiceAccounts = ref(false);
 
+// A viewer cannot list service accounts; show the no-access state instead of failing.
+const forbidden = ref(false);
+
 const groupUsersMap = ref(new Set());
 
 const { serviceAccountsState } = usePermissions();
@@ -220,10 +224,17 @@ const updateUserTable = async (value: string) => {
 const fetchOrgServiceAccounts = async () => {
   // fetch group users
   hasFetchedOrgServiceAccounts.value = true;
-  const data: any = await serviceAccountsState.getServiceAccounts(
-    store.state.selectedOrganization.identifier,
-  );
-
+  let data: Array<{ email: string; is_system?: boolean }>;
+  try {
+    data = (await serviceAccountsState.getServiceAccounts(
+      store.state.selectedOrganization.identifier,
+    )) as typeof data;
+  } catch (e: unknown) {
+    const status = (e as { response?: { status?: number } } | undefined)?.response?.status;
+    if (status !== 403) throw e;
+    forbidden.value = true;
+    data = [];
+  }
   serviceAccountsState.service_accounts_users = cloneDeep(
     data
       .filter((user: any) => user.is_system !== true) // Filter out system accounts
