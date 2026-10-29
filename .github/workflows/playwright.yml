@@ -309,7 +309,7 @@ jobs:
             fi
           fi
           # || true: under bash -e a die() would abort before the log below ever prints.
-          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS 2> /tmp/pw-select-log.txt) || true
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS --runner-groups tests/ui-testing/ci-matrix/runner_groups.json 2> /tmp/pw-select-log.txt) || true
           cat /tmp/pw-select-log.txt >&2
           if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (see build-ci-matrix log above)"; exit 1; fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -360,7 +360,8 @@ jobs:
       needs.generate_matrix.result == 'success' &&
       (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
     runs-on:
-      labels: eks-openobserve-standard-16
+      # Per-job runner from ci-matrix/runner_groups.json; empty keeps the 16-core default.
+      labels: ${{ matrix.runner || 'eks-openobserve-standard-16' }}
     permissions:
       contents: read
       actions: read
@@ -408,9 +409,9 @@ jobs:
         # runner where Docker-in-Docker is not guaranteed, and the app itself is
         # already launched the same way. ~2s, and it makes ZO_SMTP_* real.
         #
-        # Gated to the one shard that needs it — every other shard would
-        # otherwise pay a GitHub-releases download for nothing.
-        if: matrix.testfolder == 'Alerts'
+        # Gated to the job carrying Alerts ("mailpit": true in ci_matrix.json) —
+        # every other job would otherwise pay a GitHub-releases download for nothing.
+        if: matrix.mailpit == 'true'
         env:
           # Pinned, not "latest": an upstream release must never change what this
           # shard does without a commit here.
@@ -486,8 +487,8 @@ jobs:
         # same way alerts-content-templates.spec.js stands up an HTTP receiver to
         # capture what a webhook destination really sent.
         #
-        # Gated to the one shard that needs it, matching the Mailpit step above.
-        if: matrix.testfolder == 'Alerts'
+        # Gated to the job that needs it, matching the Mailpit step above.
+        if: matrix.mailpit == 'true'
         run: |
           if ! command -v node > /dev/null 2>&1; then
             echo "::warning::node not on PATH; DL fan-out case will skip"
@@ -584,13 +585,15 @@ jobs:
           if [ -n "$FILE_LIST" ]; then
             # actual_folder (the real directory under playwright-tests/) comes straight
             # from the matrix now — the logical->directory mapping lives in ci-matrix/ci_matrix.json.
+            # A job merged by ci-matrix/runner_groups.json has an empty actual_folder and
+            # folder-qualified run_files (Alerts/x.spec.js).
             ACTUAL_FOLDER="${{ matrix.actual_folder }}"
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
 
             # Build file paths
             FILE_PATHS=""
             for file in $FILE_LIST; do
-              FILE_PATH="./playwright-tests/$ACTUAL_FOLDER/$file"
+              FILE_PATH="./playwright-tests/${ACTUAL_FOLDER:+$ACTUAL_FOLDER/}$file"
               echo "DEBUG: Will run file: $FILE_PATH"
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done

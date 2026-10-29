@@ -197,9 +197,18 @@ if (selectIdx !== -1) {
   if (!changedFilesPath) die("--select-for-changes requires a path to a changed-files list");
   args.splice(selectIdx, 2);
 }
+const groupsIdx = args.indexOf("--runner-groups");
+let runnerGroupsPath = null;
+if (groupsIdx !== -1) {
+  runnerGroupsPath = args[groupsIdx + 1];
+  if (!runnerGroupsPath) die("--runner-groups requires a path to a runner_groups.json layout");
+  args.splice(groupsIdx, 2);
+}
 const [basePath, overlayPath] = args;
 if (!basePath) {
-  die("usage: build-ci-matrix.js <base.json> [overlay.json] [--select-for-changes <changed.txt>]");
+  die(
+    "usage: build-ci-matrix.js <base.json> [overlay.json] [--select-for-changes <changed.txt>] [--runner-groups <layout.json>]"
+  );
 }
 
 const base = readJson(basePath);
@@ -380,7 +389,7 @@ if (changedFilesPath) {
 // backfill in 7 sequential chunks under ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1;
 // SLO-Measurement widens it to the full window so its 3 backfilled SLOs don't
 // pay 21 chunks serially.
-const matrix = emitted.map((s) => ({
+const toJob = (s) => ({
   testfolder: s.testfolder,
   actual_folder: s.actual_folder,
   browser: s.browser || "chrome",
@@ -406,6 +415,110 @@ const matrix = emitted.map((s) => ({
   // to pin workers to 1 — otherwise the files race each other, which is not
   // something the specs themselves can express.
   workers: s.workers === undefined || s.workers === null ? "" : String(s.workers),
-}));
+  // Alerts' email specs need the Mailpit sink + DL relay steps; every other shard skips them.
+  mailpit: s.mailpit === true || s.mailpit === "true" ? "true" : "false",
+  // Runner label. Empty = the workflow default; --runner-groups sets it per job.
+  runner: "",
+});
+const matrix = emitted.map(toJob);
 
-process.stdout.write(JSON.stringify({ include: matrix }));
+// --runner-groups: how shards are packed onto runners (CI layout, not test ownership).
+// Applied AFTER smoke selection, so a PR that selects two members of a group runs one
+// job with just those two. Shards keep their identity in ci_matrix.json — ownership,
+// validation and selection never see the groups. ENT does not pass the flag, so its
+// matrix is unchanged.
+//
+// A group of 2+ shards becomes ONE job against ONE OpenObserve process, so its members
+// must agree on every server-start setting and none may carry a worker pin (a pin says
+// "these specs contend with each other"; merging them with other specs breaks that).
+// The merged job emits an empty actual_folder and folder-qualified run_files; the
+// workflow drops the empty folder segment when it builds ./playwright-tests/<path>.
+//
+// workers must leave at least 2 cores of the runner free for the OpenObserve server
+// and the runner itself; the core count is read from the label's -<N> suffix.
+const SERVER_KEYS = ["browser", "quick_mode_enabled", "synthetics_enabled", "ingest_allowed_upto", "slo_backfill_chunk_secs"];
+const FREE_CORES = 2;
+
+// Validates the whole layout against every runnable shard (not just the selected ones),
+// so a bad layout fails the PR that introduces it even when smoke selects one shard.
+function validateRunnerGroups(layout, shards) {
+  if (!Array.isArray(layout.groups)) die("runner groups layout must define a groups array");
+  const byFolder = new Map(shards.map((s) => [s.testfolder, s]));
+  const groupOf = new Map();
+  for (const g of layout.groups) {
+    if (!Array.isArray(g.shards) || g.shards.length === 0) die(`runner group ${JSON.stringify(g)} has no shards`);
+    const merged = g.shards.length > 1;
+    if (merged && !g.name) die(`runner group [${g.shards.join(", ")}] merges shards and needs a name`);
+    const name = merged ? g.name : g.shards[0];
+    if (merged && byFolder.has(name)) die(`runner group name "${name}" collides with a shard`);
+    if ([...groupOf.values()].some((o) => o.name === name)) die(`duplicate runner group name "${name}"`);
+    if (g.workers !== undefined && !(Number.isInteger(g.workers) && g.workers > 0)) {
+      die(`runner group "${name}": workers must be a positive integer`);
+    }
+    const members = g.shards.map((f) => {
+      const s = byFolder.get(f);
+      if (!s) die(`runner group "${name}" names unknown shard "${f}"`);
+      if (groupOf.has(f)) die(`shard "${f}" is in runner groups "${groupOf.get(f).name}" and "${name}"`);
+      groupOf.set(f, { ...g, name });
+      return s;
+    });
+    const pin = members[0].workers;
+    if (merged) {
+      for (const m of members) {
+        if (m.workers) die(`runner group "${name}": shard "${m.testfolder}" pins workers=${m.workers} and cannot be merged`);
+        for (const k of SERVER_KEYS) {
+          if (m[k] !== members[0][k]) {
+            die(`runner group "${name}": "${m.testfolder}" and "${members[0].testfolder}" disagree on ${k} — they need separate servers`);
+          }
+        }
+      }
+    } else if (pin && g.workers !== undefined && String(g.workers) !== pin) {
+      die(`runner group "${name}" overrides the shard's own workers pin (${pin}) — change it in ci_matrix.json instead`);
+    }
+    const cores = Number(((g.runner || "").match(/-(\d+)$/) || [])[1]);
+    const workers = g.workers === undefined ? Number(pin) : g.workers;
+    if (cores && cores < 16 && !workers) die(`runner group "${name}" runs on ${g.runner} and must set workers explicitly`);
+    if (cores && workers > cores - FREE_CORES) {
+      die(`runner group "${name}": ${workers} workers on ${g.runner} leaves fewer than ${FREE_CORES} cores free`);
+    }
+  }
+  return groupOf;
+}
+
+function applyRunnerGroups(jobs, groupOf) {
+  const out = [];
+  const done = new Set();
+  for (const job of jobs) {
+    const g = groupOf.get(job.testfolder);
+    if (!g) {
+      out.push(job);
+      continue;
+    }
+    if (done.has(g.name)) continue;
+    done.add(g.name);
+    const workers = g.workers === undefined ? job.workers : String(g.workers);
+    const runner = g.runner || "";
+    if (g.shards.length === 1) {
+      out.push({ ...job, workers, runner });
+      continue;
+    }
+    const members = jobs.filter((j) => g.shards.includes(j.testfolder));
+    log(`runner group ${g.name}: ${members.map((m) => m.testfolder).join(" + ")}`);
+    out.push({
+      ...members[0],
+      testfolder: g.name,
+      actual_folder: "",
+      run_files: members.flatMap((m) => m.run_files.map((f) => `${m.actual_folder}/${f}`)),
+      workers,
+      mailpit: members.some((m) => m.mailpit === "true") ? "true" : "false",
+      runner,
+    });
+  }
+  return out;
+}
+
+const jobs = runnerGroupsPath
+  ? applyRunnerGroups(matrix, validateRunnerGroups(readJson(runnerGroupsPath), runnable.map(toJob)))
+  : matrix;
+
+process.stdout.write(JSON.stringify({ include: jobs }));

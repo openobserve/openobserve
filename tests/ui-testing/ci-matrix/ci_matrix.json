@@ -3,6 +3,7 @@
     "testfolder": "Alerts",
     "actual_folder": "Alerts",
     "browser": "chrome",
+    "mailpit": true,
     "run_files": [
       "alerts-help-drawer.spec.js",
       "alerts-ui-operations.spec.js",

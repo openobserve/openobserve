@@ -1,0 +1,18 @@
+{
+  "_comment": "How playwright.yml packs ci_matrix.json shards onto runners. Shard ownership, smoke selection and validation still work per shard; this file only decides which shards share one job, its worker count and its runner label (default eks-openobserve-standard-16). Merged shards share one OpenObserve process, so build-ci-matrix.js refuses to merge shards that pin workers or need different server-start settings. workers must leave 2 cores of the runner free. Sizing comes from CPU per busy worker measured on run 40824034083: dense shards (Logs-Features, Dashboards-Variables, Logs-Core) are mixed with wait-bound ones (Traces, Functions, Reports) so each 16-core runner lands near 10-12 cores at 14 workers. Own-server shards are light (peaks under 2 cores, or under 6 for SLO/Synthetics) and move to smaller runners.",
+  "groups": [
+    { "name": "Combined-1", "workers": 14, "shards": ["Dashboards-Core", "Dashboards-Variables", "Management"] },
+    { "name": "Combined-2", "workers": 14, "shards": ["Dashboards-Settings", "Dashboard-Config-Settings", "Logs-Builder-Advanced", "RUM", "Org"] },
+    { "name": "Combined-3", "workers": 14, "shards": ["Alerts", "Pipelines"] },
+    { "name": "Combined-4", "workers": 14, "shards": ["Metrics", "Logs-Queries", "Logs-Core", "Reports"] },
+    { "name": "Combined-5", "workers": 14, "shards": ["Logs-Features", "GeneralTests", "Traces-Search", "Functions"] },
+    { "name": "Combined-6", "workers": 14, "shards": ["Logs-Builder-Basic", "Dashboards-Charts", "Streams", "Traces"] },
+    { "workers": 14, "shards": ["Dashboards-Isolated"] },
+    { "runner": "eks-openobserve-standard-8", "shards": ["SLO"] },
+    { "runner": "eks-openobserve-standard-8", "shards": ["Synthetics"] },
+    { "runner": "eks-openobserve-standard-4", "shards": ["RUM-Analytics"] },
+    { "runner": "eks-openobserve-standard-4", "shards": ["SLO-Measurement"] },
+    { "runner": "eks-openobserve-standard-4", "workers": 2, "shards": ["Logs-SelectStar"] },
+    { "runner": "eks-openobserve-standard-4", "workers": 2, "shards": ["RUM-Token"] }
+  ]
+}

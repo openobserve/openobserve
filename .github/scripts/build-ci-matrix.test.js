@@ -258,3 +258,89 @@ test("every run_files entry exists on disk in its shard's folder", () => {
     }
   }
 });
+
+// --- runner groups (ci-matrix/runner_groups.json) ---
+
+const GROUPS = path.join(CI_MATRIX_DIR, "runner_groups.json");
+
+function runGroups(layout, { changedFiles = null, base = BASE } = {}) {
+  const groups = typeof layout === "string" ? layout : path.join(TMP, "runner_groups.json");
+  if (typeof layout !== "string") fs.writeFileSync(groups, JSON.stringify(layout));
+  const args = [SCRIPT, base, "--runner-groups", groups];
+  if (changedFiles) {
+    const tmp = path.join(TMP, "changed.txt");
+    fs.writeFileSync(tmp, changedFiles.join("\n") + "\n");
+    args.push("--select-for-changes", tmp);
+  }
+  return JSON.parse(
+    execFileSync("node", args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, GITHUB_EVENT_NAME: "pull_request" },
+    })
+  ).include;
+}
+
+function groupsFail(layout) {
+  assert.throws(() => runGroups(layout), /Command failed/);
+}
+
+test("the committed runner layout runs every spec exactly once", () => {
+  const jobs = runGroups(GROUPS);
+  const emitted = jobs.flatMap((j) => j.run_files.map((f) => (j.actual_folder ? `${j.actual_folder}/${f}` : f)));
+  const expected = MANIFEST.flatMap((s) => s.run_files.map((f) => `${s.actual_folder || s.testfolder}/${f}`));
+  assert.deepStrictEqual([...emitted].sort(), [...expected].sort());
+  for (const f of emitted) {
+    assert.ok(fs.existsSync(path.join(REPO, "tests/ui-testing/playwright-tests", f)), f);
+  }
+});
+
+test("a merged group becomes one job with folder-qualified specs and the union of mailpit", () => {
+  const jobs = runGroups({ groups: [{ name: "Mix", workers: 14, shards: ["Alerts", "Pipelines"] }] });
+  const mix = jobs.find((j) => j.testfolder === "Mix");
+  assert.strictEqual(mix.actual_folder, "");
+  assert.strictEqual(mix.workers, "14");
+  assert.strictEqual(mix.mailpit, "true");
+  assert.ok(mix.run_files.every((f) => f.startsWith("Alerts/") || f.startsWith("Pipelines/")));
+  assert.ok(!jobs.some((j) => j.testfolder === "Alerts" || j.testfolder === "Pipelines"));
+  assert.strictEqual(jobs.length, FULL_COUNT - 1);
+});
+
+test("smoke selection runs only the selected members of a group", () => {
+  const jobs = runGroups(
+    { groups: [{ name: "Mix", workers: 14, shards: ["Alerts", "Pipelines"] }] },
+    { changedFiles: ["tests/ui-testing/playwright-tests/Alerts/alerts-import.spec.js"] }
+  );
+  const mix = jobs.find((j) => j.testfolder === "Mix");
+  assert.ok(mix.run_files.every((f) => f.startsWith("Alerts/")));
+});
+
+test("a single-shard group only changes the runner and keeps its folder", () => {
+  const jobs = runGroups({ groups: [{ runner: "eks-openobserve-standard-8", shards: ["SLO"] }] });
+  const slo = jobs.find((j) => j.testfolder === "SLO");
+  assert.strictEqual(slo.runner, "eks-openobserve-standard-8");
+  assert.strictEqual(slo.workers, "3");
+  assert.strictEqual(slo.actual_folder, "SLO");
+});
+
+test("runner groups refuse merges that would break a shard's server or worker contract", () => {
+  // SLO pins workers=3.
+  groupsFail({ groups: [{ name: "Bad", shards: ["SLO", "Alerts"] }] });
+  // Logs-SelectStar needs ZO_QUICK_MODE_ENABLED=true.
+  groupsFail({ groups: [{ name: "Bad", shards: ["Logs-SelectStar", "Logs-Core"] }] });
+  // Unknown shard, shard in two groups, unnamed merge, name colliding with a shard.
+  groupsFail({ groups: [{ shards: ["Nope"] }] });
+  groupsFail({ groups: [{ name: "A", shards: ["Alerts", "Pipelines"] }, { name: "B", shards: ["Alerts", "Metrics"] }] });
+  groupsFail({ groups: [{ shards: ["Alerts", "Pipelines"] }] });
+  groupsFail({ groups: [{ name: "Metrics", shards: ["Alerts", "Pipelines"] }] });
+  // Overriding a shard's own pin.
+  groupsFail({ groups: [{ workers: 5, shards: ["SLO"] }] });
+});
+
+test("runner groups leave at least 2 cores free", () => {
+  groupsFail({ groups: [{ name: "Big", workers: 15, shards: ["Alerts", "Pipelines"], runner: "eks-openobserve-standard-16" }] });
+  groupsFail({ groups: [{ workers: 3, runner: "eks-openobserve-standard-4", shards: ["RUM-Token"] }] });
+  // A small runner without an explicit worker count would inherit playwright.config.js's default.
+  groupsFail({ groups: [{ runner: "eks-openobserve-standard-4", shards: ["Org"] }] });
+  assert.ok(runGroups({ groups: [{ workers: 2, runner: "eks-openobserve-standard-4", shards: ["RUM-Token"] }] }));
+});

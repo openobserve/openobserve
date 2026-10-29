@@ -66,6 +66,7 @@ in **both** repos automatically — no more hand-syncing two workflow files.
 | `ingest_allowed_upto` | *(optional)* hours of backdated ingestion this shard's server accepts    |
 | `slo_backfill_chunk_secs` | *(optional)* seconds of history one SLO backfill chunk covers on this shard's server |
 | `workers`             | *(optional)* pin `--workers=N` for this shard                            |
+| `mailpit`             | *(optional)* `true` starts the Mailpit sink and DL relay for this shard's job |
 
 Every *(optional)* key except `disabled` exists because a shard is the smallest
 unit that can change it: each shard starts its own server, and these settings are
@@ -92,6 +93,28 @@ read once at server start (or, for `workers`, once per Playwright run).
   asserts on per-chunk timing or partial coverage — only on the final measured
   state. If a future spec in this shard needs to see backfill mid-flight, give
   that spec its own shard rather than lowering this back down.
+
+## Packing shards onto runners (`runner_groups.json`)
+
+`ci_matrix.json` says which specs a shard owns; `runner_groups.json` says how the OSS
+`playwright.yml` lays those shards out on runners. `build-ci-matrix.js --runner-groups`
+applies it after smoke selection, so ownership and selection still work per shard and a
+PR that selects one member of a group runs a job with just that member. ENT does not
+pass the flag, so its matrix is unchanged.
+
+- A group of 2+ shards (`name` required) becomes one job against one OpenObserve
+  process. Its specs are emitted as `Folder/spec.js` with an empty `actual_folder`.
+  The script refuses to merge a shard that pins `workers` or needs different
+  server-start settings (`quick_mode_enabled`, `synthetics_enabled`,
+  `ingest_allowed_upto`, `slo_backfill_chunk_secs`, `browser`).
+- A single-shard group only sets `runner` and/or `workers` for that shard; it cannot
+  override the shard's own `workers` pin.
+- `runner` defaults to `eks-openobserve-standard-16`. `workers` must leave at least 2
+  of the runner's cores free (read from the label's `-N` suffix) and is required on a
+  runner smaller than 16 cores.
+
+To move a shard to a different job, edit `runner_groups.json`; to add a spec, keep
+editing `ci_matrix.json` — a new shard not named in any group runs as its own job.
 
 ## Disabling a spec (JSON has no `//` comments)
 
