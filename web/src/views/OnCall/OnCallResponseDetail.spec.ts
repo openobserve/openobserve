@@ -24,6 +24,7 @@ import { responseProgressQuery } from "@/services/oncall.queries";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import store from "@/test/unit/helpers/store";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
+import { formatOnCallInstant } from "@/utils/oncall";
 import OnCallResponseDetail from "@/views/OnCall/OnCallResponseDetail.vue";
 
 vi.mock("@/services/oncall", () => ({
@@ -113,7 +114,7 @@ const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
-  OBanner: { name: "OBanner", template: "<div><slot /></div>" },
+  OBanner: { name: "OBanner", template: "<div><slot /><slot name='actions' /></div>" },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
   OnCallTimeline: { name: "OnCallTimeline", template: "<div />" },
   // `open`, not `modelValue`: ODialog has no `modelValue`, so a stub that
@@ -161,12 +162,28 @@ const stubs = {
   OnCallVerdictCard: { name: "OnCallVerdictCard", props: ["events"], template: "<div />" },
   OnCallReachAlarm: {
     name: "OnCallReachAlarm",
-    props: ["state", "deliveries", "deliveriesTotal", "progress", "smtpConfigured"],
+    props: [
+      "state",
+      "deliveries",
+      "deliveriesTotal",
+      "progress",
+      "smtpConfigured",
+      "noTeam",
+      "escalatable",
+    ],
     template: "<div />",
   },
   OnCallWhoIsOn: {
     name: "OnCallWhoIsOn",
-    props: ["positions", "deliveries", "handoverAt", "handoverTo", "closedAt", "ackedBy"],
+    props: [
+      "positions",
+      "deliveries",
+      "handoverAt",
+      "handoverTo",
+      "closedAt",
+      "ackedBy",
+      "teamDeleted",
+    ],
     template: "<div />",
   },
   OnCallAboutPage: {
@@ -182,6 +199,7 @@ const stubs = {
       "incidentId",
       "cause",
       "causeNote",
+      "teamDeleted",
     ],
     template: "<div />",
   },
@@ -514,6 +532,7 @@ describe("OnCallResponseDetail", () => {
     const banner = active.find('[data-test="oncall-response-snoozed-banner"]');
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain("unassigned");
+    expect(banner.text()).toContain(formatOnCallInstant(future, Date.now() * 1000, "UTC"));
 
     // A second mount of the same id is served from cache, so the lapsed record
     // only reaches the page on a fresh load.
@@ -1258,7 +1277,8 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     service.listMembers.mockResolvedValue({ data: [] } as any);
     service.priorCauses.mockResolvedValue({ data: [] } as any);
     service.responseHistory.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+    // The page's own team exists: an empty list would make it a deleted team, which hides Escalate.
+    service.listTeams.mockResolvedValue({ data: [{ id: "team_1", name: "Platform" }] } as any);
     service.escalationProgress.mockResolvedValue({
       data: { fired: [], next_targets: [], next_at: null, exhausted: false },
     } as any);
@@ -1475,6 +1495,436 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 
       expect(wrapper.find('[data-test="oncall-response-more-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oncall-response-meta"]').exists()).toBe(true);
+    });
+  });
+});
+
+/// Responding to a page (#3090): what the screen says when the ladder ran out,
+/// while triage holds the first page, once it closed, and when it cannot load.
+describe("OnCallResponseDetail — responding", () => {
+  const NOW = () => Date.now() * 1000;
+  const stats = (wrapper: any) => wrapper.findComponent({ name: "OStatStrip" }).props("items");
+  const stat = (wrapper: any, key: string) => stats(wrapper).find((s: any) => s.key === key);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient.clear();
+    service.getTeam.mockResolvedValue({ data: { name: "Platform" } } as any);
+    service.listMembers.mockResolvedValue({ data: [] } as any);
+    service.priorCauses.mockResolvedValue({ data: [] } as any);
+    service.responseHistory.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue({ data: [{ id: "team_1", name: "Platform" }] } as any);
+    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
+    service.escalationProgress.mockResolvedValue({
+      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
+    } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.getPolicy.mockResolvedValue({ data: null } as any);
+    service.teamReachability.mockResolvedValue({ data: { smtp_configured: true } } as any);
+    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+    alerts.get_by_alert_id.mockResolvedValue({ data: {} } as any);
+  });
+
+  describe("a page nobody answered", () => {
+    /// The ladder's own progress decides it, the same signal the Pages list reads.
+    const ranOut = (lastAt: number) =>
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [
+            { after_micros: 0, at: lastAt - 300_000_000, targets: [], reached: ["a@o2.ai"] },
+            { after_micros: 300_000_000, at: lastAt, targets: [], reached: ["b@o2.ai"] },
+          ],
+          next_targets: [],
+          next_at: null,
+          exhausted: true,
+        },
+      } as any);
+    const phrase = (wrapper: any) =>
+      wrapper.find(
+        '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]',
+      );
+
+    it("tags it and says when the last step ran, before the record's flag lands", async () => {
+      ranOut(1_700_000_000_000_000 + HOUR_MICROS);
+      const wrapper = await renderWith({ exhausted_at: null });
+
+      expect(
+        wrapper
+          .find(
+            '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-exhausted"]',
+          )
+          .exists(),
+      ).toBe(true);
+      const banner = wrapper.find('[data-test="oncall-response-exhausted-banner"]');
+      expect(banner.text()).toMatch(
+        /^Nobody answered\. Every step ran by [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}\. Acknowledge to take it, or hand it off\.$/,
+      );
+      expect(wrapper.text()).not.toContain("Triggered");
+    });
+
+    it("drops the date when the ladder ran out today", async () => {
+      ranOut(NOW() - 60_000_000);
+      const wrapper = await renderWith();
+
+      expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').text()).toMatch(
+        /^Nobody answered\. Every step ran by \d{2}:\d{2}\. Acknowledge/,
+      );
+    });
+
+    it("says nothing of the sort once somebody owns it", async () => {
+      ranOut(NOW());
+      const wrapper = await renderWith({
+        state: "acknowledged",
+        acked_by: "engineer@example.com",
+        acked_at: 1_700_000_000_000_000 + HOUR_MICROS,
+        exhausted_at: 1_700_000_000_000_000,
+      });
+
+      expect(phrase(wrapper).text()).toMatch(/^Acknowledged by engineer@example\.com/);
+      expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').exists()).toBe(false);
+    });
+  });
+
+  describe("the AI triage hold", () => {
+    const held = (heldUntil: number | null) =>
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [],
+          next_targets: [],
+          next_at: null,
+          exhausted: false,
+          held_until_micros: heldUntil,
+        },
+      } as any);
+
+    it("counts down to the first page and offers to page now", async () => {
+      held(NOW() + 54_500_000);
+      const wrapper = await renderWith();
+
+      const banner = wrapper.find('[data-test="oncall-response-hold-banner"]');
+      expect(banner.text()).toMatch(/^AI triage is checking first · paging within \d+s Page now$/);
+      expect(stat(wrapper, "rung").value).toBe("Waiting for AI triage");
+    });
+
+    it("pages rung 1 through the existing escalate action", async () => {
+      held(NOW() + 54_000_000);
+      service.escalateNow.mockResolvedValue({
+        data: { escalated_to: "rung", recipients: ["engineer@example.com"] },
+      } as any);
+      const wrapper = await renderWith();
+
+      await wrapper.find('[data-test="oncall-response-hold-page-now"]').trigger("click");
+      await flushPromises();
+
+      expect(service.escalateNow).toHaveBeenCalledTimes(1);
+    });
+
+    /// Triage can answer before the deadline, so the banner must not outlive the page it promised.
+    it("re-reads the progress while held, and drops the banner once paging started", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      held(NOW() + 80_000_000);
+      const wrapper = await renderWith();
+      expect(wrapper.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(true);
+      const reads = service.escalationProgress.mock.calls.length;
+
+      held(null);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+
+      expect(service.escalationProgress.mock.calls.length).toBe(reads + 1);
+      expect(wrapper.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
+      wrapper.unmount();
+      vi.useRealTimers();
+    });
+
+    /// A failed re-read is not the hold ending: the last good progress stays and the next tick retries.
+    it("keeps the banner and retries when a re-read while held fails", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      held(NOW() + 80_000_000);
+      const wrapper = await renderWith();
+      const reads = service.escalationProgress.mock.calls.length;
+
+      service.escalationProgress.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-hold-page-now"]').exists()).toBe(true);
+
+      held(null);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+
+      expect(service.escalationProgress.mock.calls.length).toBe(reads + 2);
+      expect(wrapper.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
+      wrapper.unmount();
+      vi.useRealTimers();
+    });
+
+    it("is gone once the deadline has passed or the field is absent", async () => {
+      held(NOW() - 1_000_000);
+      const lapsed = await renderWith();
+      expect(lapsed.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
+      lapsed.unmount();
+
+      queryClient.clear();
+      held(null);
+      const absent = await renderWith();
+      expect(absent.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
+      expect(stat(absent, "rung").value).toBe("—");
+    });
+  });
+
+  describe("a closed page", () => {
+    it("never runs an unacknowledged clock", async () => {
+      const wrapper = await renderWith({
+        state: "resolved",
+        closed_at: 1_700_000_000_000_000 + HOUR_MICROS,
+      });
+
+      expect(stat(wrapper, "ack").label).toBe("Never acknowledged");
+      expect(stat(wrapper, "ack").value).toBe("—");
+    });
+
+    it("says how far the ladder got, in the past tense", async () => {
+      service.getPolicy.mockResolvedValue({
+        data: {
+          rungs: [
+            {
+              priority: 1,
+              channels: ["email"],
+              steps: [
+                { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+                { after_micros: 300_000_000, targets: [{ kind: "next_on_call" }] },
+                { after_micros: 900_000_000, targets: [{ kind: "whole_team" }] },
+              ],
+            },
+          ],
+        },
+      } as any);
+      const wrapper = await renderWith({
+        state: "resolved",
+        closed_at: 1_700_000_000_000_000 + HOUR_MICROS,
+        reached_rung_micros: 300_000_000,
+      });
+
+      expect(stat(wrapper, "rung").label).toBe("Reached step");
+      expect(stat(wrapper, "rung").value).toBe("2 of 3");
+    });
+  });
+
+  describe("a page that cannot be loaded", () => {
+    it("shows the error with a retry instead of an empty page", async () => {
+      service.getResponse.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+      service.getResponse.mockResolvedValue({ data: { response: record(), events: [] } } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      const error = wrapper.find('[data-test="oncall-response-detail-error"]');
+      expect(error.exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-detail-empty"]').exists()).toBe(false);
+
+      wrapper.findComponent('[data-test="oncall-response-detail-error"]').vm.$emit("action");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-response-detail-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-stats"]').exists()).toBe(true);
+    });
+
+    it("says a deleted page no longer exists, and links to Pages", async () => {
+      service.getResponse.mockRejectedValue({ response: { status: 404, data: {} } });
+      const wrapper = render();
+      await flushPromises();
+
+      const gone = wrapper.findComponent('[data-test="oncall-response-detail-not-found"]');
+      expect(gone.attributes("title")).toBe("This page no longer exists");
+      gone.vm.$emit("action");
+
+      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
+    });
+
+    it("drops the previous page's ladder and team while a linked page loads", async () => {
+      const { reactive } = await import("vue");
+      const wrapper = await renderWith({ id: "resp_1", title: "First page" });
+      (wrapper.vm as any).escalation = { fired: [], next_targets: [], exhausted: true };
+      (wrapper.vm as any).teamName = "Platform";
+      service.getResponse.mockImplementationOnce(() => new Promise(() => {}));
+
+      reactive(routeState).params.responseId = "resp_next";
+      await flushPromises();
+
+      expect((wrapper.vm as any).escalation).toBe(null);
+      expect((wrapper.vm as any).teamName).toBe("");
+      reactive(routeState).params.responseId = "resp_1";
+      await flushPromises();
+    });
+
+    it("says a linked page is gone instead of keeping the page it came from", async () => {
+      const { reactive } = await import("vue");
+      const wrapper = await renderWith({ id: "resp_1", title: "First page" });
+      service.getResponse.mockRejectedValue({ response: { status: 404, data: {} } });
+
+      reactive(routeState).params.responseId = "resp_gone";
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-response-detail-not-found"]').exists()).toBe(true);
+      reactive(routeState).params.responseId = "resp_1";
+      await flushPromises();
+    });
+  });
+
+  describe("a team that was deleted", () => {
+    /// A deleted team's ladder has no rotations to reach; Hand off is the next step, and Snooze still works.
+    it("offers no Escalate for a deleted team, but keeps Snooze", async () => {
+      service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.find('[data-test="oncall-response-escalate-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-snooze-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-handoff-btn"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("escalatable")).toBe(false);
+    });
+
+    it("says so instead of the id, without a link", async () => {
+      service.getTeam.mockRejectedValue({ response: { status: 404 } });
+      service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.find('[data-test="oncall-response-team-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-team-deleted"]').text()).toBe(
+        "Deleted team",
+      );
+      expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamDeleted")).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("teamDeleted")).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
+    });
+
+    /// An unrouted page has no team at all, which is a routing fact, not a deleted team.
+    it.each([
+      ["present", "team_1", [{ id: "team_1", name: "Platform" }], false],
+      ["team list unavailable", "team_1", null, false],
+    ] as const)(
+      "does not call a %s page's team deleted",
+      async (_name, teamId, teams, expected) => {
+        if (teams) service.listTeams.mockResolvedValue({ data: teams } as any);
+        else service.listTeams.mockRejectedValue(new Error("down"));
+        const wrapper = await renderWith({ team_id: teamId });
+
+        expect(wrapper.find('[data-test="oncall-response-team-deleted"]').exists()).toBe(expected);
+        for (const name of ["OnCallAboutPage", "OnCallWhoIsOn"]) {
+          expect(wrapper.findComponent({ name }).props("teamDeleted"), name).toBe(expected);
+        }
+        expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(expected);
+      },
+    );
+  });
+
+  /// The header must not say "Not paged yet" before the ladder's progress has answered.
+  it("makes no paging claim in the header while the progress is still loading", async () => {
+    service.escalationProgress.mockReturnValue(new Promise(() => {}) as any);
+    const wrapper = await renderWith({ reached_rung_micros: 300_000_000 });
+
+    const phrase = wrapper.find(
+      '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]',
+    );
+    expect(phrase.text()).toBe("");
+  });
+
+  /// An empty 200 body is not an answer either.
+  it("makes no paging claim in the header when the progress came back empty", async () => {
+    service.escalationProgress.mockResolvedValue({ data: null } as any);
+    const wrapper = await renderWith();
+
+    const phrase = wrapper.find(
+      '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]',
+    );
+    expect(phrase.text()).toBe("");
+  });
+
+  /// An unrouted page has `team_id: null` on the wire (04-responses R6.1); there is no team to ask about or link to.
+  describe("a page with no team", () => {
+    /// The server refuses Escalate and Snooze on a page with no team (AK-4); Acknowledge, Resolve and Hand off stay.
+    it.each([
+      [
+        "desktop",
+        true,
+        "oncall-response-escalate-btn",
+        "oncall-response-snooze-btn",
+        "oncall-response-handoff-btn",
+      ],
+      [
+        "phone",
+        false,
+        "oncall-response-escalate-btn-menu",
+        "oncall-response-snooze-15-menu",
+        "oncall-response-handoff-btn-menu",
+      ],
+    ] as const)(
+      "offers Hand off but not Escalate or Snooze on %s",
+      async (_name, lgUp, escalate, snooze, handoff) => {
+        mockViewport.lgUp = lgUp;
+        mockViewport.mdUp = lgUp;
+        try {
+          service.escalationProgress.mockResolvedValue({
+            data: {
+              fired: [],
+              next_targets: [],
+              next_at: null,
+              exhausted: false,
+              held_until_micros: Date.now() * 1000 + 60_000_000,
+            },
+          } as any);
+          const teamless = await renderWith({ team_id: null });
+          expect(teamless.find(`[data-test="${escalate}"]`).exists()).toBe(false);
+          expect(teamless.find(`[data-test="${handoff}"]`).exists()).toBe(true);
+          expect(teamless.find(`[data-test="${snooze}"]`).exists()).toBe(false);
+          expect(teamless.find('[data-test="oncall-response-ack-btn"]').exists()).toBe(true);
+          expect(teamless.find('[data-test="oncall-response-resolve-btn"]').exists()).toBe(true);
+          expect(teamless.find('[data-test="oncall-response-hold-page-now"]').exists()).toBe(false);
+          expect(teamless.findComponent({ name: "OnCallReachAlarm" }).props("escalatable")).toBe(
+            false,
+          );
+          teamless.unmount();
+
+          queryClient.clear();
+          const routed = await renderWith();
+          expect(routed.find(`[data-test="${escalate}"]`).exists()).toBe(true);
+          expect(routed.find(`[data-test="${snooze}"]`).exists()).toBe(true);
+          expect(routed.find('[data-test="oncall-response-hold-page-now"]').exists()).toBe(true);
+          expect(routed.findComponent({ name: "OnCallReachAlarm" }).props("escalatable")).toBe(
+            true,
+          );
+        } finally {
+          mockViewport.lgUp = true;
+          mockViewport.mdUp = true;
+        }
+      },
+    );
+
+    it("asks no team endpoint, links nowhere, and draws no who-is-on card", async () => {
+      const wrapper = await renderWith({ team_id: null });
+
+      for (const call of [
+        service.getTeam,
+        service.listMembers,
+        service.whoIsOnCall,
+        service.getPolicy,
+        service.teamReachability,
+        service.resolvedSchedule,
+      ]) {
+        expect(call).not.toHaveBeenCalled();
+      }
+      // Hand-off to a team still needs the team list.
+      expect(service.listTeams).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="oncall-response-team-none"]').text()).toBe("Unrouted");
+      expect(wrapper.find('[data-test="oncall-response-team-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-team-deleted"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamId")).toBeNull();
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
+      for (const link of wrapper.findAllComponents({ name: "RouterLink" })) {
+        const to = link.props("to") as any;
+        if (to?.name === "onCallTeamDetail") expect(to.params.teamId).toBeTruthy();
+      }
     });
   });
 });
