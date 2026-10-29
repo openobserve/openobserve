@@ -1105,14 +1105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency ||
-                                  raw("N/A")
-                                }}
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency_type ||
-                                  "min"
-                                }}
+                                {{ formatFrequency(alerts[selectedAlertIndex]?.trigger_condition) }}
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
@@ -2824,20 +2817,34 @@ export default defineComponent({
       }
     };
 
-    const formatPeriod = (periodInSeconds: number | undefined) => {
-      if (!periodInSeconds) return raw("N/A");
+    const formatSeconds = (totalSeconds: number | undefined) => {
+      if (!totalSeconds) return raw("N/A");
 
-      // Convert seconds to minutes
-      if (periodInSeconds >= 60) {
-        const minutes = Math.floor(periodInSeconds / 60);
-        const seconds = periodInSeconds % 60;
+      if (totalSeconds >= 60) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
         if (seconds === 0) {
           return t("alerts.incidents.periodMinutes", { minutes });
         }
         return t("alerts.incidents.periodMinutesSeconds", { minutes, seconds });
       }
 
-      return t("alerts.incidents.periodSeconds", { seconds: periodInSeconds });
+      return t("alerts.incidents.periodSeconds", { seconds: totalSeconds });
+    };
+
+    // The stored alert keeps `period` in minutes but `frequency` in seconds.
+    const formatPeriod = (periodInMinutes: number | undefined) =>
+      formatSeconds(periodInMinutes ? periodInMinutes * 60 : undefined);
+
+    const formatFrequency = (triggerCondition?: {
+      frequency?: number;
+      frequency_type?: string;
+      cron?: string;
+    }) => {
+      if (triggerCondition?.frequency_type === "cron") {
+        return triggerCondition?.cron || raw("N/A");
+      }
+      return formatSeconds(triggerCondition?.frequency);
     };
 
     // Transform V1 format conditions (or/and structure) to readable expression
@@ -3147,6 +3154,7 @@ export default defineComponent({
       handleTriggerRowClick,
       getStatusLabel,
       formatPeriod,
+      formatFrequency,
       formatCustomConditions,
       formatTimestamp,
       formatTimestampUTC,
