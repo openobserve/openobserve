@@ -75,6 +75,13 @@ impl RemovalTarget {
     }
 }
 
+/// True when `requested` is not the same set of custom roles as `current`.
+#[cfg(feature = "enterprise")]
+fn custom_roles_differ(requested: &[String], current: &[String]) -> bool {
+    let requested: std::collections::HashSet<&String> = requested.iter().collect();
+    requested != current.iter().collect()
+}
+
 fn redact_token(token: &str) -> String {
     if token.is_empty() {
         return String::new();
@@ -501,9 +508,20 @@ pub async fn update_user(
             is_org_updated |= local_user.role.ne(&new_user.role);
             #[cfg(feature = "enterprise")]
             if let Some(cr) = new_org_role.custom_role {
-                custom_roles_need_change = true;
-                custom_roles.extend(cr);
-                is_org_updated = true;
+                // Only an admin grants custom roles; a self-update may resend its own unchanged.
+                if update_mode.is_self_update()
+                    && !matches!(local_user.role, UserRole::Admin | UserRole::Root)
+                    && custom_roles_differ(
+                        &cr,
+                        &o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email).await,
+                    )
+                {
+                    message = "Self custom roles cannot be changed";
+                } else {
+                    custom_roles_need_change = true;
+                    custom_roles.extend(cr);
+                    is_org_updated = true;
+                }
             }
         }
     }
@@ -1576,6 +1594,20 @@ mod tests {
 
     // Mutex to ensure test setup is serialized to prevent race conditions
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_self_update_may_resend_its_custom_roles_but_not_change_them() {
+        let current = ["a".to_string(), "b".to_string()];
+        assert!(!custom_roles_differ(&["b".into(), "a".into()], &current));
+        assert!(custom_roles_differ(
+            &["a".into(), "b".into(), "c".into()],
+            &current
+        ));
+        assert!(custom_roles_differ(&["a".into()], &current));
+        assert!(custom_roles_differ(&["c".into()], &[]));
+        assert!(!custom_roles_differ(&[], &[]));
+    }
 
     #[test]
     fn test_redact_token_exactly_four_chars() {

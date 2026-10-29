@@ -972,7 +972,7 @@ mod tests {
         assert_eq!(removal.coverage_warning(), None);
     }
 
-    /// B1: before the first handover the last person is on, so an appended newcomer went on call.
+    /// Before the first handover the last person is on, so an appended newcomer went on call.
     #[test]
     fn test_a_member_added_before_the_first_handover_is_not_put_on_call() {
         let now = ANCHOR - 24 * 60 * 60 * 1_000_000;
@@ -989,7 +989,7 @@ mod tests {
         );
     }
 
-    /// B1: dropping the holder hands the shift to whoever was next, not where the modulo lands.
+    /// Dropping the holder hands the shift to whoever was next, not where the modulo lands.
     #[test]
     fn test_removing_the_holder_hands_the_shift_to_the_next_person() {
         // Shift 4 of three people: bob holds, cara is next.
@@ -1009,7 +1009,7 @@ mod tests {
         );
     }
 
-    /// F1: a pair one shift apart, marked or not, must never share a person after an edit.
+    /// A pair one shift apart, marked or not, must never share a person after an edit.
     #[test]
     fn test_a_pair_one_shift_apart_never_shares_a_person_after_an_edit() {
         // Shift 4 of three people: Primary holds bob, the Secondary holds cara.
@@ -1026,7 +1026,7 @@ mod tests {
         }
     }
 
-    /// F12: three rotations each one shift apart all follow the first, so nobody holds two at once.
+    /// Three rotations each one shift apart all follow the first, so nobody holds two at once.
     #[test]
     fn test_a_chain_of_three_rotations_follows_the_first() {
         // Shift 4 of four people: Primary holds ana, Secondary bob, Third cara.
@@ -1094,7 +1094,7 @@ mod tests {
         }
     }
 
-    /// F10: same people in a different order is not a pair, so each rule keeps its own holder.
+    /// Same people in a different order is not a pair, so each rule keeps its own holder.
     #[test]
     fn test_a_hand_built_reordered_rotation_stays_independent() {
         let now = ANCHOR + 4 * MICROS_PER_WEEK;
@@ -1133,7 +1133,7 @@ mod tests {
         }
     }
 
-    /// F10: a rule the removed person is not on is left exactly as it was.
+    /// A rule the removed person is not on is left exactly as it was.
     #[test]
     fn test_a_rule_without_the_removed_person_is_untouched() {
         let now = ANCHOR + 4 * MICROS_PER_WEEK;

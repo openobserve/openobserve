@@ -54,6 +54,8 @@ pub enum AckOutcome {
     /// This click took the page, at this instant.
     AckedNow {
         at: i64,
+        /// When the ladder had already run out before this click, so the click stopped nothing.
+        ladder_finished_at: Option<i64>,
     },
     AlreadyAcked {
         by: Option<String>,
@@ -71,7 +73,10 @@ impl AckOutcome {
             ResponseState::Triggered | ResponseState::Triaged => Self::NotAcked,
             ResponseState::Acknowledged => match (record.acked_by.as_deref(), record.acked_at) {
                 (Some(by), Some(at)) if this_click && by.eq_ignore_ascii_case(clicker) => {
-                    Self::AckedNow { at }
+                    Self::AckedNow {
+                        at,
+                        ladder_finished_at: record.exhausted_at.filter(|&e| e <= at),
+                    }
                 }
                 _ => Self::AlreadyAcked {
                     by: record.acked_by.clone(),
@@ -116,7 +121,17 @@ pub fn get_html(
 /// The page a POST lands on, saying where the record now stands. [pure]
 pub fn outcome_html(facts: &PageFacts, outcome: &AckOutcome, open_url: &str) -> String {
     let (heading, detail) = match outcome {
-        AckOutcome::AckedNow { at } => (
+        AckOutcome::AckedNow {
+            ladder_finished_at: Some(finished),
+            ..
+        } => (
+            "Acknowledged".to_string(),
+            format!(
+                "The ladder had already finished at {}.",
+                clock(*finished, facts.timezone)
+            ),
+        ),
+        AckOutcome::AckedNow { at, .. } => (
             "Acknowledged".to_string(),
             format!("Escalation stopped at {}.", clock(*at, facts.timezone)),
         ),
@@ -265,7 +280,7 @@ mod tests {
         }
     }
 
-    /// B3: a second click shows where the page stands, never an error.
+    /// A second click shows where the page stands, never an error.
     #[test]
     fn test_outcome_follows_the_record_and_the_click() {
         let at = 1_700_000_000_000_000;
@@ -273,7 +288,10 @@ mod tests {
             (
                 page(ResponseState::Acknowledged, Some("ana@o2.ai"), Some(at)),
                 true,
-                AckOutcome::AckedNow { at },
+                AckOutcome::AckedNow {
+                    at,
+                    ladder_finished_at: None,
+                },
             ),
             (
                 page(ResponseState::Acknowledged, Some("ana@o2.ai"), Some(at)),
@@ -305,7 +323,32 @@ mod tests {
         }
     }
 
-    /// B3 amendment: a failed ack shows the record as it stands, never a success.
+    /// A ladder that finished before the click is not stopped by it, so the page says when it
+    /// finished.
+    #[test]
+    fn test_an_ack_after_the_ladder_finished_says_when_it_finished() {
+        let at = 1_700_000_000_000_000;
+        let finished = at - 50 * 60 * 1_000_000;
+        let mut record = page(ResponseState::Acknowledged, Some("ana@o2.ai"), Some(at));
+        record.exhausted_at = Some(finished);
+        let outcome = AckOutcome::of(&record, "ana@o2.ai", true);
+        assert_eq!(
+            outcome,
+            AckOutcome::AckedNow {
+                at,
+                ladder_finished_at: Some(finished)
+            }
+        );
+        let facts = PageFacts {
+            timezone: "UTC",
+            ..PageFacts::of(&record, None)
+        };
+        let html = outcome_html(&facts, &outcome, "https://o2/r1");
+        assert!(html.contains("The ladder had already finished at 21:23."));
+        assert!(!html.contains("Escalation stopped"));
+    }
+
+    /// A failed ack shows the record as it stands, never a success.
     #[test]
     fn test_a_failed_ack_never_reads_as_success() {
         let record = page(ResponseState::Triggered, None, None);
@@ -317,7 +360,7 @@ mod tests {
         assert!(!html.contains("Escalation stopped"));
     }
 
-    /// B3: the landing page says when escalation stopped, in the team's hours, and links in.
+    /// The landing page says when escalation stopped, in the team's hours, and links in.
     #[test]
     fn test_an_acknowledged_page_says_when_escalation_stopped() {
         let record = page(ResponseState::Acknowledged, None, None);
@@ -331,6 +374,7 @@ mod tests {
             &facts,
             &AckOutcome::AckedNow {
                 at: 1_700_000_000_000_000,
+                ladder_finished_at: None,
             },
             "https://o2.example/web/oncall/responses/r1?org_identifier=default",
         );
@@ -348,7 +392,7 @@ mod tests {
         }
     }
 
-    /// L8: opening a link to a page somebody already has shows its state, not the button.
+    /// Opening a link to a page somebody already has shows its state, not the button.
     #[test]
     fn test_a_get_shows_the_button_only_while_nobody_has_the_page() {
         let at = 1_700_000_000_000_000;
@@ -391,7 +435,7 @@ mod tests {
         }
     }
 
-    /// B3: the button page names the product, the page, its team and priority before a press.
+    /// The button page names the product, the page, its team and priority before a press.
     #[test]
     fn test_the_confirm_page_names_the_page_and_posts_the_token() {
         let record = page(ResponseState::Triggered, None, None);
@@ -407,7 +451,7 @@ mod tests {
         }
     }
 
-    /// B6: an untrusted link gets a sentence and a way in, and no record at all.
+    /// An untrusted link gets a sentence and a way in, and no record at all.
     #[test]
     fn test_a_broken_link_says_why_and_offers_pages() {
         let html = broken_link_html("acknowledgement link has expired", "https://o2/pages");

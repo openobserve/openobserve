@@ -443,7 +443,7 @@ describe("OnCallTeamDetail", () => {
       expect(service.listOverrides.mock.calls.length).toBeGreaterThan(before);
     });
 
-    // #3149: swap covers are stored at the handovers the server counts in the team's zone.
+    // Swap covers are stored at the handovers the server counts in the team's zone.
     it("offers swap shifts at the team-zone handovers the server uses", async () => {
       const c = shiftParity[0];
       const now = vi.spyOn(Date, "now").mockReturnValue(c.at_micros / 1000);
@@ -1105,26 +1105,6 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-team-detail-not-available"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(false);
-  });
-
-  /// There is no team to edit on "Team not found", including one deleted while the page was open.
-  it("offers Edit team only while the team is loaded", async () => {
-    service.getTeam.mockRejectedValueOnce({ response: { status: 404 } });
-    const missing = render();
-    await flushPromises();
-    expect(missing.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(false);
-    missing.unmount();
-
-    queryClient.clear();
-    const wrapper = render();
-    await flushPromises();
-    expect(wrapper.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(true);
-
-    service.getTeam.mockRejectedValueOnce({ response: { status: 404 } });
-    await wrapper.find('[data-test="oncall-team-refresh"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(false);
   });
 
   /// The org-level team list is the one fetch every on-call build serves

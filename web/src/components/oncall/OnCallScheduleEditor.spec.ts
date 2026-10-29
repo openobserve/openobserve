@@ -510,7 +510,7 @@ describe("OnCallScheduleEditor", () => {
     expect(wrapper.find('[data-test="oncall-rotation-needs-people-0"]').exists()).toBe(true);
   });
 
-  // Amendment 2: people edited on one rotation never reach another, even its form-made pair.
+  // People edited on one rotation never reach another, even its form-made pair.
   it("removing somebody from one rotation leaves its pair alone", async () => {
     const pair = ["ana@o2.ai", "bob@o2.ai"];
     const wrapper = render({
