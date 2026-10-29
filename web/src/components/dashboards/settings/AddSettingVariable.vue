@@ -191,76 +191,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </OTooltip>
                 </div>
-                <div>
-                  <div
-                    class="mb-4 flex w-full min-w-0 flex-row items-start gap-x-2"
-                    v-for="(filter, index) in variableData.query_data.filter"
-                    :key="index"
-                  >
-                    <OFormSelect
-                      :name="`query_data.filter[${index}].name`"
-                      :options="data.currentFieldsList"
-                      labelKey="name"
-                      valueKey="name"
-                      searchable
-                      :placeholder="
-                        filter.name
-                          ? raw('')
-                          : t('dashboard.addSettingVariable.selectFieldPlaceholder')
-                      "
-                      @update:model-value="filterUpdated(index, $event)"
-                      data-test="dashboard-query-values-filter-name-selector"
-                      class="min-w-0 flex-2"
-                    >
-                      <template #empty>
-                        <span class="text-text-secondary italic">{{
-                          t("dashboard.noDataFound")
-                        }}</span>
-                      </template>
-                    </OFormSelect>
-                    <OFormSelect
-                      :name="`query_data.filter[${index}].operator`"
-                      class="operator min-w-0 flex-[1.5]"
-                      data-test="dashboard-query-values-filter-operator-selector"
-                      :options="filterOperatorOptions"
-                    />
-                    <OFormCombobox
-                      v-if="!['Is Null', 'Is Not Null'].includes(filter.operator)"
-                      :name="`query_data.filter[${index}].value`"
-                      :items="dashboardVariablesFilterItems"
-                      search-regex="(?:^|[^$])\$?(\w+)"
-                      :debounce="1000"
-                      class="min-w-0 flex-2"
-                      :placeholder="t('dashboard.addSettingVariable.enterValueCap')"
-                      :data-test="`dashboard-query-values-filter-value-selector-${index}`"
-                    />
-                    <!-- Fixed input-height wrapper keeps the delete button
-                         centered on the input row while the row is items-start
-                         (so per-field validation errors hang below without
-                         nudging the inputs/button out of alignment). -->
-                    <div class="flex h-[2.125rem] shrink-0 items-center">
-                      <OButton
-                        :aria-label="t('common.remove')"
-                        variant="ghost"
-                        size="icon"
-                        @click="removeFilter(index)"
-                        :data-test="`dashboard-variable-adhoc-close-${index}`"
-                        icon-left="close"
-                      >
-                      </OButton>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    @click="addFilter"
-                    data-test="dashboard-add-filter-btn"
-                    icon-left="add"
-                  >
-                    {{ t("dashboard.addFilter") }}
-                  </OButton>
+                <div class="mt-2">
+                  <FilterBuilder
+                    ref="filterBuilderRef"
+                    profile="dashboard-variable"
+                    :model-value="variableData.query_data.filter"
+                    :fields="filterFields"
+                    :load-values="loadFilterValues"
+                    :extra-value-suggestions="filterVariableSuggestions"
+                    data-test="dashboard-variable-filter-builder"
+                    @update:model-value="setFormField('query_data.filter', $event)"
+                  />
                 </div>
 
                 <!-- show error if filter has cycle -->
@@ -542,7 +483,10 @@ import {
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
-import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import type { FilterBuilderExpose } from "@/components/filterBar/FilterBuilder.types";
+import { requestFieldValues } from "@/composables/fieldValueStore";
+import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import useNotifications from "@/composables/useNotifications";
 import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import analytics from "@/services/product_analytics";
@@ -552,7 +496,7 @@ export default defineComponent({
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
   components: {
     DashboardHeader,
-    OFormCombobox,
+    FilterBuilder,
     OButton,
     OFormToggleGroup,
     OToggleGroupItem,
@@ -601,34 +545,6 @@ export default defineComponent({
       escapeSingleQuotes: true,
     });
     const { t } = useI18nTyped();
-
-    /**
-     * Filter operators for the variable query builder. The `value` is persisted into
-     * `query_data.filter[].operator` and switched on by identity, so it stays English;
-     * only the label is translated. SQL/regex tokens are the syntax itself and stay
-     * `raw()`. Mirrors views/Dashboards/addPanel/AddCondition.vue.
-     */
-    const filterOperatorOptions = computed(() => [
-      { label: raw("="), value: "=" },
-      { label: raw("!="), value: "!=" },
-      { label: raw(">="), value: ">=" },
-      { label: raw("<="), value: "<=" },
-      { label: raw(">"), value: ">" },
-      { label: raw("<"), value: "<" },
-      { label: raw("IN"), value: "IN" },
-      { label: raw("NOT IN"), value: "NOT IN" },
-      { label: raw("str_match"), value: "str_match" },
-      { label: raw("str_match_ignore_case"), value: "str_match_ignore_case" },
-      { label: raw("match_all"), value: "match_all" },
-      { label: raw("re_match"), value: "re_match" },
-      { label: raw("re_not_match"), value: "re_not_match" },
-      { label: t("dashboard.filterOperators.contains"), value: "Contains" },
-      { label: t("dashboard.filterOperators.notContains"), value: "Not Contains" },
-      { label: t("dashboard.filterOperators.startsWith"), value: "Starts With" },
-      { label: t("dashboard.filterOperators.endsWith"), value: "Ends With" },
-      { label: t("dashboard.filterOperators.isNull"), value: "Is Null" },
-      { label: t("dashboard.filterOperators.isNotNull"), value: "Is Not Null" },
-    ]);
 
     const addSettingVariableSchema = makeAddSettingVariableSchema(t);
     const form = useOForm<AddSettingVariableForm>({
@@ -815,23 +731,8 @@ export default defineComponent({
       }
     };
 
-    const addFilter = () => {
-      formPush("query_data.filter", {
-        name: undefined,
-        operator: "=",
-        value: "",
-      });
-    };
     // Defaults (multiSelect / hideOnDashboard / selectAllValueForMultiSelect /
     // escapeSingleQuotes) are seeded by the schema defaults — no manual init.
-
-    const filterUpdated = (index: number, value: any) => {
-      setFormField(`query_data.filter[${index}].name`, value);
-    };
-
-    const removeFilter = (index: any) => {
-      formRemove("query_data.filter", index);
-    };
 
     const editMode = ref(false);
 
@@ -842,21 +743,6 @@ export default defineComponent({
           setFormField("query_data.max_record_size", null);
         }
       },
-    );
-
-    // watch for filter changes and clear value for Is Null / Is Not Null operators
-    watch(
-      () => variableData?.query_data?.filter,
-      (newValue) => {
-        if (newValue && newValue.length > 0) {
-          newValue.forEach((filter: any, i: number) => {
-            if (["Is Null", "Is Not Null"].includes(filter.operator) && filter.value) {
-              setFormField(`query_data.filter[${i}].value`, "");
-            }
-          });
-        }
-      },
-      { deep: true },
     );
 
     // Map a saved variable (API shape, with tabs/panels) onto the form shape
@@ -1469,6 +1355,33 @@ export default defineComponent({
       }));
     });
 
+    const filterBuilderRef = ref<FilterBuilderExpose | null>(null);
+
+    const filterFields = computed<FilterField[]>(() =>
+      (data.currentFieldsList ?? [])
+        .filter((field: any) => field?.name)
+        .map((field: any) => ({ name: field.name, type: toFilterFieldType(field.type) })),
+    );
+
+    // A stream picked as a `$variable` is only known once the dashboard resolves it.
+    const loadFilterValues = (field: string, search: string): Promise<string[]> => {
+      const streamName = variableData.query_data?.stream;
+      const streamType = variableData.query_data?.stream_type;
+      if (!streamName || !streamType || /\$|\{\{/.test(streamName)) return Promise.resolve([]);
+      return requestFieldValues(
+        { org: store.state.selectedOrganization.identifier, streamType, streamName },
+        field,
+        { keyword: search || undefined },
+      );
+    };
+
+    const filterVariableSuggestions = (): string[] =>
+      dashboardVariablesFilterItems.value.map((item: any) => item.value);
+
+    // The filter rows have no form field of their own, so a failed save marks their chips instead.
+    const submissionAttempts = form.useStore((s: any) => s.submissionAttempts);
+    watch(submissionAttempts, () => filterBuilderRef.value?.validate());
+
     // Merged stream options: variables + streams for the select
     const mergedStreamOptions = computed(() => {
       const variableItems = dashboardVariablesFilterItems.value.map((v: any) => ({
@@ -1562,7 +1475,6 @@ export default defineComponent({
       store,
       t,
       raw,
-      filterOperatorOptions,
       data,
       streamsFilterFn,
       fieldsFilterFn,
@@ -1580,9 +1492,11 @@ export default defineComponent({
       close,
       title,
       onSubmit,
-      addFilter,
-      removeFilter,
-      filterUpdated,
+      filterBuilderRef,
+      filterFields,
+      loadFilterValues,
+      filterVariableSuggestions,
+      setFormField,
       filterCycleError,
       dashboardVariablesFilterItems,
       mergedStreamOptionsWithLabel,

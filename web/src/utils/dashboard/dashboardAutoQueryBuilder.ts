@@ -659,6 +659,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
     const groupConditions = condition.conditions
       .map((condition: any) => buildCondition(condition, dashboardPanelData))
       .filter(Boolean);
+    // Indexed by saved position, not by kept item, so a saved group with a blank row compiles as it always has.
     const logicalOperators = condition.conditions
       .map((c: any) => c.logicalOperator)
       .filter(Boolean);
@@ -694,6 +695,14 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
           selectFilter += `IS NOT NULL`;
           break;
       }
+    } else if (condition.operator === "Is Empty" || condition.operator === "Is Not Empty") {
+      const fieldRef = streamAlias
+        ? `${streamAlias}.${condition.column.field}`
+        : condition.column.field;
+      selectFilter +=
+        condition.operator === "Is Empty"
+          ? `(${fieldRef} IS NULL OR ${fieldRef} = '')`
+          : `(${fieldRef} IS NOT NULL AND ${fieldRef} != '')`;
     } else if (condition.operator === "IN") {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
@@ -779,6 +788,18 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
   return "";
 };
 
+// Top level: a blank condition is dropped with its connector, so each kept item keeps its own AND/OR.
+const buildConditionList = (
+  conditions: any[],
+  dashboardPanelData: any,
+): { sql: string; logicalOperator: string }[] =>
+  conditions
+    .map((condition: any) => ({
+      sql: buildCondition(condition, dashboardPanelData),
+      logicalOperator: condition?.logicalOperator || "AND",
+    }))
+    .filter(({ sql }) => Boolean(sql));
+
 /**
  * Build a WHERE clause from the given filter data.
  * @param {array} filterData - an array of filter objects, each with properties
@@ -786,21 +807,11 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  * @returns {string} - the WHERE clause as a string.
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
-  const whereConditions = filterData
-    ?.map((condition: any) => buildCondition(condition, dashboardPanelData))
-    ?.filter(Boolean);
+  const built = buildConditionList(filterData ?? [], dashboardPanelData);
 
-  const logicalOperators = filterData.map((it: any) => it.logicalOperator);
-  if (whereConditions.length > 0) {
-    return ` WHERE ${whereConditions
-      .map((cond: any, index: any) => {
-        const logicalOperator =
-          index < logicalOperators.length && logicalOperators[index + 1]
-            ? logicalOperators[index + 1]
-            : "";
-
-        return index < logicalOperators.length ? `${cond} ${logicalOperator}` : cond;
-      })
+  if (built.length > 0) {
+    return ` WHERE ${built
+      .map(({ sql }, index) => `${sql} ${built[index + 1]?.logicalOperator ?? ""}`)
       .join(" ")}`;
   }
 

@@ -20,8 +20,7 @@ import AddSettingVariable from "./AddSettingVariable.vue";
 import { makeAddSettingVariableSchema } from "./AddSettingVariable.schema";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
-import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import analytics from "@/services/product_analytics";
 import { addVariable, updateVariable } from "../../../utils/commons";
 
@@ -68,7 +67,12 @@ vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
   }),
 }));
 
-vi.mock("vuex", () => ({
+vi.mock("@/composables/fieldValueStore", () => ({
+  requestFieldValues: vi.fn(async () => ["error", "warn"]),
+}));
+
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       selectedOrganization: {
@@ -393,105 +397,53 @@ describe("AddSettingVariable", () => {
       await nextTick();
     });
 
-    it("should render add filter button", () => {
-      const addFilterBtn = wrapper.find('[data-test="dashboard-add-filter-btn"]');
-      expect(addFilterBtn.exists()).toBe(true);
+    const builder = () => wrapper.findComponent(FilterBuilder);
+
+    it("edits the query filters with the shared builder in the variable profile", () => {
+      expect(builder().exists()).toBe(true);
+      expect(builder().props("profile")).toBe("dashboard-variable");
+      expect(builder().props("dataTest")).toBe("dashboard-variable-filter-builder");
     });
 
-    it("should add filter when button clicked", async () => {
-      const initialFilterCount = wrapper.vm.variableData.query_data.filter.length;
-      const addFilterBtn = wrapper.find('[data-test="dashboard-add-filter-btn"]');
-
-      await addFilterBtn.trigger("click");
-
-      expect(wrapper.vm.variableData.query_data.filter).toHaveLength(initialFilterCount + 1);
-
-      const newFilter =
-        wrapper.vm.variableData.query_data.filter[
-          wrapper.vm.variableData.query_data.filter.length - 1
-        ];
-      // Component initializes filter name as undefined (field is selected via autocomplete)
-      expect(newFilter).toEqual({
-        name: undefined,
-        operator: "=",
-        value: "",
-      });
-    });
-
-    it("should remove filter when remove button clicked", async () => {
-      // Add a filter first (form-owned array; projection lags by a flush)
-      wrapper.vm.addFilter();
-      wrapper.vm.addFilter();
-      await flushPromises();
-      const initialFilterCount = wrapper.vm.variableData.query_data.filter.length;
-
-      wrapper.vm.removeFilter(0);
-      await flushPromises();
-
-      expect(wrapper.vm.variableData.query_data.filter).toHaveLength(initialFilterCount - 1);
-    });
-
-    // START-HERE ① "non-negotiable gate" (field-array): deleting a NON-last
-    // filter row must keep each RENDERED value input aligned with its surviving
-    // row — assert the OFormCombobox→OCombobox `model-value` per row, NOT just the
-    // form data array. `:key="index"` is what keeps the indexed `name` bindings
-    // aligned after a mid-list delete.
-    it("keeps each filter row's RENDERED value input aligned after deleting a NON-last row", async () => {
-      // type is query_values by default → filter rows render. Seed 3 distinct rows
-      // (operator "=" needs a value, so the OFormCombobox is shown for each).
-      wrapper.vm.form.setFieldValue("query_data.filter", [
-        { name: "f0", operator: "=", value: "V0" },
-        { name: "f1", operator: "=", value: "V1" },
-        { name: "f2", operator: "=", value: "V2" },
-      ]);
-      await flushPromises();
-      await nextTick();
-
-      const renderedFilterValues = () =>
-        wrapper
-          .findAllComponents(OFormCombobox)
-          .filter((c: any) => /^query_data\.filter\[\d+\]\.value$/.test(c.props("name")))
-          .map((c: any) => c.findComponent(OCombobox).props("modelValue"));
-
-      expect(renderedFilterValues()).toEqual(["V0", "V1", "V2"]);
-
-      // Delete the MIDDLE (non-last) row via its delete button.
-      await wrapper.find('[data-test="dashboard-variable-adhoc-close-1"]').trigger("click");
-      await flushPromises();
-      await nextTick();
-
-      expect(renderedFilterValues()).toEqual(["V0", "V2"]);
-    });
-
-    it("should have correct operator options for filters", () => {
-      const expectedOperators = [
-        "=",
-        "!=",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "IN",
-        "NOT IN",
-        "str_match",
-        "str_match_ignore_case",
-        "match_all",
-        "re_match",
-        "re_not_match",
-        "Contains",
-        "Not Contains",
-        "Starts With",
-        "Ends With",
-        "Is Null",
-        "Is Not Null",
+    it("hands the builder the saved rows untouched", async () => {
+      const saved = [
+        { name: "k8s_namespace_name", operator: "IN", value: "('prod','dev')" },
+        { name: "level", operator: "!=", value: "$level" },
+        { name: "host", operator: "Is Null", value: "" },
       ];
+      wrapper.vm.form.setFieldValue("query_data.filter", JSON.parse(JSON.stringify(saved)));
+      await flushPromises();
+      expect(JSON.stringify(builder().props("modelValue"))).toBe(JSON.stringify(saved));
+    });
 
-      // Add a filter to test
-      wrapper.vm.addFilter();
+    it("writes the builder's rows into the form", async () => {
+      const next = [{ name: "level", operator: "=", value: "error" }];
+      builder().vm.$emit("update:modelValue", next);
+      await flushPromises();
+      expect(wrapper.vm.form.state.values.query_data.filter).toEqual(next);
+    });
 
-      // The operators are defined in the template, so we check if they're available
-      expect(expectedOperators).toContain("=");
-      expect(expectedOperators).toContain("Is Null");
+    it("offers the stream's fields and the visible $variables", async () => {
+      wrapper.vm.data.currentFieldsList = [
+        { name: "level", type: "Utf8" },
+        { name: "status", type: "Int64" },
+      ];
+      await nextTick();
+      expect(builder().props("fields")).toEqual([
+        { name: "level", type: "string" },
+        { name: "status", type: "number" },
+      ]);
+      const suggestions = builder().props("extraValueSuggestions")!("level");
+      wrapper.vm.dashboardVariablesFilterItems.forEach((item: any) =>
+        expect(suggestions).toContain(item.value),
+      );
+    });
+
+    it("loads no values while the stream is itself a $variable", async () => {
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+      wrapper.vm.form.setFieldValue("query_data.stream", "$stream");
+      await flushPromises();
+      await expect(builder().props("loadValues")!("level", "")).resolves.toEqual([]);
     });
   });
 

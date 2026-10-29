@@ -24,7 +24,7 @@ import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { buildConditionsString, isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { buildConditionsString, conditionHasValue } from "@/utils/alerts/conditionsFormatter";
 import { SINGLE_CLOSED_TOKEN_RE } from "@/lib/forms/TemplateInput/useTemplateSuggest";
 import { TEXT_SWATCHES } from "@/composables/dashboard/useColumnFormatting";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -131,7 +131,11 @@ const sqlColumn = (name: string): string =>
 export const isBlankAnnotationCondition = (
   leaf: Pick<AnnotationConditionLeaf, "column" | "operator" | "value">,
 ): boolean =>
-  !leaf?.column?.trim() || (!isUnaryOperator(leaf.operator) && !(leaf.value ?? "").trim());
+  !leaf?.column?.trim() ||
+  !conditionHasValue(
+    leaf.operator,
+    typeof leaf.value === "string" ? leaf.value.trim() : leaf.value,
+  );
 
 type AnnotationConditionNode = AnnotationConditionGroup | AnnotationConditionLeaf;
 

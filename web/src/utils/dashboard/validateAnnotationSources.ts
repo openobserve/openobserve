@@ -13,11 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ALL_CONDITION_OPERATOR_VALUES } from "@/components/alerts/conditionOperators";
 import { HEX_RE } from "@/utils/chartTheme";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 
 // Kept out of annotationSources.ts: that file's sqlIdentifiers.ts import reaches the live store at load time, which panelValidation.ts (via useDashboardPanel.ts, a near-universal import) must not carry just to run this pure structural check.
+
+/** Mirrors the backend's `ANNOTATION_FILTER_OPERATORS`. */
+const ANNOTATION_FILTER_OPERATORS = [
+  "=",
+  "!=",
+  ">=",
+  "<=",
+  ">",
+  "<",
+  "Contains",
+  "NotContains",
+  "contains",
+  "not_contains",
+  "is_null",
+  "is_not_null",
+  "is_empty",
+  "is_not_empty",
+  "in",
+  "not_in",
+  "starts_with",
+  "ends_with",
+  "re_match",
+  "re_not_match",
+];
 
 /** Caps the total defined annotation sources (enabled or not), bounding fan-out if all were enabled. */
 export const MAX_ANNOTATION_SOURCES = 10;
@@ -46,7 +69,7 @@ const annotationConditionTreeProblems = (t: TranslateFn, node: unknown): I18nTex
   if (!isRecord(node)) return [t("dashboard.annotationSources.invalidFilters")];
   if (node.filterType === "condition") {
     const operator = node.operator;
-    if (typeof operator !== "string" || !ALL_CONDITION_OPERATOR_VALUES.includes(operator)) {
+    if (typeof operator !== "string" || !ANNOTATION_FILTER_OPERATORS.includes(operator)) {
       return [t("dashboard.annotationSources.unknownOperator", { operator: String(operator) })];
     }
     const column = node.column;

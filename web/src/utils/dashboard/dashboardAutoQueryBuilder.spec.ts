@@ -1385,6 +1385,41 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("AND");
       expect(result).toContain("age < 50");
     });
+
+    it("keeps each WHERE connector on its own row when a blank condition is skipped", () => {
+      mockQueryData.fields.x = [
+        {
+          alias: "x_alias",
+          isDerived: false,
+          functionName: null,
+          args: [{ type: "field", value: { field: "status" } }],
+        },
+      ];
+      const leaf = (field: string, value: string, logicalOperator: string) => ({
+        type: "condition",
+        filterType: "condition",
+        operator: "=",
+        column: { field },
+        value,
+        values: [],
+        logicalOperator,
+      });
+      mockQueryData.fields.filter = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          leaf("status", "a", "AND"),
+          { ...leaf("count", "", "AND"), type: "list", operator: null },
+          leaf("age", "5", "OR"),
+        ],
+      };
+      const result = buildSQLChartQuery({
+        queryData: mockQueryData,
+        chartType: "bar",
+        dashboardPanelData: mockDashboardPanelData,
+      });
+      expect(result).toContain("WHERE status = 'a' OR age = 5 ");
+    });
   });
 
   describe("addMissingArgs", () => {
@@ -2059,6 +2094,73 @@ describe("dashboardAutoQueryBuilder", () => {
         mockDashboardPanelData,
       );
       expect(result).toContain("status = 'active'");
+    });
+
+    const leaf = (
+      field: string,
+      operator: string | null,
+      value: unknown,
+      logicalOperator = "AND",
+    ) => ({
+      type: "condition",
+      filterType: "condition",
+      column: { field },
+      operator,
+      value,
+      values: [],
+      logicalOperator,
+    });
+
+    it("builds Is Empty and Is Not Empty as null-or-blank checks", () => {
+      expect(buildCondition(leaf("status", "Is Empty", ""), mockDashboardPanelData)).toBe(
+        "(status IS NULL OR status = '')",
+      );
+      expect(buildCondition(leaf("status", "Is Not Empty", ""), mockDashboardPanelData)).toBe(
+        "(status IS NOT NULL AND status != '')",
+      );
+    });
+
+    it("prefixes Is Empty with the stream alias when the query has joins", () => {
+      mockDashboardPanelData.data.queries[0].joins = [{ stream: "other", streamAlias: "b" }];
+      const condition = {
+        ...leaf("status", "Is Empty", ""),
+        column: { field: "status", streamAlias: "b" },
+      };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(
+        "(b.status IS NULL OR b.status = '')",
+      );
+    });
+
+    it("compiles a saved group with a blank row exactly as before (connector by saved position)", () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          leaf("status", "=", "a"),
+          leaf("count", "=", "", "OR"),
+          leaf("status", "=", "b", "AND"),
+        ],
+      };
+      expect(buildCondition(group, mockDashboardPanelData)).toBe("(status = 'a' OR status = 'b')");
+    });
+
+    it("builds a group without blanks exactly as before", () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          leaf("status", "=", "a"),
+          leaf("count", ">", "1", "OR"),
+          {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [leaf("status", "<>", "c"), leaf("count", "<", "9", "AND")],
+          },
+        ],
+      };
+      expect(buildCondition(group, mockDashboardPanelData)).toBe(
+        "(status = 'a' OR count > 1 AND (status <> 'c' AND count < 9))",
+      );
     });
   });
 
