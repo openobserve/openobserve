@@ -27,6 +27,8 @@ use crate::utils::{encryption::decode_encryption_key, str::constant_time_eq};
 pub const TOKEN_PREFIX: &str = "o2dt.";
 pub const TOKEN_VERSION: u8 = 1;
 pub const SCOPE_ASSISTANT: &str = "assistant";
+/// Minted only by the Slack click handler, for the alert buttons' routes.
+pub const SCOPE_SLACK_ACTION: &str = "slack_action";
 pub const KEY_INFO: &[u8] = b"o2-slack-delegation-v1";
 pub const MAC_DOMAIN: &[u8] = b"o2dt.v1\0";
 /// `ZO_DELEGATION_SIGNING_KEY_PREVIOUS` value that keeps the master-key-derived key verifying.

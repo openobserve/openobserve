@@ -90,6 +90,7 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   logs: "data",
   metrics: "data",
   traces: "data",
+  profiles: "data",
   index: "data",
   metadata: "data",
   enrichment_table: "data",

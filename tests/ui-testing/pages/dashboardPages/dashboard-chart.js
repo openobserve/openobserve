@@ -48,6 +48,19 @@ export default class ChartTypeSelector {
     // HTML chart editor + rendered output
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
     this.htmlRenderer = page.locator('[data-test="html-renderer"]');
+
+    // Markdown chart editor + rendered output
+    this.markdownEditor = page.locator('[data-test="dashboard-markdown-editor"]');
+    this.markdownRenderer = page.locator('[data-test="markdown-renderer"]');
+  }
+
+  async fillMarkdownEditor(markdown) {
+    await this.markdownEditor.locator(".monaco-editor").click();
+    await this.markdownEditor.locator(".inputarea").fill(markdown);
+  }
+
+  getHtmlRendererElement(selector) {
+    return this.htmlRenderer.locator(selector);
   }
 
   // Click the geomap chart canvas at a given pixel position

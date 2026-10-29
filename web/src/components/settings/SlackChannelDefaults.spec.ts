@@ -19,6 +19,7 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
 import slack from "@/services/slack";
+import destinationService from "@/services/alert_destination";
 import SlackChannelDefaults from "./SlackChannelDefaults.vue";
 import {
   ConfirmDialogStub,
@@ -32,6 +33,8 @@ import {
   orgAccessView,
 } from "@/test/unit/helpers/slack";
 import type { InstallationView, SlackChannelDefaultRow } from "@/types/slack";
+
+vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 
 vi.mock("@/services/slack", () => ({
   default: {
@@ -118,8 +121,17 @@ const mountWith = async (realTable = false) => {
   return w;
 };
 
+const appDestination = (name: string, channel: string, installation = "inst-1") => ({
+  name,
+  type: "slack_app",
+  installation_id: installation,
+  channel_id: channel,
+  channel_name: channel,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(destinationService.list).mockReturnValue(ok([]) as any);
   vi.mocked(slack.listInstallations).mockReturnValue(
     ok({ installations: [installationView()] }) as any,
   );
@@ -140,7 +152,7 @@ afterEach(() => {
 });
 
 describe("SlackChannelDefaults (rows 21-22)", () => {
-  it("lists each channel with its answer mode and who set it, with no alert routes column yet", async () => {
+  it("lists each channel with its answer mode, who set it and a dash when no alert routes", async () => {
     const w = await mountDefaults();
     expect(slack.listChannelDefaults).toHaveBeenCalledWith("acme", "inst-1");
     const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
@@ -148,9 +160,25 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     expect(mine.text()).toContain("In thread");
     expect(mine.find('[data-col="default_org"]').text()).toBe("This org");
     expect(mine.find('[data-col="set_by"]').text()).toBe("From an alert destination");
-    expect(mine.find('[data-col="alert_routes"]').exists()).toBe(false);
+    expect(mine.find('[data-col="alert_routes"]').text()).toBe("—");
     expect(theirs.text()).toContain("Private only");
     expect(theirs.text()).toContain("Another org");
+  });
+
+  it("fills Alert routes with this workspace's Slack app destinations per channel (MK-6b)", async () => {
+    vi.mocked(destinationService.list).mockReturnValue(
+      ok([
+        appDestination("a", "C1"),
+        appDestination("b", "C1"),
+        appDestination("c", "C1", "inst-2"),
+        appDestination("d", "C2"),
+      ]) as any,
+    );
+    const w = await mountDefaults();
+    const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
+    expect(mine.find('[data-col="alert_routes"]').text()).toBe("2 destinations");
+    expect(theirs.find('[data-col="alert_routes"]').text()).toBe("1 destination");
+    expect(w.text()).not.toMatch(/failing/i);
   });
 
   it("AC-5.5 offers Edit and Remove only on rows this org set", async () => {

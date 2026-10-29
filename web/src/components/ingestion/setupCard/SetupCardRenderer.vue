@@ -48,15 +48,17 @@ import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
 import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import type { FirstEventState, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStatus from "../FirstEventStatus.vue";
-import { safeHttpUrl } from "./subs";
+import { cliFlagArg, safeHttpUrl, sanitizeInput, shellQuote } from "./subs";
 import type {
   CardSubstitutions,
   RichCardContent,
   RichCardInput,
+  RichCardSetupMode,
   RichCardStep,
   RichCardStepVariant,
   RichCardStepVariantGroup,
   RichCardStreamInput,
+  SetupMode,
   StepChipKind,
 } from "./types";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
@@ -126,6 +128,31 @@ const watchedStream = computed(() =>
     ? streamName.value.trim() || props.content.streamInput.default || "default"
     : props.content.detect?.streamName || "default",
 );
+// ── setup mode (optional) ────────────────────────────────────────────────────
+// Completion and the active step read visibleSteps, so a hidden mode's steps never block progress.
+const setupMode = ref<SetupMode | undefined>(props.content.setupModes?.[0]?.id);
+const visibleSteps = computed(() =>
+  props.content.setupModes?.length
+    ? props.content.steps.filter((s) => !s.mode || s.mode === setupMode.value)
+    : props.content.steps,
+);
+const selectSetupMode = (id: unknown) => {
+  setupMode.value = String(id) as SetupMode;
+};
+const setupModeTabs = ref<HTMLElement | null>(null);
+const showManualMode = () => {
+  if (!props.content.setupModes?.some((m) => m.id === "manual")) return;
+  selectSetupMode("manual");
+  nextTick(() =>
+    setupModeTabs.value?.scrollIntoView({
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+      block: "start",
+    }),
+  );
+};
+const setupModeLabel = (mode: RichCardSetupMode): I18nText =>
+  mode.labelKey ? t(mode.labelKey) : (mode.label ?? raw(""));
+
 // ── free-form inputs (optional) ──────────────────────────────────────────────
 // Steps can declare `inputs` (e.g. SQL Server host/port on the configure step).
 // Each field's value substitutes its `{id}` placeholder in any code block
@@ -154,7 +181,11 @@ const subStream = (text?: string, variant?: RichCardStepVariant): string | undef
   let out = text.replaceAll("{stream}", watchedStream.value).replaceAll("{flags}", () => flags);
   for (const inp of allInputs.value) {
     if (inp.flag || inp.helmSet) continue;
-    const value = inputValues.value[inp.id] ?? inp.default;
+    if (inp.cliFlag)
+      out = out.replaceAll(`{flag:${inp.id}}`, () =>
+        cliFlagArg(inp, inputValue(inp.id), inputValue),
+      );
+    const value = sanitizeInput(inp, inputValues.value[inp.id] ?? inp.default);
     // A function replacement keeps typed `$&`, `$$` etc. literal.
     out = out.replaceAll(`{${inp.id}}`, () => value);
   }
@@ -165,8 +196,6 @@ const inputValue = (id: string) => inputValues.value[id]?.trim() ?? "";
 const missingRequired = (variant?: RichCardStepVariant) =>
   !!variant?.requireOneOf &&
   variant.requireOneOf.ids.every((id) => !inputValue(id).replace(/[\s,]/g, ""));
-// Single-quoted for POSIX shells, so globs like *app* reach the installer unexpanded.
-const shellQuote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
 // Helm list items end at an unescaped `,` or `}`; escaping stops a value from closing the list.
 const helmList = (v: string) =>
   v
@@ -228,8 +257,8 @@ const onBarDetected = (result: { count: number }) => detect.markConnected(result
 
 // Re-copies through the first step's own block, so the clipboard and the toast match a click on it.
 const copyFirstSnippet = () => {
-  const index = props.content.steps.findIndex((st) => displayCode(st));
-  const step = props.content.steps[index];
+  const index = visibleSteps.value.findIndex((st) => displayCode(st));
+  const step = visibleSteps.value[index];
   if (!step) return;
   // A hidden command can't be copied; show the step and its warning instead.
   if (missingRequired(activeVariant(step))) return scrollToStep(index);
@@ -340,17 +369,19 @@ const onStepAction = (step: RichCardStep, index: number) => {
 
 // First not-done step is "active"; -1 once everything is done. OStepper's
 // model is 1-based step numbers (0 = none active, i.e. all done).
-const activeIndex = computed(() => props.content.steps.findIndex((s) => !isStepDone(s)));
+const activeIndex = computed(() => visibleSteps.value.findIndex((s) => !isStepDone(s)));
 const activeStepNumber = computed(() => (activeIndex.value >= 0 ? activeIndex.value + 1 : 0));
 
 // ── next-step auto-advance scroll ────────────────────────────────────────────
 // Refs are OStep component instances; we scroll to their root element ($el).
-const stepEls = ref<any[]>([]);
-const setStepRef = (el: unknown, i: number) => {
-  stepEls.value[i] = el ?? null;
+// Keyed by step id: a mode switch reorders the visible steps, so a position can name two steps.
+const stepEls = ref<Record<string, any>>({});
+const setStepRef = (el: unknown, id: string) => {
+  stepEls.value[id] = el ?? null;
 };
 const scrollToStep = (i: number) => {
-  const node = stepEls.value[i]?.$el ?? stepEls.value[i];
+  const id = visibleSteps.value[i]?.id;
+  const node = id ? (stepEls.value[id]?.$el ?? stepEls.value[id]) : undefined;
   if (node?.scrollIntoView)
     node.scrollIntoView({
       behavior: prefersReducedMotion() ? "auto" : "smooth",
@@ -396,7 +427,8 @@ const inlineMd = (s: string) =>
 // plain "see X below" leaves the user hunting. The href is a literal "#" and
 // the target comes from a fixed alternation, so authored content can't inject a
 // URL here (inlineMd has already escaped everything else).
-const JUMP_LINK_RE = /\[([^\]]+)\]\(#(advanced|troubleshooting)\)/g;
+// `[label](#manual)` instead switches a card with setup modes to its manual path.
+const JUMP_LINK_RE = /\[([^\]]+)\]\(#(advanced|troubleshooting|manual)\)/g;
 const noteMd = (s: string) =>
   inlineMd(s).replace(
     JUMP_LINK_RE,
@@ -410,6 +442,7 @@ const onNoteClick = (e: MouseEvent) => {
   e.preventDefault();
   if (el.dataset.jump === "advanced") openAdvanced();
   else if (el.dataset.jump === "troubleshooting") openTroubleshooting();
+  else if (el.dataset.jump === "manual") showManualMode();
 };
 
 const chipIcon = (kind: StepChipKind) =>
@@ -421,6 +454,11 @@ const codeChrome = (step: RichCardStep): "terminal" | "editor" =>
   !displayCode(step)?.filename && step.chip?.kind === "terminal" ? "terminal" : "editor";
 
 const extras = computed(() => props.content.extras ?? {});
+const uninstallSection = computed(() => {
+  const section = extras.value.uninstall;
+  if (!section?.mode || !props.content.setupModes?.length) return section;
+  return section.mode === setupMode.value ? section : undefined;
+});
 const hasInstallerAccordion = computed(
   () => !!(extras.value.installs?.length || extras.value.envVars?.length),
 );
@@ -574,6 +612,25 @@ function fireConfetti() {
         />
       </div>
 
+      <div
+        v-if="content.setupModes?.length"
+        ref="setupModeTabs"
+        class="variant-tabs setup-modes"
+        data-test="ai-setup-mode-tabs"
+      >
+        <OToggleGroup :model-value="setupMode" @update:model-value="selectSetupMode">
+          <OToggleGroupItem
+            v-for="m in content.setupModes"
+            :key="m.id"
+            :value="m.id"
+            size="sm"
+            :data-test="`ai-setup-mode-${m.id}`"
+          >
+            {{ setupModeLabel(m) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
+
       <!-- Steps — lib OStepper in expanded (checklist) mode: all panels visible,
            each step independently `done`, the first not-done step highlighted. -->
       <OStepper
@@ -584,7 +641,7 @@ function fireConfetti() {
         class="steps"
       >
         <OStep
-          v-for="(step, i) in content.steps"
+          v-for="(step, i) in visibleSteps"
           :key="step.id"
           :name="i + 1"
           :title="stepTitle(step)"
@@ -604,7 +661,7 @@ function fireConfetti() {
             </OTag>
           </template>
 
-          <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
+          <div class="step-content-pad" :ref="(el) => setStepRef(el, step.id)">
             <p class="step-desc" v-html="inlineMd(stepDescription(step))"></p>
 
             <!-- Per-step inputs (e.g. host/port) — fill {id} in this step's code -->
@@ -854,7 +911,7 @@ function fireConfetti() {
           hasInstallerAccordion ||
           extras.advanced ||
           extras.troubleshooting?.length ||
-          extras.uninstall
+          uninstallSection
         "
         class="c-more"
       >
@@ -937,21 +994,21 @@ function fireConfetti() {
 
         <!-- Removal path — last, and collapsed, since it undoes the flow above. -->
         <OCollapsible
-          v-if="extras.uninstall"
-          :label="sectionLabel(extras.uninstall)"
+          v-if="uninstallSection"
+          :label="sectionLabel(uninstallSection)"
           icon="delete-outline"
           class="acc-item"
           data-test="ai-uninstall-accordion"
         >
           <div class="acc-body">
             <p
-              v-if="sectionDescription(extras.uninstall)"
+              v-if="sectionDescription(uninstallSection)"
               class="step-desc"
-              v-html="inlineMd(sectionDescription(extras.uninstall))"
+              v-html="inlineMd(sectionDescription(uninstallSection))"
             ></p>
             <OCodeBlock
-              :lang="extras.uninstall.code.lang"
-              :code="extras.uninstall.code.raw"
+              :lang="uninstallSection.code.lang"
+              :code="subStream(uninstallSection.code.raw) || ''"
               data-test="ai-uninstall-code"
             />
           </div>
@@ -1185,6 +1242,10 @@ function fireConfetti() {
    the toggle's own visuals come from the design system. ---- */
 .variant-tabs {
   margin: 0 0 0.875rem;
+}
+
+.setup-modes {
+  margin-bottom: 1.25rem;
 }
 
 .variant-icon {

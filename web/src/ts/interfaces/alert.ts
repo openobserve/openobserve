@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText } from "@/types/i18n";
+import type { AlertGroupRef, EndOnClear } from "@/services/downtimes";
 
 export interface Condition {
   column: string;
@@ -136,7 +137,7 @@ export interface Destination {
   headers?: Headers;
   template?: string | Template;
   emails?: string;
-  type: "http" | "email" | "sns";
+  type: "http" | "email" | "sns" | "slack_app";
   output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // Frontend internal use
   destination_type_name?: string; // From backend
@@ -153,7 +154,7 @@ export interface DestinationPayload {
   headers?: Headers;
   template?: string; // Persisted/sent as the template name
   emails?: string[];
-  type: "http" | "email" | "sns";
+  type: "http" | "email" | "sns" | "slack_app";
   output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // New field added
   separator?: string; // For stringseparated format separator value
@@ -190,6 +191,121 @@ export interface AlertGroup {
   last_seen?: number;
   silenced_until?: number;
   last_notified_level?: string;
+  /** Microseconds; absent when the group is not firing or an older node wrote the row. */
+  firing_started_at?: number;
+  /** Present only while the ack is in force for the current firing. */
+  ack?: AckView;
+}
+
+export type AckSource = "ui" | "api" | "slack" | "oncall" | "incident";
+
+/** One group's ack in force (`AckView` of `POST /alerts/{id}/ack`). */
+export interface AckView {
+  /** `""` for a single-row or composite alert. */
+  group_key: string;
+  firing_started_at: number;
+  acked_by: string;
+  acked_at: number;
+  ack_source: AckSource;
+  taken_over_from?: string;
+}
+
+/** The `ack` object on an alert list item. */
+export interface AlertListAck {
+  acked_by: string;
+  acked_at: number;
+  ack_source: AckSource;
+  groups_acked: number;
+}
+
+export interface AckAlertRequest {
+  group_key?: string;
+  /** The firing the caller saw; a newer firing answers 409 `firing_changed`. */
+  firing_started_at?: number;
+  take_over?: boolean;
+  all_groups?: boolean;
+}
+
+export interface AckAlertResponse {
+  changed: boolean;
+  acks: AckView[];
+  incident?: { id: string; status: string };
+  oncall?: {
+    acknowledged: string[];
+    still_paging: { response_id: string; team: string }[];
+  };
+  other_groups_unacked: number;
+}
+
+export interface UnackAlertRequest {
+  group_key: string;
+  firing_started_at?: number;
+}
+
+export interface UnackAlertResponse {
+  changed: boolean;
+  ack?: AckView;
+}
+
+export interface AlertAcksResponse {
+  acks: AckView[];
+}
+
+export interface AlertActionPerson {
+  email: string;
+  name?: string;
+}
+
+/** 403 body of the ack and mute routes: who is on call and who could act instead. */
+export interface AlertActionRefusal {
+  code: "ack_refused" | "mute_refused";
+  message: string;
+  rule: "role" | "fga";
+  on_call: (AlertActionPerson & { team: string })[];
+  can_act: AlertActionPerson[];
+}
+
+/** Every 403/409 `code` the ack and mute routes answer with. */
+export type AlertActionError =
+  | AlertActionRefusal
+  | { code: "not_firing" }
+  | { code: "firing_changed"; firing_started_at: number }
+  | { code: "downtime_cap"; message: string }
+  | { code: "already_muted"; downtime_id: string; version: number; ends_at: number }
+  | { code: "version_changed"; version: number; ends_at: number }
+  | { code: "not_a_quick_mute" };
+
+/** Body of `POST /alerts/{id}/mute`: exactly one of `until_clear`, `minutes`, `ends_at`. */
+export interface MuteAlertRequest {
+  until_clear?: boolean;
+  /** 1..=1440. */
+  minutes?: number;
+  /** Microseconds UTC. */
+  ends_at?: number;
+  group_keys?: string[];
+  all_groups?: boolean;
+  firing_started_at?: number;
+  reason?: string;
+  folder_id?: string;
+}
+
+export interface MuteAlertResponse {
+  downtime_id: string;
+  version: number;
+  ends_at: number;
+  end_on_clear?: EndOnClear;
+  alert_groups?: AlertGroupRef[];
+}
+
+/** Body of `POST /alerts/{id}/mute/{downtime_id}/extend`, with the version the caller saw. */
+export type ExtendAlertMuteRequest = { version: number } & (
+  { minutes: number } | { until_clear: true } | { ends_at: number }
+);
+
+export interface ExtendAlertMuteResponse {
+  version: number;
+  ends_at: number;
+  end_on_clear?: EndOnClear;
 }
 
 /**

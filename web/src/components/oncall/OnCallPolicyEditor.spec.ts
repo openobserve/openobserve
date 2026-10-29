@@ -331,6 +331,19 @@ describe("OnCallPolicyEditor", () => {
       destinations: ["slack-oncall"],
     };
 
+    it("leaves Slack app destinations out of the picker (7.1)", async () => {
+      destinations.list.mockResolvedValue({
+        data: [{ name: "slack-oncall" }, { name: "sre-prod-slack", type: "slack_app" }],
+      } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: webhookPolicy, open: true },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+      const options = (wrapper.vm as any).destinationOptions.map((o: any) => o.value);
+      expect(options).toEqual(["slack-oncall"]);
+    });
+
     it("hides the picker when nothing pages by webhook", async () => {
       const wrapper = mount(OnCallPolicyEditor, {
         props: { teamId: "team_1", policy, open: true },

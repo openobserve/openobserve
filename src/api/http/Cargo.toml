@@ -95,6 +95,8 @@ futures-util.workspace = true
 
 [dev-dependencies]
 base64.workspace = true
+sea-orm.workspace = true
+svix-ksuid.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 zstd.workspace = true
