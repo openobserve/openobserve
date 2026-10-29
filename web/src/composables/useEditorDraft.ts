@@ -621,9 +621,15 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   };
 
   const decideLeave = async (): Promise<boolean> => {
-    // A second navigation while the dialog is up, or while its Save runs, must not stack another dialog.
-    if (leaveResolver || state.leaveOpen || state.leaveSaving) return false;
+    // A second leave while the dialog's Save runs must not stack another dialog.
+    if (state.leaveSaving || (state.leaveOpen && !leaveResolver)) return false;
+    // A newer navigation has already cancelled the earlier one, so the open dialog now answers for it.
+    if (leaveResolver) {
+      leaveResolver("stay");
+      leaveResolver = null;
+    }
     if (!hasUnsavedChanges()) {
+      state.leaveOpen = false;
       // Edits that were undone must not leave their earlier draft behind.
       autosave.flush();
       return true;

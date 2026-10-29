@@ -488,7 +488,8 @@ describe("FleetConfigEditor", () => {
       if (asked) await leaveVm().chooseLeave(answer);
       return { asked, allowed: await pending };
     };
-    const leave = (answer?: "stay" | "discard") => run(routeGuards.leave.at(-1), answer);
+    const leave = (answer?: "stay" | "discard") =>
+      run(routeGuards.leave.at(-1), answer, { fullPath: "/fleet" }, { fullPath: "/fleet/edge" });
     const unload = () => {
       const e = new Event("beforeunload", { cancelable: true });
       window.dispatchEvent(e);
@@ -554,8 +555,8 @@ describe("FleetConfigEditor", () => {
       wrapper = await mountEditor("edge");
       await edit(wrapper, "first: 1\n");
       let result: unknown;
-      const push = vi.spyOn(router, "push").mockImplementation(async () => {
-        result = await leave();
+      const push = vi.spyOn(router, "push").mockImplementation(async (target) => {
+        result = await run(routeGuards.leave.at(-1), "stay", router.resolve(target));
       });
       await wrapper.find('[data-test="fleet-config-editor-delete"]').trigger("click");
       await flushPromises();
@@ -566,6 +567,11 @@ describe("FleetConfigEditor", () => {
       expect(push).toHaveBeenCalled();
       push.mockRestore();
       await vi.waitFor(() => expect(result).toEqual({ asked: false, allowed: true }));
+      // The allowance was for the list only, so another target still asks.
+      expect(await run(routeGuards.leave.at(-1), "stay", { fullPath: "/elsewhere" })).toEqual({
+        asked: true,
+        allowed: false,
+      });
     });
 
     it("moves to a newly saved config without a prompt", async () => {

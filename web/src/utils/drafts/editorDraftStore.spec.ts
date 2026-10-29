@@ -36,6 +36,7 @@ import {
   isEditorDraftStorageAvailable,
   listEditorDraftIds,
   listEditorDrafts,
+  purgeRetiredEditorDrafts,
   readEditorDraft,
   stableStringify,
   writeEditorDraft,
@@ -279,6 +280,48 @@ describe("editorDraftStore", () => {
           (localStorage.getItem(key) ?? "").includes("c2VjcmV0"),
         ),
       ).toBe(false);
+    });
+
+    it("login purges retired-kind drafts and their index entries, keeping every other draft", () => {
+      const fleetKey = `${EDITOR_DRAFT_PREFIX}fleet_config:org1:edge:me%40x.io`;
+      const ghostKey = `${EDITOR_DRAFT_PREFIX}fleet_config:org2:new:me%40x.io`;
+      const expired = { ...scope, entityId: "old" };
+      writeEditorDraft(scope, { data: { name: "kept" } });
+      storeRaw(expired, Date.now() - EDITOR_DRAFT_TTL_MS - 1);
+      localStorage.setItem(fleetKey, JSON.stringify({ v: 1, savedAt: Date.now(), data: {} }));
+      const index = JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");
+      localStorage.setItem(
+        EDITOR_DRAFT_INDEX_KEY,
+        JSON.stringify({ ...index, [fleetKey]: Date.now(), [ghostKey]: Date.now() }),
+      );
+
+      resumeEditorDraftSession();
+
+      expect(localStorage.getItem(fleetKey)).toBeNull();
+      expect(Object.keys(JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}"))).toEqual(
+        expect.not.arrayContaining([fleetKey, ghostKey]),
+      );
+      expect(readEditorDraft(scope)?.data).toEqual({ name: "kept" });
+      expect(localStorage.getItem(editorDraftKey(expired))).not.toBeNull();
+    });
+
+    it("purges an index-only retired entry, and writes nothing when there is none", () => {
+      const ghostKey = `${EDITOR_DRAFT_PREFIX}fleet_config:org1:edge:me%40x.io`;
+      writeEditorDraft(scope, { data: {} });
+      const index = JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");
+      localStorage.setItem(EDITOR_DRAFT_INDEX_KEY, JSON.stringify({ ...index, [ghostKey]: 1 }));
+      expect(purgeRetiredEditorDrafts()).toBe(0);
+      expect(JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}")).not.toHaveProperty([
+        ghostKey,
+      ]);
+
+      const setItem = vi.spyOn(Storage.prototype, "setItem");
+      const removeItem = vi.spyOn(Storage.prototype, "removeItem");
+      const revision = editorDraftRevision.value;
+      expect(purgeRetiredEditorDrafts()).toBe(0);
+      expect(setItem).not.toHaveBeenCalled();
+      expect(removeItem).not.toHaveBeenCalled();
+      expect(editorDraftRevision.value).toBe(revision);
     });
 
     it("leaves panel drafts alone", () => {

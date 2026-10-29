@@ -105,6 +105,9 @@ export const NEW_EDITOR_DRAFT_ID = "new";
 const NEW_VARIANT_PREFIX = `${NEW_EDITOR_DRAFT_ID}~`;
 // Earlier builds stored these kinds with secrets in plain text, so cleanup deletes whatever of them is left.
 const RETIRED_DRAFT_KINDS: ReadonlySet<string> = new Set(["fleet_config"]);
+const RETIRED_KEY_PREFIXES = [...RETIRED_DRAFT_KINDS].map(
+  (kind) => `${EDITOR_DRAFT_PREFIX}${encodeURIComponent(kind)}:`,
+);
 
 /** Bumped on every write, delete and cross-tab storage event, so list dots can re-read storage. */
 export const editorDraftRevision = ref(0);
@@ -336,6 +339,8 @@ export const isEditorDraftStorageAvailable = (): boolean => {
 const capGroup = (parsed: ParsedKey) =>
   [parsed.kind, parsed.org, parsed.userEmail].map(encodeURIComponent).join(":");
 
+const isRetiredKey = (key: string) => RETIRED_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+
 /** Drops expired, unreadable, old-format and retired-kind drafts, then keeps only the newest `maxPerKind` of each kind per user and org. */
 export const cleanupEditorDrafts = (
   now: number = Date.now(),
@@ -373,6 +378,28 @@ export const cleanupEditorDrafts = (
     return removed;
   }
   if (removed) bumpRevision();
+  return removed;
+};
+
+/** Deletes retired-kind drafts and their index entries; one key scan, and no write when there are none. */
+export const purgeRetiredEditorDrafts = (): number => {
+  const storage = getStorage();
+  if (!storage) return 0;
+  let removed = 0;
+  try {
+    const retired = draftKeys(storage).filter(isRetiredKey);
+    const raw = storage.getItem(EDITOR_DRAFT_INDEX_KEY);
+    const indexed = !!raw && RETIRED_KEY_PREFIXES.some((prefix) => raw.includes(`"${prefix}`));
+    if (!retired.length && !indexed) return 0;
+    retired.forEach((key) => storage.removeItem(key));
+    removed = retired.length;
+    updateIndex(storage, (index) => {
+      for (const key of [...index.keys()]) if (isRetiredKey(key)) index.delete(key);
+    });
+  } catch {
+    return removed;
+  }
+  bumpRevision();
   return removed;
 };
 
@@ -606,9 +633,10 @@ export const endEditorDraftSession = (userEmail: string): void => {
   clearEditorDraftsFor(userEmail);
 };
 
-/** Runs on login. */
+/** Runs on login, and on app start with a live session. */
 export const resumeEditorDraftSession = (): void => {
   resumeDraftSession();
+  purgeRetiredEditorDrafts();
 };
 
 /** Minute precision in the user's locale and timezone, the same format the panel drafts use. */

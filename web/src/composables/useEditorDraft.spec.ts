@@ -689,7 +689,7 @@ describe("useEditorDraft", () => {
       expect(byTest("editor-draft-leave-dialog")).toBeNull();
     });
 
-    it("asks once and blocks a second navigation while open", async () => {
+    it("hands the open dialog to a second navigation and refuses the first", async () => {
       const draft = await startHost();
       userInput();
       await edit({ name: "typed" });
@@ -697,11 +697,16 @@ describe("useEditorDraft", () => {
       const first = leave();
       await flushPromises();
       expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-      expect(await leave()).toBe(false);
-
-      draft.chooseLeave("stay");
+      const second = leave();
       expect(await first).toBe(false);
-      expect(draft.hasUnsavedChanges()).toBe(true);
+      await flushPromises();
+      expect(draft.state.leaveOpen).toBe(true);
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+
+      draft.chooseLeave("discard");
+      expect(await second).toBe(true);
+      expect(draft.state.leaveOpen).toBe(false);
+      expect(draft.hasUnsavedChanges()).toBe(false);
     });
 
     it("blocks a navigation while the leave dialog's save runs, and stays usable after it fails", async () => {

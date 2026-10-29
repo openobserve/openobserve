@@ -544,7 +544,8 @@ const name = computed(() => (isNew.value ? "untitled-config" : id.value));
 const unsaved = computed(
   () => loaded.value && yamlText.value.trimEnd() !== savedText.value.trimEnd(),
 );
-let leaveAllowed = false;
+// The one target a Discard or delete let through; any other navigation asks again.
+let leaveAllowedTo: string | null = null;
 const subtitle = computed(() =>
   isNew.value ? t("fleet.editor.newDescription") : (detail.value?.description ?? ""),
 );
@@ -1002,7 +1003,7 @@ async function deleteConfig() {
     await deleteMutation.mutateAsync(id.value);
     deleteOpen.value = false;
     toast({ variant: "success", message: t("fleet.editor.deleted", { name: raw(name.value) }) });
-    leaveAllowed = true;
+    leaveAllowedTo = router.resolve(backTo).fullPath;
     router.push(backTo);
   } catch (err) {
     // A 409 names what still references the configuration, which the counts ignore permissions for.
@@ -1063,19 +1064,22 @@ const leaveOpen = ref(false);
 const leaveSaving = ref(false);
 const leaveCanSave = computed(() => !draftSignOutDiscardOnly.value);
 let leaveResolver: ((allowed: boolean) => void) | null = null;
+let leaveTarget: string | null = null;
 
 function settleLeave(allowed: boolean) {
   const resolve = leaveResolver;
   leaveResolver = null;
+  leaveTarget = null;
   leaveOpen.value = false;
   resolve?.(allowed);
 }
 
 async function chooseLeave(requested: EditorDraftLeaveChoice) {
-  if (leaveSaving.value) return;
+  // Escape reports a second "stay" once the dialog has closed, which must not clear the first answer's allowance.
+  if (leaveSaving.value || !leaveResolver) return;
   // A forced sign-out cannot be cancelled, so closing the dialog discards and the sign-out goes on.
   const choice = requested === "stay" && draftSignOutForced.value ? "discard" : requested;
-  if (choice === "discard") leaveAllowed = true;
+  if (choice === "discard") leaveAllowedTo = leaveTarget;
   if (choice !== "save") return settleLeave(choice === "discard");
   if (!leaveCanSave.value) return;
   leaveSaving.value = true;
@@ -1085,10 +1089,16 @@ async function chooseLeave(requested: EditorDraftLeaveChoice) {
 }
 
 // Unsaved YAML is never written to browser storage, so leaving offers only the server draft or Discard.
-function guardLeave(): boolean | Promise<boolean> {
-  if (leaveAllowed || !unsaved.value) return true;
-  // A second navigation while the dialog is up must not stack another one.
-  if (leaveResolver) return false;
+function guardLeave(to: RouteLocationNormalized): boolean | Promise<boolean> {
+  // A guard redirect (the sign-out's /logout to /login) is the same leave, and keeps the first target in redirectedFrom.
+  const target = to.redirectedFrom?.fullPath ?? to.fullPath;
+  if (leaveAllowedTo !== null && leaveAllowedTo === target) return true;
+  leaveAllowedTo = null;
+  if (!unsaved.value) return true;
+  if (leaveSaving.value) return false;
+  // The router has already cancelled the earlier navigation, so the open dialog now answers for this one.
+  leaveResolver?.(false);
+  leaveTarget = target;
   return new Promise<boolean>((resolve) => {
     leaveResolver = resolve;
     leaveOpen.value = true;
@@ -1102,16 +1112,19 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 onBeforeRouteLeave(guardLeave);
 // Another config's page reuses this view, so only an id change leaves the draft.
 onBeforeRouteUpdate((to: RouteLocationNormalized, from: RouteLocationNormalized) =>
-  to.params.id === from.params.id ? true : guardLeave(),
+  to.params.id === from.params.id ? true : guardLeave(to),
 );
 onMounted(() => window.addEventListener("beforeunload", onBeforeUnload));
-// A redirect (the sign-out's /logout to /login) asks the guard again, so a Discard holds until the navigation settles.
-const removeLeaveReset = router.afterEach(() => {
-  leaveAllowed = false;
-});
+// A navigation that throws runs no afterEach, so the allowance is also dropped on error.
+const resetLeaveAllowed = () => {
+  leaveAllowedTo = null;
+};
+const removeLeaveReset = router.afterEach(resetLeaveAllowed);
+const removeLeaveErrorReset = router.onError(resetLeaveAllowed);
 
 onBeforeUnmount(() => {
   removeLeaveReset();
+  removeLeaveErrorReset();
   window.removeEventListener("beforeunload", onBeforeUnload);
   leaveSaving.value = false;
   settleLeave(false);

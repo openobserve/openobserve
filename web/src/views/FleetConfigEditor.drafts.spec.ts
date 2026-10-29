@@ -135,11 +135,18 @@ const leaveButton = (id: string) =>
 const pressEscape = () =>
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
-/** Every localStorage key the draft store could have written, or that holds the YAML secret. */
-const storedYamlTraces = () =>
-  Object.keys(localStorage).filter(
-    (key) => key.startsWith("o2_draft") || (localStorage.getItem(key) ?? "").includes(SECRET),
-  );
+const traces = (storage: Storage, fleetRelated: (key: string, value: string) => boolean) =>
+  Object.keys(storage).filter((key) => fleetRelated(key, storage.getItem(key) ?? ""));
+
+/** Every key the draft store could have written, or that holds the YAML secret; in sessionStorage, anything Fleet's. */
+const storedYamlTraces = () => [
+  ...traces(localStorage, (key, value) => key.startsWith("o2_draft") || value.includes(SECRET)),
+  ...traces(
+    sessionStorage,
+    (key, value) =>
+      /draft|fleet/i.test(key) || /fleet|otlphttp/i.test(value) || value.includes(SECRET),
+  ),
+];
 
 /** Starts a move to another config and waits for its leave guard, without awaiting the move itself. */
 const goToOtherConfig = async () => {
@@ -151,6 +158,7 @@ const goToOtherConfig = async () => {
 describe("FleetConfigEditor leave guard", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.mocked(fleet.getConfig).mockImplementation(
       async (_org: string, id: string) => ({ data: detail(id, VALID) }) as never,
     );
@@ -165,6 +173,7 @@ describe("FleetConfigEditor leave guard", () => {
     vi.unstubAllGlobals();
     resumeDraftSession();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it("never writes the YAML to browser storage while editing, on reload or after leaving", async () => {
@@ -269,6 +278,55 @@ describe("FleetConfigEditor leave guard", () => {
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(wrapper!.findComponent({ name: "FleetCodeEditor" }).props("code")).toBe(SECRET_YAML);
     expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
+  });
+
+  it("a second navigation while the dialog is open takes over the dialog", async () => {
+    await mountEditor("edge");
+    await editYaml(SECRET_YAML);
+    const first = router.push({ name: "fleet" });
+    await flushPromises();
+    const { navigation: second } = await goToOtherConfig();
+
+    expect(await first).toBeTruthy();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    leaveButton("o-dialog-neutral-btn")?.click();
+    expect(await second).toBeUndefined();
+    await flushPromises();
+
+    expect(router.currentRoute.value.params.id).toBe("other");
+    expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
+  });
+
+  it("a Discard holds only for its own target, and not past a navigation that throws", async () => {
+    await mountEditor("edge");
+    await editYaml(SECRET_YAML);
+    let throwOnce = true;
+    router.beforeEach((to) => {
+      if (to.name === "fleet" && throwOnce) {
+        throwOnce = false;
+        throw new Error("chunk failed");
+      }
+    });
+    const failed = router.push({ name: "fleet" }).catch((err: Error) => err);
+    await flushPromises();
+    leaveButton("o-dialog-neutral-btn")?.click();
+    expect(await failed).toBeInstanceOf(Error);
+    await flushPromises();
+    expect(router.currentRoute.value.params.id).toBe("edge");
+
+    const { navigation } = await goToOtherConfig();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    pressEscape();
+    await navigation;
+    await flushPromises();
+
+    const again = router.push({ name: "fleet" });
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    pressEscape();
+    await again;
+    await flushPromises();
+    expect(router.currentRoute.value.params.id).toBe("edge");
   });
 
   describe("sign-out", () => {
