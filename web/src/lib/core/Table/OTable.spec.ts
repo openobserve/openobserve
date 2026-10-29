@@ -257,6 +257,47 @@ describe("OTable", () => {
     });
   });
 
+  describe("pagination: client with filters", () => {
+    const INFO = '[data-test="o2-table-pagination-info"]';
+    const filterableColumns = (): OTableColumnDef<TestRow>[] =>
+      makeColumns().map((c) => (c.id === "status" ? { ...c, filterable: true } : c));
+    const rowsWithFourPending = (): TestRow[] =>
+      makeRows(16).map((r, i) => (i < 4 ? { ...r, status: "Pending" } : r));
+    const footerText = () => wrapper.find(INFO).text().replace(/\s+/g, " ");
+
+    it("counts only rows matching the global filter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: rowsWithFourPending(),
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 10,
+          globalFilter: "Pending",
+        },
+      });
+      await nextTick();
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+    });
+
+    it("counts only rows matching a column filter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: rowsWithFourPending(),
+          columns: filterableColumns(),
+          pagination: "client",
+          pageSize: 10,
+        },
+      });
+      expect(footerText()).toMatch(/1 - 10 \S+ 16$/);
+
+      (wrapper.vm as any).table.getColumn("status").setFilterValue(["Pending"]);
+      await nextTick();
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+    });
+  });
+
   // ── Server-Side Pagination ──────────────────────────────────
 
   describe("pagination: server", () => {

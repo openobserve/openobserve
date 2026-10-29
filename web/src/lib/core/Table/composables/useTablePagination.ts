@@ -62,7 +62,8 @@ export function useTablePagination<TData>(
 
   const totalCount = computed(() => {
     if (isServerMode.value) return props.totalCount ?? 0;
-    return props.data.length;
+    // Pages are cut from the filtered rows, so the footer must count those, not the raw data.
+    return table.getFilteredRowModel().rows.length;
   });
 
   const isFirstPage = computed(() => currentPage.value <= 1);
