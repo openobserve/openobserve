@@ -116,6 +116,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       logs: getLogs,
       metrics: getMetrics,
       traces: getTraces,
+      profiles: getProfiles,
       index: getIndexStreams,
       alert: getAlerts,
       template: getTemplates,
@@ -590,6 +591,16 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     });
   };
 
+  const getProfiles = async (resource: Resource | Entity) => {
+    const profiles: any = await getStreams("profiles", false);
+
+    updateEntityEntities(resource, ["name"], profiles.list);
+
+    return new Promise((resolve) => {
+      resolve(true);
+    });
+  };
+
   const getMetadataStreams = async () => {
     const metadata: any = await getStreams("metadata", false);
 
@@ -605,6 +616,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       { stream_type: "logs", name: t("common.logs") },
       { stream_type: "traces", name: t("common.traces") },
       { stream_type: "metrics", name: t("common.metrics") },
+      { stream_type: "profiles", name: t("menu.profiles") },
       { stream_type: "index", name: t("iam.indices") },
     ];
 
@@ -829,6 +841,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getIndexStreams,
     getMetrics,
     getTraces,
+    getProfiles,
     getMetadataStreams,
     getStreamsTypes,
     getReportFolders,
