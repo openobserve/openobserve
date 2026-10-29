@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="handleStreamSelection"
           @open="streamPickerOpen = true"
           @close="onStreamPickerClose"
-          @search="streamPickerSearch = $event"
+          @search="onStreamPickerSearch"
           @header-action="onStreamPickerHeaderAction"
         >
           <template #empty>{{ t("search.noResult") }}</template>
@@ -523,6 +523,11 @@ export default defineComponent({
       open: streamPickerOpen,
       search: streamPickerSearch,
     });
+
+    // A debounced search can land after the popover closed and would stick until the next open.
+    const onStreamPickerSearch = (term: string) => {
+      if (streamPickerOpen.value) streamPickerSearch.value = term;
+    };
 
     const onStreamPickerClose = () => {
       streamPickerOpen.value = false;
@@ -2032,6 +2037,7 @@ export default defineComponent({
       quickPickMoreCount,
       streamPickerOpen,
       streamPickerSearch,
+      onStreamPickerSearch,
       onStreamPickerClose,
       onStreamPickerHeaderAction,
       streamPickerAnnouncement,

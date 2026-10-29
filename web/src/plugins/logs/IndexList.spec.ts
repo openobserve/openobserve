@@ -3222,6 +3222,16 @@ describe("Stream picker — internal streams", () => {
     expect(header().headerCount).toBe("2 hidden");
   });
 
+  it("ignores a search that lands after the popover closed", async () => {
+    setting.hideInternalStreams.value = true;
+    select().vm.$emit("open");
+    select().vm.$emit("close");
+    select().vm.$emit("search", "_r");
+    await flushPromises();
+    expect(wrapper.vm.streamPickerSearch).toBe("");
+    expect(header().headerCount).toBe("2 hidden");
+  });
+
   it("gives an org whose streams are all internal and hidden just the collapsed row", async () => {
     await loadStreams([stream("_rumdata", true), stream("_anomalies", true)]);
     setting.hideInternalStreams.value = true;
