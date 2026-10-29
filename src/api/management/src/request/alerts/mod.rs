@@ -789,6 +789,11 @@ fn composite_error_response(
         CompositeServiceError::NegativePendingPeriod => {
             composite_machine_error(StatusCode::BAD_REQUEST, "negative_pending_period", error)
         }
+        CompositeServiceError::JiraDestinationNotSupported(_) => composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "jira_destination_not_supported",
+            error,
+        ),
     }
 }
 
