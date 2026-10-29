@@ -77,8 +77,8 @@ describe("LibraryCard", () => {
     const wrapper = mountCard({ ready: false });
     const note = wrapper.find('[data-test="alert-library-card-needs-data"]');
     expect(note.exists()).toBe(true);
-    expect(note.text()).toContain("Not ingested");
-    expect(note.text()).toContain("kube_pod_container_status_last_terminated_reason");
+    expect(note.text()).toBe("Not ingested");
+    expect(note.attributes("title")).toContain("kube_pod_container_status_last_terminated_reason");
     expect(note.attributes("title")).toContain("would never fire");
   });
 
@@ -130,15 +130,34 @@ describe("LibraryCard", () => {
     expect(dashed(false)).toBe(dashed(true));
   });
 
-  it("gives the note its own row, so a long stream name is not truncated away", () => {
-    // Stream names run to 40+ characters. Sharing the footer row with the
-    // query-language tag left roughly a word's worth of space, so the string
-    // the message exists to name would ellipsis into nothing.
+  it("puts the note at the end of the stream line, beside the stream it names", () => {
     const wrapper = mountCard({ ready: false });
-    const note = wrapper.find('[data-test="alert-library-card-needs-data"]').element;
-    const tag = wrapper.find('[data-test="alert-library-card-query-type"]').element;
-    // Not flex siblings: the note is on a line the tag does not share.
-    expect(note.parentElement).not.toBe(tag.parentElement);
+    const line = wrapper.find('[data-test="alert-library-card-stream"]');
+    expect(line.find('[data-test="alert-library-card-needs-data"]').exists()).toBe(true);
+    expect(line.text()).toContain("kube_pod_container_status_last_terminated_reason");
+    expect(line.element.lastElementChild?.getAttribute("data-test")).toBe(
+      "alert-library-card-needs-data",
+    );
+  });
+
+  it("shows the stream on its own line with a database icon, under the description", () => {
+    const wrapper = mountCard();
+    const line = wrapper.find('[data-test="alert-library-card-stream"]');
+    expect(line.exists()).toBe(true);
+    expect(line.text()).toBe("kube_pod_container_status_last_terminated_reason");
+    expect(line.findComponent({ name: "OIcon" }).props("name")).toBe("database");
+  });
+
+  it("keeps the stream name out of the chip row", () => {
+    const tag = mountCard().find('[data-test="alert-library-card-query-type"]').element;
+    expect(tag.parentElement?.textContent).not.toContain(
+      "kube_pod_container_status_last_terminated_reason",
+    );
+  });
+
+  it("renders no stream line for an entry without a stream", () => {
+    const wrapper = mountCard({ entry: { ...entry, stream: "" } });
+    expect(wrapper.find('[data-test="alert-library-card-stream"]').exists()).toBe(false);
   });
 
   it("does not dim the card, so its description stays readable", () => {
@@ -344,26 +363,45 @@ describe("LibraryCard", () => {
   });
 
   describe("actions", () => {
-    const ADD = `[data-test="alert-library-card-add-${entry.id}"]`;
-    const CUSTOMIZE = `[data-test="alert-library-card-customize-${entry.id}"]`;
+    const ADD_ID = `alert-library-card-add-${entry.id}`;
+    const CUSTOMIZE_ID = `alert-library-card-customize-${entry.id}`;
+    const ADD = `[data-test="${ADD_ID}"]`;
+    const CUSTOMIZE = `[data-test="${CUSTOMIZE_ID}"]`;
     const anomaly: AlertLibraryEntry = {
       ...entry,
       query_type: "sql",
       alert_type: "anomaly_detection",
     };
 
-    it("offers short Add and Customize labels on a scheduled card", () => {
+    it("offers a short Add label and an icon-only Customize on a scheduled card", () => {
       const wrapper = mountCard();
       expect(wrapper.find(ADD).text()).toBe("Add");
-      expect(wrapper.find(CUSTOMIZE).text()).toBe("Customize");
+      const customize = wrapper.find(CUSTOMIZE);
+      expect(customize.text()).toBe("");
+      expect(customize.attributes("aria-label")).toBe("Customize in editor");
+      const button = wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b) => b.attributes("data-test") === CUSTOMIZE_ID);
+      expect(button?.props("variant")).toBe("outline");
+      expect(button?.props("size")).toBe("icon-sm");
+      expect(button?.props("iconLeft")).toBe("edit");
     });
 
-    it("spells out the full action of each button on hover", () => {
+    it("explains Customize in a tooltip and spells out Add on hover", () => {
       const wrapper = mountCard();
       expect(wrapper.find(ADD).attributes("title")).toBe("Add to alerts");
-      expect(wrapper.find(CUSTOMIZE).attributes("title")).toBe(
-        "Opens the standard alert editor prefilled with this alert.",
+      const tip = wrapper.find(CUSTOMIZE).findComponent({ name: "OTooltip" });
+      expect(tip.props("content")).toBe("Opens the alert editor prefilled");
+    });
+
+    it("puts Customize before Add, at the end of the chip row", () => {
+      const wrapper = mountCard();
+      const row = wrapper.find('[data-test="alert-library-card-query-type"]').element.parentElement;
+      const ids = Array.from(row?.querySelectorAll("[data-test]") ?? []).map((n) =>
+        n.getAttribute("data-test"),
       );
+      expect(ids.indexOf(CUSTOMIZE_ID)).toBeLessThan(ids.indexOf(ADD_ID));
+      expect(ids.indexOf(CUSTOMIZE_ID)).toBeGreaterThan(-1);
     });
 
     it("offers Customize on a SQL card as well as a PromQL one", () => {

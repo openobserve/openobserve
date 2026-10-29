@@ -13075,7 +13075,6 @@
     "statReady": "Pronti all'uso",
     "statNeedsData": "Non ingerito",
     "statAll": "Tutti",
-    "notIngested": "Non ingerito: {stream}",
     "notIngestedHint": "Questa organizzazione non riceve {stream}, quindi questo avviso non scatterà mai. Aggiungilo comunque e inizierà a funzionare quando i dati arriveranno.",
     "alertCount": "{count} avviso | {count} avvisi",
     "noCollectorTitle": "Niente qui corrisponde ancora ai tuoi dati",
@@ -13103,7 +13102,7 @@
     "enterprise": "Enterprise",
     "enterpriseHint": "Gli avvisi di rilevamento anomalie richiedono OpenObserve Enterprise.",
     "card": {
-      "customize": "Personalizza"
+      "customizeTooltip": "Apre l'editor degli avvisi precompilato"
     },
     "drawer": {
       "dataAvailable": "Dati disponibili",

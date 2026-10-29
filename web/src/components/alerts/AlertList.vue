@@ -843,16 +843,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- First run only: the filtered state keeps its single Clear filters action. -->
                   <template v-if="!(filterQuery || searchQuery || stateFilter)" #actions>
                     <OButton
-                      variant="primary"
-                      icon-left="add"
-                      data-test="alert-list-empty-new-alert"
-                      @click="showAddUpdateFn({})"
-                    >
-                      {{ t("emptyState.noAlerts.action") }}
-                    </OButton>
-                    <OButton
                       v-if="showAlertLibrary"
-                      variant="outline"
+                      variant="primary"
+                      size="lg"
                       icon-left="menu-book"
                       data-test="alert-list-empty-alert-library"
                       @click="goToAlertLibrary"
@@ -860,12 +853,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.alertLibrary") }}
                     </OButton>
                     <OButton
+                      v-if="!showAlertLibrary"
+                      variant="primary"
+                      size="lg"
+                      icon-left="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
+                    </OButton>
+                    <OButton
                       variant="outline"
+                      size="lg"
                       icon-left="upload-file"
                       data-test="alert-list-empty-import"
                       @click="importAlert"
                     >
                       {{ t("alerts.importAlert") }}
+                    </OButton>
+                    <OButton
+                      v-if="showAlertLibrary"
+                      variant="outline"
+                      size="lg"
+                      icon-left="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
                     </OButton>
                   </template>
                 </OEmptyState>
