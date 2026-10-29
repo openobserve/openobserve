@@ -1003,7 +1003,6 @@
         "slo": "SLO",
         "synthetic_check": "synthetic check",
         "synthetic_browser": "browser test",
-        "fleet_config": "collector configuration",
         "prompt": "prompt",
         "experiment": "experiment",
         "dashboard_settings": "dashboard settings",
@@ -27520,8 +27519,7 @@
       "visualUnavailable": "The visual editor cannot show this YAML without losing parts of it",
       "publishedWithWarnings": "Published v{version} with {count} warning | Published v{version} with {count} warnings",
       "notFound": "Configuration {name} was not found",
-      "importNotApplied": "The imported file was not applied because you continued your earlier draft. Import it again to use it.",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "Still referenced by fleets: {fleets}, collectors: {collectors}, active rollouts: {rollouts}. Change those fleets to another configuration first."
     },
     "history": {

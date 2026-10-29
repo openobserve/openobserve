@@ -27495,8 +27495,7 @@
       "visualUnavailable": "Визуальный редактор не может показать этот YAML без потери его частей",
       "publishedWithWarnings": "Опубликована v{version} с {count} предупреждением | Опубликована v{version}, предупреждений: {count}",
       "notFound": "Конфигурация {name} не найдена",
-      "importNotApplied": "Импортированный файл не применён, так как вы продолжили прежний черновик. Импортируйте его снова, чтобы использовать.",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "Всё ещё используется парками: {fleets}, коллекторами: {collectors}, активными развертываниями: {rollouts}. Сначала переведите эти парки на другую конфигурацию."
     },
     "history": {

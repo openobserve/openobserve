@@ -27490,8 +27490,7 @@
       "visualUnavailable": "視覺化編輯器無法在不遺失部分內容的情況下顯示此 YAML",
       "publishedWithWarnings": "已發佈 v{version}，有 {count} 個警告 | 已發佈 v{version}，有 {count} 個警告",
       "notFound": "找不到組態 {name}",
-      "importNotApplied": "由於你繼續了先前的草稿，匯入的檔案未被套用。如需使用，請重新匯入。",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "仍被以下項目參照：機群 {fleets}、收集器 {collectors}、進行中的推出 {rollouts}。請先將這些機群變更為其他組態。"
     },
     "history": {

@@ -62,7 +62,7 @@ export type EditorDraftRestoreChoice = "continue" | "fresh" | "dismiss";
 export type EditorDraftLeaveChoice = "save" | "keep" | "discard" | "stay";
 
 export interface EditorDraftApplyContext {
-  /** Redacted fields the user had changed, or that could not be refilled: they come back blank and must be re-entered before saving. */
+  /** Redacted fields the user had changed: they come back blank and must be re-entered before saving. */
   notKeptPaths: string[];
 }
 
@@ -96,10 +96,6 @@ export interface UseEditorDraftOptions<T> {
   secretExemptKeys?: string[];
   /** Extra elements whose fields count as this editor's, for fields rendered outside its own component tree. */
   inputRoots?: () => (Element | null | undefined)[];
-  /** Refills the blanked secrets of a continued draft from the current state, in place of the built-in path restore. */
-  restoreSecrets?: (draftData: T, currentData: T, redactedPaths: string[]) => T;
-  /** Of `paths`, the ones still blank in `data`, for paths the built-in check cannot read (e.g. into a YAML string); a refill that leaves one blank counts as not kept. */
-  blankSecrets?: (data: T, paths: string[]) => string[];
   /** An extra line in the restore dialog about what continuing this draft will do (e.g. a key that is regenerated). */
   restoreNote?: (draftData: T) => I18nText | null;
   /** Names the fields behind redacted paths, so the restore dialog can say which changes were not kept. */
@@ -311,11 +307,6 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     return options.hasChanges ? options.hasChanges() : true;
   };
 
-  const blankOf = (data: T, paths: string[], labels: Record<string, string>): string[] =>
-    options.blankSecrets
-      ? options.blankSecrets(data, paths)
-      : blankRedactedPaths(data, paths, labels);
-
   const keptDraftStillStored = () =>
     keptDraft !== null && !keptReplaced && readEditorDraft(scope())?.savedAt === keptDraft.savedAt;
 
@@ -351,7 +342,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     const redactedPaths = [...new Set([...redacted.paths, ...listPaths, ...(extra?.paths ?? [])])];
     const changed = changedRedactedPaths(snapshot, baselineSnapshot(), redactedPaths);
     // A not-kept secret still blank is no value to redact, yet the next restore must still ask for it.
-    const stillBlank = blankOf(snapshot, notKept.value.paths, notKept.value.labels);
+    const stillBlank = blankRedactedPaths(snapshot, notKept.value.paths, notKept.value.labels);
     const carriedLabels = Object.fromEntries(
       stillBlank.flatMap((path) =>
         path in notKept.value.labels ? [[path, notKept.value.labels[path]]] : [],
@@ -462,11 +453,8 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     const changed = notKeptPathsOf(draft);
     // A changed secret is never refilled: the old value would silently replace what the user typed.
     const paths = (draft.redactedPaths ?? []).filter((path) => !changed.includes(path));
-    const restored = options.restoreSecrets
-      ? options.restoreSecrets(draft.data, current, paths)
-      : restoreRedacted(draft.data, current, paths, draft.redactedLabels ?? {});
-    const unrestored = options.blankSecrets ? options.blankSecrets(restored, paths) : [];
-    return { current, restored, notKeptPaths: [...new Set([...changed, ...unrestored])] };
+    const restored = restoreRedacted(draft.data, current, paths, draft.redactedLabels ?? {});
+    return { current, restored, notKeptPaths: changed };
   };
 
   const askRestore = (draft: EditorDraft<T>, changedOnServer: boolean) =>
@@ -714,7 +702,8 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     markSaved,
     discard,
     hasUnsavedChanges,
-    pendingReentries: () => blankOf(options.snapshot(), notKept.value.paths, notKept.value.labels),
+    pendingReentries: () =>
+      blankRedactedPaths(options.snapshot(), notKept.value.paths, notKept.value.labels),
     storageAvailable,
     state,
     chooseRestore,

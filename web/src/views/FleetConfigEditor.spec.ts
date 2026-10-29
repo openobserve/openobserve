@@ -470,13 +470,11 @@ describe("FleetConfigEditor", () => {
 
   describe("unsaved changes", () => {
     type Guard = (to?: unknown, from?: unknown) => boolean | Promise<boolean>;
-    interface DraftVm {
-      configDraft: {
-        state: { leaveOpen: boolean };
-        chooseLeave: (choice: "stay" | "discard") => void;
-      };
+    interface LeaveVm {
+      leaveOpen: boolean;
+      chooseLeave: (choice: "stay" | "discard") => Promise<void>;
     }
-    const controller = () => (wrapper.vm as unknown as DraftVm).configDraft;
+    const leaveVm = () => wrapper.vm as unknown as LeaveVm;
     /** Runs a guard and answers the leave dialog when it opens. */
     const run = async (
       guard: Guard,
@@ -486,8 +484,8 @@ describe("FleetConfigEditor", () => {
     ) => {
       const pending = guard(to, from);
       await flushPromises();
-      const asked = controller().state.leaveOpen;
-      if (asked) controller().chooseLeave(answer);
+      const asked = leaveVm().leaveOpen;
+      if (asked) await leaveVm().chooseLeave(answer);
       return { asked, allowed: await pending };
     };
     const leave = (answer?: "stay" | "discard") => run(routeGuards.leave.at(-1), answer);
@@ -496,16 +494,13 @@ describe("FleetConfigEditor", () => {
       window.dispatchEvent(e);
       return e.defaultPrevented;
     };
-    // The draft baseline is the editor as it was at the first input, as in the browser.
     const edit = async (w: VueWrapper, text: string) => {
-      window.dispatchEvent(new Event("pointerdown"));
       await toYaml(w);
       w.findComponent({ name: "FleetCodeEditor" }).vm.$emit("update:code", text);
       await flushPromises();
     };
 
     beforeEach(() => {
-      localStorage.clear();
       routeGuards.leave.length = 0;
       routeGuards.update.length = 0;
     });

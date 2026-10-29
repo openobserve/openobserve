@@ -251,6 +251,36 @@ describe("editorDraftStore", () => {
       expect(draftKeyCount()).toBe(1);
     });
 
+    it("deletes every live fleet_config draft and its index entry, which may hold plaintext YAML secrets", () => {
+      const fleetKeys = [
+        `${EDITOR_DRAFT_PREFIX}fleet_config:org1:edge:me%40x.io`,
+        `${EDITOR_DRAFT_PREFIX}fleet_config:org2:new:other%40x.io`,
+      ];
+      const now = Date.now();
+      const yamlText = "exporters:\n  otlp:\n    headers:\n      authorization: Basic c2VjcmV0\n";
+      fleetKeys.forEach((key) =>
+        localStorage.setItem(key, JSON.stringify({ v: 1, savedAt: now, data: { yamlText } })),
+      );
+      writeEditorDraft(scope, { data: { name: "kept" } });
+      expect(JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}")).toHaveProperty([
+        fleetKeys[0],
+      ]);
+      expect(countEditorDraftsFor("me@x.io")).toBe(2);
+
+      expect(cleanupEditorDrafts()).toBe(2);
+
+      fleetKeys.forEach((key) => expect(localStorage.getItem(key)).toBeNull());
+      const index = JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");
+      expect(Object.keys(index)).toEqual([editorDraftKey(scope)]);
+      expect(readEditorDraft(scope)?.data).toEqual({ name: "kept" });
+      expect(countEditorDraftsFor("me@x.io")).toBe(1);
+      expect(
+        Object.keys(localStorage).some((key) =>
+          (localStorage.getItem(key) ?? "").includes("c2VjcmV0"),
+        ),
+      ).toBe(false);
+    });
+
     it("leaves panel drafts alone", () => {
       localStorage.setItem("o2_panel_draft:me@x.io:o:d:new", "{}");
       clearEditorDraftsFor("me@x.io");

@@ -27495,8 +27495,7 @@
       "visualUnavailable": "El editor visual no puede mostrar este YAML sin perder partes de él",
       "publishedWithWarnings": "v{version} publicada con {count} advertencia | v{version} publicada con {count} advertencias",
       "notFound": "No se encontró la configuración {name}",
-      "importNotApplied": "El archivo importado no se aplicó porque continuaste tu borrador anterior. Vuelve a importarlo para usarlo.",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "Aún referenciada por flotas: {fleets}, colectores: {collectors}, despliegues activos: {rollouts}. Cambia primero esas flotas a otra configuración."
     },
     "history": {

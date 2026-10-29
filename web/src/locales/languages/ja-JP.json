@@ -27495,8 +27495,7 @@
       "visualUnavailable": "ビジュアルエディターでは、この YAML の一部が失われるため表示できません",
       "publishedWithWarnings": "v{version} を公開しました（警告 {count} 件） | v{version} を公開しました（警告 {count} 件）",
       "notFound": "構成 {name} が見つかりません",
-      "importNotApplied": "以前の下書きを続行したため、インポートしたファイルは適用されていません。使用するには再度インポートしてください。",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "まだ参照されています。フリート: {fleets}、コレクター: {collectors}、アクティブなロールアウト: {rollouts}。先にそれらのフリートを別の構成に変更してください。"
     },
     "history": {

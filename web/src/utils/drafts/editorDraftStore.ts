@@ -32,7 +32,6 @@ export type EditorDraftKind =
   | "slo"
   | "synthetic_check"
   | "synthetic_browser"
-  | "fleet_config"
   | "prompt"
   | "experiment"
   | "dashboard_settings"
@@ -104,6 +103,8 @@ export const EDITOR_DRAFT_MAX_PER_KIND = 20;
 export const EDITOR_DRAFT_INDEX_KEY = "o2_draft_index";
 export const NEW_EDITOR_DRAFT_ID = "new";
 const NEW_VARIANT_PREFIX = `${NEW_EDITOR_DRAFT_ID}~`;
+// Earlier builds stored these kinds with secrets in plain text, so cleanup deletes whatever of them is left.
+const RETIRED_DRAFT_KINDS: ReadonlySet<string> = new Set(["fleet_config"]);
 
 /** Bumped on every write, delete and cross-tab storage event, so list dots can re-read storage. */
 export const editorDraftRevision = ref(0);
@@ -335,7 +336,7 @@ export const isEditorDraftStorageAvailable = (): boolean => {
 const capGroup = (parsed: ParsedKey) =>
   [parsed.kind, parsed.org, parsed.userEmail].map(encodeURIComponent).join(":");
 
-/** Drops expired, unreadable and old-format drafts, then keeps only the newest `maxPerKind` of each kind per user and org. */
+/** Drops expired, unreadable, old-format and retired-kind drafts, then keeps only the newest `maxPerKind` of each kind per user and org. */
 export const cleanupEditorDrafts = (
   now: number = Date.now(),
   maxPerKind: number = EDITOR_DRAFT_MAX_PER_KIND,
@@ -349,7 +350,7 @@ export const cleanupEditorDrafts = (
     for (const key of draftKeys(storage)) {
       const parsed = parseKey(key);
       const draft = parseDraft(storage.getItem(key));
-      if (parsed && isLive(draft, now)) {
+      if (parsed && !RETIRED_DRAFT_KINDS.has(parsed.kind) && isLive(draft, now)) {
         live.set(key, draft.savedAt);
         const list = byGroup.get(capGroup(parsed)) ?? [];
         list.push({ key, savedAt: draft.savedAt });

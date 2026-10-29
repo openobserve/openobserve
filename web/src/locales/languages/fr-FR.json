@@ -27495,8 +27495,7 @@
       "visualUnavailable": "L'éditeur visuel ne peut pas afficher ce YAML sans en perdre des parties",
       "publishedWithWarnings": "v{version} publiée avec {count} avertissement | v{version} publiée avec {count} avertissements",
       "notFound": "Configuration {name} introuvable",
-      "importNotApplied": "Le fichier importé n'a pas été appliqué, car vous avez repris votre brouillon précédent. Importez-le à nouveau pour l'utiliser.",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "Encore référencée par des flottes : {fleets}, des collecteurs : {collectors}, des déploiements actifs : {rollouts}. Faites d'abord passer ces flottes à une autre configuration."
     },
     "history": {

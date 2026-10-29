@@ -27495,8 +27495,7 @@
       "visualUnavailable": "可视化编辑器无法在不丢失部分内容的情况下显示此 YAML",
       "publishedWithWarnings": "已发布 v{version}，有 {count} 个警告 | 已发布 v{version}，有 {count} 个警告",
       "notFound": "未找到配置 {name}",
-      "importNotApplied": "由于你继续了之前的草稿，导入的文件未被应用。如需使用，请重新导入。",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "仍被以下对象引用：机群：{fleets}，Collector：{collectors}，进行中的上线：{rollouts}。请先将这些机群切换到其他配置。"
     },
     "history": {

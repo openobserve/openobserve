@@ -27495,8 +27495,7 @@
       "visualUnavailable": "لا يستطيع المحرر المرئي عرض YAML هذا دون فقدان أجزاء منه",
       "publishedWithWarnings": "تم نشر v{version} مع {count} تحذير | تم نشر v{version} مع {count} تحذيرات",
       "notFound": "لم يتم العثور على التكوين {name}",
-      "importNotApplied": "لم يتم تطبيق الملف المستورد لأنك تابعت مسودتك السابقة. استورده مرة أخرى لاستخدامه.",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "لا يزال مُشارًا إليه من الأساطيل: {fleets}، وCollectors: {collectors}، وعمليات الطرح النشطة: {rollouts}. غيّر تلك الأساطيل إلى تكوين آخر أولًا."
     },
     "history": {

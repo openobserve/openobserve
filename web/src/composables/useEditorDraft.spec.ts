@@ -373,32 +373,6 @@ describe("useEditorDraft", () => {
       expect(rows.rows).toEqual([{ key: "X-Api-Key", value: "K" }]);
     });
 
-    it("uses the editor's restoreSecrets in place of the path restore", async () => {
-      const restoreSecrets = vi.fn((data: Form, current: Form) => ({
-        ...data,
-        password: `${current.password}!`,
-      }));
-      overrides = { restoreSecrets };
-      form.password = "stored";
-      seed(
-        editScope,
-        { name: "draft", password: "" },
-        { redactedPaths: ["/password"], changedRedactedPaths: [] },
-      );
-      const draft = await mountHost();
-      const started = draft.start();
-      await flushPromises();
-      draft.chooseRestore("continue");
-      await started;
-
-      expect(restoreSecrets).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "draft", password: "" }),
-        expect.objectContaining({ password: "stored" }),
-        ["/password"],
-      );
-      expect(form.password).toBe("stored!");
-    });
-
     it("fills an unchanged blanked secret from the item as it is now, without a note", async () => {
       server = { name: "saved", password: "stored", tab: "a" };
       form.password = "stored";
@@ -486,27 +460,6 @@ describe("useEditorDraft", () => {
       flushAutosave();
       expect(readEditorDraft(editScope)?.changedRedactedPaths).toEqual(["/password"]);
       expect(second.pendingReentries()).toEqual([]);
-    });
-
-    it("counts a secret the editor's refill left blank as not kept and names it", async () => {
-      overrides = {
-        restoreSecrets: (data) => data,
-        blankSecrets: (data, paths) => (data.password === "" ? paths : []),
-        describeRedacted: (paths) => paths.map((path) => raw(path)),
-      };
-      seed(
-        editScope,
-        { name: "draft", password: "" },
-        { redactedPaths: ["/password"], changedRedactedPaths: [] },
-      );
-      const draft = await mountHost();
-      const started = draft.start();
-      await flushPromises();
-      expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("/password");
-      draft.chooseRestore("continue");
-      await started;
-      expect(apply).toHaveBeenLastCalledWith(expect.anything(), { notKeptPaths: ["/password"] });
-      expect(draft.pendingReentries()).toEqual(["/password"]);
     });
 
     it("treats every secret of a draft written before changes were tracked as changed", async () => {

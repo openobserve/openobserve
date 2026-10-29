@@ -27495,8 +27495,7 @@
       "visualUnavailable": "Trình chỉnh sửa trực quan không thể hiển thị YAML này mà không làm mất một số phần của nó",
       "publishedWithWarnings": "Đã phát hành v{version} với {count} cảnh báo | Đã phát hành v{version} với {count} cảnh báo",
       "notFound": "Không tìm thấy cấu hình {name}",
-      "importNotApplied": "Tệp đã nhập chưa được áp dụng vì bạn đã tiếp tục bản nháp trước đó. Hãy nhập lại để sử dụng.",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "Vẫn được tham chiếu bởi các fleet: {fleets}, collector: {collectors}, đợt triển khai đang hoạt động: {rollouts}. Hãy đổi các fleet đó sang cấu hình khác trước."
     },
     "history": {

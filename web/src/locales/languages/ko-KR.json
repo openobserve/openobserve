@@ -27495,8 +27495,7 @@
       "visualUnavailable": "시각 편집기는 일부 내용을 잃지 않고는 이 YAML을 표시할 수 없습니다",
       "publishedWithWarnings": "v{version}을(를) 경고 {count}개와 함께 게시했습니다 | v{version}을(를) 경고 {count}개와 함께 게시했습니다",
       "notFound": "구성 {name}을(를) 찾을 수 없습니다",
-      "importNotApplied": "이전 초안을 계속했기 때문에 가져온 파일이 적용되지 않았습니다. 사용하려면 다시 가져오세요.",
-      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
+      "leaveEntity": "collector configuration",
       "deleteInUse": "아직 참조 중: 플릿 {fleets}, 수집기 {collectors}, 활성 롤아웃 {rollouts}. 먼저 해당 플릿을 다른 구성으로 변경하세요."
     },
     "history": {
