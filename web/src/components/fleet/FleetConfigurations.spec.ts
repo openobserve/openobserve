@@ -185,7 +185,7 @@ describe("FleetConfigurations", () => {
             config({ id: "unpublished", latest_version: 0 }),
           ],
         },
-      } as any);
+      } as never);
     });
 
     it("shows a never-published config as a draft instead of a version", async () => {

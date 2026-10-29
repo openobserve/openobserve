@@ -777,7 +777,7 @@ export default defineComponent({
           return [
             row.key
               ? t("common.editorDraft.headerField", { name: row.key })
-              : t("aiToolset.headers"),
+              : t("common.editorDraft.headersField"),
           ];
         }
         if (!row.key) {

@@ -28,6 +28,7 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, leaveButton, click, clickLeave, clickRestore } from "@/test/unit/helpers/draftDom";
 import AnnouncementBannerList from "./AnnouncementBannerList.vue";
 import AnnouncementBannerEditor from "./AnnouncementBannerEditor.vue";
 import AnnouncementBannerEditorForm from "./AnnouncementBannerEditorForm.vue";
@@ -100,10 +101,6 @@ const form = () =>
       form: { state: { values: { message: string } } };
     }
   ).form;
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
-const leaveButton = (id: string) => inDialog("editor-draft-leave-dialog", id);
 const savedBanners = () =>
   (service.setConfig.mock.calls.at(-1)?.[1] as { banners: Record<string, unknown>[] }).banners;
 
@@ -152,14 +149,14 @@ describe("AnnouncementBannerEditor drafts", () => {
 
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("announcement banner");
     expect(byTest("editor-draft-changed-on-server")).toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values.message).toBe("Maintenance moved to 23:00 UTC");
 
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
     expect(router.currentRoute.value.name).toBe("logs");
   });
@@ -177,7 +174,7 @@ describe("AnnouncementBannerEditor drafts", () => {
     wrapper!.unmount();
 
     await mountAt("announcementBannerEditor");
-    inDialog("editor-draft-restore-dialog", "o-dialog-secondary-btn")?.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
     expect(form().state.values.message).toBe("");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -188,11 +185,11 @@ describe("AnnouncementBannerEditor drafts", () => {
     await fillField("announcement-editor-message", "Not kept");
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("announcement-editor-cancel")?.click();
+    click("announcement-editor-cancel");
     await flushPromises();
     expect(byTest("announcement-editor-leave-dialog")).toBeNull();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
 
     expect(router.currentRoute.value.name).toBe("announcementBanners");
@@ -205,7 +202,7 @@ describe("AnnouncementBannerEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
 
     expect(savedBanners()[0]).toMatchObject({ id: maintenance.id, message: "Saved from leave" });
@@ -218,7 +215,7 @@ describe("AnnouncementBannerEditor drafts", () => {
     await fillField("announcement-editor-message", "Saved normally");
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("announcement-editor-save")?.click();
+    click("announcement-editor-save");
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("announcementBanners"));
 
     expect(savedBanners()[0]).toMatchObject({ message: "Saved normally" });
@@ -304,17 +301,18 @@ describe("AnnouncementBannerEditor drafts", () => {
       await mountAt("announcementBannerEditor", { index: "1" });
       await fillField("announcement-editor-message", "Old banner, edited");
 
-      byTest("announcement-editor-cancel")?.click();
+      click("announcement-editor-cancel");
       await flushPromises();
       expect(byTest("editor-draft-leave-message")?.textContent).toContain("discard your changes");
       expect(leaveButton("o-dialog-secondary-btn")).toBeNull();
-      leaveButton("o-dialog-close-btn")?.click();
+      clickLeave("o-dialog-close-btn");
       await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).toBeNull();
       expect(router.currentRoute.value.name).toBe("announcementBannerEditor");
 
-      byTest("announcement-editor-cancel")?.click();
+      click("announcement-editor-cancel");
       await flushPromises();
-      leaveButton("o-dialog-neutral-btn")?.click();
+      clickLeave("o-dialog-neutral-btn");
       await flushPromises();
       expect(router.currentRoute.value.name).toBe("announcementBanners");
       expect(localStorage.length).toBe(0);
@@ -333,7 +331,7 @@ describe("AnnouncementBannerEditor drafts", () => {
       expect(await first).toBeTruthy();
       expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
 
-      leaveButton("o-dialog-neutral-btn")?.click();
+      clickLeave("o-dialog-neutral-btn");
       await second;
       await flushPromises();
       expect(router.currentRoute.value.name).toBe("announcementBanners");
@@ -345,7 +343,7 @@ describe("AnnouncementBannerEditor drafts", () => {
 
       const navigation = router.push("/logs");
       await flushPromises();
-      leaveButton("editor-draft-leave-save")?.click();
+      clickLeave("editor-draft-leave-save");
       await navigation;
 
       expect(savedBanners()[1]).toMatchObject({ message: "Old banner, saved" });

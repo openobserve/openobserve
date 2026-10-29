@@ -26,6 +26,8 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import type { ProtocolCheck } from "@/types/synthetics";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
+import { fillField } from "@/test/unit/helpers/fillField";
 import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 
 vi.mock("@/services/synthetics", async (importOriginal) => {
@@ -135,12 +137,6 @@ const edit = async (patch: Partial<ProtocolCheck>) => {
   await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 describe("CreateProtocolCheck drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -184,6 +180,37 @@ describe("CreateProtocolCheck drafts", () => {
     );
   });
 
+  it("drafts a name filled with no key or pointer event, and leaving asks", async () => {
+    await mountEditor({ checkType: "http" }, { CheckConfigure: false });
+    await fillField("synthetics-check-details-name-input", "Autofilled check");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft<ProtocolCheck>(httpScope)?.data.name).toBe("Autofilled check");
+
+    const navigation = router.push("/logs");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    clickLeave("o-dialog-close-btn");
+    await navigation;
+    expect(router.currentRoute.value.name).toBe("syntheticsAdd");
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    writeEditorDraft(httpScope, { data: { ...savedCheck(), name: "From draft" } });
+    await mountEditor();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect((configure().props("check") as ProtocolCheck).name).toBe("");
+    expect(readEditorDraft(httpScope)).not.toBeNull();
+    wrapper!.unmount();
+
+    await mountEditor();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect((configure().props("check") as ProtocolCheck).name).toBe("");
+    expect(readEditorDraft(httpScope)).toBeNull();
+  });
+
   it("continues a new check's draft and warns that credentials were not kept", async () => {
     writeEditorDraft(httpScope, {
       data: { ...savedCheck(), name: "From draft" },
@@ -195,7 +222,7 @@ describe("CreateProtocolCheck drafts", () => {
       "unsaved changes to this synthetic check",
     );
     expect(byTest("editor-draft-credentials-not-saved")).not.toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect((configure().props("check") as ProtocolCheck).name).toBe("From draft");
@@ -228,7 +255,7 @@ describe("CreateProtocolCheck drafts", () => {
 
     await mountEditor({ checkType: "http", editId: "chk-1" });
     expect(byTest("editor-draft-changed-on-server")).toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(configure().props("check")).toMatchObject({
       name: "Renamed",
@@ -254,7 +281,7 @@ describe("CreateProtocolCheck drafts", () => {
     wrapper!.unmount();
 
     await mountEditor({ checkType: "http", editId: "chk-1" });
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect((configure().props("check") as ProtocolCheck).headers).toEqual([
       expect.objectContaining({ key: "X-Api-Key", value: "tokB" }),
@@ -269,7 +296,7 @@ describe("CreateProtocolCheck drafts", () => {
     wrapper!.unmount();
 
     await mountEditor({ checkType: "http", editId: "chk-1" });
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect((configure().props("check") as ProtocolCheck).auth?.password).toBe("");
     expect(configure().props("validationErrors")).toMatchObject({
@@ -299,7 +326,7 @@ describe("CreateProtocolCheck drafts", () => {
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
       "Your change to the URL was not kept.",
     );
-    byTest("editor-draft-continue")!.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect((configure().props("check") as ProtocolCheck).url).toBe("");
     expect(configure().props("validationErrors")).toMatchObject({
@@ -326,7 +353,7 @@ describe("CreateProtocolCheck drafts", () => {
     wrapper!.unmount();
 
     await mountEditor({ checkType: "http", editId: "chk-1" });
-    byTest("editor-draft-continue")!.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(configure().props("check")).toMatchObject({
       name: "Renamed",
@@ -363,7 +390,7 @@ describe("CreateProtocolCheck drafts", () => {
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
       "X-Signature header",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     const value = wrapper!.find('[data-test="synthetics-check-http-header-value-0"]');
     expect(value.exists()).toBe(true);
@@ -384,7 +411,7 @@ describe("CreateProtocolCheck drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -408,7 +435,7 @@ describe("CreateProtocolCheck drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -422,18 +449,18 @@ describe("CreateProtocolCheck drafts", () => {
     await edit({ name: "Kept" });
     const keep = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await keep;
     expect(router.currentRoute.value.name).toBe("logs");
     expect(readEditorDraft<ProtocolCheck>(httpScope)?.data.name).toBe("Kept");
     wrapper!.unmount();
 
     await mountEditor();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     const discard = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await discard;
     expect(router.currentRoute.value.name).toBe("logs");
     expect(readEditorDraft(httpScope)).toBeNull();

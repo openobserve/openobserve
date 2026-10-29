@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <EditorDraftDot
                 v-if="toolsetDrafts.ids.has(row.id)"
                 :saved-at="toolsetDrafts.savedAt(row.id)"
-                :data-test="`ai-toolsets-draft-dot-${row.name}`"
+                :data-test="`ai-toolsets-${row.name}-draft-dot`"
               />
             </div>
           </template>

@@ -1314,10 +1314,10 @@ describe("FunctionList", () => {
       const wrapper = mount(FunctionList, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
-      await flushPromises();
       // OTable holds its skeleton for MIN_SKELETON_MS before rows render.
-      await new Promise((r) => setTimeout(r, 80));
-      await nextTick();
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="function-list-name-cell-func1"]').exists()).toBe(true),
+      );
       return wrapper;
     };
 
@@ -1329,9 +1329,9 @@ describe("FunctionList", () => {
       seed(draftScope("func2", "other@example.com"));
       const wrapper = await mountRows();
 
-      const dot = wrapper.get('[data-test="function-list-draft-dot-func1"]');
+      const dot = wrapper.get('[data-test="function-list-func1-draft-dot"]');
       expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
-      expect(wrapper.find('[data-test="function-list-draft-dot-func2"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(false);
 
       const addButton = wrapper.get('[data-test="function-list-add-function-btn"]');
       expect(addButton.attributes("aria-label")).toBe("New function · unsaved draft");
@@ -1342,14 +1342,14 @@ describe("FunctionList", () => {
 
     it("updates the dots when a draft is written or removed", async () => {
       const wrapper = await mountRows();
-      expect(wrapper.find('[data-test="function-list-draft-dot-func2"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(false);
       expect(
         wrapper.get('[data-test="function-list-add-function-btn"]').attributes("aria-label"),
       ).toBeUndefined();
 
       seed(draftScope("func2"));
       await nextTick();
-      expect(wrapper.find('[data-test="function-list-draft-dot-func2"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(true);
     });
 
     it("drops every user's draft of a deleted function", async () => {

@@ -31,6 +31,7 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, clickIn } from "@/test/unit/helpers/draftDom";
 
 vi.mock("@/services/oncall", () => ({
   default: { setSchedule: vi.fn(), listUnavailability: vi.fn(), previewResolvedSchedule: vi.fn() },
@@ -127,12 +128,11 @@ const openRotation = async (next: ScheduleEditorIntent = { mode: "edit", id: "ro
   await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
 const nameField = () =>
   document.body.querySelector<HTMLInputElement>('[data-test="oncall-schedule-name"] input');
 const drawerOpen = () => byTest("oncall-rotation-drawer") !== null;
 const choose = async (dialog: string, id: string) => {
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`)!.click();
+  clickIn(dialog, id);
   await flushPromises();
 };
 const footerButton = (label: string) =>

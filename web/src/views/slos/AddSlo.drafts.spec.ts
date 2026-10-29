@@ -25,6 +25,8 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
+import { fillField } from "@/test/unit/helpers/fillField";
 import AddSlo from "./AddSlo.vue";
 
 const getStreams = vi.fn((type: string) => Promise.resolve({ list: [{ name: `${type}_stream` }] }));
@@ -121,12 +123,6 @@ const vm = () =>
     sloDraft: { hasUnsavedChanges: () => boolean };
   };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 const edit = async (fields: Record<string, unknown>) => {
   window.dispatchEvent(new Event("pointerdown"));
   Object.assign(vm().form, fields);
@@ -197,7 +193,7 @@ describe("AddSlo drafts", () => {
     expect(byTest("editor-draft-restore-message")?.textContent).toContain(
       "unsaved changes to this SLO",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(vm().form.name).toBe("metrics-slo");
@@ -250,16 +246,65 @@ describe("AddSlo drafts", () => {
     expect(byTest("editor-draft-restore-dialog")).toBeNull();
   });
 
+  it("drafts a name filled with no key or pointer event, and Cancel asks", async () => {
+    await mountEditor("/slos/add");
+    await fillField("slos-addslo-name", "autofilled-slo");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft<SloDraft>(newScope)?.data.form.name).toBe("autofilled-slo");
+
+    click("slos-addslo-cancel");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    expect(router.currentRoute.value.name).toBe("addSlo");
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    await mountEditor("/slos/add");
+    await edit({ name: "from-draft" });
+    window.dispatchEvent(new Event("pagehide"));
+    wrapper!.unmount();
+
+    await mountEditor("/slos/add");
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(vm().form.name).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+    wrapper!.unmount();
+
+    await mountEditor("/slos/add");
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(vm().form.name).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  it("Keep draft leaves and offers the work on the next visit", async () => {
+    await mountEditor("/slos/add");
+    await edit({ name: "kept-slo" });
+
+    const navigation = router.push("/logs");
+    await flushPromises();
+    clickLeave("o-dialog-secondary-btn");
+    await navigation;
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(readEditorDraft<SloDraft>(newScope)?.data.form.name).toBe("kept-slo");
+    wrapper!.unmount();
+
+    await mountEditor("/slos/add");
+    expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
+  });
+
   it("Cancel with unsaved changes asks, and Discard drops the draft and leaves", async () => {
     await mountEditor("/slos/add");
     await edit({ name: "to-discard" });
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("slos-addslo-cancel")?.click();
+    click("slos-addslo-cancel");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("sloList");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -271,7 +316,7 @@ describe("AddSlo drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -286,7 +331,7 @@ describe("AddSlo drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -301,7 +346,7 @@ describe("AddSlo drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(editScope)).not.toBeNull();
 
-    byTest("slos-addslo-save")?.click();
+    click("slos-addslo-save");
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("sloList"));
 
     expect(sloService.update).toHaveBeenCalledTimes(1);

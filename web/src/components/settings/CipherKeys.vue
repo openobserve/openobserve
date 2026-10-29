@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <EditorDraftDot
                 v-if="cipherKeyDrafts.ids.has(row.name)"
                 :saved-at="cipherKeyDrafts.savedAt(row.name)"
-                :data-test="`cipher-keys-draft-dot-${row.name}`"
+                :data-test="`cipher-keys-${row.name}-draft-dot`"
               />
             </div>
           </template>

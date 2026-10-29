@@ -157,7 +157,7 @@
             <EditorDraftDot
               v-if="promptDrafts.ids.has(row.entityId)"
               :saved-at="promptDrafts.savedAt(row.entityId)"
-              :data-test="`prompt-draft-dot-${row.entityId}`"
+              :data-test="`prompt-${row.entityId}-draft-dot`"
             />
           </span>
         </template>

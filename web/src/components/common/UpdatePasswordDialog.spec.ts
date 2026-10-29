@@ -382,8 +382,13 @@ describe("UpdatePasswordDialog", () => {
       return false;
     };
     routerGuards.unshift(editorGuard);
+    const vm = wrapper.vm as unknown as {
+      submit: (
+        values: Record<"old_password" | "new_password" | "confirm_password", string>,
+      ) => Promise<void>;
+    };
     try {
-      await (wrapper.vm as any).submit({
+      await vm.submit({
         old_password: "old-secret",
         new_password: "New-Secret-1!",
         confirm_password: "New-Secret-1!",

@@ -26,8 +26,9 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
-import { createReportDefaults, type CreateReportForm } from "./CreateReport.schema";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { createReportDefaults, type CreateReportForm } from "./CreateReport.schema";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import CreateReport from "./CreateReport.vue";
 
@@ -157,12 +158,6 @@ const vm = () =>
     reportDraft: { hasUnsavedChanges: () => boolean };
   };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 const edit = async (fields: Partial<CreateReportForm>) => {
   window.dispatchEvent(new Event("pointerdown"));
   Object.entries(fields).forEach(([key, value]) => form().setFieldValue(key, value));
@@ -228,7 +223,7 @@ describe("CreateReport drafts", () => {
       "unsaved changes to this report",
     );
     vi.mocked(dashboardService.list).mockClear();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(form().state.values).toMatchObject({ name: "draft-report", emails: "team@example.com" });
@@ -270,7 +265,7 @@ describe("CreateReport drafts", () => {
         data: { values: validValues(), step: 2, folderId: "folder-b", showCustomDimensions: false },
       });
       await mountEditor("/reports/create?folder=default", { realFolderPicker: true });
-      byTest("editor-draft-continue")?.click();
+      click("editor-draft-continue");
       await flushPromises();
 
       expect(vm().selectedReportFolderId).toBe("folder-b");
@@ -307,7 +302,7 @@ describe("CreateReport drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
     expect(router.currentRoute.value.name).toBe("createReport");
   });
@@ -382,16 +377,53 @@ describe("CreateReport drafts", () => {
     expect(byTest("editor-draft-changed-on-server")).not.toBeNull();
   });
 
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    await mountEditor("/reports/create");
+    await edit({ name: "from-draft" });
+    window.dispatchEvent(new Event("pagehide"));
+    wrapper!.unmount();
+
+    await mountEditor("/reports/create");
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(form().state.values.name).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+    wrapper!.unmount();
+
+    await mountEditor("/reports/create");
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(form().state.values.name).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  it("Keep draft leaves and offers the work on the next visit", async () => {
+    await mountEditor("/reports/create");
+    await edit({ name: "kept-report" });
+
+    const navigation = router.push("/logs");
+    await flushPromises();
+    clickLeave("o-dialog-secondary-btn");
+    await navigation;
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(readEditorDraft<ReportDraft>(newScope)?.data.values.name).toBe("kept-report");
+    wrapper!.unmount();
+
+    await mountEditor("/reports/create");
+    expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
+  });
+
   it("Cancel with unsaved changes asks, and Discard drops the draft and leaves", async () => {
     await mountEditor("/reports/create");
     await edit({ name: "to-discard" });
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("add-report-cancel-btn")?.click();
+    click("add-report-cancel-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("reports");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -403,7 +435,7 @@ describe("CreateReport drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -418,7 +450,7 @@ describe("CreateReport drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -433,7 +465,7 @@ describe("CreateReport drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(newScope)).not.toBeNull();
 
-    byTest("add-report-save-btn")?.click();
+    click("add-report-save-btn");
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("reports"));
 
     expect(reports.createReportV2).toHaveBeenCalledTimes(1);

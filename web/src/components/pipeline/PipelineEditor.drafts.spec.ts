@@ -28,6 +28,15 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
+import {
+  byTest,
+  click,
+  clickIn,
+  clickLeave,
+  clickRestore,
+  pressEscape,
+} from "@/test/unit/helpers/draftDom";
+import { fillField } from "@/test/unit/helpers/fillField";
 import PipelineEditor from "./PipelineEditor.vue";
 import { projectPipeline, type PipelineDraftData } from "./pipelineDraft";
 
@@ -179,12 +188,6 @@ const mountEditor = async (path: string) => {
   return wrapper;
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 const firstInput = () => window.dispatchEvent(new Event("pointerdown"));
 
 const addValidPipeline = async (name = "my_pipe") => {
@@ -251,7 +254,7 @@ describe("PipelineEditor drafts", () => {
     expect(byTest("editor-draft-restore-message")?.textContent).toContain(
       "unsaved changes to this pipeline",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     const current = pipelineObj.currentSelectedPipeline;
@@ -285,7 +288,7 @@ describe("PipelineEditor drafts", () => {
       }),
     });
     await mountEditor("/pipeline/pipelines/add");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(pipelineObj.currentSelectedNodeData).toEqual(staged);
@@ -315,7 +318,7 @@ describe("PipelineEditor drafts", () => {
     await mountEditor("/pipeline/pipelines/edit?id=p1");
 
     expect(byTest("editor-draft-changed-on-server")).not.toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(pipelineObj.dirtyFlag).toBe(true);
   });
@@ -329,17 +332,65 @@ describe("PipelineEditor drafts", () => {
     expect(router.currentRoute.value.name).toBe("pipelines");
   });
 
+  it("drafts a name filled with no key or pointer event, and Cancel asks", async () => {
+    const pageTitle = document.createElement("div");
+    pageTitle.id = "o2-page-title";
+    document.body.appendChild(pageTitle);
+    try {
+      await mountEditor("/pipeline/pipelines/add");
+      // A name alone is no unsaved pipeline; it counts once the canvas has steps.
+      pipelineObj.currentSelectedPipeline.nodes = [
+        streamNode("n1", "input", "in"),
+        streamNode("n2", "output", "out"),
+      ];
+      await nextTick();
+      window.dispatchEvent(new Event("pagehide"));
+      expect(readEditorDraft(newScope)).toBeNull();
+      click("pipeline-editor-name-input-trigger");
+      await flushPromises();
+      await fillField("pipeline-editor-name-input-input", "autofilled_pipe");
+      window.dispatchEvent(new Event("pagehide"));
+      expect(readEditorDraft<PipelineDraftData>(newScope)?.data.name).toBe("autofilled_pipe");
+
+      click("add-pipeline-cancel-btn");
+      await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      expect(router.currentRoute.value.name).toBe("createPipeline");
+    } finally {
+      wrapper?.unmount();
+      wrapper = null;
+      pageTitle.remove();
+    }
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    writeEditorDraft(newScope, { data: draftData() });
+    await mountEditor("/pipeline/pipelines/add");
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(pipelineObj.currentSelectedPipeline.name).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+
+    wrapper!.unmount();
+    await mountEditor("/pipeline/pipelines/add");
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(pipelineObj.currentSelectedPipeline.name).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
+  });
+
   it("Cancel with unsaved changes asks, and Discard drops the draft and leaves", async () => {
     await mountEditor("/pipeline/pipelines/add");
     await addValidPipeline();
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("add-pipeline-cancel-btn")?.click();
+    click("add-pipeline-cancel-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     expect(router.currentRoute.value.name).toBe("createPipeline");
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("pipelines");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -352,7 +403,7 @@ describe("PipelineEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -372,15 +423,13 @@ describe("PipelineEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("createPipeline");
     expect(pipelineService.createPipeline).not.toHaveBeenCalled();
 
-    document.body
-      .querySelector<HTMLElement>('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]')
-      ?.click();
+    clickIn("confirm-dialog", "o-dialog-primary-btn");
     await flushPromises();
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("logs"));
     expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1);
@@ -398,11 +447,11 @@ describe("PipelineEditor drafts", () => {
     // A stayed leave must not leave its destination behind for a later prompt.
     const stayed = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await stayed;
     await flushPromises();
 
-    byTest("add-pipeline-save-btn")?.click();
+    click("add-pipeline-save-btn");
     const confirm = () =>
       document.body.querySelector<HTMLElement>(
         '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
@@ -419,7 +468,7 @@ describe("PipelineEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -433,7 +482,7 @@ describe("PipelineEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await navigation;
     await flushPromises();
 
@@ -451,7 +500,7 @@ describe("PipelineEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
 
     expect(router.currentRoute.value.name).toBe("logs");
@@ -468,7 +517,7 @@ describe("PipelineEditor drafts", () => {
     await addValidPipeline();
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("add-pipeline-save-btn")?.click();
+    click("add-pipeline-save-btn");
     await vi.waitFor(() => expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1));
     await flushPromises();
 
@@ -486,7 +535,7 @@ describe("PipelineEditor drafts", () => {
     await mountEditor("/pipeline/pipelines/add");
     await addValidPipeline();
 
-    byTest("add-pipeline-save-btn")?.click();
+    click("add-pipeline-save-btn");
     await vi.waitFor(() => expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1));
     await flushPromises();
 
@@ -499,7 +548,7 @@ describe("PipelineEditor drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(newScope)).not.toBeNull();
 
-    byTest("add-pipeline-save-btn")?.click();
+    click("add-pipeline-save-btn");
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("pipelines"));
 
     expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1);

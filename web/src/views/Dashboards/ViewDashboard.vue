@@ -729,6 +729,7 @@ import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
@@ -1371,12 +1372,16 @@ export default defineComponent({
     };
 
     const settingsDrafts = useEditorDraftIds("dashboard_settings");
+    const draftLabel = useDraftLabel();
     const hasSettingsDraft = computed(() =>
       settingsDrafts.ids.has(String(route.query.dashboard ?? "")),
     );
     const settingsButtonLabel = computed(() =>
       hasSettingsDraft.value
-        ? t("common.editorDraft.newDot", { label: t("dashboard.setting") })
+        ? draftLabel(
+            t("dashboard.setting"),
+            settingsDrafts.savedAt(String(route.query.dashboard ?? "")),
+          )
         : t("dashboard.setting"),
     );
 

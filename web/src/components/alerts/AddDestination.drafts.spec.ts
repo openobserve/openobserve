@@ -26,6 +26,8 @@ import {
   readEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
+import { fillField } from "@/test/unit/helpers/fillField";
 import AddDestination from "./AddDestination.vue";
 
 vi.mock("@/services/alert_destination", async (importOriginal) => {
@@ -161,12 +163,6 @@ const fillCustomWebhook = () =>
 
 const storedRaw = (scope: EditorDraftScope) => localStorage.getItem(editorDraftKey(scope)) ?? "";
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 describe("AddDestination drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -225,7 +221,7 @@ describe("AddDestination drafts", () => {
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
       "Your changes to the Authorization header and X-Routing-Key header were not kept.",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values.url).toBe("https://hooks.example.com/notify/v2");
   });
@@ -251,7 +247,7 @@ describe("AddDestination drafts", () => {
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
       "Your change to the URL was not kept. Re-enter it before saving.",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(form().state.values.url).toBe("");
@@ -283,7 +279,7 @@ describe("AddDestination drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
 
     await remount({ destination: { ...hook } });
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values.apiHeaders).toEqual([{ key: "Authorization", value: "" }]);
 
@@ -376,12 +372,46 @@ describe("AddDestination drafts", () => {
     expect(raw).not.toContain("eu-west");
 
     await remount({ destination: { ...serviceNow } });
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     const values = form().state.values;
     expect(values.credentials).toMatchObject({ password: "hunter2", assignmentGroup: "sre" });
     expect(values.apiHeaders).toEqual([{ key: "X-Region", value: "eu-west" }]);
+  });
+
+  it("drafts a name filled with no key or pointer event, and Cancel asks", async () => {
+    await mountEditor();
+    form().setFieldValue("destination_type", "custom");
+    form().setFieldValue("type", "http");
+    await flushPromises();
+    await fillField("add-destination-name-input", "autofilled_hook");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft<{ name: string }>(newScope)?.data.name).toBe("autofilled_hook");
+
+    await wrapper!.get('[data-test="add-destination-cancel-btn"]').trigger("click");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    expect(emitted.cancel).toBe(0);
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    await mountEditor();
+    await fillCustomWebhook();
+    window.dispatchEvent(new Event("pagehide"));
+
+    await remount();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(form().state.values.name).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+
+    await remount();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(form().state.values.name).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
   });
 
   it("Cancel with unsaved changes asks, and Discard closes and drops the draft", async () => {
@@ -393,7 +423,7 @@ describe("AddDestination drafts", () => {
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(emitted.cancel).toBe(1);
     expect(readEditorDraft(newScope)).toBeNull();
@@ -418,7 +448,7 @@ describe("AddDestination drafts", () => {
 
     await wrapper!.get('[data-test="add-destination-cancel-btn"]').trigger("click");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await vi.waitFor(() => expect(emitted.cancel).toBe(1));
 
     expect(destinationService.create).toHaveBeenCalledTimes(1);
@@ -436,7 +466,7 @@ describe("AddDestination drafts", () => {
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     expect(router.currentRoute.value.name).toBe("alertDestinations");
 
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await flushPromises();
 
     expect(router.currentRoute.value.name).toBe("alertTemplates");

@@ -30,6 +30,8 @@ import {
 } from "@/utils/drafts/editorDraftStore";
 import { alertDraftBase } from "@/utils/alerts/alertEditorDraft";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { PANEL_DRAFT_AUTOSAVE_MS } from "@/composables/dashboard/usePanelDraft";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import AddAlert from "./AddAlert.vue";
 
 vi.mock("@/composables/useStreams", () => ({
@@ -222,12 +224,6 @@ const edit = async (path: string, value: unknown) => {
   await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 const seedValidScheduled = (form: AlertForm) => {
   form.setFieldValue("name", "checkout_5xx");
   form.setFieldValue("stream_type", "logs");
@@ -256,6 +252,7 @@ describe("AddAlert drafts", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     wrapper?.unmount();
     wrapper = null;
   });
@@ -314,7 +311,7 @@ describe("AddAlert drafts", () => {
     expect(byTest("editor-draft-restore-message")?.textContent).toContain(
       "unsaved changes to this alert",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(vm().formData.name).toBe("checkout_errors");
@@ -322,6 +319,92 @@ describe("AddAlert drafts", () => {
     expect(vm().activeTab).toBe("advanced");
     expect(vm().activeFolderId).toBe("7400179149878333440");
     expect(vm().alertDraft.hasUnsavedChanges()).toBe(true);
+  });
+
+  it("drafts a composite alert from its form's update and continues it as a composite", async () => {
+    const composite = { CompositeAlertForm: true };
+    await mountEditor("/alerts?action=add", {}, true, composite);
+    await edit("is_real_time", "composite");
+    await edit("name", "checkout_composite");
+    const children = [
+      { alert_id: "a1", alias: "A" },
+      { alert_id: "a2", alias: "B" },
+    ];
+    window.dispatchEvent(new Event("pointerdown"));
+    wrapper!.findComponent({ name: "CompositeAlertForm" }).vm.$emit("update:modelValue", {
+      composite_condition: {
+        expression: "A && B",
+        warning_counts_as_firing: true,
+        stale_child_policy: "use_last_state",
+      },
+      children,
+    });
+    await flushPromises();
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(
+      readEditorDraft<{ values: Record<string, unknown> }>(newScope)?.data.values,
+    ).toMatchObject({
+      name: "checkout_composite",
+      is_real_time: "composite",
+      composite_condition: { expression: "A && B" },
+      children,
+    });
+    wrapper!.unmount();
+
+    await mountEditor("/alerts?action=add", {}, true, composite);
+    click("editor-draft-continue");
+    await flushPromises();
+    expect(vm().formData).toMatchObject({
+      name: "checkout_composite",
+      is_real_time: "composite",
+      composite_condition: { expression: "A && B" },
+      children,
+    });
+    expect(wrapper!.findComponent({ name: "CompositeAlertForm" }).exists()).toBe(true);
+    expect(vm().alertDraft.hasUnsavedChanges()).toBe(true);
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    await mountEditor();
+    await edit("name", "from_draft");
+    window.dispatchEvent(new Event("pagehide"));
+    wrapper!.unmount();
+
+    await mountEditor();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(vm().formData.name).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+    wrapper!.unmount();
+
+    await mountEditor();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(vm().formData.name).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  it("a new anomaly detection's draft has its own slot, with Escape and Start fresh", async () => {
+    const anomalyScope = { ...newScope, variant: "anomaly" };
+    writeEditorDraft(anomalyScope, {
+      data: { values: { name: "anomaly_from_draft" }, tab: "condition", folderId: "default" },
+    });
+    await mountEditor("/alerts/anomaly/add");
+    expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(readEditorDraft(anomalyScope)).not.toBeNull();
+    expect(readEditorDraft(newScope)).toBeNull();
+    wrapper!.unmount();
+
+    await mountEditor("/alerts/anomaly/add");
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(readEditorDraft(anomalyScope)).toBeNull();
   });
 
   it("keys an edited alert's draft by its id and ignores evaluation timestamps in the base", async () => {
@@ -358,7 +441,7 @@ describe("AddAlert drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
     expect(readEditorDraft(editScope)).not.toBeNull();
   });
@@ -382,7 +465,7 @@ describe("AddAlert drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
   });
 
@@ -397,7 +480,7 @@ describe("AddAlert drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await navigation;
     await flushPromises();
 
@@ -414,8 +497,10 @@ describe("AddAlert drafts", () => {
     const hidden = wrapper!.findComponent(AddAlert).get('select[aria-hidden="true"]');
     hidden.element.dispatchEvent(new Event("change", { bubbles: true }));
     await flushPromises();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     vm().form.setFieldValue("description", "set by a late load");
-    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await vi.advanceTimersByTimeAsync(PANEL_DRAFT_AUTOSAVE_MS + 100);
+    vi.useRealTimers();
     window.dispatchEvent(new Event("pagehide"));
 
     expect(vm().alertDraft.hasUnsavedChanges()).toBe(false);
@@ -439,13 +524,15 @@ describe("AddAlert drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")!.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(readEditorDraft(editScope)).toBeNull();
 
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     vm().form.setFieldValue("description", "set by a late load");
     window.dispatchEvent(new Event("pointerdown"));
-    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await vi.advanceTimersByTimeAsync(PANEL_DRAFT_AUTOSAVE_MS + 100);
+    vi.useRealTimers();
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(editScope)).toBeNull();
 
@@ -490,10 +577,10 @@ describe("AddAlert drafts", () => {
     await edit("name", "checkout_errors");
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("add-alert-cancel-btn")?.click();
+    click("add-alert-cancel-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
 
     expect(emitted.cancel).toBe(1);
@@ -507,7 +594,7 @@ describe("AddAlert drafts", () => {
     const navigation = router.push("/alerts");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
 
     expect(router.currentRoute.value.query.action).toBeUndefined();
@@ -524,7 +611,7 @@ describe("AddAlert drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    byTest("editor-draft-leave-save")?.click();
+    click("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -540,7 +627,7 @@ describe("AddAlert drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    byTest("editor-draft-leave-save")?.click();
+    click("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 

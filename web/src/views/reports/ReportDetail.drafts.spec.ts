@@ -26,6 +26,7 @@ import { writeEditorDraft, type EditorDraftScope } from "@/utils/drafts/editorDr
 import { createReportDefaults } from "@/components/reports/CreateReport.schema";
 import { reportDraftId } from "@/components/reports/reportDraft";
 import CreateReport from "@/components/reports/CreateReport.vue";
+import { byTest, click } from "@/test/unit/helpers/draftDom";
 import ReportDetail from "./ReportDetail.vue";
 
 vi.mock("@/services/reports", async (importOriginal) => {
@@ -115,10 +116,8 @@ const mountApp = async (path: string) => {
   await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-
 const clickEdit = async () => {
-  byTest("reports-reportdetail-edit")?.click();
+  click("reports-reportdetail-edit");
   await flushPromises();
   await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("createReport"));
   await flushPromises();
@@ -151,7 +150,7 @@ describe("ReportDetail -> CreateReport drafts", () => {
 
     expect(router.currentRoute.value.query.folder).toBe("folder-b");
     expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     const form = (
       wrapper!.findComponent(CreateReport).vm as unknown as {

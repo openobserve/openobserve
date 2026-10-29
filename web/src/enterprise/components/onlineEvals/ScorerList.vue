@@ -125,7 +125,7 @@
               v-if="scorerDrafts.ids.has(entityId(row))"
               :saved-at="scorerDrafts.savedAt(entityId(row))"
               class="shrink-0"
-              :data-test="`scorer-list-draft-dot-${entityId(row)}`"
+              :data-test="`scorer-list-${entityId(row)}-draft-dot`"
             />
           </div>
         </template>

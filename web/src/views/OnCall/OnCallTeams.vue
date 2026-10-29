@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <EditorDraftDot
             v-if="teamDraftSavedAt(row.id) !== null"
             :saved-at="teamDraftSavedAt(row.id)"
-            :data-test="`oncall-teams-draft-dot-${row.id}`"
+            :data-test="`oncall-teams-${row.id}-draft-dot`"
           />
           <OTag
             v-if="row.id === defaultTeamId"

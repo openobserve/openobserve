@@ -27,8 +27,9 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
-import { promptEditorDefaults } from "./PromptEditor.schema";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { promptEditorDefaults } from "./PromptEditor.schema";
 import PromptEditorPage from "./PromptEditorPage.vue";
 
 vi.mock("@/services/llm-prompts.service", () => ({
@@ -144,12 +145,6 @@ const fillValid = async () => {
   await edit("commitMessage", "first");
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 describe("PromptEditorPage drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -186,7 +181,7 @@ describe("PromptEditorPage drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
     expect(router.currentRoute.value.name).toBe("aiPromptCreate");
   });
@@ -202,7 +197,7 @@ describe("PromptEditorPage drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
   });
 
@@ -216,7 +211,7 @@ describe("PromptEditorPage drafts", () => {
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain(
       "unsaved changes to this prompt",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(form().state.values).toMatchObject({ name: "restored", textPayload: "Draft body" });
@@ -241,16 +236,55 @@ describe("PromptEditorPage drafts", () => {
     expect(readEditorDraft(newScope)).toBeNull();
   });
 
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    await mountEditor();
+    await edit("textPayload", "From the draft");
+    window.dispatchEvent(new Event("pagehide"));
+    wrapper!.unmount();
+
+    await mountEditor();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(form().state.values.textPayload).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+    wrapper!.unmount();
+
+    await mountEditor();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(form().state.values.textPayload).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  it("keep draft lets the route leave and offers the work on the next visit", async () => {
+    await mountEditor();
+    await edit("textPayload", "Kept for later");
+
+    const navigation = router.push("/logs");
+    await flushPromises();
+    clickLeave("o-dialog-secondary-btn");
+    await navigation;
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(readEditorDraft<PromptDraftData>(newScope)?.data.values).toMatchObject({
+      textPayload: "Kept for later",
+    });
+    wrapper!.unmount();
+
+    await mountEditor();
+    expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
+  });
+
   it("cancel with unsaved changes asks, and discard leaves and drops the draft", async () => {
     await mountEditor();
     await edit("textPayload", "to discard");
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("prompt-editor-cancel-btn")?.click();
+    click("prompt-editor-cancel-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("aiPrompts");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -262,7 +296,7 @@ describe("PromptEditorPage drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -278,7 +312,7 @@ describe("PromptEditorPage drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -305,7 +339,7 @@ describe("PromptEditorPage drafts", () => {
     await mountEditor();
     await edit("textPayload", "Try {{ this }}");
 
-    byTest("prompt-editor-test-btn")?.click();
+    click("prompt-editor-test-btn");
     await flushPromises();
 
     expect(router.currentRoute.value.name).toBe("aiPlayground");
@@ -322,7 +356,7 @@ describe("PromptEditorPage drafts", () => {
     const navigation = router.push("/ai/prompts/prompt-a/versions/new?base_version=1");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
 
     expect(router.currentRoute.value.query.base_version).toBeUndefined();

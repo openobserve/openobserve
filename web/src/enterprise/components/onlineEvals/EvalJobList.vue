@@ -95,7 +95,7 @@
               v-if="jobDrafts.ids.has(String(row.id))"
               :saved-at="jobDrafts.savedAt(String(row.id))"
               class="shrink-0"
-              :data-test="`eval-job-list-draft-dot-${row.id}`"
+              :data-test="`eval-job-list-${row.id}-draft-dot`"
             />
           </div>
         </template>

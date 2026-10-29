@@ -728,14 +728,15 @@ describe("fleet mutations", () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.audit("acme") });
   });
 
-  it("saves a draft and refetches only that config", async () => {
+  it("saves a draft and refetches that config and the configurations list", async () => {
     mockClient.put.mockResolvedValueOnce({ data: { at: 1 } });
     await run(saveFleetConfigDraftMutation("acme"), { id: "edge", yaml: "x: 1" });
     expect(mockClient.put).toHaveBeenCalledWith("/api/acme/fleet/configs/edge/draft", {
       yaml: "x: 1",
     });
-    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate).toHaveBeenCalledTimes(2);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.config("acme", "edge") });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.configs("acme") });
   });
 
   it("publishes a version and refetches the list, the config and the audit log", async () => {

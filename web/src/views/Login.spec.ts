@@ -516,7 +516,7 @@ describe("Login.vue", () => {
     });
 
     it("ends the session as an expired one, keeping drafts, when the organizations are refused", async () => {
-      (organizationsService.list as any).mockRejectedValueOnce({ response: { status: 403 } });
+      vi.mocked(organizationsService.list).mockRejectedValueOnce({ response: { status: 403 } });
 
       await wrapper.vm.getDefaultOrganization();
       await flushPromises();

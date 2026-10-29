@@ -2307,7 +2307,7 @@ describe("ViewDashboard", () => {
       await flushPromises();
       expect(wrapper.vm.hasSettingsDraft).toBe(true);
       // A button's children are presentational, so the draft state must be in the button's own name.
-      expect(settings().attributes("aria-label")).toBe("common.editorDraft.newDot");
+      expect(settings().attributes("aria-label")).toBe("common.editorDraft.newDotDated");
       localStorage.clear();
     });
 

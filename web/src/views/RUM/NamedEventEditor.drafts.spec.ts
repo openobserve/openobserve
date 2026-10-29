@@ -41,6 +41,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import NamedEventEditor from "./NamedEventEditor.vue";
 
 interface EventDraft {
@@ -73,23 +74,8 @@ const editScope = (id: string): EditorDraftScope => ({
   variant: null,
 });
 
-const q = (dt: string) => document.querySelector<HTMLElement>(`[data-test="${dt}"]`);
 const input = (dt: string) =>
   document.querySelector<HTMLInputElement>(`[data-test="${dt}"] input, input[data-test="${dt}"]`);
-const leaveButton = (id: string) =>
-  document.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-const restoreButton = (id: string) =>
-  document.querySelector<HTMLElement>(
-    `[data-test="editor-draft-restore-dialog"] [data-test="${id}"]`,
-  );
-const settle = async (n = 4) => {
-  for (let i = 0; i < n; i++) {
-    await new Promise((r) => setTimeout(r, 20));
-    await flushPromises();
-  }
-};
 
 describe("NamedEventEditor drafts", () => {
   let wrapper: VueWrapper | null = null;
@@ -122,7 +108,7 @@ describe("NamedEventEditor drafts", () => {
       { global: { plugins: [router, store] }, attachTo: document.body },
     );
     await vi.waitFor(() => expect(useNamedEvents().loading.value).toBe(false));
-    await settle();
+    await flushPromises();
   };
 
   const unmount = () => {
@@ -170,11 +156,11 @@ describe("NamedEventEditor drafts", () => {
     unmount();
 
     await mountAt(PA_ROUTES.eventNew);
-    expect(q("editor-draft-restore-dialog")).toBeNull();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
     unmount();
 
     await mountAt(PA_ROUTES.eventNew, {}, copy);
-    expect(q("editor-draft-restore-dialog")).not.toBeNull();
+    expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
   });
 
   it("continues a draft, Start fresh drops it and Escape keeps it", async () => {
@@ -188,27 +174,26 @@ describe("NamedEventEditor drafts", () => {
       },
     });
     await mountAt(PA_ROUTES.eventNew);
-    expect(q("editor-draft-restore-message")?.textContent).toContain(
+    expect(byTest("editor-draft-restore-message")?.textContent).toContain(
       "unsaved changes to this named event",
     );
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await settle();
-    if (q("editor-draft-restore-dialog")) restoreButton("o-dialog-close-btn")?.click();
-    await settle();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
     expect(input("rum-analytics-named-events-name")?.value).toBe("");
     expect(readEditorDraft(newScope())).not.toBeNull();
     unmount();
 
     await mountAt(PA_ROUTES.eventNew);
-    q("editor-draft-continue")?.click();
-    await settle();
+    click("editor-draft-continue");
+    await flushPromises();
     expect(input("rum-analytics-named-events-name")?.value).toBe("From draft");
     expect(input("rum-analytics-named-events-rule-1-value")?.value).toBe("/web/b");
     unmount();
 
     await mountAt(PA_ROUTES.eventNew);
-    restoreButton("o-dialog-secondary-btn")?.click();
-    await settle();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
     expect(readEditorDraft(newScope())).toBeNull();
     expect(input("rum-analytics-named-events-name")?.value).toBe("");
   });
@@ -223,13 +208,13 @@ describe("NamedEventEditor drafts", () => {
     unmount();
 
     await mountAt(PA_ROUTES.eventEdit, { id });
-    expect(q("editor-draft-restore-dialog")).not.toBeNull();
-    expect(q("editor-draft-changed-on-server")).toBeNull();
+    expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
+    expect(byTest("editor-draft-changed-on-server")).toBeNull();
     unmount();
 
     api.touch("events", id, { name: "Checkout (theirs)" });
     await mountAt(PA_ROUTES.eventEdit, { id });
-    expect(q("editor-draft-changed-on-server")).not.toBeNull();
+    expect(byTest("editor-draft-changed-on-server")).not.toBeNull();
   });
 
   it("drops the draft of an event that no longer exists", async () => {
@@ -246,13 +231,30 @@ describe("NamedEventEditor drafts", () => {
   it("Cancel asks; Keep draft leaves with the draft", async () => {
     await mountAt(PA_ROUTES.eventNew);
     await typeName("Half done");
-    q("rum-analytics-event-editor-cancel-btn")!.click();
-    await settle();
-    leaveButton("o-dialog-secondary-btn")!.click();
-    await settle();
+    click("rum-analytics-event-editor-cancel-btn");
+    await flushPromises();
+    clickLeave("o-dialog-secondary-btn");
+    await flushPromises();
 
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.events);
     expect(readEditorDraft<EventDraft>(newScope())?.data.name).toBe("Half done");
+  });
+
+  it("Cancel asks; Discard leaves and drops the draft", async () => {
+    await mountAt(PA_ROUTES.eventNew);
+    await typeName("Not kept");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft(newScope())).not.toBeNull();
+
+    click("rum-analytics-event-editor-cancel-btn");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    clickLeave("o-dialog-neutral-btn");
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe(PA_ROUTES.events);
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
+    expect(readEditorDraft(newScope())).toBeNull();
   });
 
   it("Save in the leave dialog creates the event and goes where the user was headed", async () => {
@@ -261,10 +263,10 @@ describe("NamedEventEditor drafts", () => {
     await fillField("rum-analytics-named-events-rule-0-value", "/web/logs");
 
     const navigation = router.push({ name: PA_ROUTES.overview, query: SCOPE });
-    await settle();
-    leaveButton("editor-draft-leave-save")!.click();
+    await flushPromises();
+    clickLeave("editor-draft-leave-save");
     await navigation;
-    await settle();
+    await flushPromises();
 
     expect(api.bodies("createEvent").map((b) => b.name)).toEqual(["Opened logs"]);
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.overview);
@@ -276,10 +278,10 @@ describe("NamedEventEditor drafts", () => {
     await typeName("No rule value");
 
     const navigation = router.push({ name: PA_ROUTES.overview, query: SCOPE });
-    await settle();
-    leaveButton("editor-draft-leave-save")!.click();
+    await flushPromises();
+    clickLeave("editor-draft-leave-save");
     await navigation;
-    await settle();
+    await flushPromises();
 
     expect(api.service.createEvent).not.toHaveBeenCalled();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.eventNew);
@@ -292,11 +294,11 @@ describe("NamedEventEditor drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(newScope())).not.toBeNull();
 
-    q("rum-analytics-event-editor")!
+    byTest("rum-analytics-event-editor")!
       .closest("form")!
       .dispatchEvent(new Event("submit", { cancelable: true }));
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe(PA_ROUTES.events));
-    expect(q("editor-draft-leave-dialog")).toBeNull();
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(readEditorDraft(newScope())).toBeNull();
   });
 });

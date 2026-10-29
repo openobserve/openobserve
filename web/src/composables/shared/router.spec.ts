@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
-import { createMemoryHistory, createRouter } from "vue-router";
+import { createMemoryHistory, createRouter, type RouteRecordRaw } from "vue-router";
 import useRoutes from "./router";
 import Login from "@/views/Login.vue";
 import store from "@/stores";
@@ -407,7 +407,10 @@ describe("useRoutes (router.ts)", () => {
       });
 
       const { parentRoutes } = useRoutes();
-      parentRoutes.find((r: any) => r.path === "/logout").beforeEnter({}, {}, vi.fn());
+      const logout = (parentRoutes as RouteRecordRaw[]).find((r) => r.path === "/logout");
+      const enter = logout?.beforeEnter;
+      if (typeof enter !== "function") throw new Error("/logout has no beforeEnter guard");
+      enter.call(undefined, {} as never, {} as never, vi.fn());
       window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
 
       expect(dispatch).toHaveBeenCalledWith("logout", { draftsOf: "me@x.io" });

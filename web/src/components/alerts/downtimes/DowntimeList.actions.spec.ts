@@ -276,10 +276,10 @@ describe("DowntimeList drafts", () => {
         total: ROWS.length,
         counts: { active: 1, scheduled: 1, recurring: 0, ended: 1, cancelled: 1, ended_early: 1 },
       },
-    } as any);
+    } as never);
     vi.mocked(downtimes.remove)
       .mockReset()
-      .mockResolvedValue({ data: {} } as any);
+      .mockResolvedValue({ data: {} } as never);
   });
 
   it("marks the New button and the drafted row only", async () => {

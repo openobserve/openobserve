@@ -152,8 +152,9 @@ function seed(): Store {
   }
   const configs: FleetConfigDetail[] = [
     configOf("base-linux", "Host metrics and system logs", 4),
-    configOf("k8s-node", "Kubelet stats and pod logs", 2),
+    configOf("k8s-node", "Kubelet stats and pod logs", 2, false),
     configOf("debug-tail", "Prints everything to the collector log", 1),
+    configOf("otlp-gateway", "Receives OTLP from apps and forwards it", 0),
   ];
   configs[0].fleets_hidden = 1;
   const tokens: FleetToken[] = fleets.map((f, i) => ({
@@ -243,7 +244,12 @@ function collectorOf(fleet: string, i: number, config: string, version: number):
   };
 }
 
-function configOf(id: string, description: string, versions: number): FleetConfigDetail {
+function configOf(
+  id: string,
+  description: string,
+  versions: number,
+  hasDraft = true,
+): FleetConfigDetail {
   return {
     id,
     description,
@@ -253,7 +259,7 @@ function configOf(id: string, description: string, versions: number): FleetConfi
     fleets: [],
     updated_at: NOW - DAY,
     updated_by: "root@example.com",
-    draft: { yaml: BASE_YAML, by: "root@example.com", at: NOW - DAY },
+    draft: hasDraft ? { yaml: BASE_YAML, by: "root@example.com", at: NOW - DAY } : null,
     versions: Array.from({ length: versions }, (_, i) => ({
       version: versions - i,
       author: "root@example.com",
@@ -740,6 +746,8 @@ export const fleetMock: FleetApi = {
   publishConfigVersion: (_org, id, body) => {
     const c = store.configs.find((x) => x.id === id);
     if (!c) return fail(404, "configuration not found");
+    // Publishing turns the draft into the new version, as the backend's bump_latest does.
+    c.draft = null;
     c.latest_version += 1;
     c.versions.unshift({
       version: c.latest_version,

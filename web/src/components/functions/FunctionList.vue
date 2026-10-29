@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <EditorDraftDot
                   v-if="functionDrafts.ids.has(row?.name)"
                   :saved-at="functionDrafts.savedAt(row?.name)"
-                  :data-test="`function-list-draft-dot-${row?.name}`"
+                  :data-test="`function-list-${row?.name}-draft-dot`"
                 />
               </span>
             </template>

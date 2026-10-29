@@ -127,8 +127,8 @@ describe("PromptsPage drafts", () => {
     writeEditorDraft(scope("triage"), { data: { values: {}, messages: [] } });
     await mountPage();
 
-    expect(wrapper!.find('[data-test="prompt-draft-dot-triage"]').exists()).toBe(true);
-    expect(wrapper!.find('[data-test="prompt-draft-dot-summary"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="prompt-triage-draft-dot"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="prompt-summary-draft-dot"]').exists()).toBe(false);
   });
 
   it("drops a prompt's drafts when it is archived", async () => {
@@ -142,7 +142,7 @@ describe("PromptsPage drafts", () => {
 
     expect(readEditorDraft(scope("triage"))).toBeNull();
     expect(readEditorDraft(scope("summary"))).not.toBeNull();
-    expect(wrapper!.find('[data-test="prompt-draft-dot-triage"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="prompt-triage-draft-dot"]').exists()).toBe(false);
   });
 
   it("keeps the drafts when archiving fails", async () => {

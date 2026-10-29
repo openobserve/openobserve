@@ -2205,15 +2205,38 @@ describe("AlertList - editor drafts", () => {
   });
   const draftData = { values: {}, tab: "condition", folderId: "default" };
 
+  interface DraftListRow {
+    alert_id: string;
+    name: string;
+    selected?: boolean;
+    folder_name?: { id: string; name: string };
+  }
+  interface DraftListVm {
+    activeTab: string;
+    filteredResults: DraftListRow[];
+    selectedAlerts: AlertV2[];
+    showAddAlertDialog: boolean;
+    router: { currentRoute: { value: { query: Record<string, string> } } };
+    handleActionQuery: (action: string | undefined) => Promise<void>;
+    showDeleteDialogFn: (props: { row: Pick<DraftListRow, "alert_id" | "name"> }) => Promise<void>;
+    deleteAlertByAlertId: () => Promise<void>;
+    bulkDeleteAlerts: () => Promise<void>;
+    refreshList: (folderId: string, options: { navigate: boolean }) => Promise<void>;
+  }
+  const mountDraftList = async () => {
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    return { wrapper, vm: wrapper.vm as unknown as DraftListVm };
+  };
+
   beforeEach(() => localStorage.clear());
 
   it("marks the New alert button and the rows that have drafts", async () => {
     writeEditorDraft(scope(null), { data: draftData });
     writeEditorDraft(scope("alert-3"), { data: draftData });
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
+    const { wrapper, vm } = await mountDraftList();
     // A stale ?action from an earlier spec's navigation can swap the table for the editor.
-    await wrapper.vm.handleActionQuery(undefined);
+    await vm.handleActionQuery(undefined);
     await flushPromises();
 
     const addButton = wrapper.find('[data-test="alert-list-add-alert-btn"]');
@@ -2229,10 +2252,9 @@ describe("AlertList - editor drafts", () => {
 
   it("on the anomaly tab, marks the Add button only for a new anomaly detection's draft", async () => {
     writeEditorDraft(scope(null), { data: draftData });
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    await wrapper.vm.handleActionQuery(undefined);
-    wrapper.vm.activeTab = "anomalyDetection";
+    const { wrapper, vm } = await mountDraftList();
+    await vm.handleActionQuery(undefined);
+    vm.activeTab = "anomalyDetection";
     await flushPromises();
     const dot = () => wrapper.find('[data-test="alert-list-add-alert-draft-dot"]').exists();
     expect(dot()).toBe(false);
@@ -2242,12 +2264,12 @@ describe("AlertList - editor drafts", () => {
     expect(dot()).toBe(true);
     const dotProps = wrapper
       .findAllComponents(EditorDraftDot)
-      .find((c: any) => c.props("dataTest") === "alert-list-add-alert-draft-dot");
+      .find((c) => c.props("dataTest") === "alert-list-add-alert-draft-dot");
     expect(dotProps?.props("savedAt")).toBe(
       readEditorDraft({ ...scope(null), variant: "anomaly" })?.savedAt,
     );
 
-    wrapper.vm.activeTab = "all";
+    vm.activeTab = "all";
     deleteEditorDraft(scope(null));
     await flushPromises();
     expect(dot()).toBe(false);
@@ -2260,19 +2282,18 @@ describe("AlertList - editor drafts", () => {
     vi.mocked(Date.now).mockReturnValue(now);
     writeEditorDraft({ ...scope(null), variant: "anomaly" }, { data: draftData });
     vi.mocked(Date.now).mockRestore();
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    await wrapper.vm.handleActionQuery(undefined);
-    wrapper.vm.activeTab = "all";
+    const { wrapper, vm } = await mountDraftList();
+    await vm.handleActionQuery(undefined);
+    vm.activeTab = "all";
     await flushPromises();
 
     const dot = () =>
       wrapper
         .findAllComponents(EditorDraftDot)
-        .find((c: any) => c.props("dataTest") === "alert-list-add-alert-draft-dot");
+        .find((c) => c.props("dataTest") === "alert-list-add-alert-draft-dot");
     expect(dot()?.props("savedAt")).toBe(now - 60_000);
 
-    wrapper.vm.activeTab = "anomalyDetection";
+    vm.activeTab = "anomalyDetection";
     await flushPromises();
     expect(dot()?.props("savedAt")).toBe(now);
   });
@@ -2281,13 +2302,12 @@ describe("AlertList - editor drafts", () => {
     writeEditorDraft(scope("alert-1"), { data: draftData });
     writeEditorDraft(scope("alert-1", "teammate@example.com"), { data: draftData });
     writeEditorDraft(scope("alert-2"), { data: draftData });
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
+    const { vm } = await mountDraftList();
 
-    await wrapper.vm.showDeleteDialogFn({
+    await vm.showDeleteDialogFn({
       row: { alert_id: "alert-1", name: "Scheduled Alert A" },
     });
-    await wrapper.vm.deleteAlertByAlertId();
+    await vm.deleteAlertByAlertId();
     await flushPromises();
 
     expect(readEditorDraft(scope("alert-1"))).toBeNull();
@@ -2298,13 +2318,12 @@ describe("AlertList - editor drafts", () => {
   it("keeps the draft when the delete fails", async () => {
     writeEditorDraft(scope("alert-1"), { data: draftData });
     alertsSvc.delete_by_alert_id.mockRejectedValueOnce({ response: { status: 500 } });
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
+    const { vm } = await mountDraftList();
 
-    await wrapper.vm.showDeleteDialogFn({
+    await vm.showDeleteDialogFn({
       row: { alert_id: "alert-1", name: "Scheduled Alert A" },
     });
-    await wrapper.vm.deleteAlertByAlertId();
+    await vm.deleteAlertByAlertId();
     await flushPromises();
 
     expect(readEditorDraft(scope("alert-1"))).not.toBeNull();
@@ -2313,17 +2332,16 @@ describe("AlertList - editor drafts", () => {
   it("drops drafts only for the alerts a bulk delete removed", async () => {
     writeEditorDraft(scope("alert-1"), { data: draftData });
     writeEditorDraft(scope("alert-2"), { data: draftData });
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.filteredResults[0].selected = true;
-    wrapper.vm.filteredResults[1].selected = true;
-    await wrapper.vm.$nextTick();
-    const [first, second] = wrapper.vm.selectedAlerts.map((a: AlertV2) => a.alert_id);
+    const { vm } = await mountDraftList();
+    vm.filteredResults[0].selected = true;
+    vm.filteredResults[1].selected = true;
+    await nextTick();
+    const [first, second] = vm.selectedAlerts.map((a: AlertV2) => a.alert_id);
     alertsSvc.bulkDelete.mockResolvedValueOnce({
       data: { successful: [first], unsuccessful: [{ alert_id: second, code: "internal" }] },
     });
 
-    await wrapper.vm.bulkDeleteAlerts();
+    await vm.bulkDeleteAlerts();
     await flushPromises();
 
     expect(readEditorDraft(scope(first))).toBeNull();
@@ -2334,22 +2352,21 @@ describe("AlertList - editor drafts", () => {
     writeEditorDraft(scope("alert-1"), { data: draftData });
     writeEditorDraft(scope("alert-3"), { data: draftData });
     writeEditorDraft(scope("alert-ops"), { data: draftData });
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.filteredResults = [
-      ...wrapper.vm.filteredResults,
+    const { vm } = await mountDraftList();
+    vm.filteredResults = [
+      ...vm.filteredResults,
       { alert_id: "alert-ops", name: "Ops alert", folder_name: { id: "ops", name: "Ops" } },
     ];
-    for (const row of wrapper.vm.filteredResults)
+    for (const row of vm.filteredResults)
       row.selected = ["alert-1", "alert-3", "alert-ops"].includes(row.alert_id);
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.selectedAlerts).toHaveLength(3);
+    await nextTick();
+    expect(vm.selectedAlerts).toHaveLength(3);
     alertsSvc.bulkDelete.mockImplementationOnce(async () => {
       alertsDB = alertsDB.filter((a) => a.alert_id !== "alert-1");
       return { data: {} };
     });
 
-    await wrapper.vm.bulkDeleteAlerts();
+    await vm.bulkDeleteAlerts();
     await flushPromises();
 
     expect(readEditorDraft(scope("alert-1"))).toBeNull();
@@ -2358,13 +2375,12 @@ describe("AlertList - editor drafts", () => {
   });
 
   it("drops the draft of an alert that no longer exists when its edit link opens", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
+    const { vm } = await mountDraftList();
     writeEditorDraft(scope("gone-1"), { data: draftData });
     alertsSvc.get_by_alert_id.mockRejectedValueOnce({ response: { status: 404 } });
-    wrapper.vm.router.currentRoute.value.query = { action: "update", alert_id: "gone-1" };
+    vm.router.currentRoute.value.query = { action: "update", alert_id: "gone-1" };
 
-    await wrapper.vm.handleActionQuery("update");
+    await vm.handleActionQuery("update");
     await flushPromises();
 
     expect(readEditorDraft(scope("gone-1"))).toBeNull();
@@ -2377,17 +2393,16 @@ describe("AlertList - editor drafts", () => {
   });
 
   it("refreshes without closing the editor when the leave dialog saved", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.router.currentRoute.value.query = { action: "add" };
-    wrapper.vm.showAddAlertDialog = true;
+    const { vm } = await mountDraftList();
+    vm.router.currentRoute.value.query = { action: "add" };
+    vm.showAddAlertDialog = true;
     const pushSpy = vi.spyOn(router, "push");
 
-    await wrapper.vm.refreshList("default", { navigate: false });
+    await vm.refreshList("default", { navigate: false });
 
     expect(alertsSvc.listByFolderId).toHaveBeenCalled();
     expect(pushSpy).not.toHaveBeenCalled();
-    expect(wrapper.vm.showAddAlertDialog).toBe(true);
+    expect(vm.showAddAlertDialog).toBe(true);
   });
 });
 

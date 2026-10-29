@@ -31,6 +31,7 @@ import {
 import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import { stopSessionServices } from "@/utils/sessionServices";
+import { byTest, leaveButton, clickLeave } from "@/test/unit/helpers/draftDom";
 import FleetConfigEditor from "./FleetConfigEditor.vue";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
@@ -132,11 +133,6 @@ const editYaml = async (text: string) => {
   await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
 const pressEscape = () =>
   document.dispatchEvent(
     new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
@@ -208,7 +204,7 @@ describe("FleetConfigEditor leave guard", () => {
     ).toBe(VALID);
     await editYaml(SECRET_YAML);
     const { navigation } = await goToOtherConfig();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await navigation;
     await flushPromises();
     expect(storedYamlTraces()).toEqual([]);
@@ -247,7 +243,7 @@ describe("FleetConfigEditor leave guard", () => {
     expect(wrapper!.findComponent({ name: "FleetCreateConfigDialog" }).props("open")).toBe(false);
 
     const second = await goToOtherConfig();
-    leaveButton("o-dialog-neutral-btn")!.click();
+    clickLeave("o-dialog-neutral-btn");
     await second.navigation;
     expect(router.currentRoute.value.params.id).toBe("other");
     expect(fleet.createConfig).not.toHaveBeenCalled();
@@ -257,7 +253,7 @@ describe("FleetConfigEditor leave guard", () => {
     await mountEditor("edge");
     await editYaml(SECRET_YAML);
     const { navigation } = await goToOtherConfig();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -276,7 +272,7 @@ describe("FleetConfigEditor leave guard", () => {
     await mountEditor("edge");
     await editYaml(SECRET_YAML);
     const { navigation } = await goToOtherConfig();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -290,7 +286,7 @@ describe("FleetConfigEditor leave guard", () => {
     await editYaml(SECRET_YAML);
     const navigation = router.push({ name: "fleet" });
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await navigation;
     await flushPromises();
 
@@ -323,7 +319,7 @@ describe("FleetConfigEditor leave guard", () => {
 
     expect(await first).toBeTruthy();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     expect(await second).toBeUndefined();
     await flushPromises();
 
@@ -343,7 +339,7 @@ describe("FleetConfigEditor leave guard", () => {
     });
     const failed = router.push({ name: "fleet" }).catch((err: Error) => err);
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     expect(await failed).toBeInstanceOf(Error);
     await flushPromises();
     expect(router.currentRoute.value.params.id).toBe("edge");
@@ -382,7 +378,7 @@ describe("FleetConfigEditor leave guard", () => {
       expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
       expect(draftSessionEnded.value).toBe(false);
       expect(stopSessionServices).not.toHaveBeenCalled();
-      leaveButton("editor-draft-leave-save")?.click();
+      clickLeave("editor-draft-leave-save");
       await vi.waitFor(() => expect(fleet.saveConfigDraft).toHaveBeenCalled());
 
       expect(await signingOut).toBe(true);
@@ -418,7 +414,7 @@ describe("FleetConfigEditor leave guard", () => {
       expect(byTest("editor-draft-leave-sign-out")?.getAttribute("aria-label")).toBe(
         "Signing out also discards 1 other unsaved draft in this browser.",
       );
-      leaveButton("o-dialog-neutral-btn")!.click();
+      clickLeave("o-dialog-neutral-btn");
       expect(await signingOut).toBe(true);
     });
 
@@ -434,7 +430,7 @@ describe("FleetConfigEditor leave guard", () => {
       pressEscape();
       await flushPromises();
       expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-      leaveButton("o-dialog-neutral-btn")!.click();
+      clickLeave("o-dialog-neutral-btn");
 
       expect(await signingOut).toBe(true);
       expect(fleet.saveConfigDraft).not.toHaveBeenCalled();

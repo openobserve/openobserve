@@ -86,6 +86,7 @@ import {
 import slack from "@/services/slack";
 import { queryClient } from "@/composables/query/queryClient";
 import { installationView } from "@/test/unit/helpers/slack";
+import { clickIn } from "@/test/unit/helpers/draftDom";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
@@ -161,13 +162,14 @@ const makeTemplate = (idx: number) => ({
 
 // ── mount helper ─────────────────────────────────────────────────────────────
 
-function mountComponent() {
+function mountComponent({ realConfirm = false } = {}) {
   return mount(AlertsDestinationList, {
+    attachTo: realConfirm ? document.body : undefined,
     global: {
       plugins: [i18n, store, router],
       stubs: {
         OTable: OTableStub,
-        ConfirmDialog: ConfirmDialogStub,
+        ConfirmDialog: realConfirm ? false : ConfirmDialogStub,
         AddDestination: { template: '<div data-test="add-destination-stub" />' },
         ImportDestination: { template: '<div data-test="import-destination-stub" />' },
         NoData: { template: '<div data-test="no-data-stub" />' },
@@ -482,6 +484,10 @@ describe("AlertsDestinationList", () => {
   });
 
   describe("drafts", () => {
+    interface BulkDeleteVm {
+      handleSelectedIdsUpdate: (ids: string[]) => void;
+      bulkDeleteDestinations: () => Promise<void>;
+    }
     const scope = (entityId: string | null): EditorDraftScope => ({
       kind: "alert_destination",
       org: "default",
@@ -505,27 +511,33 @@ describe("AlertsDestinationList", () => {
       expect(add.find('[data-test="alert-destination-list-add-draft-dot"]').exists()).toBe(true);
       expect(add.attributes("aria-label")).toContain("unsaved draft");
       expect(
-        wrapper.find('[data-test="alert-destination-list-draft-dot-destination-2"]').exists(),
+        wrapper.find('[data-test="alert-destination-list-destination-2-draft-dot"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="alert-destination-list-draft-dot-destination-1"]').exists(),
+        wrapper.find('[data-test="alert-destination-list-destination-1-draft-dot"]').exists(),
       ).toBe(false);
     });
 
-    it("drops a deleted destination's draft and keeps it when the delete fails", async () => {
-      wrapper = mountComponent();
+    const deleteFromRow = async (name: string) => {
+      await wrapper!
+        .get(`[data-test="alert-destination-list-${name}-delete-destination"]`)
+        .trigger("click");
       await flushPromises();
-      const dest = (wrapper.vm as any).destinations[1];
+      clickIn("confirm-dialog", "o-dialog-primary-btn");
+      await flushPromises();
+    };
 
-      (destinationService.delete as any).mockRejectedValueOnce({ response: { status: 500 } });
-      (wrapper.vm as any).confirmDelete.data = dest;
-      (wrapper.vm as any).deleteDestination();
+    it("drops a deleted destination's draft and keeps it when the delete fails", async () => {
+      wrapper = mountComponent({ realConfirm: true });
       await flushPromises();
+
+      vi.mocked(destinationService.delete).mockRejectedValueOnce({ response: { status: 500 } });
+      await deleteFromRow("destination-2");
+      expect(destinationService.delete).toHaveBeenCalledTimes(1);
       expect(readEditorDraft(scope("destination-2"))).not.toBeNull();
 
-      (wrapper.vm as any).confirmDelete.data = dest;
-      (wrapper.vm as any).deleteDestination();
-      await flushPromises();
+      await deleteFromRow("destination-2");
+      expect(destinationService.delete).toHaveBeenCalledTimes(2);
       expect(readEditorDraft(scope("destination-2"))).toBeNull();
       expect(readEditorDraft(scope(null))).not.toBeNull();
     });
@@ -534,13 +546,13 @@ describe("AlertsDestinationList", () => {
       writeEditorDraft(scope("destination-1"), { data: {} });
       wrapper = mountComponent();
       await flushPromises();
-      const vm = wrapper.vm as any;
+      const vm = wrapper.vm as unknown as BulkDeleteVm;
       vm.handleSelectedIdsUpdate(["destination-1", "destination-2"]);
 
-      (destinationService.bulkDelete as any).mockResolvedValueOnce({ data: {} });
-      (destinationService.list as any).mockResolvedValue({
+      vi.mocked(destinationService.bulkDelete).mockResolvedValueOnce({ data: {} } as never);
+      vi.mocked(destinationService.list).mockResolvedValue({
         data: [makeDestination(1), makeDestination(3)],
-      });
+      } as never);
       await vm.bulkDeleteDestinations();
       await flushPromises();
 
@@ -552,11 +564,11 @@ describe("AlertsDestinationList", () => {
     it("keeps every bulk-delete draft when the fallback refetch fails", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      const vm = wrapper.vm as any;
+      const vm = wrapper.vm as unknown as BulkDeleteVm;
       vm.handleSelectedIdsUpdate(["destination-2"]);
 
-      (destinationService.bulkDelete as any).mockResolvedValueOnce({ data: {} });
-      (destinationService.list as any).mockRejectedValue({ response: { status: 500 } });
+      vi.mocked(destinationService.bulkDelete).mockResolvedValueOnce({ data: {} } as never);
+      vi.mocked(destinationService.list).mockRejectedValue({ response: { status: 500 } });
       await vm.bulkDeleteDestinations();
       await flushPromises();
 

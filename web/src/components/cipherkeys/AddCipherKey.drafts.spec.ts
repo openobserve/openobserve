@@ -31,6 +31,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import CipherKeys from "@/components/settings/CipherKeys.vue";
+import { byTest, click, clickLeave, clickRestore } from "@/test/unit/helpers/draftDom";
 import AddCipherKey from "./AddCipherKey.vue";
 import { addCipherKeyDefaults, type AddCipherKeyForm } from "./AddCipherKey.schema";
 
@@ -98,10 +99,6 @@ const mountPage = async (query: Record<string, string> = {}) => {
 
 const editor = () => wrapper!.findComponent(AddCipherKey);
 const form = () => (editor().vm as unknown as { form: CipherForm }).form;
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
-const leaveButton = (id: string) => inDialog("editor-draft-leave-dialog", id);
 
 const edit = async (field: string, value: unknown) => {
   window.dispatchEvent(new Event("pointerdown"));
@@ -110,7 +107,7 @@ const edit = async (field: string, value: unknown) => {
 };
 
 const clickCancel = async () => {
-  byTest("add-cipher-key-cancel-btn")?.click();
+  click("add-cipher-key-cancel-btn");
   await flushPromises();
 };
 
@@ -159,17 +156,17 @@ describe("AddCipherKey drafts", () => {
 
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("cipher key");
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("Secret");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(form().state.values.name).toBe("from_draft");
     expect(form().state.values.key.store.local).toBe("");
-    byTest("add-cipher-key-save-btn")?.click();
+    click("add-cipher-key-save-btn");
     await flushPromises();
     expect(service.create).not.toHaveBeenCalled();
 
     await fillField("add-cipher-key-openobserve-secret-input", "bmV3LXNlY3JldA==");
-    byTest("add-cipher-key-save-btn")?.click();
+    click("add-cipher-key-save-btn");
     await vi.waitFor(() => expect(service.create).toHaveBeenCalledTimes(1));
     expect(service.create.mock.calls[0][1].key.store.local).toBe("bmV3LXNlY3JldA==");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -208,7 +205,7 @@ describe("AddCipherKey drafts", () => {
     await mountPage({ action: "edit", name: "payments_key" });
 
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("DFC IV");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     const restored = form().state.values.key.store.akeyless;
     expect(restored.access_id).toBe("p-ab12cd");
@@ -216,13 +213,13 @@ describe("AddCipherKey drafts", () => {
     expect(restored.store.dfc.encrypted_data).toBe("ZW5jcnlwdGVk");
     expect(restored.store.dfc.iv).toBe("");
 
-    byTest("add-cipher-key-save-btn")?.click();
+    click("add-cipher-key-save-btn");
     await flushPromises();
     expect(service.update).not.toHaveBeenCalled();
     expect(byTest("add-cipher-key-akeyless-dfc-iv-input")?.textContent).toContain("Re-enter");
 
     await fillField("add-cipher-key-akeyless-dfc-iv-input", "aXYtbmV3");
-    byTest("add-cipher-key-save-btn")?.click();
+    click("add-cipher-key-save-btn");
     await vi.waitFor(() => expect(service.update).toHaveBeenCalledTimes(1));
     expect(service.update.mock.calls[0][1].key.store.akeyless.store.dfc.iv).toBe("aXYtbmV3");
   });
@@ -247,7 +244,7 @@ describe("AddCipherKey drafts", () => {
     writeEditorDraft(newScope, { data: draftOf((f) => (f.name = "from_draft")) });
     await mountPage({ action: "add" });
 
-    inDialog("editor-draft-restore-dialog", "o-dialog-secondary-btn")?.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
 
     expect(form().state.values.name).toBe("");
@@ -285,7 +282,7 @@ describe("AddCipherKey drafts", () => {
     wrapper!.unmount();
     await mountPage({ action: "edit", name: "payments_key" });
     expect(byTest("editor-draft-changed-on-server")).toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values.key.mechanism.type).toBe("tink_keyset");
     expect(form().state.values.key.store.local).toBe("c3VwZXItc2VjcmV0LWtleQ==");
@@ -312,7 +309,7 @@ describe("AddCipherKey drafts", () => {
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     expect(editor().exists()).toBe(true);
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(editor().exists()).toBe(false);
     expect(readEditorDraft(newScope)).toBeNull();
@@ -323,7 +320,7 @@ describe("AddCipherKey drafts", () => {
     await fillField("add-cipher-key-name-input", "kept_for_later");
 
     await clickCancel();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await flushPromises();
 
     expect(editor().exists()).toBe(false);
@@ -336,7 +333,7 @@ describe("AddCipherKey drafts", () => {
     service.list.mockReturnValue(new Promise(() => undefined));
 
     await clickCancel();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await flushPromises();
 
     expect(router.currentRoute.value.query.action).toBeUndefined();
@@ -369,7 +366,7 @@ describe("AddCipherKey drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
 
     expect(service.create).toHaveBeenCalledTimes(1);
@@ -384,7 +381,7 @@ describe("AddCipherKey drafts", () => {
     const navigation = router.push({ name: "cipherKeys", query: {} });
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
 
     expect(router.currentRoute.value.query.action).toBe("add");
@@ -397,8 +394,8 @@ describe("AddCipherKey drafts", () => {
 
     expect(byTest("cipher-keys-add-draft-dot")).not.toBeNull();
     expect(byTest("cipher-keys-add-btn")?.getAttribute("aria-label")).toContain("unsaved draft");
-    await vi.waitFor(() => expect(byTest("cipher-keys-draft-dot-payments_key")).not.toBeNull());
-    expect(byTest("cipher-keys-draft-dot-audit_key")).toBeNull();
+    await vi.waitFor(() => expect(byTest("cipher-keys-payments_key-draft-dot")).not.toBeNull());
+    expect(byTest("cipher-keys-audit_key-draft-dot")).toBeNull();
   });
 
   it("deleting a key drops its drafts, singly and in bulk", async () => {
@@ -422,6 +419,6 @@ describe("AddCipherKey drafts", () => {
     list.bulkDeleteCipherKeys();
     await flushPromises();
     expect(readEditorDraft(editScope)).toBeNull();
-    expect(byTest("cipher-keys-draft-dot-payments_key")).toBeNull();
+    expect(byTest("cipher-keys-payments_key-draft-dot")).toBeNull();
   });
 });

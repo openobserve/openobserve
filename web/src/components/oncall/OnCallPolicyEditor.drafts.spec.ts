@@ -31,6 +31,7 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, click, clickIn, pressEscape } from "@/test/unit/helpers/draftDom";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -118,11 +119,8 @@ const mountEditor = async () => {
   await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
 const choose = async (dialog: string, id: string) => {
-  inDialog(dialog, id)!.click();
+  clickIn(dialog, id);
   await flushPromises();
 };
 const smsBox = () =>
@@ -194,7 +192,7 @@ describe("OnCallPolicyEditor drafts", () => {
     await mountEditor();
     await tickSms();
 
-    byTest("o-drawer-close-btn")!.click();
+    click("o-drawer-close-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     expect(open.value).toBe(true);
@@ -207,7 +205,7 @@ describe("OnCallPolicyEditor drafts", () => {
   it("closing the leave dialog keeps the drawer open with the edit", async () => {
     await mountEditor();
     await tickSms();
-    byTest("o-drawer-close-btn")!.click();
+    click("o-drawer-close-btn");
     await flushPromises();
 
     await choose("editor-draft-leave-dialog", "o-dialog-close-btn");
@@ -250,6 +248,27 @@ describe("OnCallPolicyEditor drafts", () => {
     expect(smsBox()?.getAttribute("aria-checked")).toBe("false");
   });
 
+  it("Escape on the restore dialog keeps the draft and opens on the stored policy", async () => {
+    writeEditorDraft(scope, {
+      data: {
+        rungs: [{ ...policy.rungs[0], channels: ["email", "sms"] }],
+        destinations: [],
+        repeatCount: 1,
+        finalAction: "stop",
+        l0: null,
+      },
+    });
+    await mountEditor();
+    expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
+    pressEscape();
+    await flushPromises();
+
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(open.value).toBe(true);
+    expect(smsBox()?.getAttribute("aria-checked")).toBe("false");
+    expect(readEditorDraft(scope)).not.toBeNull();
+  });
+
   it("a restored triage gate reaches the AI triage editor", async () => {
     writeEditorDraft(scope, {
       data: {
@@ -276,7 +295,7 @@ describe("OnCallPolicyEditor drafts", () => {
   it("the leave dialog's Save stores the policy and closes the drawer without navigating", async () => {
     await mountEditor();
     await tickSms();
-    byTest("o-drawer-close-btn")!.click();
+    click("o-drawer-close-btn");
     await flushPromises();
 
     await choose("editor-draft-leave-dialog", "editor-draft-leave-save");
@@ -294,11 +313,11 @@ describe("OnCallPolicyEditor drafts", () => {
     service.setPolicy.mockRejectedValueOnce({ response: { status: 403 } });
     await mountEditor();
     await tickSms();
-    byTest("oncall-policy-save")!.click();
+    click("oncall-policy-save");
     await flushPromises();
     vi.mocked(toast).mockClear();
 
-    byTest("o-drawer-close-btn")!.click();
+    click("o-drawer-close-btn");
     await flushPromises();
     await choose("editor-draft-leave-dialog", "editor-draft-leave-save");
 
@@ -332,7 +351,7 @@ describe("OnCallPolicyEditor drafts", () => {
     await flushPromises();
     vi.mocked(toast).mockClear();
 
-    byTest("o-drawer-close-btn")!.click();
+    click("o-drawer-close-btn");
     await flushPromises();
     await choose("editor-draft-leave-dialog", "editor-draft-leave-save");
 
@@ -366,7 +385,7 @@ describe("OnCallPolicyEditor drafts", () => {
     editor.policyTab = "triage";
     await flushPromises();
 
-    byTest("o-drawer-close-btn")!.click();
+    click("o-drawer-close-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(open.value).toBe(false);

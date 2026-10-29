@@ -176,7 +176,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
         <EditorDraftDot
           v-if="roleDrafts.ids.has(row?.role_name)"
           :saved-at="roleDrafts.savedAt(row?.role_name)"
-          :data-test="`iam-roles-draft-dot-${row?.role_name}`"
+          :data-test="`iam-roles-${row?.role_name}-draft-dot`"
         />
       </span>
     </template>

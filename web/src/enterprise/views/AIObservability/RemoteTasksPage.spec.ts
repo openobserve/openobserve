@@ -243,8 +243,8 @@ describe("RemoteTasksPage", () => {
 
     expect(wrapper.find('[data-test="ai-remote-tasks-new-draft-dot"]').exists()).toBe(true);
     expect(newButton.attributes("aria-label")).toBe("New Task · unsaved draft");
-    expect(wrapper.find('[data-test="ai-remote-tasks-draft-dot-head-2"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="ai-remote-tasks-draft-dot-head-1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-remote-tasks-head-2-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-remote-tasks-head-1-draft-dot"]').exists()).toBe(false);
   });
 
   it("deleting a task drops its drafts; a failed delete keeps them", async () => {

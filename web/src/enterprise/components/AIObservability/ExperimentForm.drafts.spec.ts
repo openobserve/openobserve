@@ -32,6 +32,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import ExperimentForm from "./ExperimentForm.vue";
 import {
   experimentFormDefaults,
@@ -161,12 +162,6 @@ const fillValid = async () => {
   await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 describe("ExperimentForm drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -218,11 +213,7 @@ describe("ExperimentForm drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(document.body.querySelector('[data-test="editor-draft-leave-dialog"]')).not.toBeNull();
-    document.body
-      .querySelector<HTMLElement>(
-        '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-close-btn"]',
-      )
-      ?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
     expect(router.currentRoute.value.name).toBe("aiExperimentCreate");
   });
@@ -236,7 +227,7 @@ describe("ExperimentForm drafts", () => {
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain(
       "unsaved changes to this experiment",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(form().state.values).toMatchObject({
@@ -244,6 +235,25 @@ describe("ExperimentForm drafts", () => {
       datasetId: "ds-1",
       trialCount: 4,
     });
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    writeEditorDraft(newScope, {
+      data: { ...experimentFormDefaults("ds-1"), name: "restored run" },
+    });
+    await mountForm();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(form().state.values.name).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+    wrapper!.unmount();
+
+    await mountForm();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(form().state.values.name).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
   });
 
   it("a continued managed-prompt draft keeps its own model and temperature", async () => {
@@ -265,7 +275,7 @@ describe("ExperimentForm drafts", () => {
       },
     });
     await mountForm();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(llmPromptsService.resolve).toHaveBeenCalled();
@@ -294,11 +304,11 @@ describe("ExperimentForm drafts", () => {
     await edit("name", "to discard");
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("ai-experiment-form-back-btn")?.click();
+    click("ai-experiment-form-back-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("aiExperiments");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -310,7 +320,7 @@ describe("ExperimentForm drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -325,7 +335,7 @@ describe("ExperimentForm drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -339,7 +349,7 @@ describe("ExperimentForm drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
 
     expect(router.currentRoute.value.name).toBe("logs");

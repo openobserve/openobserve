@@ -248,9 +248,9 @@ describe("OnCallPolicies - editor drafts", () => {
     localStorage.clear();
     vi.clearAllMocks();
     resetListViewState();
-    service.listTeams.mockResolvedValue({ data: TEAMS } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
+    service.listTeams.mockResolvedValue({ data: TEAMS } as never);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as never);
+    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as never);
   });
 
   it("dots the team whose escalation policy has an unsaved draft", async () => {
@@ -281,8 +281,8 @@ describe("OnCallPolicies - editor drafts", () => {
     });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-policies-draft-dot-t2"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-policies-draft-dot-t1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-policies-t2-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-policies-t1-draft-dot"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("Platform");
   });
 });

@@ -1286,10 +1286,12 @@ describe("PipelinesList", () => {
           },
         },
       });
-      await flushPromises();
       // OTable holds its skeleton for MIN_SKELETON_MS before rows render.
-      await new Promise((r) => setTimeout(r, 80));
-      await nextTick();
+      await vi.waitFor(() =>
+        expect(rows.find('[data-test="pipeline-list-name-cell-Test Pipeline 1"]').exists()).toBe(
+          true,
+        ),
+      );
       return rows;
     };
 
@@ -1300,9 +1302,9 @@ describe("PipelinesList", () => {
       seed(draftScope("pipeline2", "other@x.io"));
       const rows = await mountRows();
 
-      const dot = rows.get('[data-test="pipeline-list-draft-dot-Test Pipeline 1"]');
+      const dot = rows.get('[data-test="pipeline-list-Test Pipeline 1-draft-dot"]');
       expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
-      expect(rows.find('[data-test="pipeline-list-draft-dot-Test Pipeline 2"]').exists()).toBe(
+      expect(rows.find('[data-test="pipeline-list-Test Pipeline 2-draft-dot"]').exists()).toBe(
         false,
       );
       rows.unmount();

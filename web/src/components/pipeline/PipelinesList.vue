@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <EditorDraftDot
                 v-if="pipelineDrafts.ids.has(row.pipeline_id)"
                 :saved-at="pipelineDrafts.savedAt(row.pipeline_id)"
-                :data-test="`pipeline-list-draft-dot-${row.name}`"
+                :data-test="`pipeline-list-${row.name}-draft-dot`"
               />
             </span>
           </template>

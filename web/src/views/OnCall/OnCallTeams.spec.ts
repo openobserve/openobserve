@@ -645,11 +645,11 @@ describe("OnCallTeams - editor drafts", () => {
     __resetOnCallRoutingConfig();
     resetListViewState();
     vi.clearAllMocks();
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as never);
+    service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as never);
     service.listTeams.mockResolvedValue({
       data: [team("team_1", "Platform"), team("team_2", "Payments")],
-    } as any);
+    } as never);
   });
 
   it("dots a team whose rotation or escalation policy has an unsaved draft", async () => {
@@ -664,8 +664,8 @@ describe("OnCallTeams - editor drafts", () => {
     });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-teams-draft-dot-team_1"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-teams-draft-dot-team_2"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-teams-team_1-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-teams-team_2-draft-dot"]').exists()).toBe(true);
   });
 
   it("drops a deleted team's policy and rotation drafts, and keeps another team's", async () => {
@@ -681,7 +681,7 @@ describe("OnCallTeams - editor drafts", () => {
     writeEditorDraft(scopeOf("oncall_schedule", "team_10/rot_a"), { data: {} });
     writeEditorDraft(scopeOf("oncall_policy", "team_1"), { data: {} });
     writeEditorDraft(scopeOf("oncall_policy", "team_2"), { data: {} });
-    service.deleteTeam.mockResolvedValue({ data: {} } as any);
+    service.deleteTeam.mockResolvedValue({ data: {} } as never);
     const wrapper = render();
     await flushPromises();
     await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");

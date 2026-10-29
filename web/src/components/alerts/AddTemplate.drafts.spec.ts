@@ -28,6 +28,8 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
+import { fillField } from "@/test/unit/helpers/fillField";
 import { emptyContentSpec } from "./template-content/contentSpec";
 import AddTemplate from "./AddTemplate.vue";
 
@@ -125,12 +127,6 @@ const edit = async (field: string, value: unknown) => {
   await nextTick();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 describe("AddTemplate drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -167,7 +163,7 @@ describe("AddTemplate drafts", () => {
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain(
       "unsaved changes to this alert template",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(form().state.values).toMatchObject({
@@ -175,6 +171,42 @@ describe("AddTemplate drafts", () => {
       kind: "custom",
       body: '{"a":1}',
     });
+  });
+
+  it("drafts a name filled with no key or pointer event, and Cancel asks", async () => {
+    await mountEditor();
+    await fillField("add-template-name-input", "autofilled_tpl");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft<{ values: { name: string } }>(newScope)?.data.values.name).toBe(
+      "autofilled_tpl",
+    );
+
+    await wrapper!.get('[data-test="add-template-cancel-btn"]').trigger("click");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    expect(emitted.cancel).toBe(0);
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    const draft = {
+      values: { name: "from_draft", type: "http", kind: "custom", title: "", body: '{"a":1}' },
+      contentSpec: emptyContentSpec(),
+      customBodyStash: null,
+    };
+    writeEditorDraft(newScope, { data: draft });
+    await mountEditor();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(form().state.values.name).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+
+    wrapper!.unmount();
+    await mountEditor();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(form().state.values.name).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
   });
 
   it("a clone neither offers nor overwrites the new-template draft, and keeps its own", async () => {
@@ -225,7 +257,7 @@ describe("AddTemplate drafts", () => {
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     expect(emitted.cancel).toBe(0);
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(emitted.cancel).toBe(1);
     expect(readEditorDraft(newScope)).toBeNull();
@@ -237,7 +269,7 @@ describe("AddTemplate drafts", () => {
 
     await wrapper!.get('[data-test="add-template-cancel-btn"]').trigger("click");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await vi.waitFor(() => expect(emitted.cancel).toBe(1));
 
     expect(templateService.create).toHaveBeenCalledTimes(1);
@@ -252,7 +284,7 @@ describe("AddTemplate drafts", () => {
     const navigation = router.push({ name: "alertTemplates", query: {} });
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
 
     expect(router.currentRoute.value.query.action).toBe("add");
@@ -264,7 +296,7 @@ describe("AddTemplate drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
 
     expect(router.currentRoute.value.name).toBe("logs");

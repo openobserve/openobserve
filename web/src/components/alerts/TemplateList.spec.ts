@@ -398,7 +398,7 @@ describe("alertTemplates view state restore", () => {
 });
 
 describe("TemplateList drafts", () => {
-  let wrapper: any;
+  let wrapper: VueWrapper;
   const scope = (entityId: string | null): EditorDraftScope => ({
     kind: "alert_template",
     org: "default",
@@ -410,7 +410,7 @@ describe("TemplateList drafts", () => {
     localStorage.clear();
     writeEditorDraft(scope(null), { data: {} });
     writeEditorDraft(scope("Template2"), { data: {} });
-    (router as any).currentRoute.value.query = {};
+    router.currentRoute.value.query = {};
     resetListViewState();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     wrapper = mount(TemplateList, {
@@ -490,7 +490,7 @@ describe("TemplateList drafts", () => {
       http.delete(`${templatesUrl}/Template2`, () => HttpResponse.json({ code: 200 })),
       http.get(templatesUrl, () =>
         HttpResponse.json(
-          alertsFixture.templates.get.filter((tpl: any) => tpl.name !== "Template2"),
+          alertsFixture.templates.get.filter((tpl: { name: string }) => tpl.name !== "Template2"),
         ),
       ),
     );

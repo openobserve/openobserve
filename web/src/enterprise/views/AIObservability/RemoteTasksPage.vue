@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="taskDrafts.ids.has(row.entityId)"
               :saved-at="taskDrafts.savedAt(row.entityId)"
               class="shrink-0"
-              :data-test="`ai-remote-tasks-draft-dot-${row.entityId}`"
+              :data-test="`ai-remote-tasks-${row.entityId}-draft-dot`"
             />
           </div>
         </template>

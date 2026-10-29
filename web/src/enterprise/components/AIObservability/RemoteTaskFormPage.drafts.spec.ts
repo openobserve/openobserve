@@ -30,6 +30,7 @@ import {
 } from "@/utils/drafts/editorDraftStore";
 import { fillField } from "@/test/unit/helpers/fillField";
 import { blankSecretLists } from "@/utils/drafts/redactDraftSecrets";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import RemoteTaskFormPage from "./RemoteTaskFormPage.vue";
 import {
   remoteTaskFormDefaults,
@@ -144,12 +145,6 @@ const edit = async (field: string, value: unknown) => {
   await nextTick();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
-const leaveButton = (id: string) => inDialog("editor-draft-leave-dialog", id);
-const restoreButton = (id: string) => inDialog("editor-draft-restore-dialog", id);
-
 const published = { published: true, versionBumped: true, task: { version: 1 }, report: null };
 
 describe("RemoteTaskFormPage drafts", () => {
@@ -176,7 +171,7 @@ describe("RemoteTaskFormPage drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
     expect(router.currentRoute.value.name).toBe("aiRemoteTaskCreate");
   });
@@ -196,7 +191,7 @@ describe("RemoteTaskFormPage drafts", () => {
       "Your change to the token was not kept.",
     );
 
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values).toMatchObject({ name: "restored", authType: "bearer", token: "" });
   });
@@ -205,7 +200,7 @@ describe("RemoteTaskFormPage drafts", () => {
     writeEditorDraft(newScope, { data: { ...remoteTaskFormDefaults(), name: "old" } });
     await mountAt("/ai/remote-tasks/new");
 
-    restoreButton("o-dialog-secondary-btn")?.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
     expect(form().state.values.name).toBe("");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -215,7 +210,7 @@ describe("RemoteTaskFormPage drafts", () => {
     writeEditorDraft(newScope, { data: { ...remoteTaskFormDefaults(), name: "old" } });
     await mountAt("/ai/remote-tasks/new");
 
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    pressEscape();
     await flushPromises();
     expect(byTest("editor-draft-restore-dialog")).toBeNull();
     expect(form().state.values.name).toBe("");
@@ -262,7 +257,7 @@ describe("RemoteTaskFormPage drafts", () => {
       "Signing keys are not kept in this browser",
     );
     expect(byTest("editor-draft-continue")?.textContent).toContain("Continue editing");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values.signingEnabled).toBe(true);
     expect(form().state.values.signingKey).not.toBe("");
@@ -276,7 +271,7 @@ describe("RemoteTaskFormPage drafts", () => {
     expect(key.compareDocumentPosition(notice!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(notice?.textContent).not.toContain("copy");
 
-    byTest("ai-remote-task-form-signing-key-regenerate")?.click();
+    click("ai-remote-task-form-signing-key-regenerate");
     await flushPromises();
     expect(byTest("ai-remote-task-form-signing-key-regenerated")).toBeNull();
   });
@@ -295,7 +290,7 @@ describe("RemoteTaskFormPage drafts", () => {
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
       "Your change to the endpoint URL was not kept.",
     );
-    byTest("editor-draft-continue")!.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values).toMatchObject({ name: "summarizer", endpoint: "" });
   });
@@ -323,7 +318,7 @@ describe("RemoteTaskFormPage drafts", () => {
       changedRedactedPaths: ["/token"],
     });
     await mountAt("/ai/remote-tasks/new");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     await edit("authType", "none");
@@ -386,7 +381,7 @@ describe("RemoteTaskFormPage drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
     expect(router.currentRoute.value.name).toBe("aiRemoteTaskCreate");
   });
@@ -425,7 +420,7 @@ describe("RemoteTaskFormPage drafts", () => {
     });
     await mountAt("/ai/remote-tasks/new");
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("X-Api-Key header");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     await form().handleSubmit();
@@ -446,7 +441,7 @@ describe("RemoteTaskFormPage drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -467,7 +462,7 @@ describe("RemoteTaskFormPage drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -479,19 +474,19 @@ describe("RemoteTaskFormPage drafts", () => {
     await edit("name", "kept");
     let navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
     expect(router.currentRoute.value.name).toBe("logs");
     expect(readEditorDraft<RemoteTaskFormValues>(newScope)?.data.name).toBe("kept");
 
     await router.push("/ai/remote-tasks/new");
     await flushPromises();
-    restoreButton("o-dialog-secondary-btn")?.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
     await edit("name", "dropped");
     navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await navigation;
     expect(router.currentRoute.value.name).toBe("logs");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -501,10 +496,10 @@ describe("RemoteTaskFormPage drafts", () => {
     await mountAt("/ai/remote-tasks/new");
     await edit("name", "to discard");
 
-    byTest("ai-remote-task-form-cancel-btn")?.click();
+    click("ai-remote-task-form-cancel-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("aiRemoteTasks");
   });

@@ -29,6 +29,7 @@ import {
 } from "@/utils/drafts/editorDraftStore";
 import { fillField } from "@/test/unit/helpers/fillField";
 import AiToolsets from "@/components/settings/AiToolsets.vue";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import AddAiToolset from "./AddAiToolset.vue";
 
 vi.mock("@/services/ai_toolsets", () => ({
@@ -136,16 +137,6 @@ const noticeVariants = () =>
     .map(([arg]) => (arg as { variant: string }).variant)
     .filter((variant) => variant !== "loading");
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-const restoreButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-restore-dialog"] [data-test="${id}"]`,
-  );
-
 describe("AddAiToolset drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -192,6 +183,20 @@ describe("AddAiToolset drafts", () => {
     expect(note).toContain("credential file KUBECONFIG");
   });
 
+  it("names a header value with no header name in lowercase, as part of the sentence", async () => {
+    await mountPage();
+    await edit({
+      name: "ops_mcp",
+      "mcp.headers": [{ key: "", value: "unnamed-secret", visible: false }],
+    });
+    window.dispatchEvent(new Event("pagehide"));
+
+    await remount();
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "Your change to the headers was not kept.",
+    );
+  });
+
   it("counts a name typed with no key or pointer event", async () => {
     await mountPage();
     await fillField("ai-toolset-name-input", "filled_toolset");
@@ -205,7 +210,7 @@ describe("AddAiToolset drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(editScope)).toBeNull();
 
-    byTest("ai-toolset-cancel-btn")?.click();
+    click("ai-toolset-cancel-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(router.currentRoute.value.query.action).toBeUndefined();
@@ -220,15 +225,14 @@ describe("AddAiToolset drafts", () => {
     expect(byTest("editor-draft-restore-message")?.textContent).toContain(
       "unsaved changes to this AI toolset",
     );
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    pressEscape();
     await flushPromises();
-    if (byTest("editor-draft-restore-dialog")) restoreButton("o-dialog-close-btn")?.click();
-    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
     expect(form().state.values.name).toBe("");
     expect(readEditorDraft(newScope)).not.toBeNull();
 
     await remount();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values).toMatchObject({
       name: "draft_tool",
@@ -236,7 +240,7 @@ describe("AddAiToolset drafts", () => {
     });
 
     await remount();
-    restoreButton("o-dialog-secondary-btn")?.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
     expect(readEditorDraft(newScope)).toBeNull();
     expect(form().state.values.name).toBe("");
@@ -262,7 +266,7 @@ describe("AddAiToolset drafts", () => {
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
       "Your change to the Authorization header was not kept.",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values.description).toBe("Edited");
     expect(form().state.values.mcp.headers).toEqual([
@@ -299,7 +303,7 @@ describe("AddAiToolset drafts", () => {
     await remount({ action: "edit", id: "ts1" });
     expect(byTest("editor-draft-changed-on-server")).toBeNull();
     expect(byTest("editor-draft-credentials-not-saved")).toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values).toMatchObject({
       description: "Edited",
@@ -317,7 +321,7 @@ describe("AddAiToolset drafts", () => {
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
       "Your change to the Endpoint URL was not kept.",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values.mcp.url).toBe("");
     expect(form().getFieldMeta("mcp.url")?.errors?.length).toBeGreaterThan(0);
@@ -376,7 +380,7 @@ describe("AddAiToolset drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
 
     await remount();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     await form().handleSubmit();
     await flushPromises();
@@ -410,7 +414,7 @@ describe("AddAiToolset drafts", () => {
 
     await remount({ action: "edit", id: "ts1" });
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("KUBECONFIG");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(byTest("ai-toolset-cred-file-reenter-0")).not.toBeNull();
     expect(byTest("ai-toolset-cred-file-reenter-0")?.classList).toContain("text-status-error-text");
@@ -423,7 +427,7 @@ describe("AddAiToolset drafts", () => {
   it("Cancel asks; Keep draft returns to the list with a dot on Add, Discard drops it", async () => {
     await mountPage();
     await edit({ name: "kept_tool" });
-    byTest("ai-toolset-cancel-btn")?.click();
+    click("ai-toolset-cancel-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     // A slow list reload must not remount the editor and offer the draft just kept.
@@ -437,7 +441,7 @@ describe("AddAiToolset drafts", () => {
             } as never);
         }),
     );
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await flushPromises();
     expect(byTest("editor-draft-restore-dialog")).toBeNull();
     expect(wrapper!.findComponent(AddAiToolset).exists()).toBe(false);
@@ -451,11 +455,11 @@ describe("AddAiToolset drafts", () => {
     expect(add.attributes("aria-label")).toBe("New AI Toolset · unsaved draft");
 
     await remount();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
-    byTest("ai-toolset-back-btn")?.click();
+    click("ai-toolset-back-btn");
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(router.currentRoute.value.query.action).toBeUndefined();
     expect(readEditorDraft(newScope)).toBeNull();
@@ -467,7 +471,7 @@ describe("AddAiToolset drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -491,7 +495,7 @@ describe("AddAiToolset drafts", () => {
   it("marks a toolset row with a draft and drops the draft when the toolset is deleted", async () => {
     writeEditorDraft(editScope, { data: { name: "github_mcp" } });
     await mountPage({});
-    expect(byTest("ai-toolsets-draft-dot-github_mcp")).not.toBeNull();
+    expect(byTest("ai-toolsets-github_mcp-draft-dot")).not.toBeNull();
 
     const page = wrapper!.findComponent(AiToolsets).vm as unknown as {
       confirmDeleteToolset: (row: { id: string; name: string }) => void;

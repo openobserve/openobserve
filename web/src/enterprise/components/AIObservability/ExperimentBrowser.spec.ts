@@ -630,7 +630,7 @@ describe("ExperimentBrowser", () => {
       props: {
         orgId: "acme",
         experiments: [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)],
-        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as never,
       },
       global: { stubs, plugins: [store] },
     });
@@ -656,7 +656,7 @@ describe("ExperimentBrowser", () => {
       props: {
         orgId: "acme",
         experiments: [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)],
-        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as never,
       },
       global: { stubs, plugins: [store] },
     });

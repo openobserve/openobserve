@@ -30,12 +30,14 @@ import { SEEDS } from "@/components/fleet/editor/editorGraph.fixtures";
 import { setPendingImport } from "@/components/fleet/useFleetApi";
 import FleetConfigEditor from "./FleetConfigEditor.vue";
 
+type CapturedGuard = (to?: unknown, from?: unknown) => unknown;
+
 const { toastMock, focusMock, revealMock, canvasMounts, routeGuards } = vi.hoisted(() => ({
   toastMock: vi.fn(),
   focusMock: vi.fn(),
   revealMock: vi.fn(),
   canvasMounts: vi.fn(),
-  routeGuards: { leave: [] as any[], update: [] as any[] },
+  routeGuards: { leave: [] as CapturedGuard[], update: [] as CapturedGuard[] },
 }));
 
 // The editor is mounted outside a router-view, so the guards are captured and called directly.
@@ -43,8 +45,8 @@ vi.mock("vue-router", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    onBeforeRouteLeave: (guard: unknown) => routeGuards.leave.push(guard),
-    onBeforeRouteUpdate: (guard: unknown) => routeGuards.update.push(guard),
+    onBeforeRouteLeave: (guard: CapturedGuard) => routeGuards.leave.push(guard),
+    onBeforeRouteUpdate: (guard: CapturedGuard) => routeGuards.update.push(guard),
   };
 });
 
@@ -469,7 +471,11 @@ describe("FleetConfigEditor", () => {
   });
 
   describe("unsaved changes", () => {
-    type Guard = (to?: unknown, from?: unknown) => boolean | Promise<boolean>;
+    const last = (guards: CapturedGuard[]): CapturedGuard => {
+      const guard = guards.at(-1);
+      if (!guard) throw new Error("The editor registered no route guard");
+      return guard;
+    };
     interface LeaveVm {
       leaveOpen: boolean;
       chooseLeave: (choice: "stay" | "discard") => Promise<void>;
@@ -477,7 +483,7 @@ describe("FleetConfigEditor", () => {
     const leaveVm = () => wrapper.vm as unknown as LeaveVm;
     /** Runs a guard and answers the leave dialog when it opens. */
     const run = async (
-      guard: Guard,
+      guard: CapturedGuard,
       answer: "stay" | "discard" = "stay",
       to?: unknown,
       from?: unknown,
@@ -489,7 +495,7 @@ describe("FleetConfigEditor", () => {
       return { asked, allowed: await pending };
     };
     const leave = (answer?: "stay" | "discard") =>
-      run(routeGuards.leave.at(-1), answer, { fullPath: "/fleet" }, { fullPath: "/fleet/edge" });
+      run(last(routeGuards.leave), answer, { fullPath: "/fleet" }, { fullPath: "/fleet/edge" });
     const unload = () => {
       const e = new Event("beforeunload", { cancelable: true });
       window.dispatchEvent(e);
@@ -556,7 +562,7 @@ describe("FleetConfigEditor", () => {
       await edit(wrapper, "first: 1\n");
       let result: unknown;
       const push = vi.spyOn(router, "push").mockImplementation(async (target) => {
-        result = await run(routeGuards.leave.at(-1), "stay", router.resolve(target));
+        result = await run(last(routeGuards.leave), "stay", router.resolve(target));
       });
       await wrapper.find('[data-test="fleet-config-editor-delete"]').trigger("click");
       await flushPromises();
@@ -568,7 +574,7 @@ describe("FleetConfigEditor", () => {
       push.mockRestore();
       await vi.waitFor(() => expect(result).toEqual({ asked: false, allowed: true }));
       // The allowance was for the list only, so another target still asks.
-      expect(await run(routeGuards.leave.at(-1), "stay", { fullPath: "/elsewhere" })).toEqual({
+      expect(await run(last(routeGuards.leave), "stay", { fullPath: "/elsewhere" })).toEqual({
         asked: true,
         allowed: false,
       });
@@ -581,7 +587,7 @@ describe("FleetConfigEditor", () => {
       let result: unknown;
       const replace = vi.spyOn(router, "replace").mockImplementation(async () => {
         result = await run(
-          routeGuards.update.at(-1),
+          last(routeGuards.update),
           "stay",
           { params: { id: "fresh" } },
           { params: { id: "new" } },
@@ -666,7 +672,7 @@ describe("FleetConfigEditor", () => {
     it("asks only when the route moves to another config", async () => {
       wrapper = await mountEditor("edge");
       await edit(wrapper, "first: 1\n");
-      const update = routeGuards.update.at(-1);
+      const update = last(routeGuards.update);
       expect(update({ params: { id: "edge" } }, { params: { id: "edge" } })).toBe(true);
       expect(
         await run(update, "stay", { params: { id: "other" } }, { params: { id: "edge" } }),

@@ -27,6 +27,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { getAllRolePermissions, updateRole } from "@/services/iam";
+import { byTest, click, clickLeave, clickRestore } from "@/test/unit/helpers/draftDom";
 import EditRole from "./EditRole.vue";
 
 vi.setConfig({ testTimeout: 20000 });
@@ -126,11 +127,8 @@ const mountEditor = async () => {
 };
 
 const vm = () => wrapper!.findComponent(EditRole).vm as unknown as RoleVm;
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
 const leaveChoice = async (id: string) => {
-  inDialog("editor-draft-leave-dialog", id)!.click();
+  clickLeave(id);
   await flushPromises();
 };
 
@@ -176,7 +174,7 @@ describe("EditRole drafts", () => {
     await mountEditor();
     expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
 
-    inDialog("editor-draft-restore-dialog", "editor-draft-continue")!.click();
+    clickRestore("editor-draft-continue");
     await flushPromises();
     await flushPromises();
 
@@ -193,7 +191,7 @@ describe("EditRole drafts", () => {
       data: { ...draftData, added: [], addedUsers: [], removedUsers: ["u1@x.io"] },
     });
     await mountEditor();
-    inDialog("editor-draft-restore-dialog", "editor-draft-continue")!.click();
+    clickRestore("editor-draft-continue");
     await flushPromises();
     await flushPromises();
 
@@ -206,7 +204,7 @@ describe("EditRole drafts", () => {
   it("Start fresh drops the draft and stages nothing", async () => {
     seedDraft();
     await mountEditor();
-    inDialog("editor-draft-restore-dialog", "o-dialog-secondary-btn")!.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
 
     expect(readEditorDraft(scope)).toBeNull();
@@ -296,7 +294,7 @@ describe("EditRole drafts", () => {
     await vi.advanceTimersByTimeAsync(1100);
     expect(readEditorDraft(scope)).not.toBeNull();
 
-    byTest("edit-role-save-btn")!.click();
+    click("edit-role-save-btn");
     await flushPromises();
 
     expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);

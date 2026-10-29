@@ -1729,7 +1729,7 @@ describe("Commons Utility Functions", () => {
       localStorage.clear();
       mockStore.state.organizationData.allDashboardList = {};
       mockStore.state.organizationData.allDashboardData = {};
-      (dashboardService.delete as any).mockResolvedValue({ success: true });
+      vi.mocked(dashboardService.delete).mockResolvedValue({ success: true } as never);
       writeEditorDraft(settingsDraftScope("dashboard-gone"), { data: { tab: "generalSettings" } });
       writeEditorDraft(settingsDraftScope("dashboard-kept"), { data: { tab: "generalSettings" } });
 

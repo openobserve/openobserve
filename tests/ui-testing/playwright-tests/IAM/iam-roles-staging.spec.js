@@ -159,11 +159,11 @@ test.describe('IAM · Edit Role · staged changes', { tag: '@enterprise' }, () =
         await pm.rolesPage.grantScope('function', 'AllowList');
 
         await pm.rolesPage.cancelButton.click();
-        // A leave guard may stand in the way; discarding is the point of the test.
+        // A staged change always asks before leaving; discarding is the point of the test.
         const confirm = page.locator('[data-test="editor-draft-leave-dialog"]');
-        if (await confirm.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await confirm.locator('[data-test="o-dialog-neutral-btn"]').click();
-        }
+        await expect(confirm).toBeVisible({ timeout: 10000 });
+        await confirm.locator('[data-test="o-dialog-neutral-btn"]').click();
+        await expect(confirm).toBeHidden();
         await page.waitForTimeout(2000);
         expect(await getPerms(page, name)).toEqual([]);
     });

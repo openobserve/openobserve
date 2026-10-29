@@ -28,6 +28,7 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, click, clickIn, clickLeave, clickRestore } from "@/test/unit/helpers/draftDom";
 import RegexPatternList from "./RegexPatternList.vue";
 import AddRegexPattern from "./AddRegexPattern.vue";
 
@@ -129,16 +130,11 @@ const openEdit = async () => {
   await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
-const leaveButton = (id: string) => inDialog("editor-draft-leave-dialog", id);
 // A click into the field, then typed text: the path every user takes, apart from autofill.
 const clickAndType = async (dataTest: string, value: string) => {
   window.dispatchEvent(new Event("pointerdown"));
   await fillField(dataTest, value);
 };
-const drawerButton = (id: string) => inDialog("regex-pattern-list-add-regex-pattern-drawer", id);
 
 describe("AddRegexPattern drafts", () => {
   beforeEach(() => {
@@ -178,7 +174,7 @@ describe("AddRegexPattern drafts", () => {
     await openNew();
 
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("regex pattern");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(regexForm().state.values).toMatchObject(draftData());
@@ -189,7 +185,7 @@ describe("AddRegexPattern drafts", () => {
     await mountPage();
     await openNew();
 
-    inDialog("editor-draft-restore-dialog", "o-dialog-secondary-btn")?.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
 
     expect(regexForm().state.values.name).toBe("");
@@ -235,12 +231,12 @@ describe("AddRegexPattern drafts", () => {
     await clickAndType("add-regex-pattern-name-input", "not_kept");
     window.dispatchEvent(new Event("pagehide"));
 
-    drawerButton("o-drawer-secondary-btn")?.click();
+    clickIn("regex-pattern-list-add-regex-pattern-drawer", "o-drawer-secondary-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     expect(drawerOpen()).toBe(true);
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(drawerOpen()).toBe(false);
     expect(readEditorDraft(newScope)).toBeNull();
@@ -251,10 +247,10 @@ describe("AddRegexPattern drafts", () => {
     await openNew();
     await clickAndType("add-regex-pattern-name-input", "kept_for_later");
 
-    drawerButton("o-drawer-close-btn")?.click();
+    clickIn("regex-pattern-list-add-regex-pattern-drawer", "o-drawer-close-btn");
     await flushPromises();
     expect(drawerOpen()).toBe(true);
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await flushPromises();
 
     expect(drawerOpen()).toBe(false);
@@ -265,7 +261,7 @@ describe("AddRegexPattern drafts", () => {
     await mountPage();
     await openNew();
 
-    drawerButton("o-drawer-close-btn")?.click();
+    clickIn("regex-pattern-list-add-regex-pattern-drawer", "o-drawer-close-btn");
     await flushPromises();
 
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
@@ -278,9 +274,9 @@ describe("AddRegexPattern drafts", () => {
     await clickAndType("add-regex-pattern-name-input", "saved_from_leave");
     await clickAndType("add-regex-pattern-input", "\\d+");
 
-    drawerButton("o-drawer-secondary-btn")?.click();
+    clickIn("regex-pattern-list-add-regex-pattern-drawer", "o-drawer-secondary-btn");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await vi.waitFor(() => expect(service.create).toHaveBeenCalledTimes(1));
     await flushPromises();
 
@@ -296,7 +292,7 @@ describe("AddRegexPattern drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
 
     expect(router.currentRoute.value.name).toBe("logs");
@@ -310,7 +306,7 @@ describe("AddRegexPattern drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(editScope)).not.toBeNull();
 
-    drawerButton("o-drawer-primary-btn")?.click();
+    clickIn("regex-pattern-list-add-regex-pattern-drawer", "o-drawer-primary-btn");
     await vi.waitFor(() => expect(service.update).toHaveBeenCalledTimes(1));
     await flushPromises();
 

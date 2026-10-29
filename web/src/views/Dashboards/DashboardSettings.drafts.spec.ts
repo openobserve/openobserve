@@ -28,6 +28,7 @@ import { addVariable, editTab, updateDashboard } from "@/utils/commons";
 import { fillField } from "@/test/unit/helpers/fillField";
 import { dashboardSettingsBase } from "@/components/dashboards/settings/dashboardSettingsDraft";
 import type { DashboardSettingsDraft } from "@/components/dashboards/settings/dashboardSettingsDraft";
+import { byTest, inDialog } from "@/test/unit/helpers/draftDom";
 import DashboardSettings from "./DashboardSettings.vue";
 
 interface FixtureTab {
@@ -176,26 +177,16 @@ const mountSettings = async (realPicker = false) => {
       },
     },
   );
-  await settle();
-};
-
-const settle = async () => {
-  for (let i = 0; i < 6; i++) {
-    await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
+  await flushPromises();
 };
 
 const reopen = async () => {
   open.value = false;
-  await settle();
+  await flushPromises();
   open.value = true;
-  await settle();
+  await flushPromises();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
 const fieldValue = (id: string) =>
   (byTest(id)?.querySelector("input, textarea") as HTMLInputElement | null)?.value ??
   (byTest(id) as HTMLInputElement | null)?.value;
@@ -203,7 +194,7 @@ const fieldValue = (id: string) =>
 const click = async (el: HTMLElement | null, what = "element") => {
   if (!el) throw new Error(`${what} not found`);
   el.click();
-  await settle();
+  await flushPromises();
 };
 
 const closeDrawer = () => click(inDialog("dashboard-settings-drawer", "o-drawer-close-btn"));
@@ -214,7 +205,7 @@ const openTab = async (id: string) => {
   const tab = byTest(id);
   if (!tab) throw new Error(`${id} not found`);
   tab.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
-  await settle();
+  await flushPromises();
 };
 
 const draftData = () => readEditorDraft<DashboardSettingsDraft>(scope)?.data;
@@ -315,7 +306,7 @@ describe("DashboardSettings drafts", () => {
     expect(draftData()?.general?.values.name).toBe("Kept title");
 
     open.value = true;
-    await settle();
+    await flushPromises();
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain(
       "unsaved changes to this dashboard from",
     );
@@ -369,6 +360,7 @@ describe("DashboardSettings drafts", () => {
     await closeDrawer();
     await leave("editor-draft-leave-save");
 
+    await vi.waitFor(() => expect(open.value).toBe(false));
     expect(updateDashboard).toHaveBeenCalledTimes(1);
     expect(db.server.title).toBe("Saved from the dialog");
     expect(open.value).toBe(false);
@@ -382,16 +374,17 @@ describe("DashboardSettings drafts", () => {
     await closeDrawer();
     await leave("editor-draft-leave-save");
 
+    await vi.waitFor(() => expect(byTest("editor-draft-leave-dialog")).toBeNull());
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Name is required"));
     expect(updateDashboard).not.toHaveBeenCalled();
     expect(open.value).toBe(true);
-    expect(byTest("editor-draft-leave-dialog")).toBeNull();
   });
 
   it("a normal Save leaves no draft and closes without asking", async () => {
     await mountSettings();
     await fillField("dashboard-general-setting-name", "Saved normally");
     await click(byTest("dashboard-general-setting-save-btn"));
-    expect(db.server.title).toBe("Saved normally");
+    await vi.waitFor(() => expect(db.server.title).toBe("Saved normally"));
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(scope)).toBeNull();
 
@@ -405,14 +398,14 @@ describe("DashboardSettings drafts", () => {
     await fillField("dashboard-general-setting-name", "Route leave");
 
     const first = router.push("/logs");
-    await settle();
+    await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     await leave("o-dialog-close-btn");
     await first;
     expect(router.currentRoute.value.path).toBe("/dashboards/view");
 
     const second = router.push("/logs");
-    await settle();
+    await flushPromises();
     await leave("o-dialog-secondary-btn");
     await second;
     expect(router.currentRoute.value.path).toBe("/logs");
@@ -423,7 +416,7 @@ describe("DashboardSettings drafts", () => {
     await mountSettings();
     await fillField("dashboard-general-setting-name", "Still here");
     await router.replace("/dashboards/view?dashboard=dash1&folder=default&period=1h");
-    await settle();
+    await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
   });
 
@@ -514,6 +507,7 @@ describe("DashboardSettings drafts", () => {
     await closeDrawer();
     await leave("editor-draft-leave-save");
 
+    await vi.waitFor(() => expect(open.value).toBe(false));
     expect(db.server.title).toBe("Both saved");
     expect(editTab).toHaveBeenCalledTimes(1);
     expect(db.server.tabs[0].name).toBe("Home");
@@ -576,6 +570,7 @@ describe("DashboardSettings drafts", () => {
     await closeDrawer();
     await leave("editor-draft-leave-save");
 
+    await vi.waitFor(() => expect(open.value).toBe(false));
     expect(addVariable).toHaveBeenCalledTimes(1);
     expect(db.server.variables.list.map((v) => v.name)).toContain("env");
     expect(open.value).toBe(false);

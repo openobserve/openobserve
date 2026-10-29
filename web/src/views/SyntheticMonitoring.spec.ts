@@ -1231,6 +1231,12 @@ describe("SyntheticMonitoring", () => {
       localStorage.clear();
     });
 
+    interface DeleteVm {
+      bulkDeleteMonitors: () => Promise<void>;
+      confirmDeleteStatusPage: (page: { id: string; name: string }) => Promise<void>;
+    }
+    const deleteVm = () => wrapper.vm as unknown as DeleteVm;
+
     it("drops the drafts of checks that were deleted, singly or in bulk", async () => {
       localStorage.clear();
       for (const id of ["m1", "a", "b"]) {
@@ -1243,7 +1249,7 @@ describe("SyntheticMonitoring", () => {
       table().vm.$emit("delete", { id: "m1", name: "n" });
       await flushPromises();
       table().vm.$emit("update:selected-ids", ["a"]);
-      await (wrapper.vm as any).bulkDeleteMonitors();
+      await deleteVm().bulkDeleteMonitors();
 
       expect(readEditorDraft(draftScope("synthetic_check", "m1"))).toBeNull();
       expect(readEditorDraft(draftScope("synthetic_browser", "m1"))).toBeNull();
@@ -1260,10 +1266,10 @@ describe("SyntheticMonitoring", () => {
       await flushPromises();
 
       confirmMock.mockResolvedValueOnce(true);
-      await (wrapper.vm as any).confirmDeleteStatusPage({ id: "sp1", name: "Public" });
+      await deleteVm().confirmDeleteStatusPage({ id: "sp1", name: "Public" });
       mockStatusPagesDelete.mockRejectedValueOnce(new Error("boom"));
       confirmMock.mockResolvedValueOnce(true);
-      await (wrapper.vm as any).confirmDeleteStatusPage({ id: "sp2", name: "Internal" });
+      await deleteVm().confirmDeleteStatusPage({ id: "sp2", name: "Internal" });
 
       expect(readEditorDraft(draftScope("status_page", "sp1"))).toBeNull();
       expect(readEditorDraft(draftScope("status_page", "sp2"))).not.toBeNull();

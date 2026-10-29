@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <EditorDraftDot
                 v-if="destinationDrafts.ids.has(row.name)"
                 :saved-at="destinationDrafts.savedAt(row.name)"
-                :data-test="`alert-destination-list-draft-dot-${row.name}`"
+                :data-test="`alert-destination-list-${row.name}-draft-dot`"
               />
             </div>
           </template>

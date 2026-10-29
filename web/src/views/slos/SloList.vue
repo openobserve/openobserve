@@ -162,7 +162,7 @@
             v-if="sloDrafts.ids.has(row.id)"
             :saved-at="sloDrafts.savedAt(row.id)"
             class="shrink-0"
-            :data-test="`slos-slolist-draft-dot-${row.name}`"
+            :data-test="`slos-slolist-${row.name}-draft-dot`"
           />
           <OTag
             v-if="isGrouped(row)"

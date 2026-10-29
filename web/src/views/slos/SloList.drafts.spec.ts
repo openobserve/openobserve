@@ -40,6 +40,7 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, click, clickIn } from "@/test/unit/helpers/draftDom";
 
 const ORG = store.state.selectedOrganization.identifier;
 const EMAIL = store.state.userInfo.email;
@@ -63,16 +64,6 @@ const sloRow = (id: string, name: string) => ({
   status: { sli: 99.95, error_budget_remaining: 0.6, burn_rate: 0.4, coverage: 1, no_data: false },
 });
 
-// ODialog portals out of the wrapper; the stub keeps the confirm button reachable.
-const ODialogStub = {
-  name: "ODialog",
-  props: { open: { type: Boolean, default: false } },
-  setup(_: unknown, { slots }: { slots: Record<string, () => unknown> }) {
-    return (props: { open: boolean }) =>
-      props.open ? h("div", [slots.default?.(), slots.footer?.()]) : null;
-  },
-};
-
 let wrapper: VueWrapper | null = null;
 
 const mountList = async () => {
@@ -86,21 +77,18 @@ const mountList = async () => {
       stubs: {
         FolderList: { render: () => h("div") },
         SelectFolderDropDown: true,
-        ODialog: ODialogStub,
       },
     },
   });
-  await flushPromises();
   // OTable holds its skeleton for MIN_SKELETON_MS before rows render.
-  await new Promise((r) => setTimeout(r, 75));
-  await flushPromises();
+  await vi.waitFor(() => expect(byTest("slos-slolist-delete-checkout")).not.toBeNull());
   return wrapper;
 };
 
 const deleteRow = async (name: string) => {
-  await wrapper!.find(`[data-test="slos-slolist-delete-${name}"]`).trigger("click");
+  click(`slos-slolist-delete-${name}`);
   await flushPromises();
-  await wrapper!.find('[data-test="slos-slolist-delete-confirm"]').trigger("click");
+  clickIn("slos-slolist-delete-dialog", "slos-slolist-delete-confirm");
   await flushPromises();
 };
 
@@ -123,9 +111,9 @@ describe("SloList editor drafts", () => {
     seed(draftScope(null));
     await mountList();
 
-    const dot = wrapper!.get('[data-test="slos-slolist-draft-dot-checkout"]');
+    const dot = wrapper!.get('[data-test="slos-slolist-checkout-draft-dot"]');
     expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
-    expect(wrapper!.find('[data-test="slos-slolist-draft-dot-search"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="slos-slolist-search-draft-dot"]').exists()).toBe(false);
     const newButton = wrapper!.get('[data-test="slos-slolist-new"]');
     expect(newButton.attributes("aria-label")).toMatch(/unsaved draft$/);
     expect(newButton.find('[data-test="slos-slolist-new-draft-dot"]').exists()).toBe(true);

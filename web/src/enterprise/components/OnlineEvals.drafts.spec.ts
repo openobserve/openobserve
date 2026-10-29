@@ -31,6 +31,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import OnlineEvals from "./OnlineEvals.vue";
 import EvalJobList from "./onlineEvals/EvalJobList.vue";
 
@@ -177,12 +178,6 @@ const edit = async (field: string, value: unknown) => {
   await nextTick();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
-const leaveButton = (id: string) => inDialog("editor-draft-leave-dialog", id);
-const restoreButton = (id: string) => inDialog("editor-draft-restore-dialog", id);
-
 describe("OnlineEvals editor drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -218,7 +213,7 @@ describe("OnlineEvals editor drafts", () => {
       const navigation = router.push("/ai/evaluations?tab=scorers");
       await flushPromises();
       expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-      leaveButton("o-dialog-close-btn")?.click();
+      clickLeave("o-dialog-close-btn");
       await navigation;
       expect(router.currentRoute.value.query).toMatchObject({ tab: "jobs", action: "add" });
       expect(byTest("job-form-title")).not.toBeNull();
@@ -233,7 +228,7 @@ describe("OnlineEvals editor drafts", () => {
 
       expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("Unsaved local changes");
       expect(byTest("editor-draft-restore-message")?.textContent).toContain("evaluation job");
-      byTest("editor-draft-continue")?.click();
+      click("editor-draft-continue");
       await flushPromises();
       expect(form().state.values).toMatchObject({ name: "nightly", samplingValue: "0.5" });
     });
@@ -249,7 +244,7 @@ describe("OnlineEvals editor drafts", () => {
       let streamsArrive: (value: unknown) => void = () => {};
       streamsList.current = () => new Promise((resolve) => (streamsArrive = resolve));
       await remount("tab=jobs&action=add");
-      byTest("editor-draft-continue")?.click();
+      click("editor-draft-continue");
       await flushPromises();
       streamsArrive({ list: [{ name: "default" }, { name: "agents" }] });
       await flushPromises();
@@ -263,13 +258,14 @@ describe("OnlineEvals editor drafts", () => {
         data: { values: { name: "old" }, endSignalGroup: null },
       });
       await mountAt("tab=jobs&action=add");
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      pressEscape();
       await flushPromises();
+      expect(byTest("editor-draft-restore-dialog")).toBeNull();
       expect(form().state.values.name).toBe("");
       expect(readEditorDraft(scope("eval_job", null))).not.toBeNull();
 
       await remount("tab=jobs&action=add");
-      restoreButton("o-dialog-secondary-btn")?.click();
+      clickRestore("o-dialog-secondary-btn");
       await flushPromises();
       expect(form().state.values.name).toBe("");
       expect(readEditorDraft(scope("eval_job", null))).toBeNull();
@@ -308,7 +304,7 @@ describe("OnlineEvals editor drafts", () => {
         },
       });
       await mountAt("tab=jobs&action=add");
-      byTest("editor-draft-continue")?.click();
+      click("editor-draft-continue");
       await flushPromises();
 
       expect(form().state.values).toMatchObject({
@@ -359,7 +355,7 @@ describe("OnlineEvals editor drafts", () => {
 
       const navigation = router.push("/logs");
       await flushPromises();
-      leaveButton("editor-draft-leave-save")?.click();
+      clickLeave("editor-draft-leave-save");
       await navigation;
       await flushPromises();
 
@@ -378,7 +374,7 @@ describe("OnlineEvals editor drafts", () => {
       await edit("description", "kept");
       const navigation = router.push("/logs");
       await flushPromises();
-      leaveButton("o-dialog-secondary-btn")?.click();
+      clickLeave("o-dialog-secondary-btn");
       await navigation;
 
       expect(router.currentRoute.value.name).toBe("logs");
@@ -392,10 +388,10 @@ describe("OnlineEvals editor drafts", () => {
       await edit("description", "gone");
       window.dispatchEvent(new Event("pagehide"));
 
-      byTest("job-form-cancel-btn")?.click();
+      click("job-form-cancel-btn");
       await flushPromises();
       expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-      leaveButton("o-dialog-neutral-btn")?.click();
+      clickLeave("o-dialog-neutral-btn");
       await flushPromises();
 
       expect(router.currentRoute.value.query.action).toBeUndefined();
@@ -427,7 +423,7 @@ describe("OnlineEvals editor drafts", () => {
         "New job · unsaved draft",
       );
       // The table renders its rows a tick after the list arrives.
-      await vi.waitFor(() => expect(byTest("eval-job-list-draft-dot-job-1")).not.toBeNull());
+      await vi.waitFor(() => expect(byTest("eval-job-list-job-1-draft-dot")).not.toBeNull());
     });
 
     it("deleting a job drops its draft; a bulk delete drops only the deleted ones", async () => {
@@ -511,7 +507,7 @@ describe("OnlineEvals editor drafts", () => {
 
       const navigation = router.push("/ai/evaluations?tab=scorers");
       await flushPromises();
-      leaveButton("o-dialog-secondary-btn")?.click();
+      clickLeave("o-dialog-secondary-btn");
       await navigation;
       await flushPromises();
       expect(byTest("scorers-list-add-draft-dot")).not.toBeNull();
@@ -559,7 +555,7 @@ describe("OnlineEvals editor drafts", () => {
       expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
         "X-Api-Key header",
       );
-      byTest("editor-draft-continue")?.click();
+      click("editor-draft-continue");
       await flushPromises();
 
       await form().handleSubmit();
@@ -589,7 +585,7 @@ describe("OnlineEvals editor drafts", () => {
       expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
         "Your change to the URL was not kept.",
       );
-      byTest("editor-draft-continue")!.click();
+      click("editor-draft-continue");
       await flushPromises();
       expect(form().state.values.remoteEndpoint).toBe("");
 
@@ -607,7 +603,7 @@ describe("OnlineEvals editor drafts", () => {
       await edit("authBearerToken", "tok-123");
       window.dispatchEvent(new Event("pagehide"));
       await remount("tab=scorers&action=add&scorer_type=remote");
-      byTest("editor-draft-continue")?.click();
+      click("editor-draft-continue");
       await flushPromises();
       expect(form().state.values.authBearerToken).toBe("");
 
@@ -617,13 +613,49 @@ describe("OnlineEvals editor drafts", () => {
       expect(onlineEvalsService.scorers.create).toHaveBeenCalledTimes(1);
     });
 
+    it("start fresh drops a scorer's draft; escape keeps it", async () => {
+      writeEditorDraft(scope("eval_scorer", null, "llm_judge"), {
+        data: { values: { name: "old judge" } },
+      });
+      await mountAt("tab=scorers&action=add&scorer_type=llm_judge");
+      pressEscape();
+      await flushPromises();
+      expect(byTest("editor-draft-restore-dialog")).toBeNull();
+      expect(form().state.values.name).toBe("");
+      expect(readEditorDraft(scope("eval_scorer", null, "llm_judge"))).not.toBeNull();
+
+      await remount("tab=scorers&action=add&scorer_type=llm_judge");
+      clickRestore("o-dialog-secondary-btn");
+      await flushPromises();
+      expect(form().state.values.name).toBe("");
+      expect(readEditorDraft(scope("eval_scorer", null, "llm_judge"))).toBeNull();
+    });
+
+    it("cancel asks, and discard closes the scorer form and drops the draft", async () => {
+      await mountAt("tab=scorers&action=update&id=s1");
+      await edit("description", "gone");
+      window.dispatchEvent(new Event("pagehide"));
+      expect(readEditorDraft(scope("eval_scorer", "s1"))).not.toBeNull();
+
+      click("scorer-form-cancel-btn");
+      await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      clickLeave("o-dialog-neutral-btn");
+      await flushPromises();
+
+      expect(router.currentRoute.value.query.action).toBeUndefined();
+      expect(byTest("scorer-form-title")).toBeNull();
+      expect(byTest("editor-draft-leave-dialog")).toBeNull();
+      expect(readEditorDraft(scope("eval_scorer", "s1"))).toBeNull();
+    });
+
     it("save from the leave dialog updates the scorer and goes on", async () => {
       await mountAt("tab=scorers&action=update&id=s1");
       await edit("description", "sharper");
 
       const navigation = router.push("/logs");
       await flushPromises();
-      leaveButton("editor-draft-leave-save")?.click();
+      clickLeave("editor-draft-leave-save");
       await navigation;
       await flushPromises();
 
@@ -644,7 +676,7 @@ describe("OnlineEvals editor drafts", () => {
       vi.mocked(onlineEvalsService.scorers.delete).mockResolvedValue(undefined as never);
       await mountAt("tab=scorers");
       // The table renders its rows a tick after the list arrives.
-      await vi.waitFor(() => expect(byTest("scorer-list-draft-dot-s1")).not.toBeNull());
+      await vi.waitFor(() => expect(byTest("scorer-list-s1-draft-dot")).not.toBeNull());
 
       wrapper!.findComponent({ name: "ScorerList" }).vm.$emit("delete", scorer);
       await flushPromises();

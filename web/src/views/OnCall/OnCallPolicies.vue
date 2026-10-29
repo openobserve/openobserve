@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <EditorDraftDot
             v-if="policyDrafts.ids.has(row.teamId)"
             :saved-at="policyDrafts.savedAt(row.teamId)"
-            :data-test="`oncall-policies-draft-dot-${row.teamId}`"
+            :data-test="`oncall-policies-${row.teamId}-draft-dot`"
           />
         </span>
       </template>

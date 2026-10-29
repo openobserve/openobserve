@@ -28,6 +28,8 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
+import { fillField } from "@/test/unit/helpers/fillField";
 import AddDowntime from "./AddDowntime.vue";
 
 vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
@@ -164,11 +166,16 @@ const typeReason = async (reason: string) => {
   await nextTick();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
+const reasonValue = () => {
+  const reason = wrapper!.get('[data-test="add-downtime-reason"]');
+  const textarea = reason.element.matches("textarea") ? reason : reason.get("textarea");
+  return (textarea.element as HTMLTextAreaElement).value;
+};
+const remount = async () => {
+  wrapper?.unmount();
+  wrapper = null;
+  await mountNew();
+};
 
 describe("AddDowntime drafts", () => {
   beforeEach(() => {
@@ -213,12 +220,60 @@ describe("AddDowntime drafts", () => {
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain(
       "unsaved changes to this downtime",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     const reason = wrapper!.get('[data-test="add-downtime-reason"]');
     const textarea = reason.element.matches("textarea") ? reason : reason.get("textarea");
     expect((textarea.element as HTMLTextAreaElement).value).toBe("From the draft");
+  });
+
+  it("drafts a reason filled with no key or pointer event, and asks on leave", async () => {
+    await mountNew();
+    await fillField("add-downtime-reason", "Autofilled reason");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft<{ reason: string }>(newScope)?.data.reason).toBe("Autofilled reason");
+
+    const navigation = router.push({ name: "downtimes" });
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    clickLeave("o-dialog-close-btn");
+    await navigation;
+    expect(router.currentRoute.value.name).toBe("addDowntime");
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    writeEditorDraft(newScope, {
+      data: { ...defaultDowntimeValues(Date.now(), "UTC"), reason: "From the draft" },
+    });
+    await mountNew();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(reasonValue()).toBe("");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+
+    await remount();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(reasonValue()).toBe("");
+    expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  it("Keep draft leaves and offers the work on the next visit", async () => {
+    await mountNew();
+    await typeReason("Kept for later");
+
+    const navigation = router.push({ name: "downtimes" });
+    await flushPromises();
+    clickLeave("o-dialog-secondary-btn");
+    await navigation;
+    expect(router.currentRoute.value.name).toBe("downtimes");
+    expect(readEditorDraft<{ reason: string }>(newScope)?.data.reason).toBe("Kept for later");
+
+    await remount();
+    expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
   });
 
   it("a duplicate neither offers nor overwrites the new-downtime draft, and keeps its own", async () => {
@@ -272,7 +327,7 @@ describe("AddDowntime drafts", () => {
     vi.mocked(downtimes.get).mockResolvedValue({ data: stored(4) } as never);
     await mountEdit();
     await vi.waitFor(() => expect(byTest("editor-draft-continue")).not.toBeNull());
-    byTest("editor-draft-continue")!.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     await wrapper!.get('[data-test="add-downtime-save"]').trigger("click");
@@ -300,13 +355,14 @@ describe("AddDowntime drafts", () => {
     await wrapper!.get('[data-test="add-downtime-cancel"]').trigger("click");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(router.currentRoute.value.name).toBe("addDowntime");
 
     await wrapper!.get('[data-test="add-downtime-cancel"]').trigger("click");
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
 
     expect(router.currentRoute.value.name).toBe("downtimes");
@@ -319,7 +375,7 @@ describe("AddDowntime drafts", () => {
 
     const navigation = router.push({ name: "downtimeDetail", params: { id: "d1" } });
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 

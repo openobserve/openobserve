@@ -28,6 +28,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import AddFunction from "./AddFunction.vue";
 
 vi.mock("@/services/jstransform", async (importOriginal) => {
@@ -133,12 +134,6 @@ const typeCode = async (code: string) => {
   await nextTick();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-
 describe("AddFunction drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -170,7 +165,7 @@ describe("AddFunction drafts", () => {
   it("drafts and guards a new function named with no key or pointer event (autofill, fill())", async () => {
     await mountEditor({}, true);
     // A plain click event opens the name editor; it carries no pointerdown.
-    byTest("add-function-name-input-trigger")?.click();
+    click("add-function-name-input-trigger");
     await flushPromises();
     await fillField("add-function-name-input-input", "filled_fn");
     window.dispatchEvent(new Event("pagehide"));
@@ -179,7 +174,7 @@ describe("AddFunction drafts", () => {
     const pending = vm().cancelAddFunction();
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await pending;
     expect(emitted.cancel).toBe(0);
   });
@@ -193,11 +188,30 @@ describe("AddFunction drafts", () => {
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain(
       "unsaved changes to this function",
     );
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(vm().formData.function).toBe(".b = 2");
     expect(vm().functionDraft.hasUnsavedChanges()).toBe(true);
+  });
+
+  it("Escape on the restore dialog keeps the draft, Start fresh drops it", async () => {
+    writeEditorDraft(newScope, {
+      data: { name: "draft_fn", transType: "0", function: ".b = 2", params: "row" },
+    });
+    await mountEditor();
+    pressEscape();
+    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
+    expect(vm().formData.function).not.toBe(".b = 2");
+    expect(readEditorDraft(newScope)).not.toBeNull();
+    wrapper!.unmount();
+
+    await mountEditor();
+    clickRestore("o-dialog-secondary-btn");
+    await flushPromises();
+    expect(vm().formData.function).not.toBe(".b = 2");
+    expect(readEditorDraft(newScope)).toBeNull();
   });
 
   it("keys an edited function's draft by its name and the server copy", async () => {
@@ -217,21 +231,21 @@ describe("AddFunction drafts", () => {
     await typeCode(". = {}");
     const keep = vm().cancelAddFunction();
     await flushPromises();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await keep;
     expect(row.function).toBe(". = .");
     wrapper!.unmount();
 
     await mountEditor({ modelValue: row, isUpdated: true });
     expect(byTest("editor-draft-changed-on-server")).toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(vm().formData.function).toBe(". = {}");
 
     const cancel = vm().cancelAddFunction();
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await cancel;
     expect(readEditorDraft(editScope)?.data).toMatchObject({ function: ". = {}" });
   });
@@ -246,7 +260,7 @@ describe("AddFunction drafts", () => {
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     expect(emitted.cancel).toBe(0);
 
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await pending;
     expect(emitted.cancel).toBe(1);
     expect(readEditorDraft(newScope)).toBeNull();
@@ -259,7 +273,7 @@ describe("AddFunction drafts", () => {
 
     const pending = vm().cancelAddFunction();
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await pending;
     await flushPromises();
 
@@ -275,7 +289,7 @@ describe("AddFunction drafts", () => {
 
     const pending = vm().cancelAddFunction();
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await pending;
     await flushPromises();
 
@@ -291,7 +305,7 @@ describe("AddFunction drafts", () => {
     const navigation = router.push("/logs");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-close-btn")?.click();
+    clickLeave("o-dialog-close-btn");
     await navigation;
 
     expect(router.currentRoute.value.name).toBe("functionList");
@@ -303,7 +317,7 @@ describe("AddFunction drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
 
     expect(router.currentRoute.value.name).toBe("logs");

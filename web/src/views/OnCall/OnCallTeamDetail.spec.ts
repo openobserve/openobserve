@@ -777,7 +777,7 @@ describe("OnCallTeamDetail", () => {
           timezone: "UTC",
           rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
         },
-      } as any);
+      } as never);
       writeEditorDraft(scopeFor("rot_primary"), { data: {} });
       writeEditorDraft(scopeFor("rot_backup"), { data: {} });
       // A teammate's duplicate of the deleted rotation in this browser goes with it.
@@ -817,7 +817,7 @@ describe("OnCallTeamDetail", () => {
       for (const scope of [gone, live, goneClone, fresh]) writeEditorDraft(scope, { data: {} });
       service.getSchedule.mockResolvedValue({
         data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
-      } as any);
+      } as never);
       const wrapper = await openSchedule();
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("edit", "rot_primary");

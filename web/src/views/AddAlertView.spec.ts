@@ -373,7 +373,7 @@ describe("AddAlertView.vue", () => {
 
       beforeEach(() => {
         localStorage.clear();
-        vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+        vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as never);
         writeEditorDraft(missingScope, { data: { values: {}, tab: "condition" } });
       });
 
@@ -401,10 +401,10 @@ describe("AddAlertView.vue", () => {
     });
 
     it("stays put when the leave dialog's Save reports the save", async () => {
-      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as never);
       vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
         data: { name: "my-alert" },
-      } as any);
+      } as never);
       const wrapper = await mountEditing();
       const pushSpy = vi.spyOn(router, "push");
 

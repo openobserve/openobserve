@@ -28,6 +28,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import StatusPageEditor from "./StatusPageEditor.vue";
 
 vi.mock("@/services/status_pages", () => ({
@@ -130,16 +131,6 @@ const edit = async (values: Record<string, unknown>) => {
   await nextTick();
 };
 
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const leaveButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
-  );
-const restoreButton = (id: string) =>
-  document.body.querySelector<HTMLElement>(
-    `[data-test="editor-draft-restore-dialog"] [data-test="${id}"]`,
-  );
-
 describe("StatusPageEditor drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -181,7 +172,7 @@ describe("StatusPageEditor drafts", () => {
   it("continues a draft into the form, its components and the loaded logo", async () => {
     await mountEditor();
     await edit({ name: "Acme cloud", brand_name: "Acme Inc" });
-    byTest("status-page-add-component")?.click();
+    click("status-page-add-component");
     await flushPromises();
     window.dispatchEvent(new Event("pagehide"));
 
@@ -190,7 +181,7 @@ describe("StatusPageEditor drafts", () => {
       "unsaved changes to this status page",
     );
     expect(byTest("editor-draft-changed-on-server")).toBeNull();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
 
     expect(form().state.values).toMatchObject({
@@ -206,15 +197,14 @@ describe("StatusPageEditor drafts", () => {
       data: { values: { name: "Kept" }, usingOrgLogoDefault: false, components: [] },
     });
     await mountEditor();
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    pressEscape();
     await flushPromises();
-    if (byTest("editor-draft-restore-dialog")) restoreButton("o-dialog-close-btn")?.click();
-    await flushPromises();
+    expect(byTest("editor-draft-restore-dialog")).toBeNull();
     expect(form().state.values.name).toBe("Acme status");
     expect(readEditorDraft(scope)).not.toBeNull();
 
     await remount();
-    restoreButton("o-dialog-secondary-btn")?.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
     expect(readEditorDraft(scope)).toBeNull();
     expect(form().state.values.name).toBe("Acme status");
@@ -261,17 +251,17 @@ describe("StatusPageEditor drafts", () => {
 
     await remount();
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("Password");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values).toMatchObject({ visibility: "password", password: "" });
 
-    byTest("status-page-editor-save")?.click();
+    click("status-page-editor-save");
     await flushPromises();
     expect(statusPagesService.update).not.toHaveBeenCalled();
     expect(form().getFieldMeta("password")?.errors?.length).toBeGreaterThan(0);
 
     await edit({ password: "n3w-pass" });
-    byTest("status-page-editor-save")?.click();
+    click("status-page-editor-save");
     await vi.waitFor(() => expect(statusPagesService.update).toHaveBeenCalledTimes(1));
     expect(vi.mocked(statusPagesService.update).mock.calls[0][2]).toMatchObject({
       password: "n3w-pass",
@@ -284,10 +274,10 @@ describe("StatusPageEditor drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
 
     await remount();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     await edit({ visibility: "public" });
-    byTest("status-page-editor-save")?.click();
+    click("status-page-editor-save");
     await vi.waitFor(() => expect(statusPagesService.update).toHaveBeenCalledTimes(1));
     expect(vi.mocked(statusPagesService.update).mock.calls[0][2]).not.toHaveProperty("password");
   });
@@ -304,32 +294,32 @@ describe("StatusPageEditor drafts", () => {
 
     await remount();
     expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("Logo");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values).toMatchObject({ name: "Big logo", logo_img: LOGO });
 
-    byTest("status-page-editor-save")?.click();
+    click("status-page-editor-save");
     await vi.waitFor(() => expect(statusPagesService.update).toHaveBeenCalledTimes(1));
   });
 
   it("Cancel asks; Keep draft leaves with the draft, Discard leaves without it", async () => {
     await mountEditor();
     await edit({ name: "Keep me" });
-    byTest("status-page-editor-cancel")?.click();
+    click("status-page-editor-cancel");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("synthetics");
     expect(router.currentRoute.value.query.section).toBe("status-pages");
     expect(readEditorDraft<{ values: { name: string } }>(scope)?.data.values.name).toBe("Keep me");
 
     await remount();
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
-    byTest("status-page-editor-back")?.click();
+    click("status-page-editor-back");
     await flushPromises();
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("synthetics");
     expect(readEditorDraft(scope)).toBeNull();
@@ -341,7 +331,7 @@ describe("StatusPageEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
     await flushPromises();
 
@@ -356,7 +346,7 @@ describe("StatusPageEditor drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(scope)).not.toBeNull();
 
-    byTest("status-page-editor-save")?.click();
+    click("status-page-editor-save");
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("synthetics"));
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(readEditorDraft(scope)).toBeNull();

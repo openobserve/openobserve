@@ -29,6 +29,7 @@ import {
   writeEditorDraft,
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
+import { byTest, click, clickLeave, clickRestore } from "@/test/unit/helpers/draftDom";
 import ModelPricingList from "./ModelPricingList.vue";
 import ModelPricingEditor from "./ModelPricingEditor.vue";
 
@@ -136,10 +137,6 @@ const form = () =>
       form: { state: { values: { name: string } } };
     }
   ).form;
-const byTest = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
-const inDialog = (dialog: string, id: string) =>
-  document.body.querySelector<HTMLElement>(`[data-test="${dialog}"] [data-test="${id}"]`);
-const leaveButton = (id: string) => inDialog("editor-draft-leave-dialog", id);
 
 describe("ModelPricingEditor drafts", () => {
   beforeEach(() => {
@@ -171,7 +168,7 @@ describe("ModelPricingEditor drafts", () => {
     writeEditorDraft(newScope, { data: formDraft("From draft") });
     await mountAt("modelPricingEditor");
     expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("model price");
-    byTest("editor-draft-continue")?.click();
+    click("editor-draft-continue");
     await flushPromises();
     expect(form().state.values.name).toBe("From draft");
     wrapper!.unmount();
@@ -187,7 +184,7 @@ describe("ModelPricingEditor drafts", () => {
     wrapper!.unmount();
 
     await mountAt("modelPricingEditor");
-    inDialog("editor-draft-restore-dialog", "o-dialog-secondary-btn")?.click();
+    clickRestore("o-dialog-secondary-btn");
     await flushPromises();
     expect(form().state.values.name).toBe("");
     expect(readEditorDraft(newScope)).toBeNull();
@@ -248,10 +245,10 @@ describe("ModelPricingEditor drafts", () => {
     await fillField("model-pricing-name-input", "Not kept");
     window.dispatchEvent(new Event("pagehide"));
 
-    byTest("model-pricing-editor-cancel-btn")?.click();
+    click("model-pricing-editor-cancel-btn");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("modelPricingEditor");
-    leaveButton("o-dialog-neutral-btn")?.click();
+    clickLeave("o-dialog-neutral-btn");
     await flushPromises();
 
     expect(router.currentRoute.value.name).toBe("modelPricing");
@@ -264,7 +261,7 @@ describe("ModelPricingEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("o-dialog-secondary-btn")?.click();
+    clickLeave("o-dialog-secondary-btn");
     await navigation;
 
     expect(router.currentRoute.value.name).toBe("logs");
@@ -277,7 +274,7 @@ describe("ModelPricingEditor drafts", () => {
 
     const navigation = router.push("/logs");
     await flushPromises();
-    leaveButton("editor-draft-leave-save")?.click();
+    clickLeave("editor-draft-leave-save");
     await navigation;
 
     expect(service.update).toHaveBeenCalledTimes(1);
@@ -292,7 +289,7 @@ describe("ModelPricingEditor drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(editScope)).not.toBeNull();
 
-    byTest("model-pricing-editor-save-btn")?.click();
+    click("model-pricing-editor-save-btn");
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("modelPricing"));
 
     expect(service.update).toHaveBeenCalledTimes(1);
