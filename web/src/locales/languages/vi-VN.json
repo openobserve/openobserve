@@ -2791,6 +2791,7 @@
     "feature_logs": "Nhật ký",
     "feature_metrics": "Chỉ số",
     "feature_traces": "Trace",
+    "feature_rum": "RUM",
     "feature_alerts": "Cảnh báo",
     "feature_dashboards": "Bảng điều khiển",
     "feature_reports": "Báo cáo",

@@ -2791,6 +2791,7 @@
     "feature_logs": "Günlükler",
     "feature_metrics": "Metrikler",
     "feature_traces": "İzler",
+    "feature_rum": "RUM",
     "feature_alerts": "Uyarılar",
     "feature_dashboards": "Gösterge panoları",
     "feature_reports": "Raporlar",

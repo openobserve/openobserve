@@ -2791,6 +2791,7 @@
     "feature_logs": "ログ",
     "feature_metrics": "メトリクス",
     "feature_traces": "トレース",
+    "feature_rum": "RUM",
     "feature_alerts": "アラート",
     "feature_dashboards": "ダッシュボード",
     "feature_reports": "レポート",

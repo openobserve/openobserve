@@ -2791,6 +2791,7 @@
     "feature_logs": "日誌",
     "feature_metrics": "指標",
     "feature_traces": "追蹤",
+    "feature_rum": "RUM",
     "feature_alerts": "警示",
     "feature_dashboards": "儀表板",
     "feature_reports": "報表",

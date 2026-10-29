@@ -2791,6 +2791,7 @@
     "feature_logs": "Логи",
     "feature_metrics": "Метрики",
     "feature_traces": "Трейсы",
+    "feature_rum": "RUM",
     "feature_alerts": "Оповещения",
     "feature_dashboards": "Дашборды",
     "feature_reports": "Отчеты",

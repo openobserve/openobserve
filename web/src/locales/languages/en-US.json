@@ -2791,6 +2791,7 @@
     "feature_logs": "Logs",
     "feature_metrics": "Metrics",
     "feature_traces": "Traces",
+    "feature_rum": "RUM",
     "feature_alerts": "Alerts",
     "feature_dashboards": "Dashboards",
     "feature_reports": "Reports",
