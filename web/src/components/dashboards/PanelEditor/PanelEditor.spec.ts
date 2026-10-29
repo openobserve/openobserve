@@ -1038,4 +1038,45 @@ describe("PanelEditor.vue", () => {
       ]);
     });
   });
+
+  describe("Preview Chart | Data view", () => {
+    const TOGGLE = { name: "PanelViewToggle" };
+
+    beforeEach(() => {
+      mockChartData.value = {};
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    afterEach(() => {
+      mockChartData.value = undefined;
+    });
+
+    const mountEditor = (pageType = "dashboard") =>
+      shallowMount(PanelEditor, { props: { pageType: pageType as any }, global: mountGlobal });
+
+    it("offers the switch on a dashboard chart and starts on Chart", () => {
+      wrapper = mountEditor();
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PanelDataView" }).exists()).toBe(false);
+    });
+
+    it("hides the switch for table panels and outside dashboards", () => {
+      mockDashboardPanelData.data.type = "table";
+      wrapper = mountEditor();
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(false);
+      wrapper.unmount();
+
+      mockDashboardPanelData.data.type = "line";
+      wrapper = mountEditor("metrics");
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(false);
+    });
+
+    it("overlays the raw rows when Data is picked", async () => {
+      wrapper = mountEditor();
+      wrapper.findComponent({ name: "PanelViewToggle" }).vm.$emit("update:modelValue", "data");
+      await nextTick();
+      expect(wrapper.findComponent({ name: "PanelDataView" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(true);
+    });
+  });
 });
