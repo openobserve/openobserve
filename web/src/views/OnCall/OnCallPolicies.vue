@@ -92,6 +92,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
+      <template #cell-teamName="{ row, value }">
+        <span class="inline-flex items-center gap-2">
+          <span class="text-text-body">{{ value }}</span>
+          <EditorDraftDot
+            v-if="policyDrafts.ids.has(row.teamId)"
+            :saved-at="policyDrafts.savedAt(row.teamId)"
+            :data-test="`oncall-policies-${row.teamId}-draft-dot`"
+          />
+        </span>
+      </template>
+
       <template #cell-on_call="{ row }">
         <OUserCell v-if="row.onCall" :value="row.onCall" />
         <OTag v-else type="oncallCoverage" value="gap" size="sm" />
@@ -160,6 +171,8 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { queryClient } from "@/composables/query/queryClient";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { useListViewState } from "@/composables/useListViewState";
 import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
@@ -183,6 +196,8 @@ const store = useStore();
 const router = useRouter();
 
 const ABSENT = raw("—");
+
+const policyDrafts = useEditorDraftIds("oncall_policy");
 
 const allRows = ref<PolicyRow[]>([]);
 const forbidden = ref<ForbiddenState>(false);

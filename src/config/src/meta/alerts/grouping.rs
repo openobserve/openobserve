@@ -26,6 +26,10 @@ use serde::{Deserialize, Serialize};
 use super::{
     Operator, TriggerCondition,
     level::{AlertLevel, evaluate_level},
+    recovery::{
+        ClosedEpisode, ClosedGroupEpisode, EpisodeInput, RecoveryReason, apply_episode,
+        hold_firing_cycle,
+    },
     state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate, apply_outcome},
 };
 use crate::meta::self_reporting::usage::RunOutcome;
@@ -87,11 +91,6 @@ pub enum MultiAlertError {
     /// A PromQL alert opted in without a `promql_condition`: there is no
     /// threshold to classify a series against, so no group can have a level.
     PromqlConditionMissing,
-    /// Alert-level notification grouping batches every group under one
-    /// fingerprint with enqueue-time delivery accounting, collapsing the
-    /// per-group pages this feature exists to split apart. Rejected until
-    /// per-group batching (§5.5 MN-4) exists.
-    NotificationGroupingUnsupported,
 }
 
 impl std::fmt::Display for MultiAlertError {
@@ -124,10 +123,6 @@ impl std::fmt::Display for MultiAlertError {
             ),
             Self::PromqlConditionMissing => f.write_str(
                 "per-series alerting needs a PromQL condition to classify each series against",
-            ),
-            Self::NotificationGroupingUnsupported => f.write_str(
-                "per-group alerting cannot yet be combined with notification grouping; turn off \
-                 notification grouping or per-group alerting",
             ),
         }
     }
@@ -849,6 +844,10 @@ pub fn group_fate(state: &AlertState, now: i64, resolve_after: i64, grace: i64) 
 /// observation. The two clocks only diverge when M-7 resolves a group, so the
 /// gap is the marker — no extra column needed.
 fn is_resolved(state: &AlertState) -> bool {
+    // A failed delivery also advances `last_outcome_at` past `last_seen`, on a row still firing.
+    if state.last_outcome != Some(RunOutcome::Normal) {
+        return false;
+    }
     match (state.last_outcome_at, state.last_seen) {
         (Some(outcome_at), Some(seen)) => outcome_at > seen,
         _ => false,
@@ -916,6 +915,7 @@ pub fn resolve_group_update(
         episode_incident_id: prev.episode_incident_id.clone(),
         recovering_since: prev.recovering_since,
         firing_started_at: None,
+        group_label_set: prev.group_label_set.clone(),
     };
 
     // An already-Ok group that vanished changes nothing on either axis, so no
@@ -972,7 +972,7 @@ pub fn with_group_component(base: String, group_key: Option<&str>) -> String {
 /// feed them a state that never existed.
 /// Serializable so the whole plan can cross the super-cluster queue as one
 /// message, matching the one transaction it commits in.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct GroupPlan {
     /// Per-group upserts plus the rollup row.
     pub updates: Vec<StateUpdate>,
@@ -982,6 +982,26 @@ pub struct GroupPlan {
     /// be firing in reality, so writing a recovery row would be a lie. Deleting
     /// is what keeps stored rows actually bounded by the cap under churn.
     pub evicted: Vec<String>,
+    /// Group episodes to close, each by a guarded statement applied before the upserts.
+    #[serde(default)]
+    pub closed_episodes: Vec<ClosedGroupEpisode>,
+    /// Resolved rows past their grace, deleted only if nothing observed or reopened them since.
+    #[serde(default)]
+    pub reaped: Vec<ReapedGroup>,
+}
+
+/// A reap delete's guard: the `level_at` the sweep read.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReapedGroup {
+    pub group_key: String,
+    pub prev_level_at: Option<i64>,
+}
+
+/// One sweep's writes: each M-7 resolve in its own plan, everything else in `rest`.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SweepPlan {
+    pub resolves: Vec<GroupPlan>,
+    pub rest: GroupPlan,
 }
 
 /// Group rows to delete when an alert turns `multi_alert` **off** (M-9/D26).
@@ -1014,9 +1034,11 @@ pub fn plan_group_updates(
     prev: &HashMap<String, AlertState>,
     at: i64,
     pending_period_sec: i64,
+    keep_firing_for_secs: i64,
 ) -> GroupPlan {
     let mut updates = Vec::with_capacity(classification.groups.len() + 1);
     let mut retained: HashSet<String> = HashSet::with_capacity(classification.groups.len());
+    let mut closed_episodes = Vec::new();
 
     for group in &classification.groups {
         let key = group_key(&group.labels);
@@ -1058,9 +1080,18 @@ pub fn plan_group_updates(
 
         if let Some(state) = update.state.as_mut() {
             state.group_labels = Some(rendered.clone());
+            state.group_label_set = Some(group.labels.clone());
             // Rollup-only field; a group row carrying it would make the
             // overflow warning renderable from the wrong row.
             state.groups_observed = None;
+            closed_episodes.extend(step_group_episode(
+                state,
+                prev_out,
+                level.is_firing(),
+                keep_firing_for_secs,
+                at,
+                Some(group.actual_value),
+            ));
         }
         if let Some(t) = update.transition.as_mut() {
             // M-8: per-group history renders from the transition alone, because
@@ -1161,7 +1192,115 @@ pub fn plan_group_updates(
         }
     };
 
-    GroupPlan { updates, evicted }
+    GroupPlan {
+        updates,
+        evicted,
+        closed_episodes,
+        reaped: vec![],
+    }
+}
+
+/// Runs the episode axis on a group row the plan writes; a close it returns must apply first.
+pub fn step_group_episode(
+    state: &mut AlertState,
+    prev: Option<&AlertState>,
+    firing: bool,
+    keep_firing_for_secs: i64,
+    at: i64,
+    value: Option<f64>,
+) -> Option<ClosedGroupEpisode> {
+    let input = EpisodeInput::undelivered(keep_firing_for_secs);
+    let closed = apply_episode(state, firing, &input, at, String::new);
+    hold_firing_cycle(prev, state);
+    let mut close = ClosedGroupEpisode::new(
+        state,
+        closed?,
+        prev.and_then(|p| p.level_at),
+        RecoveryReason::Cleared,
+        value,
+    );
+    // The write that closes the episode also ends the cycle, so only the prior row still holds it.
+    close.firing_started_at = prev.and_then(|p| p.firing_started_at);
+    Some(close)
+}
+
+/// The close an unobserved group's open episode is owed (M-7); `None` when nothing is open.
+pub fn disappearance_close(state: &AlertState, now: i64) -> Option<ClosedGroupEpisode> {
+    let episode_id = state.episode_id.clone()?;
+    let resolved_at = if is_resolved(state) {
+        state.last_outcome_at.unwrap_or(now)
+    } else {
+        now
+    };
+    // A group last observed clear inside a hold recovered; it did not stop reporting.
+    let (recovered_at, reason) = match state.recovering_since {
+        Some(since) => (since, RecoveryReason::Cleared),
+        None => (resolved_at, RecoveryReason::Disappeared),
+    };
+    let closed = ClosedEpisode {
+        episode_id,
+        incident_id: state.episode_incident_id.clone(),
+        opened_at: state.episode_opened_at.unwrap_or(recovered_at),
+        recovered_at,
+    };
+    Some(ClosedGroupEpisode::new(
+        state,
+        closed,
+        state.level_at,
+        reason,
+        None,
+    ))
+}
+
+/// One sweep's fates as writes (M-7); rule mode closes its own episodes in the evaluation.
+pub fn plan_sweep(
+    alert_id: &str,
+    groups: &[AlertState],
+    now: i64,
+    rule_mode: bool,
+    mut fate: impl FnMut(&AlertState) -> GroupFate,
+) -> SweepPlan {
+    let mut plan = SweepPlan::default();
+    for state in groups {
+        let close = (!rule_mode)
+            .then(|| disappearance_close(state, now))
+            .flatten();
+        match fate(state) {
+            GroupFate::Resolve => {
+                let mut update = resolve_group_update(alert_id, &state.group_key, state, now);
+                if update.is_noop() {
+                    continue;
+                }
+                // Cleared by the close; carried here, a replica would reopen it.
+                if close.is_some()
+                    && let Some(s) = update.state.as_mut()
+                {
+                    s.episode_id = None;
+                    s.episode_opened_at = None;
+                    s.episode_incident_id = None;
+                    s.recovering_since = None;
+                }
+                plan.resolves.push(GroupPlan {
+                    updates: vec![update],
+                    closed_episodes: close.into_iter().collect(),
+                    ..Default::default()
+                });
+            }
+            GroupFate::Keep => {
+                if is_resolved(state) {
+                    plan.rest.closed_episodes.extend(close);
+                }
+            }
+            GroupFate::Reap => {
+                plan.rest.closed_episodes.extend(close);
+                plan.rest.reaped.push(ReapedGroup {
+                    group_key: state.group_key.clone(),
+                    prev_level_at: state.level_at,
+                });
+            }
+        }
+    }
+    plan
 }
 
 #[cfg(test)]
@@ -1576,6 +1715,7 @@ mod tests {
             episode_incident_id: None,
             recovering_since: None,
             firing_started_at: None,
+            group_label_set: None,
         }
     }
 
@@ -1604,6 +1744,7 @@ mod tests {
             episode_incident_id: None,
             recovering_since: None,
             firing_started_at: None,
+            group_label_set: None,
         }
     }
 
@@ -2200,7 +2341,7 @@ mod tests {
             500,
         );
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let updates = plan.updates;
 
         assert_eq!(updates.len(), 3, "two groups plus the rollup row");
@@ -2219,7 +2360,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let updates = plan.updates;
 
         for u in &updates {
@@ -2243,7 +2384,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let updates = plan.updates;
 
         let a = update_for(&updates, &group_key(&labels(&[("host", "a")]))).unwrap();
@@ -2265,7 +2406,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let updates = plan.updates;
         let rollup = update_for(&updates, ROLLUP_GROUP_KEY).unwrap();
 
@@ -2290,7 +2431,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let updates = plan.updates;
         let rollup = update_for(&updates, ROLLUP_GROUP_KEY).unwrap();
 
@@ -2319,7 +2460,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
         let updates = plan.updates;
         let a = update_for(&updates, &key_a).unwrap();
 
@@ -2363,7 +2504,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
         let updates = plan.updates;
 
         let a = update_for(&updates, &key_a).unwrap();
@@ -2408,7 +2549,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
         let updates = plan.updates;
 
         let a = update_for(&updates, &key_a)
@@ -2455,7 +2596,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
         let updates = plan.updates;
         let new = update_for(&updates, &key_new).unwrap();
 
@@ -2496,7 +2637,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
         let updates = plan.updates;
 
         assert!(
@@ -2521,7 +2662,7 @@ mod tests {
         let classification = classify_groups(vec![], &c, 500);
         assert_eq!(classification.rollup, None);
 
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
         let updates = plan.updates;
         let rollup = update_for(&updates, ROLLUP_GROUP_KEY)
             .expect("the rollup row is still written on an empty result");
@@ -2572,7 +2713,7 @@ mod tests {
             .collect();
         let classification = classify_groups(obs, &c, cap);
 
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
 
         assert_eq!(
             classification.dropped.len(),
@@ -2647,7 +2788,7 @@ mod tests {
             .collect();
         let classification = classify_groups(obs, &c, 3);
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 200, 0, 0);
         assert!(
             plan.evicted.is_empty(),
             "nothing was tracked, so nothing can be evicted"
@@ -2678,7 +2819,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
 
         assert!(
             !plan.evicted.contains(&key_gone),
@@ -2697,7 +2838,7 @@ mod tests {
             .collect();
         let classification = classify_groups(obs, &c, 500);
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
 
         // Must be PERSISTED on the rollup row, not merely returned: the
         // overflow banner renders from stored state on the list and detail
@@ -2734,7 +2875,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -2756,7 +2897,7 @@ mod tests {
             500,
         );
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let t = update_for(&plan.updates, &key_a)
             .unwrap()
             .transition
@@ -2778,7 +2919,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
 
         let g = update_for(&plan.updates, &key_a)
             .unwrap()
@@ -2812,7 +2953,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
 
         let g = update_for(&plan.updates, &key_a)
             .unwrap()
@@ -2833,7 +2974,7 @@ mod tests {
             .collect();
         let classification = classify_groups(obs, &c, 500);
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let updates = plan.updates;
         assert_eq!(updates.len(), 501, "500 retained groups plus the rollup");
     }
@@ -2933,8 +3074,8 @@ mod tests {
             )
         };
 
-        let first = plan_group_updates("alert-1", &build(), &HashMap::new(), 100, 0);
-        let second = plan_group_updates("alert-1", &build(), &HashMap::new(), 100, 0);
+        let first = plan_group_updates("alert-1", &build(), &HashMap::new(), 100, 0, 0);
+        let second = plan_group_updates("alert-1", &build(), &HashMap::new(), 100, 0, 0);
         assert_eq!(first, second);
     }
 
@@ -3890,7 +4031,7 @@ mod tests {
             "fixture must actually overflow"
         );
 
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
 
         assert!(
             plan.evicted.contains(&key_absent),
@@ -3922,7 +4063,7 @@ mod tests {
             .map(|i| GroupObservation::new(labels(&[("host", &format!("h{i}"))]), 150.0))
             .collect();
         let classification = classify_groups(obs, &c, 2);
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
 
         assert!(
             !plan.evicted.iter().any(|k| k == ROLLUP_GROUP_KEY),
@@ -3954,8 +4095,8 @@ mod tests {
             classify_groups(obs, &c, 2)
         };
 
-        let first = plan_group_updates("alert-1", &build(), &prev, 200, 0);
-        let second = plan_group_updates("alert-1", &build(), &prev, 200, 0);
+        let first = plan_group_updates("alert-1", &build(), &prev, 200, 0, 0);
+        let second = plan_group_updates("alert-1", &build(), &prev, 200, 0, 0);
 
         assert_eq!(first.evicted, second.evicted);
         let mut sorted = first.evicted.clone();
@@ -4134,7 +4275,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4162,7 +4303,7 @@ mod tests {
 
         assert_eq!(classification.firing_observed, 900);
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4182,7 +4323,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4201,7 +4342,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let group = plan
             .updates
             .iter()
@@ -4288,7 +4429,7 @@ mod tests {
             reached_healthy: false,
         });
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4310,7 +4451,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4345,7 +4486,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0, 0);
         let t = update_for(&plan.updates, &key_a)
             .unwrap()
             .transition
@@ -4482,6 +4623,24 @@ mod tests {
                 },
             ],
             evicted: vec!["host=web-9".to_string(), "host=web-8".to_string()],
+            closed_episodes: vec![crate::meta::alerts::recovery::ClosedGroupEpisode {
+                group_key: "host=web-2".to_string(),
+                episode_id: "ep-1".to_string(),
+                prev_level_at: Some(1_750_000_000_000_000),
+                incident_id: None,
+                opened_at: 1_749_000_000_000_000,
+                recovered_at: 1_750_000_000_000_000,
+                reason: crate::meta::alerts::recovery::RecoveryReason::Disappeared,
+                value: Some(0.5),
+                labels: BTreeMap::from([("host".to_string(), "web-2".to_string())]),
+                group_labels: Some("host=web-2".to_string()),
+                last_notified_level: Some(AlertLevel::Critical),
+                firing_started_at: Some(1_749_000_000_000_000),
+            }],
+            reaped: vec![crate::meta::alerts::grouping::ReapedGroup {
+                group_key: "host=web-3".to_string(),
+                prev_level_at: Some(1_749_000_000_000_000),
+            }],
         };
 
         let bytes = crate::utils::json::to_vec(&plan).unwrap();
@@ -4496,13 +4655,20 @@ mod tests {
     fn an_empty_group_plan_round_trips() {
         use crate::meta::alerts::grouping::GroupPlan;
 
-        let plan = GroupPlan {
-            updates: vec![],
-            evicted: vec![],
-        };
+        let plan = GroupPlan::default();
         let bytes = crate::utils::json::to_vec(&plan).unwrap();
         let back: GroupPlan = crate::utils::json::from_slice(&bytes).unwrap();
         assert_eq!(back, plan);
+    }
+
+    #[test]
+    fn a_group_plan_from_an_older_region_decodes_without_the_episode_fields() {
+        use crate::meta::alerts::grouping::GroupPlan;
+
+        let back: GroupPlan =
+            crate::utils::json::from_slice(br#"{"updates":[],"evicted":["k"]}"#).unwrap();
+        assert_eq!(back.evicted, vec!["k".to_string()]);
+        assert!(back.closed_episodes.is_empty() && back.reaped.is_empty());
     }
     #[test]
     fn test_rule_mode_allows_single_and_multi_without_value_thresholds() {
@@ -4578,7 +4744,7 @@ mod tests {
                 &c,
                 500,
             );
-            for u in plan_group_updates("alert-1", &classification, &prev, at, 0).updates {
+            for u in plan_group_updates("alert-1", &classification, &prev, at, 0, 0).updates {
                 let s = u.state.unwrap();
                 prev.insert(s.group_key.clone(), s);
             }
@@ -4600,5 +4766,284 @@ mod tests {
             resolved.firing_started_at, None,
             "the reaper's resolve clears it"
         );
+    }
+
+    // ── Per-group recovery episodes (openobserve#15178) ─────────────────────
+
+    mod group_recovery {
+        use std::collections::HashMap;
+
+        use super::*;
+        use crate::meta::alerts::{
+            grouping::{GroupFate, GroupPlan, disappearance_close, plan_group_updates, plan_sweep},
+            recovery::RecoveryReason,
+            state::{AlertState, ROLLUP_GROUP_KEY, StateUpdate},
+        };
+
+        const SEC: i64 = 1_000_000;
+
+        fn critical_below_one() -> TriggerCondition {
+            tc(Operator::LessThan, 1, None)
+        }
+
+        fn evaluate(
+            db: &mut HashMap<String, AlertState>,
+            values: &[(&str, f64)],
+            at: i64,
+            keep_firing_for: i64,
+        ) -> GroupPlan {
+            let obs = values
+                .iter()
+                .map(|(host, v)| GroupObservation::new(labels(&[("host", host)]), *v))
+                .collect();
+            let c = classify_groups(obs, &critical_below_one(), 500);
+            let plan = plan_group_updates("alert-1", &c, db, at, 0, keep_firing_for);
+            apply(db, &plan);
+            plan
+        }
+
+        /// Mimics the table: guarded closes, then upserts that keep a group row's episode.
+        fn apply(db: &mut HashMap<String, AlertState>, plan: &GroupPlan) {
+            for close in &plan.closed_episodes {
+                if let Some(row) = db.get_mut(&close.group_key)
+                    && row.episode_id.as_deref() == Some(close.episode_id.as_str())
+                    && row.level_at == close.prev_level_at
+                {
+                    row.episode_id = None;
+                    row.episode_opened_at = None;
+                    row.episode_incident_id = None;
+                    row.recovering_since = None;
+                    row.last_notified_level = None;
+                    row.silenced_until = None;
+                }
+            }
+            for state in plan
+                .updates
+                .iter()
+                .filter_map(|u: &StateUpdate| u.state.as_ref())
+            {
+                let mut next = state.clone();
+                if let Some(row) = db.get(&state.group_key)
+                    && state.group_key != ROLLUP_GROUP_KEY
+                {
+                    next.episode_id = row.episode_id.clone();
+                    next.episode_opened_at = row.episode_opened_at;
+                    next.silenced_until = row.silenced_until;
+                    next.last_notified_level = row.last_notified_level;
+                }
+                db.insert(state.group_key.clone(), next);
+            }
+        }
+
+        fn deliver(db: &mut HashMap<String, AlertState>, host: &str, id: &str, at: i64) {
+            let row = db.get_mut(&key(host)).unwrap();
+            if row.episode_id.is_none() {
+                row.episode_id = Some(id.to_string());
+                row.episode_opened_at = Some(at);
+            }
+            row.last_notified_level = row.level;
+            row.silenced_until = Some(at + 3_600 * SEC);
+        }
+
+        fn key(host: &str) -> String {
+            group_key(&labels(&[("host", host)]))
+        }
+
+        #[test]
+        fn an_undelivered_firing_opens_nothing() {
+            let mut db = HashMap::new();
+            evaluate(&mut db, &[("a", 0.0)], 10 * SEC, 0);
+            let plan = evaluate(&mut db, &[("a", 5.0)], 20 * SEC, 0);
+            assert!(plan.closed_episodes.is_empty());
+            assert!(db[&key("a")].episode_id.is_none());
+        }
+
+        #[test]
+        fn two_groups_recover_independently_and_each_exactly_once() {
+            let mut db = HashMap::new();
+            evaluate(&mut db, &[("a", 0.0), ("b", 0.0)], 10 * SEC, 0);
+            deliver(&mut db, "a", "ep-a", 11 * SEC);
+            deliver(&mut db, "b", "ep-b", 11 * SEC);
+
+            let plan = evaluate(&mut db, &[("a", 5.0), ("b", 0.0)], 20 * SEC, 0);
+            assert_eq!(plan.closed_episodes.len(), 1);
+            let close = &plan.closed_episodes[0];
+            assert_eq!(close.episode_id, "ep-a");
+            assert_eq!(close.reason, RecoveryReason::Cleared);
+            assert_eq!(close.value, Some(5.0));
+            assert_eq!(close.labels, labels(&[("host", "a")]));
+            assert_eq!(close.recovered_at, 20 * SEC);
+            assert!(db[&key("a")].episode_id.is_none());
+            assert_eq!(db[&key("b")].episode_id.as_deref(), Some("ep-b"));
+
+            for at in [30, 40] {
+                let plan = evaluate(&mut db, &[("a", 5.0), ("b", 0.0)], at * SEC, 0);
+                assert!(plan.closed_episodes.is_empty(), "a closes once");
+            }
+            let plan = evaluate(&mut db, &[("a", 5.0), ("b", 5.0)], 50 * SEC, 0);
+            assert_eq!(plan.closed_episodes.len(), 1);
+            assert_eq!(plan.closed_episodes[0].episode_id, "ep-b");
+            assert!(
+                db[ROLLUP_GROUP_KEY].episode_id.is_none(),
+                "the rollup never opens"
+            );
+        }
+
+        #[test]
+        fn the_close_clears_delivery_state_so_a_re_fire_pages_again() {
+            let mut db = HashMap::new();
+            evaluate(&mut db, &[("a", 0.0)], 10 * SEC, 0);
+            deliver(&mut db, "a", "ep-a", 11 * SEC);
+            evaluate(&mut db, &[("a", 5.0)], 20 * SEC, 0);
+            let row = &db[&key("a")];
+            assert!(row.silenced_until.is_none() && row.last_notified_level.is_none());
+        }
+
+        #[test]
+        fn keep_firing_for_holds_per_group_and_a_re_fire_keeps_the_id() {
+            let mut db = HashMap::new();
+            evaluate(&mut db, &[("a", 0.0)], 0, 60);
+            deliver(&mut db, "a", "ep-a", SEC);
+
+            assert!(
+                evaluate(&mut db, &[("a", 5.0)], 10 * SEC, 60)
+                    .closed_episodes
+                    .is_empty()
+            );
+            assert_eq!(db[&key("a")].recovering_since, Some(10 * SEC));
+            evaluate(&mut db, &[("a", 0.0)], 20 * SEC, 60);
+            assert_eq!(db[&key("a")].episode_id.as_deref(), Some("ep-a"));
+            assert!(db[&key("a")].recovering_since.is_none());
+
+            evaluate(&mut db, &[("a", 5.0)], 30 * SEC, 60);
+            let plan = evaluate(&mut db, &[("a", 5.0)], 90 * SEC, 60);
+            assert_eq!(plan.closed_episodes.len(), 1);
+            assert_eq!(plan.closed_episodes[0].recovered_at, 30 * SEC);
+        }
+
+        #[test]
+        fn the_hold_keeps_the_firing_cycle_and_the_close_names_it() {
+            let mut db = HashMap::new();
+            evaluate(&mut db, &[("a", 0.0)], 0, 60);
+            deliver(&mut db, "a", "ep-a", SEC);
+            let started = db[&key("a")].firing_started_at;
+            assert!(started.is_some());
+
+            evaluate(&mut db, &[("a", 5.0)], 10 * SEC, 60);
+            assert_eq!(db[&key("a")].firing_started_at, started, "held");
+            let plan = evaluate(&mut db, &[("a", 5.0)], 80 * SEC, 60);
+            assert_eq!(plan.closed_episodes[0].firing_started_at, started);
+            assert_eq!(db[&key("a")].firing_started_at, None);
+        }
+
+        #[test]
+        fn the_observed_label_map_is_stored_and_carried_to_an_m7_resolve() {
+            let mut db = HashMap::new();
+            evaluate(&mut db, &[("a", 0.0)], 10 * SEC, 0);
+            let row = db[&key("a")].clone();
+            assert_eq!(row.group_label_set, Some(labels(&[("host", "a")])));
+            let resolved = resolve_group_update("alert-1", &key("a"), &row, 500 * SEC);
+            assert_eq!(resolved.state.unwrap().group_label_set, row.group_label_set);
+        }
+
+        #[test]
+        fn m7_closes_with_disappeared_or_cleared_after_a_hold() {
+            let mut row = state_at("g", Some(AlertLevel::Critical), 10 * SEC);
+            row.episode_id = Some("ep".into());
+            row.episode_opened_at = Some(10 * SEC);
+            let close = disappearance_close(&row, 500 * SEC).unwrap();
+            assert_eq!(close.reason, RecoveryReason::Disappeared);
+            assert_eq!(close.recovered_at, 500 * SEC);
+
+            row.recovering_since = Some(20 * SEC);
+            let close = disappearance_close(&row, 500 * SEC).unwrap();
+            assert_eq!(close.reason, RecoveryReason::Cleared);
+            assert_eq!(
+                close.recovered_at,
+                20 * SEC,
+                "the hold does not move the recovery"
+            );
+
+            row.episode_id = None;
+            assert!(disappearance_close(&row, 500 * SEC).is_none());
+        }
+
+        #[test]
+        fn a_failed_delivery_does_not_read_as_resolved() {
+            let mut row = state_at("g", Some(AlertLevel::Critical), 10 * SEC);
+            row.last_outcome = Some(RunOutcome::NotifyFailed);
+            row.last_outcome_at = Some(11 * SEC);
+            assert_eq!(group_fate(&row, 12 * SEC, 180 * SEC, 1), GroupFate::Keep);
+            let update = resolve_group_update("alert-1", "g", &row, 500 * SEC);
+            assert!(
+                update.transition.is_some(),
+                "it resolves through M-7 with an Ok transition"
+            );
+        }
+
+        #[test]
+        fn the_sweep_resolve_carries_no_episode_after_its_close() {
+            let mut row = state_at("g", Some(AlertLevel::Critical), 10 * SEC);
+            row.episode_id = Some("ep".into());
+            let plan = plan_sweep("alert-1", &[row], 500 * SEC, false, |_| GroupFate::Resolve);
+            assert_eq!(plan.resolves.len(), 1);
+            let resolve = &plan.resolves[0];
+            assert_eq!(resolve.closed_episodes[0].episode_id, "ep");
+            let state = resolve.updates[0].state.as_ref().unwrap();
+            assert!(state.episode_id.is_none() && state.recovering_since.is_none());
+        }
+
+        #[test]
+        fn the_sweep_closes_resolved_rows_still_holding_an_episode_except_in_rule_mode() {
+            let mut kept = state_at("k", Some(AlertLevel::Ok), 10 * SEC);
+            kept.last_outcome = Some(RunOutcome::Normal);
+            kept.last_outcome_at = Some(50 * SEC);
+            kept.episode_id = Some("ep-k".into());
+            let mut reaped = kept.clone();
+            reaped.group_key = "r".into();
+            reaped.episode_id = Some("ep-r".into());
+            let rows = [kept, reaped];
+            let fate = |s: &AlertState| {
+                if s.group_key == "k" {
+                    GroupFate::Keep
+                } else {
+                    GroupFate::Reap
+                }
+            };
+
+            let plan = plan_sweep("alert-1", &rows, 500 * SEC, false, fate);
+            let closed: Vec<_> = plan
+                .rest
+                .closed_episodes
+                .iter()
+                .map(|c| &c.episode_id)
+                .collect();
+            assert_eq!(closed, ["ep-k", "ep-r"]);
+            assert_eq!(plan.rest.reaped.len(), 1);
+            assert_eq!(plan.rest.closed_episodes[0].recovered_at, 50 * SEC);
+
+            let plan = plan_sweep("alert-1", &rows, 500 * SEC, true, fate);
+            assert!(
+                plan.rest.closed_episodes.is_empty(),
+                "rule mode closes in the evaluation"
+            );
+        }
+
+        #[test]
+        fn eviction_closes_nothing() {
+            let mut db = HashMap::new();
+            evaluate(&mut db, &[("a", 0.0), ("b", 0.0)], 10 * SEC, 0);
+            deliver(&mut db, "a", "ep-a", 11 * SEC);
+            let obs = vec![GroupObservation::new(labels(&[("host", "b")]), 0.0)];
+            let c = classify_groups(obs, &critical_below_one(), 1);
+            let mut c = c;
+            c.cap = GroupCapOutcome::Exceeded {
+                observed: 2,
+                cap: 1,
+            };
+            let plan = plan_group_updates("alert-1", &c, &db, 20 * SEC, 0, 0);
+            assert_eq!(plan.evicted, vec![key("a")]);
+            assert!(plan.closed_episodes.is_empty());
+        }
     }
 }

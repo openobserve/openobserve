@@ -614,6 +614,8 @@ function useSavedGrantsFixture() {
 const mountEditRoleVm = async () => (await mountEditRole()).vm;
 
 beforeEach(() => {
+  // A draft one test leaves behind would open the restore dialog on the next mount of the same role.
+  localStorage.clear();
   // resourcesQuery is cached by TanStack, so without this the second mount
   // never re-calls getResources and the call-order pins go stale.
   queryClient.clear();
@@ -2733,22 +2735,10 @@ describe("EditRole - tabs and dirty state [characterization]", () => {
     expect(vm.isUsersDirty).toBe(false);
   });
 
-  // The leave guard holds the navigation in a promise the dialog resolves.
-  it("resolves the held navigation with the user's answer and forgets the resolver", async () => {
+  it("opens with no leave or restore dialog", async () => {
     const vm = await mountEditRoleVm();
-    const resolve = vi.fn();
-    vm.leaveConfirm = { show: true, resolve };
-
-    vm.onLeaveConfirm(true);
-
-    expect(resolve).toHaveBeenCalledWith(true);
-    expect(vm.leaveConfirm.show).toBe(false);
-    expect(vm.leaveConfirm.resolve).toBeNull();
-  });
-
-  it("opens with no dialog and nothing to resolve", async () => {
-    const vm = await mountEditRoleVm();
-    expect(vm.leaveConfirm).toEqual({ show: false, resolve: null });
+    expect(vm.roleDraft.state.leaveOpen).toBe(false);
+    expect(vm.roleDraft.state.restoreOpen).toBe(false);
   });
 });
 

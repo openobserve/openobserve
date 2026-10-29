@@ -31,6 +31,7 @@ import { normalizeThresholds, resolveStepValues, stepColorFor } from "./threshol
 import { getAnnotationsData } from "./getAnnotationsData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveSeriesOverride } from "./seriesOverrides";
+import { isRowTimeline } from "./chartTypeGroups";
 import { HOSTMAP_MAX_CELLS } from "./convertHostmapData";
 
 export const STATE_TIMELINE_MAX_ROWS = 500;
@@ -674,7 +675,7 @@ const rowWheelZoom = (visibleRows: number) => ({
 
 /** The series cap the PromQL loader applies to a panel; a state timeline and a host map draw far more series, so each has its own. */
 export const promqlSeriesCap = (panelType: string | undefined, zoConfig: any): number => {
-  if (panelType === "state-timeline") {
+  if (isRowTimeline(panelType)) {
     return zoConfig?.max_dashboard_state_timeline_series ?? STATE_TIMELINE_MAX_SERIES;
   }
   if (panelType === "hostmap") return zoConfig?.max_dashboard_hostmap_cells ?? HOSTMAP_MAX_CELLS;

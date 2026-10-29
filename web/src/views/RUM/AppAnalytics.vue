@@ -192,12 +192,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         :disabled="eventsFull"
+        :aria-label="
+          hasNewEventDraft
+            ? t('common.editorDraft.newDot', { label: t('rum.analytics.events.newEvent') })
+            : undefined
+        "
         data-test="rum-analytics-named-events-new-btn"
         @click="openNewEvent"
         >{{ t("rum.analytics.events.newEvent")
         }}<OTooltip
           v-if="eventsFull"
-          :content="t('rum.analytics.events.capReached', { max: MAX_EVENTS_PER_APP })"
+          :content="
+            t('rum.analytics.events.capReached', { max: MAX_EVENTS_PER_APP })
+          " /><EditorDraftDot
+          v-if="hasNewEventDraft"
+          :saved-at="newEventDraftSavedAt"
+          corner
+          :tooltip="!eventsFull"
+          data-test="rum-analytics-named-events-new-draft-dot"
       /></OButton>
       <OButton
         v-if="showNewFunnel"
@@ -354,7 +366,11 @@ import SampledTag from "@/components/rum/productAnalytics/SampledTag.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
 import ExclusionsDrawer from "@/components/rum/productAnalytics/ExclusionsDrawer.vue";
-import useNamedEvents from "@/composables/rum/useNamedEvents";
+import useNamedEvents, {
+  namedEventDraftVariant,
+  useNewEventDraftTimes,
+} from "@/composables/rum/useNamedEvents";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useFunnelDraft from "@/composables/rum/useFunnelDraft";
 import useRum from "@/composables/rum/useRum";
@@ -612,6 +628,12 @@ const onExactChange = (value: boolean) => {
 const refresh = () => {
   void pa.refresh().then(() => syncUrl());
 };
+
+const newEventDrafts = useNewEventDraftTimes();
+const newEventDraftSavedAt = computed(() =>
+  newEventDrafts.savedAt(namedEventDraftVariant(pa.state.app)),
+);
+const hasNewEventDraft = computed(() => newEventDraftSavedAt.value !== null);
 
 const openNewEvent = () => {
   void router.push({ name: PA_ROUTES.eventNew, query: pa.toQuery() });

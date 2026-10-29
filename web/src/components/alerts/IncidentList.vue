@@ -915,11 +915,27 @@ export default defineComponent({
       updateStatus(incident, "acknowledged");
     };
 
-    const resolveIncident = (incident: Incident) => {
+    const resolveIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.resolveConfirmTitle"),
+        message: t("alerts.incidents.resolveConfirmMessage"),
+        confirmLabel: t("alerts.incidents.resolve"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "resolved");
     };
 
-    const reopenIncident = (incident: Incident) => {
+    const reopenIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopen"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "open");
     };
 

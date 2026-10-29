@@ -52,6 +52,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-status-positive": "#208a3c",
   "--color-surface-subtle": "#f5f5f5",
   "--color-white": "#ffffff",
+  "--color-black": "#000000",
   "--color-tooltip-text": "#262626",
   "--color-tooltip-bg": "#ffffff",
   "--color-tooltip-border": "#ededed",
@@ -100,7 +101,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-table-22": "#FFF2CC",
   "--color-chart-table-23": "#FFE6E6",
   "--color-chart-table-24": "#E8F4FD",
-  "--color-chart-gridline": "rgba(0, 0, 0, 0.2)",
+  "--color-chart-gridline": "rgba(0, 10, 23, 0.09)",
   "--color-chart-band": "rgba(115, 115, 115, 0.22)",
   // --color-chart-crosshair-bg is deliberately absent: it is dark-only, and the empty
   // string light returns is what makes ECharts use its own auto default (base.css:262).

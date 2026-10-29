@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       !promqlBuilderMode &&
       dashboardPanelData.data.type != 'geomap' &&
       dashboardPanelData.data.type != 'maps' &&
-      dashboardPanelData.data.type != 'sankey'
+      !isFlowChart(dashboardPanelData.data.type)
     "
   >
     <!-- x axis container -->
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
                 radius="sm"
                 :divided="true"
                 :draggable="isDragArmed('x-' + index)"
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
                 radius="sm"
                 :divided="true"
                 :draggable="isDragArmed('breakdown-' + index)"
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
             radius="sm"
             :divided="true"
             :draggable="isDragArmed('y-' + index)"
@@ -536,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
               radius="sm"
               :divided="true"
               :draggable="isDragArmed('z-' + index)"
@@ -675,6 +675,7 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { useStore } from "vuex";
 import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
@@ -1552,6 +1553,7 @@ export default defineComponent({
     return {
       shouldShowPromQLQueryType,
       showXAxis,
+      isFlowChart,
       t,
       FIELD_FUNCTION_MENU_WIDTH,
       panelName,

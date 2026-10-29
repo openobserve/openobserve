@@ -60,6 +60,16 @@ describe("useOnCallPermissions", () => {
     unmount();
   });
 
+  /// 08-rbac: only an observed 403 closes a control; a 401 is a session problem the http layer handles.
+  it("does not latch on a 401", () => {
+    const { perms, unmount } = host();
+
+    perms.noteConfigurationDenied({ response: { status: 401 } });
+
+    expect(perms.canConfigure.value).toBe(true);
+    unmount();
+  });
+
   it("ignores a non-permission failure", () => {
     const { perms, unmount } = host();
 

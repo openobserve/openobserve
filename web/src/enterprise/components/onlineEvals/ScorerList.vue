@@ -118,6 +118,18 @@
           </OButton>
         </template>
 
+        <template #cell-name="{ row }">
+          <div class="flex min-w-0 items-center gap-2">
+            <OTruncatedText>{{ row.name }}</OTruncatedText>
+            <EditorDraftDot
+              v-if="scorerDrafts.ids.has(entityId(row))"
+              :saved-at="scorerDrafts.savedAt(entityId(row))"
+              class="shrink-0"
+              :data-test="`scorer-list-${entityId(row)}-draft-dot`"
+            />
+          </div>
+        </template>
+
         <template #cell-type="{ row }">
           <OTag type="scorerType" :value="scorerTypeOf(row)" />
         </template>
@@ -237,6 +249,9 @@ import EvalListShell from "./EvalListShell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 import type { ForbiddenState } from "@/utils/featureGate";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 
 const props = defineProps<{
   rows: Scorer[];
@@ -269,6 +284,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const scorerDrafts = useEditorDraftIds("eval_scorer");
 const typeFilter = ref<ScorerType | null>(null);
 const selectedIds = ref<string[]>([]);
 

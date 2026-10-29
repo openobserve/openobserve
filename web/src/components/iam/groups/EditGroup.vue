@@ -107,6 +107,8 @@ import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { licenseDeniedFeatures } from "@/utils/featureGate";
 
@@ -123,6 +125,8 @@ const store = useStore();
 const router = useRouter();
 
 const { t } = useI18nTyped();
+
+const { confirm } = useConfirmDialog();
 
 const groupDetails = ref({
   group_name: "dev",
@@ -170,6 +174,7 @@ const onLeaveConfirm = (proceed: boolean) => {
 
 onBeforeRouteLeave(() => {
   if (!isAnyDirty.value) return true;
+  if (draftSignOutForced.value) return confirmForcedSignOutDiscard(confirm, t);
 
   return new Promise<boolean>((resolve) => {
     leaveConfirm.value.resolve = resolve;

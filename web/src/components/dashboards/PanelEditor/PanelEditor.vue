@@ -165,11 +165,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Query Builder -->
                   <DashboardQueryBuilder
-                    v-if="resolvedConfig.showQueryBuilder"
+                    v-if="
+                      resolvedConfig.showQueryBuilder &&
+                      !isCustomSqlPanel(dashboardPanelData.data.type)
+                    "
                     :dashboardData="dashboardData"
                     @custom-chart-template-selected="handleCustomChartTemplateSelected"
                   />
-                  <OSeparator v-if="resolvedConfig.showQueryBuilder" />
+                  <OSeparator
+                    v-if="
+                      resolvedConfig.showQueryBuilder &&
+                      !isCustomSqlPanel(dashboardPanelData.data.type)
+                    "
+                  />
 
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
@@ -758,6 +766,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { SERIES_OVERRIDE_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
+import { isCustomSqlPanel } from "@/utils/dashboard/chartTypeGroups";
 
 // ============================================================================
 // Component Imports

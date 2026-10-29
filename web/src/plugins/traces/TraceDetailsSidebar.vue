@@ -64,7 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Row 1: Trace Details -->
       <div class="flex flex-nowrap items-center justify-between overflow-x-auto p-1">
-        <div class="flex flex-nowrap items-center">
+        <div
+          class="flex min-w-0 flex-wrap items-center gap-y-1"
+          data-test="trace-details-sidebar-header-toolbar-chips"
+        >
           <!-- Service Badge -->
           <OTag
             type="metricChip"
@@ -177,7 +180,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTag>
         </div>
 
-        <div class="flex items-center">
+        <div
+          class="flex shrink-0 items-center"
+          data-test="trace-details-sidebar-header-toolbar-actions"
+        >
           <!-- Span ID Badge -->
           <OTag
             type="metricChip"
@@ -2988,7 +2994,8 @@ export default defineComponent({
     border-bottom: none;
   }
 
-  td span {
+  /* The error tab's empty state is an icon+text flex row; a full-width span there squeezes the text to one letter per line. */
+  td span:not([data-test="exception-stacktrace-empty"] span) {
     display: inline-block;
     width: 100%;
     word-break: break-word;

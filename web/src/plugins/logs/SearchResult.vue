@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        class="border-card-glass-border bg-card-glass-bg flex min-h-9 shrink-0 items-center border-b max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ recordsChips.time }}</OTag
               >
               <OTag
-                v-if="recordsChips.scan"
+                v-if="recordsChips.scan && !scannedSize"
                 type="logsResultChip"
                 value="warn"
                 class="max-md:hidden"
@@ -94,6 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </template>
             <span v-else class="min-w-0 truncate">{{ noOfRecordsTitle }}</span>
+            <span
+              v-if="scannedSize"
+              class="text-text-secondary shrink-0 text-xs"
+              data-test="logs-result-scan-progress"
+              >{{ t("search.scannedSoFar", { size: scannedSize }) }}</span
+            >
           </template>
           <!-- Patterns mode: structured chips -->
           <template v-else>
@@ -172,9 +178,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <!-- Refresh in bordered wrapper -->
             <div
-              class="border-card-glass-border rounded-default inline-flex h-6 items-center overflow-hidden border px-1"
+              class="border-card-glass-border rounded-default inline-flex h-6 items-center border px-1"
             >
               <ORefreshButton
+                size="inset"
                 :last-run-at="searchObj.meta.lastRunAt"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disabled="searchObj.loading || searchObj.loadingHistogram"
@@ -281,11 +288,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Outside scrollContainerRef so the results progress bar can't scroll away. -->
       <div class="relative">
-        <LoadingProgress
+        <div
           data-test="logs-results-progress"
-          :loading="searchObj.loading"
-          :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
-        />
+          class="pointer-events-none absolute inset-x-0 top-0 z-999 h-0.5"
+          :class="showResultsLoader ? 'opacity-100' : 'opacity-0'"
+        >
+          <div
+            v-if="showResultsLoader"
+            role="progressbar"
+            :aria-label="t('search.resultsProgressLabel')"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="resultsProgressWidth"
+            class="bg-accent h-full transition-[width] duration-300 ease-out"
+            :style="{ width: `${resultsProgressWidth}%` }"
+          />
+        </div>
       </div>
 
       <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
@@ -565,6 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-if="logsCellHtml(col.id, row)"
                       class="log-cell-html"
+                      :class="severityFieldTextClass(col.id, value)"
                       :data-test="
                         col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
                       "
@@ -572,6 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span
                       v-else
+                      :class="severityFieldTextClass(col.id, value)"
                       :data-test="
                         col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
                       "
@@ -961,8 +981,13 @@ import {
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
-import { severityIndicatorColor, severityRowClass } from "@/utils/logs/statusParser";
+import {
+  severityFieldTextClass,
+  severityIndicatorColor,
+  severityRowClass,
+} from "@/utils/logs/statusParser";
 import useLogSeverity from "@/composables/useLogs/useLogSeverity";
+import { useResultsLoadingIndicator } from "@/composables/useLogs/useResultsLoadingIndicator";
 import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -2465,6 +2490,11 @@ export default defineComponent({
     // First paint has nothing to show, so the skeleton is right; once rows exist we switch to `streaming` so partial results stay on screen.
     const isResultsSkeleton = computed(() => searchObj.loading && !hasResultRows.value);
     const isResultsStreaming = computed(() => searchObj.loading && hasResultRows.value);
+    const { showLoader: showResultsLoader, scannedSize } = useResultsLoadingIndicator(searchObj);
+    // A floor keeps the line visible before the first progress event arrives.
+    const resultsProgressWidth = computed(() =>
+      Math.round(Math.min(100, Math.max(5, searchObj.loadingProgressPercentage || 0))),
+    );
 
     const getPartitionPaginations = computed(() => {
       return searchObj.data.queryResults?.partitionDetail?.paginations || [];
@@ -2941,6 +2971,7 @@ export default defineComponent({
       getLogRowStatusColor,
       getLogRowClass,
       logRowSeveritySrText,
+      severityFieldTextClass,
       expandedLogIds,
       onExpandedLogIdsChange,
       openLogDetailsByRow,
@@ -2989,6 +3020,9 @@ export default defineComponent({
       hasResultRows,
       isResultsSkeleton,
       isResultsStreaming,
+      showResultsLoader,
+      scannedSize,
+      resultsProgressWidth,
       reorderSelectedFields,
       getPaginations,
       refreshPagination,

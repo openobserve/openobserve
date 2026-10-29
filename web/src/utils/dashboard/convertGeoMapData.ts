@@ -85,13 +85,12 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
 
   const filteredMapData = panelSchema.queries.map((query: any, index: any) => {
     return mapData?.[index]?.filter((item: any) => {
-      if (
-        getDataValue(item, query.fields.latitude.alias) != null &&
-        getDataValue(item, query.fields.longitude.alias) != null
-      ) {
-        return true;
-      }
-      return false;
+      const lat = getDataValue(item, query.fields.latitude.alias);
+      const lng = getDataValue(item, query.fields.longitude.alias);
+      if (lat == null || lng == null) return false;
+      // A non-numeric value stays in so the check below can report it; an off-globe one is dropped.
+      if (isNaN(lat) || isNaN(lng)) return true;
+      return Math.abs(Number(lat)) <= 90 && Math.abs(Number(lng)) <= 180;
     });
   });
 
@@ -113,12 +112,14 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     return queryField;
   });
 
+  // Panels saved with `map_view: null` must still open on the default view.
+  const mapView = panelSchema.config?.map_view ?? {};
   const options: any = {
     lmap: {
       // See https://leafletjs.com/reference.html#map-option for details
       // NOTE: note that this order is reversed from Leaflet's [lat, lng]!
-      center: [panelSchema.config.map_view.lng, panelSchema.config.map_view.lat], // [lng, lat]
-      zoom: panelSchema.config.map_view.zoom,
+      center: [Number(mapView.lng) || 0, Number(mapView.lat) || 0], // [lng, lat]
+      zoom: Number.isFinite(Number(mapView.zoom ?? NaN)) ? Number(mapView.zoom) : 1,
       roam: true,
       resizeEnable: true, // automatically handles browser window resize.
       // whether echarts layer should be rendered when the map is moving. Default is true.

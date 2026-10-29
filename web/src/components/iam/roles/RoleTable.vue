@@ -13,8 +13,12 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { ForbiddenState } from "@/utils/featureGate";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 
 const { t } = useI18nTyped();
+
+const roleDrafts = useEditorDraftIds("iam_role");
 
 const props = defineProps<{
   data: any[];
@@ -165,6 +169,17 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
           @update:model-value="emit('update:globalFilter', $event)"
         />
       </div>
+    </template>
+
+    <template #cell-role_name="{ row, value }">
+      <span class="inline-flex items-center gap-2">
+        <span class="text-text-body">{{ value }}</span>
+        <EditorDraftDot
+          v-if="roleDrafts.ids.has(row?.role_name)"
+          :saved-at="roleDrafts.savedAt(row?.role_name)"
+          :data-test="`iam-roles-${row?.role_name}-draft-dot`"
+        />
+      </span>
     </template>
 
     <!-- Members: a role with nobody in it is muted, not coloured — it is a cleanup

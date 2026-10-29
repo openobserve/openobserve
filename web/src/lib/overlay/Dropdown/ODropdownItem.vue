@@ -59,7 +59,7 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
       'group/item relative flex items-center gap-2',
       'rounded-default w-full px-3 py-1.5',
       'cursor-pointer outline-none select-none',
-      'transition-colors duration-150',
+      'transition-colors duration-(--duration-hover-out) data-[highlighted]:duration-(--duration-hover-in)',
       variantClasses[variant],
       'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',
       unavailable &&
@@ -77,7 +77,7 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
       <slot name="icon-left">
         <OIcon v-if="props.iconLeft" :name="props.iconLeft" size="sm" />
       </slot>
-      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-1">
+      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span><slot /></span>
         <OText
           :id="reasonId"

@@ -473,6 +473,22 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", incident.id, "open");
     });
 
+    it.each([
+      ["resolveIncident", "Resolve incident?"],
+      ["reopenIncident", "Reopen incident?"],
+    ] as const)("%s asks first and changes nothing when cancelled", async (action, title) => {
+      // The instance exposes setup() bindings that the mounted type does not declare.
+      const vm = wrapper.vm as unknown as Record<
+        typeof action,
+        (incident: Incident) => Promise<void>
+      > & { allIncidents: Incident[] };
+      mockConfirm.mockResolvedValueOnce(false);
+      await vm[action](vm.allIncidents[0]);
+      await flushPromises();
+      expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
+
     it("reloads incidents after successful status update", async () => {
       const incident = (wrapper.vm as any).allIncidents[0];
       vi.clearAllMocks();

@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           ref="labelRef"
-          class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal text-ellipsis [hyphens:none] transition-colors duration-250 max-md:text-start max-md:text-sm"
+          class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal text-ellipsis [hyphens:none] transition-colors duration-250 max-md:text-start max-md:text-sm max-md:leading-snug"
           :class="labelClass"
         >
           {{ title }}

@@ -8,8 +8,11 @@
     size="sm"
     :title="currentDialog.title"
     :primary-button-label="currentDialog.confirmLabel || t('common.ok')"
-    :secondary-button-label="currentDialog.cancelLabel || t('common.cancel')"
-    :persistent="currentDialog.persistent ?? true"
+    :secondary-button-label="
+      currentDialog.confirmOnly ? undefined : currentDialog.cancelLabel || t('common.cancel')
+    "
+    :persistent="currentDialog.confirmOnly || (currentDialog.persistent ?? true)"
+    :show-close="!currentDialog.confirmOnly"
     :primary-button-variant="currentDialog.confirmVariant ?? 'primary'"
     :initial-focus="currentDialog.focusCancel ? 'secondary' : 'primary'"
     @click:primary="handleConfirm"
