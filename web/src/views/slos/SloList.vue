@@ -44,7 +44,7 @@
     <!-- SLOs share the ALERT folder namespace (there is no FolderType::Slos),
          so `type="alerts"` is not a copy-paste slip — it is what makes a
          "payments" folder hold that team's alerts and its SLOs together. -->
-    <template #sidebar>
+    <template v-if="!anomalyLocked" #sidebar>
       <FolderList type="alerts" :drawer-on-mobile="false" @update:activeFolderId="onFolderChange" />
     </template>
 
@@ -57,6 +57,7 @@
       row-key="id"
       :loading="loading"
       :error="error"
+      :forbidden="forbidden"
       :page-size="pageSize"
       :page-size-options="[25, 50, 100]"
       :sort-by="sortBy"
@@ -528,6 +529,8 @@ import { slosQuery } from "@/services/slos.queries";
 // stays off the query layer and calls the endpoint directly.
 import sloService from "@/services/slos";
 import { computed, onMounted, ref, nextTick, watch } from "vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -592,10 +595,13 @@ const store = useStore();
 const readOrg = ref<string>(store.state.selectedOrganization?.identifier ?? "");
 const readFolder = ref<string | undefined>(undefined);
 
+// SLOs are licensed under anomaly detection; a locked license reads nothing and says so.
+const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
+
 const slosList = useQuery(() =>
   // Held until the folder resolves: the reactive key would otherwise fetch an unscoped list first.
   Object.assign(slosQuery(readOrg.value, readFolder.value), {
-    enabled: !!readOrg.value && readFolder.value !== undefined,
+    enabled: !!readOrg.value && readFolder.value !== undefined && !anomalyLocked.value,
   }),
 );
 
@@ -603,7 +609,8 @@ const slosList = useQuery(() =>
 // scope repaints these rows with no wiring here.
 const rows = computed<SloListItem[]>(() => (slosList.data.value ?? []) as SloListItem[]);
 
-const loading = slosList.isPending;
+// A disabled query stays pending forever, so a locked list must not read that as loading.
+const loading = computed(() => !anomalyLocked.value && slosList.isPending.value);
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = slosList.isFetching;
@@ -614,7 +621,11 @@ const lastUpdatedAt = slosList.dataUpdatedAt;
 // query's error and nothing else, so the table used to render an empty list
 // with no explanation.
 const loadError = ref<string | null>(null);
+const forbidden = computed<ForbiddenState>(() =>
+  anomalyLocked.value ? ["anomaly_detection"] : forbiddenState(slosList.error.value),
+);
 const error = computed<string | null>(() => {
+  if (forbidden.value) return null;
   if (loadError.value) return loadError.value;
   const e = slosList.error.value as any;
   if (!e) return null;
@@ -976,7 +987,7 @@ const refresh = () => load(null, undefined, true);
 // fall back to the current org and active folder — the folder-change path is the
 // only caller that passes a folder the refs have not caught up with yet.
 async function load(orgId?: string | null, folderId?: string, force = false) {
-  if (!org.value) return;
+  if (!org.value || anomalyLocked.value) return;
   loadError.value = null;
   // sometimes the folder id might not be updated so passed via
   // query params.

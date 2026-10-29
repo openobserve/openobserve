@@ -15,8 +15,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { createRouter, createWebHistory, type Router } from "vue-router";
+import { createRouter, createWebHistory, RouterView, type Router } from "vue-router";
 import { createStore } from "vuex";
+import { defineComponent, h, ref } from "vue";
+import { provideFeatureLock } from "@/composables/useFeatureLock";
 
 const streams: Record<string, { name: string; schema: { name: string }[] } | undefined> = {};
 let streamGate: Promise<void> = Promise.resolve();
@@ -96,6 +98,22 @@ describe("RealUserMonitoring tabs", () => {
     const tabs = wrapper!.findAll('[role="tab"]').map((t) => t.text());
     expect(tabs).toEqual(["Performance", "Sessions", "Error Tracking", "Source Maps"]);
     expect(wrapper!.find('[data-test="rum-tab-product-analytics"]').exists()).toBe(false);
+  });
+
+  it("keeps the section tabs live on a license-locked page", async () => {
+    router = makeRouter();
+    await router.push("/rum/sessions");
+    const LockedShell = defineComponent({
+      setup() {
+        provideFeatureLock(ref("rum"));
+        return () => h(RouterView);
+      },
+    });
+    wrapper = mount(LockedShell, { global: { plugins: [router, store] } });
+    await flushPromises();
+    const tabs = wrapper.findAll('[role="tab"]');
+    expect(tabs.length).toBeGreaterThan(0);
+    expect(tabs.filter((t) => t.attributes("aria-disabled") === "true")).toHaveLength(0);
   });
 
   it("keeps Performance as the default landing tab", async () => {

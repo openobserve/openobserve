@@ -70,9 +70,10 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   let store: any;
   let router: any;
 
-  const mountCard = (slug: string) => {
+  const mountCard = (slug: string, features: Record<string, string> = {}) => {
     store = createStore({
       state: {
+        zoConfig: { features },
         selectedOrganization: { identifier: "test-org" },
         userInfo: { email: "t@e.com" },
         organizationData: { organizationPasscode: "pc" },
@@ -110,6 +111,51 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
+  });
+
+  describe("license locks", () => {
+    const stepAction = (id: string) =>
+      renderer()
+        .props("content")
+        .steps.find((s: any) => s.action?.id === id)?.action;
+
+    it("skips the auto-import and locks the dashboard action when dashboards are locked", async () => {
+      wrapper = mountCard("linux", { dashboards: "locked" });
+      renderer().vm.$emit("detected", 4);
+      renderer().vm.$emit("step-action", "view-host-dashboard");
+      await flushPromises();
+
+      expect(importHostMetricsDashboard).not.toHaveBeenCalled();
+      expect(toastMock).not.toHaveBeenCalled();
+      expect(stepAction("view-host-dashboard")).toMatchObject({ disabled: true, icon: "lock" });
+      expect(stepAction("view-host-dashboard").disabledReason).toBeTruthy();
+    });
+
+    it("skips the companion dashboard import when dashboards are locked", async () => {
+      wrapper = mountCard("nvidiaDcgm", { dashboards: "locked" });
+      renderer().vm.$emit("detected", 1);
+      renderer().vm.$emit("step-action", "open-setup-dashboard");
+      await flushPromises();
+
+      expect(importSetupDashboard).not.toHaveBeenCalled();
+      expect(stepAction("open-setup-dashboard")).toMatchObject({ disabled: true, icon: "lock" });
+    });
+
+    it("drops the View hosts toast action when host monitoring is locked", async () => {
+      wrapper = mountCard("linux", { host_monitoring: "locked" });
+      renderer().vm.$emit("detected", 4);
+      await flushPromises();
+
+      expect(importHostMetricsDashboard).toHaveBeenCalledTimes(1);
+      expect(toastMock.mock.calls[0][0].action).toBeUndefined();
+    });
+
+    it("leaves the dashboard action untouched when dashboards are enabled", () => {
+      wrapper = mountCard("linux", { dashboards: "enabled" });
+
+      expect(stepAction("view-host-dashboard").disabled).toBeFalsy();
+      expect(stepAction("view-host-dashboard").disabledReason).toBeUndefined();
+    });
   });
 
   it.each(["linux", "windows", "macos"])(

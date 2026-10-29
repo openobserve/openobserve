@@ -362,6 +362,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { TABLE_INDEX_COL_SIZE, COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 import workflowService from "@/services/workflows";
@@ -429,7 +430,7 @@ const loading = ref(true);
 // Separate from `loading`, the cold-read skeleton: this spins the refresh button on every read.
 const fetching = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
-const forbidden = ref(false);
+const forbidden = ref<ForbiddenState>(false);
 const filterQuery = ref(viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const sortBy = ref(viewState.sortBy);
@@ -660,7 +661,7 @@ const getWorkflows = async (folderId?: string, force = false) => {
   } catch (error: any) {
     if (read !== latestRead) return;
     console.error(error);
-    forbidden.value = error?.response?.status === 403;
+    forbidden.value = forbiddenState(error);
   } finally {
     if (read === latestRead) {
       loading.value = false;

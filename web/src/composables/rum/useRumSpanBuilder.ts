@@ -30,6 +30,7 @@ import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constant
 import { spanWindowUs } from "@/utils/rum/traceWindow";
 import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
 import { sqlIn } from "@/utils/query/sqlFilterBuilder";
+import { featureState } from "@/utils/featureGate";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
 // A browser request starts before the trace but is stamped on completion, so the tail is longer.
@@ -191,7 +192,11 @@ export default function useRumSpanBuilder(
     };
 
     try {
-      if (!logStreams.value.includes("_rumdata") || !traceId) {
+      if (
+        !logStreams.value.includes("_rumdata") ||
+        !traceId ||
+        featureState(store.state.zoConfig?.features, "rum") === "locked"
+      ) {
         return empty;
       }
       if (!hasDanglingParent(spans)) return empty;

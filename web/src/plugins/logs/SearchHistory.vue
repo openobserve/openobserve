@@ -347,6 +347,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { copyToClipboard } from "@/utils/clipboard";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
@@ -421,7 +422,7 @@ export default defineComponent({
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
@@ -581,7 +582,7 @@ export default defineComponent({
           setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
         }
       } catch (error: any) {
-        forbidden.value = error?.response?.status === 403;
+        forbidden.value = forbiddenState(error);
         // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!forbidden.value) {
           toast({

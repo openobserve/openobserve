@@ -39,10 +39,12 @@ const {
   mockFilterDimensionsForCorrelation: vi.fn(),
 }));
 
+const mockZoConfig = vi.hoisted(() => ({ features: {} as Record<string, string> }));
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({
     state: {
       selectedOrganization: { identifier: "test-org" },
+      zoConfig: mockZoConfig,
     },
   })),
 }));
@@ -305,6 +307,19 @@ describe("useServiceCorrelation", () => {
       );
       expect(result).not.toBeNull();
       expect(result!.service.service_name).toBe("api-service");
+    });
+
+    it("makes no identity-config or correlate call when correlation is license-locked", async () => {
+      mockZoConfig.features = { correlation: "locked" };
+      try {
+        mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
+        const { findRelatedTelemetry } = useServiceCorrelation();
+        expect(await findRelatedTelemetry(mockContext as any, "logs", 5, "default")).toBeNull();
+        expect(mockGetIdentityConfig).not.toHaveBeenCalled();
+        expect(mockCorrelate).not.toHaveBeenCalled();
+      } finally {
+        mockZoConfig.features = {};
+      }
     });
 
     it("flags noMatch (not error) when correlate API returns null", async () => {

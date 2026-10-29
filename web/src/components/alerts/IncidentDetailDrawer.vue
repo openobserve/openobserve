@@ -147,6 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="tab"
             :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
             :data-test="TAB_TEST_IDS[tab]"
+            :suffix-icon="isCorrelationTab(tab) && correlationLocked ? 'lock' : undefined"
+            :tooltip="
+              isCorrelationTab(tab) && correlationLocked ? correlationLockedReason : undefined
+            "
           >
             <template v-if="tab === 'alertTriggers'" #default>
               <div class="flex items-center gap-1.5">
@@ -1204,7 +1208,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Logs Tab Content -->
-              <div v-if="activeTab === 'logs'" class="flex h-full flex-1 flex-col overflow-hidden">
+              <LicenseDeniedState
+                v-if="correlationLocked && isCorrelationTab(activeTab)"
+                :features="['correlation']"
+                data-test="incident-correlation-license-denied"
+              />
+              <div
+                v-else-if="activeTab === 'logs'"
+                class="flex h-full flex-1 flex-col overflow-hidden"
+              >
                 <!-- Loading State -->
                 <div
                   v-if="correlationLoading"
@@ -1285,7 +1297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Metrics Tab Content -->
               <div
-                v-if="activeTab === 'metrics'"
+                v-else-if="activeTab === 'metrics'"
                 class="flex h-full flex-1 flex-col overflow-hidden"
               >
                 <!-- Loading State -->
@@ -1366,7 +1378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Traces Tab Content -->
               <div
-                v-if="activeTab === 'traces'"
+                v-else-if="activeTab === 'traces'"
                 class="flex h-full flex-1 flex-col overflow-hidden"
               >
                 <!-- Refresh Button (shown when traces data is loaded) -->
@@ -1471,6 +1483,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="loading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
       </div>
+      <LicenseDeniedState
+        v-else-if="licenseDenied"
+        :features="licenseDenied"
+        data-test="incident-detail-license-denied"
+      />
     </OPageLayout>
   </div>
 </template>
@@ -1538,6 +1555,9 @@ import { useIncidentRca } from "@/composables/useIncidentRca";
 import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 import BillingService, { type AiCreditCounts } from "@/services/billings";
 import config from "@/aws-exports";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const LS_INCIDENT_TAB_ORDER_KEY = "o2_incident_detail_tab_order";
 const DEFAULT_INCIDENT_TAB_ORDER = [
@@ -1561,6 +1581,12 @@ const TAB_TEST_IDS: Record<IncidentTab, string> = {
   metrics: "incident-metrics-tab",
   traces: "incident-traces-tab",
 };
+
+const CORRELATION_TABS: readonly string[] = ["logs", "metrics", "traces"];
+
+function isCorrelationTab(name: unknown): boolean {
+  return CORRELATION_TABS.includes(name as string);
+}
 
 function isIncidentTab(name: unknown): name is IncidentTab {
   return DEFAULT_INCIDENT_TAB_ORDER.includes(name as IncidentTab);
@@ -1602,6 +1628,7 @@ export default defineComponent({
     OTruncatedText,
     OInlineEdit,
     OBanner,
+    LicenseDeniedState,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
@@ -1636,6 +1663,7 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const licenseDenied = ref<string[] | null>(null);
     const updating = ref(false);
     // Backend also returns a top-level correlation_reason not declared on IncidentWithAlerts.
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
@@ -1800,6 +1828,8 @@ export default defineComponent({
       { label: t("alerts.incidents.severityP4"), value: "P4" },
     ];
 
+    const { locked: correlationLocked, lockedReason: correlationLockedReason } =
+      useLicenseLock("correlation");
     // Telemetry correlation state
     const correlationData = ref<IncidentCorrelatedStreams | null>(null);
     const correlationLoading = ref(false);
@@ -2085,7 +2115,7 @@ export default defineComponent({
 
     // Fetch correlated telemetry streams
     const fetchCorrelatedStreams = async (force: boolean = false) => {
-      if (!incidentDetails.value) return;
+      if (!incidentDetails.value || correlationLocked.value) return;
 
       // Skip if already loaded and not forcing refresh
       if (!force && correlationData.value) return;
@@ -2498,6 +2528,7 @@ export default defineComponent({
 
     const loadDetails = async (incidentId: string) => {
       loading.value = true;
+      licenseDenied.value = null;
 
       // Reset correlation state when loading new incident
       correlationData.value = null;
@@ -2529,6 +2560,7 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("Failed to load incident details:", error);
+        licenseDenied.value = licenseDeniedFeatures(error);
         toast({
           variant: "error",
           message: t("toastMessages.alerts.failedToLoadIncidentDetails"),
@@ -3053,6 +3085,7 @@ export default defineComponent({
     };
 
     return {
+      licenseDenied,
       mutedBannerText,
       openMutingDowntime,
       raw,
@@ -3135,6 +3168,9 @@ export default defineComponent({
       alertActivityChartData,
       getSemanticGroupDisplayName,
       refreshCorrelation,
+      correlationLocked,
+      correlationLockedReason,
+      isCorrelationTab,
       close,
       handleSendToAiChat,
       acknowledgeIncident,

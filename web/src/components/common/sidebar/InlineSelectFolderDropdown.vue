@@ -117,6 +117,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useFolderIcons } from "@/composables/useFolderIcons";
@@ -208,7 +209,10 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      await getFoldersListByType(store, props.type);
+      // The top bar already explains a license denial; anything else still surfaces.
+      await getFoldersListByType(store, props.type).catch((error) => {
+        if (!licenseDeniedFeatures(error)) throw error;
+      });
     });
 
     return {

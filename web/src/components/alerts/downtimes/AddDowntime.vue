@@ -162,7 +162,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="m"
                   :value="m"
                   size="sm"
-                  :icon-left="MODULE_ICONS[m]"
+                  :icon-left="moduleLocks[m].locked.value ? 'lock' : MODULE_ICONS[m]"
+                  :disabled="moduleLocks[m].locked.value"
+                  :tooltip="
+                    moduleLocks[m].locked.value ? moduleLocks[m].lockedReason.value : undefined
+                  "
                   :data-test="`add-downtime-module-${m}`"
                 >
                   {{ t(MODULE_LABEL_KEYS[m]) }}
@@ -377,7 +381,7 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { useAutoName } from "@/composables/useAutoName";
-import { useDowntimeItems } from "@/composables/downtimes/useDowntimeItems";
+import { useDowntimeItems, useTargetModuleLocks } from "@/composables/downtimes/useDowntimeItems";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import {
@@ -462,7 +466,10 @@ const queryList = (value: unknown): string[] =>
     .filter(Boolean);
 
 const browserZone = browserTimezone();
-const prefillModule = MODULE_ORDER.find((m) => m === route.query.module);
+const moduleLocks = useTargetModuleLocks();
+const prefillModule = MODULE_ORDER.find(
+  (m) => m === route.query.module && !moduleLocks[m].locked.value,
+);
 
 // A new downtime without a folder in the URL is filed where the user may create one.
 const folderDefault = useDefaultDowntimeFolder();
@@ -490,7 +497,9 @@ const alertFolders = useQuery(() =>
   Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
 const syntheticFolders = useQuery(() =>
-  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), {
+    enabled: !!orgId.value && !moduleLocks.synthetics.locked.value,
+  }),
 );
 const detailQuery = useQuery(() =>
   Object.assign(downtimeDetailQuery(orgId.value, sourceId.value, sourceFolder), {
@@ -642,6 +651,16 @@ const values = form.useStore((s) => s.values);
 watch(
   () => values.value.modules,
   (modules) => (listedModules.value = [...modules]),
+);
+// The org config can land after mount; a new downtime then drops a module its license locks.
+watch(
+  () => MODULE_ORDER.filter((m) => moduleLocks[m].locked.value),
+  (locked) => {
+    if (isEdit.value || !locked.length) return;
+    const kept = values.value.modules.filter((m) => !locked.includes(m));
+    if (kept.length !== values.value.modules.length) form.setFieldValue("modules", kept);
+  },
+  { immediate: true },
 );
 const folderId = computed(() => values.value.folder_id);
 const setFolder = (value: string) => form.setFieldValue("folder_id", value || "default");

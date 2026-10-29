@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import config from "@/aws-exports";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import store from "@/test/unit/helpers/store";
@@ -22,6 +23,11 @@ import router from "@/test/unit/helpers/router";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import { groupNavLinks, NAV_GROUPS } from "@/lib/core/Navbar/navGroups";
 import type { NavItem, RailEntry } from "@/lib/core/Navbar/ONavbar.types";
+import {
+  addLicenseDeniedError,
+  addUnauthorizedError,
+} from "@/composables/useUnauthorizedErrorGrouper";
+import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -149,6 +155,170 @@ describe("MainLayout — Product Analytics menu entry", () => {
     expect(experienceChildren(entries)).toBeUndefined();
     expect(tileNames(entries)).toContain("synthetics");
     expect(tileNames(entries)).not.toContain("productAnalytics");
+  });
+
+  describe("license-gated entries", () => {
+    // The license map only applies on an enterprise or cloud build, and CI runs with neither set.
+    const edition = config.isEnterprise;
+    beforeEach(() => {
+      config.isEnterprise = "true";
+    });
+    afterEach(() => {
+      config.isEnterprise = edition;
+      delete store.state.zoConfig.features;
+    });
+
+    it("keeps a locked feature on the rail with a lock, pointing at its own page", async () => {
+      store.state.zoConfig.features = { incidents: "locked" };
+      const incidents = (await railItems()).find((l) => l.name === "incidentList");
+      expect(incidents).toMatchObject({
+        link: "/incidents",
+        locked: false,
+        licenseLocked: true,
+      });
+    });
+
+    it("locks the page whose route needs a locked feature, and only while it is locked", async () => {
+      router.addRoute({
+        path: "/locked-probe",
+        name: "lockedProbe",
+        component: StubDiv,
+        meta: { licenseFeature: "workflows" },
+      });
+      await router.push("/locked-probe");
+      store.state.zoConfig.features = { workflows: "locked" };
+      await railItems();
+      expect((wrapper!.vm as any).lockedFeature).toBe("workflows");
+      addLicenseDeniedError(["alerts"]);
+      await flushPromises();
+      expect(wrapper!.find('[data-test="feature-lock-banner-denied"]').exists()).toBe(false);
+      expect(wrapper!.find('[data-test="feature-lock-banner-dismiss"]').exists()).toBe(false);
+      store.state.zoConfig.features = { workflows: "enabled" };
+      await flushPromises();
+      expect((wrapper!.vm as any).lockedFeature).toBeNull();
+      await router.push("/");
+      router.removeRoute("lockedProbe");
+    });
+
+    it("clears license denials on a path change, ignores the old page's late ones, keeps the access toast", async () => {
+      router.addRoute({ path: "/denial-a", name: "denialA", component: StubDiv });
+      router.addRoute({ path: "/denial-b", name: "denialB", component: StubDiv });
+      await router.push("/denial-a");
+      await railItems();
+      (wrapper!.vm as any).isLoading = true;
+      addLicenseDeniedError(["oncall"]);
+      await flushPromises();
+      const denied = () => wrapper!.find('[data-test="feature-lock-banner-denied"]');
+      expect(denied().text()).toContain("oncall");
+      await router.push({ path: "/denial-a", query: { period: "15m" } });
+      await flushPromises();
+      expect(denied().exists()).toBe(true);
+      const startedOnA = Date.now() - 1;
+      addUnauthorizedError("http://localhost:5080/api/default/alerts");
+      await router.push("/denial-b");
+      await flushPromises();
+      expect(denied().exists()).toBe(false);
+      addLicenseDeniedError(["oncall"], startedOnA);
+      await flushPromises();
+      expect(denied().exists()).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      expect(toastRecords.map((r) => r.details?.map((d) => d.url))).toEqual([
+        ["/api/default/alerts"],
+      ]);
+      dismissAll();
+      await router.push("/");
+      router.removeRoute("denialA");
+      router.removeRoute("denialB");
+    });
+
+    it("keeps a license-locked Downtimes entry, though its flag is off, pointing at its page", async () => {
+      store.state.zoConfig.downtimes_enabled = false;
+      store.state.zoConfig.features = { alerts: "locked" };
+      const downtimes = (await railItems()).find((l) => l.name === "downtimes");
+      expect(downtimes).toMatchObject({ link: "/downtimes", licenseLocked: true });
+      delete store.state.zoConfig.downtimes_enabled;
+    });
+
+    it("keeps the AI entry with online evals off, since Monitor needs no flag", async () => {
+      store.state.zoConfig.online_evals_enabled = false;
+      const ai = (await railItems()).find((l) => l.name === "aiObservability");
+      expect(ai).toMatchObject({ link: "/ai", licenseLocked: false });
+      delete store.state.zoConfig.online_evals_enabled;
+    });
+
+    it("locks the AI entry when ai_observability is locked, and drops it when hidden", async () => {
+      store.state.zoConfig.features = { ai_observability: "locked" };
+      const ai = (await railItems()).find((l) => l.name === "aiObservability");
+      expect(ai).toMatchObject({ link: "/ai", licenseLocked: true });
+      wrapper?.unmount();
+      store.state.zoConfig.features = { ai_observability: "hidden" };
+      expect((await railItems()).map((l) => l.name)).not.toContain("aiObservability");
+    });
+
+    it.each([
+      ["rum", "rum", "/rum"],
+      ["productAnalytics", "product_analytics", "/product-analytics"],
+      ["dashboards", "dashboards", "/dashboards"],
+      ["reports", "reports", "/reports"],
+      ["alertList", "alerts", "/alerts"],
+      ["sloList", "anomaly_detection", "/slos"],
+    ])(
+      "locks the %s entry when %s is locked, and drops it when hidden",
+      async (name, key, link) => {
+        store.state.zoConfig.features = { [key]: "locked" };
+        const entry = (await railItems()).find((l) => l.name === name);
+        expect(entry).toMatchObject({ link, licenseLocked: true });
+        wrapper?.unmount();
+        store.state.zoConfig.features = { [key]: "hidden" };
+        expect((await railItems()).map((l) => l.name)).not.toContain(name);
+      },
+    );
+
+    it("adds no lock to a static entry whose feature is enabled", async () => {
+      store.state.zoConfig.features = { dashboards: "enabled" };
+      const entry = (await railItems()).find((l) => l.name === "dashboards");
+      expect(entry).not.toHaveProperty("licenseLocked");
+    });
+
+    it("re-applies the lock when the license arrives after mount", async () => {
+      const before = (await railItems()).find((l) => l.name === "dashboards");
+      expect(before).not.toHaveProperty("licenseLocked");
+      store.state.zoConfig.features = { dashboards: "locked" };
+      await flushPromises();
+      const links = wrapper!.findAllComponents(NavbarStub)[0].props("linksList") as NavItem[];
+      expect(links.find((l) => l.name === "dashboards")).toMatchObject({ licenseLocked: true });
+    });
+
+    it("keeps a license-locked Synthetics entry, though its flag is off", async () => {
+      store.state.zoConfig.synthetics_enabled = false;
+      store.state.zoConfig.features = { synthetics: "locked" };
+      const synthetics = (await railItems()).find((l) => l.name === "synthetics");
+      expect(synthetics).toMatchObject({ link: "/synthetics", licenseLocked: true });
+    });
+
+    it("keeps Synthetics unlocked with its flag on, and drops it when hidden", async () => {
+      store.state.zoConfig.synthetics_enabled = true;
+      const synthetics = (await railItems()).find((l) => l.name === "synthetics");
+      expect(synthetics).toMatchObject({ link: "/synthetics", licenseLocked: false });
+      wrapper?.unmount();
+      store.state.zoConfig.features = { synthetics: "hidden" };
+      expect((await railItems()).map((l) => l.name)).not.toContain("synthetics");
+    });
+
+    it("keeps a license-locked Profiles entry, though its flag is off", async () => {
+      store.state.zoConfig.profiling_enabled = false;
+      store.state.zoConfig.features = { continuous_profiling: "locked" };
+      const profiles = (await railItems()).find((l) => l.name === "profiles");
+      expect(profiles).toMatchObject({ link: "/profiles", licenseLocked: true });
+      delete store.state.zoConfig.profiling_enabled;
+    });
+
+    it("leaves a hidden or unsent feature off the rail", async () => {
+      store.state.zoConfig.features = { workflows: "hidden" };
+      const names = (await railItems()).map((l) => l.name);
+      expect(names).not.toContain("workflows");
+      expect(names).not.toContain("incidentList");
+    });
   });
 
   it("uses only registered icons on the Experience tile and its children", async () => {

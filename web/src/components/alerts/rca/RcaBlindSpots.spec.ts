@@ -20,6 +20,7 @@ const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 import RcaBlindSpots from "./RcaBlindSpots.vue";
 import type { RcaBlindSpot } from "@/services/incidents";
 import {
@@ -71,6 +72,26 @@ describe("RcaBlindSpots (03 VE8, VE34, VE37)", () => {
     expect(button.text()).toBe(label);
     await button.trigger("click");
     expect(push).toHaveBeenCalledWith({ name, query: { org_identifier: "default" } });
+  });
+
+  it.each([
+    ["connect_toolset", "ai_toolsets"],
+    ["open_pipeline", "pipelines"],
+  ] as const)("%s: disabled with a lock while %s is license-locked", async (fix, feature) => {
+    store.state.zoConfig.features = { [feature]: "locked" };
+    try {
+      const wrapper = mount(RcaBlindSpots, {
+        props: { blindSpots: [rcaBlindSpot({ fix })], org: "default", live: false },
+        global: { plugins: [i18n, store] },
+      });
+      const button = wrapper.find('[data-test="rca-blind-spot-action"]');
+      expect(button.attributes("disabled")).toBeDefined();
+      expect(wrapper.find('[data-test="rca-blind-spot-action-lock"]').exists()).toBe(true);
+      await button.trigger("click");
+      expect(push).not.toHaveBeenCalled();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
   });
 
   it.each(["resume_run", "none"] as const)(

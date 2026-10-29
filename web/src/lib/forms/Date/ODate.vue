@@ -3,6 +3,7 @@
 
 import type { DateProps, DateEmits, DateSlots } from "./ODate.types";
 import { computed, ref, useAttrs, useId, type Ref } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import {
   DatePickerRoot,
   DatePickerField,
@@ -50,6 +51,7 @@ const props = withDefaults(defineProps<DateProps>(), {
 
 const emit = defineEmits<DateEmits>();
 defineSlots<DateSlots>();
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
@@ -136,7 +138,7 @@ const wrapperClasses = computed(() => [
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
   "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
-  props.disabled ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
+  isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);
 </script>
@@ -170,7 +172,7 @@ const wrapperClasses = computed(() => [
       :model-value="autoApply === false ? stagedDate : rekaValue"
       :min-value="rekaMin"
       :max-value="rekaMax"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :readonly="readonly"
       :name="name"
       @update:model-value="handleDateChange"
@@ -327,7 +329,7 @@ const wrapperClasses = computed(() => [
         >
           <button
             type="button"
-            :disabled="disabled"
+            :disabled="isDisabled"
             class="rounded-default bg-datepicker-day-selected-bg text-datepicker-day-selected-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
             @click="handleApply"
           >

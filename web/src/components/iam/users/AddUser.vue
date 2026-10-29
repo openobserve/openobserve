@@ -116,7 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (existingUser || beingUpdated) &&
             userRole !== 'member' &&
             store.state.userInfo.email !== formEmail &&
-            (config.isEnterprise == 'true' || config.isCloud == 'true')
+            (config.isEnterprise == 'true' || config.isCloud == 'true') &&
+            rbacLicensed
           "
           name="custom_role"
           :label="t('user.customRole')"
@@ -256,7 +257,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch, type PropType } from "vue";
+import {
+  computed,
+  defineComponent,
+  ref,
+  onActivated,
+  onBeforeMount,
+  watch,
+  type PropType,
+} from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -290,6 +299,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import PasswordRequirementList from "@/components/common/PasswordRequirementList.vue";
 import { durationFormatter } from "@/utils/formatters";
 import { reuseRejection } from "@/utils/passwordComplexity";
+import { featureState } from "@/utils/featureGate";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -411,6 +421,10 @@ export default defineComponent({
     // `custom_role` is an Enterprise/Cloud-only concept — the field is rendered
     // and hydrated (getUserRoles) ONLY under this flag.
     const supportsCustomRole = config.isEnterprise == "true" || config.isCloud == "true";
+    // Custom roles cannot be listed without the rbac license, so the picker would stay empty.
+    const rbacLicensed = computed(
+      () => featureState(store.state.zoConfig?.features, "rbac") === "enabled",
+    );
 
     // Decide whether to send `custom_role`:
     //   • OSS → never (the field is Enterprise/Cloud-only).
@@ -733,6 +747,7 @@ export default defineComponent({
       existingUser,
       organization,
       isExternalUser,
+      rbacLicensed,
       changePassword,
       formEmail,
       formRole,

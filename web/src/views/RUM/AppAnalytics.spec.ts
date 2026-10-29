@@ -181,6 +181,15 @@ describe("AppAnalytics shell", () => {
     ).toBe("active");
   });
 
+  it("sits the sub-tabs in a lock-exempt container, so they stay live on a license-locked page", async () => {
+    await mountAt("/product-analytics/funnels?period=7d");
+    const tabs = wrapper!.findAll('[data-test^="rum-analytics-subtab-"][role="tab"]');
+    expect(tabs.length).toBe(5);
+    for (const tab of tabs) {
+      expect(tab.element.closest("[data-feature-lock-exempt]")).not.toBeNull();
+    }
+  });
+
   it("lights Funnels on the funnel builder route", async () => {
     await mountAt("/product-analytics/funnels/build?app=web&period=7d");
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.funnelBuilder);

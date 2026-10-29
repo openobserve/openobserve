@@ -104,7 +104,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left><NotEqualIcon class="size-2.5" /></template>
               {{ t("logs.patternList.excludeFromQuery") }}
             </OButton>
+            <OTooltip v-if="alertsLocked" :content="alertsLockedReason">
+              <span class="inline-flex">
+                <OButton
+                  variant="warning"
+                  size="xs"
+                  disabled
+                  data-test="pattern-detail-create-alert-btn"
+                >
+                  <template #icon-left>
+                    <OIcon name="lock" size="sm" data-test="pattern-detail-create-alert-lock" />
+                  </template>
+                  {{ t("logs.patternList.createAlertAction") }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
+              v-else
               variant="warning"
               size="xs"
               icon-left="notifications"
@@ -362,6 +378,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -394,6 +412,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { locked: alertsLocked, lockedReason: alertsLockedReason } = useLicenseLock("alerts");
 
 // Window-wide occurrences for the selected pattern, read from the SAME cache the
 // rows use. Opening a row is therefore a cache hit and shows its real count
@@ -435,7 +454,7 @@ const onExclude = () => {
   emit("update:modelValue", false);
 };
 const onCreateAlert = () => {
-  if (!props.selectedPattern) return;
+  if (!props.selectedPattern || alertsLocked.value) return;
   emit("create-alert", props.selectedPattern.pattern);
   emit("update:modelValue", false);
 };

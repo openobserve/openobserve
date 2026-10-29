@@ -3,7 +3,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { h } from "vue";
 import SectionRail from "./SectionRail.vue";
+import FeatureLockBoundary from "./FeatureLockBoundary.vue";
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({
@@ -30,7 +32,7 @@ const stubs = {
   OTabs: { template: "<div><slot /></div>" },
   OTab: {
     name: "OTab",
-    props: ["name", "label", "icon", "tooltip"],
+    props: ["name", "label", "icon", "tooltip", "suffixIcon"],
     template: "<button :data-name='name'>{{ label }}</button>",
   },
   OButton: {
@@ -139,6 +141,52 @@ describe("SectionRail", () => {
     await wrapper.get('[data-test="section-rail-toggle"]').trigger("click");
     await wrapper.get('[data-name="insights"]').trigger("click");
     expect(push).toHaveBeenCalledWith({ name: "a" });
+  });
+
+  const lockedGroups = (flags: Record<string, boolean>) => [
+    {
+      label: "Permissions",
+      items: [{ key: "roles", label: "Roles", to: { name: "roles" }, ...flags }],
+    },
+  ];
+
+  it("keeps its links enabled inside a license-locked page", async () => {
+    const wrapper = mount(FeatureLockBoundary, {
+      props: { feature: "rbac" },
+      slots: { default: () => h(SectionRail, { groups }) },
+      global: { stubs: { OTooltip: stubs.OTooltip } },
+    });
+    const tab = wrapper.get('[role="tab"]');
+    expect(tab.attributes("disabled")).toBeUndefined();
+    expect(tab.attributes("aria-disabled")).toBeUndefined();
+    await tab.trigger("click");
+    expect(push).toHaveBeenCalledWith({ name: "a" });
+    wrapper.unmount();
+  });
+
+  it("routes an edition-locked item to the upgrade page", async () => {
+    const wrapper = mountRail({ groups: lockedGroups({ locked: true }) });
+    expect(wrapper.findComponent({ name: "OTab" }).props("suffixIcon")).toBe("lock");
+    await wrapper.get('[data-name="roles"]').trigger("click");
+    expect(push).toHaveBeenCalledWith({ name: "enterpriseFeatures" });
+  });
+
+  // The licensed page shows its own banner, so the upgrade page would only hide it.
+  it("shows the lock on a license-locked item but still opens its page", async () => {
+    const wrapper = mountRail({ groups: lockedGroups({ licenseLocked: true }) });
+    expect(wrapper.findComponent({ name: "OTab" }).props("suffixIcon")).toBe("lock");
+    await wrapper.get('[data-name="roles"]').trigger("click");
+    expect(push).toHaveBeenCalledWith({ name: "roles" });
+  });
+
+  it("drops the license lock once collapsed", async () => {
+    const wrapper = mountRail({
+      groups: lockedGroups({ licenseLocked: true }),
+      collapsible: true,
+      icon: "auto-awesome",
+    });
+    await wrapper.get('[data-test="section-rail-toggle"]').trigger("click");
+    expect(wrapper.findComponent({ name: "OTab" }).props("suffixIcon")).toBeUndefined();
   });
 
   const headings = (wrapper: ReturnType<typeof mountRail>) =>

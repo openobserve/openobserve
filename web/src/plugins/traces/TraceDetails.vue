@@ -564,8 +564,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </span>
             </div>
+            <OTooltip
+              v-if="hasReplaySession && !hideSessionReplayButton && rumLocked"
+              :content="rumLockedReason"
+            >
+              <span class="ms-1 inline-flex">
+                <OButton
+                  data-test="trace-details-view-session-replay-btn"
+                  variant="outline"
+                  size="sm"
+                  disabled
+                >
+                  <template #icon-left>
+                    <OIcon name="lock" size="sm" />
+                  </template>
+                  {{ t("rum.playSessionReplay") }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
-              v-if="hasReplaySession && !hideSessionReplayButton"
+              v-else-if="hasReplaySession && !hideSessionReplayButton"
               data-test="trace-details-view-session-replay-btn"
               variant="outline"
               size="sm"
@@ -1054,6 +1072,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder, { hasDanglingParent } from "@/composables/rum/useRumSpanBuilder";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import analytics from "@/services/product_analytics";
@@ -1345,7 +1364,14 @@ export default defineComponent({
     const traceGraphSearch = ref("");
     const sidebarActiveTab = ref("attributes");
 
-    const { searchObj, getUrlQueryParams, navigateToCorrelatedLogs } = useTraces();
+    const {
+      searchObj,
+      getUrlQueryParams,
+      navigateToCorrelatedLogs,
+      navigateToLogs,
+      buildQueryDetails,
+    } = useTraces();
+    const { locked: correlationLocked } = useLicenseLock("correlation");
 
     const { loadKeyFields } = useServiceCorrelation();
 
@@ -1659,6 +1685,7 @@ export default defineComponent({
     // Gate and target share one span so the button never links to a session with nothing to play.
     const replaySpan = computed(() => resolveReplaySpan(spanList.value));
     const hasReplaySession = computed(() => replaySpan.value !== null);
+    const { locked: rumLocked, lockedReason: rumLockedReason } = useLicenseLock("rum");
 
     // Computed properties for mode-based priority logic
     const effectiveTraceId = computed(() => {
@@ -3177,6 +3204,10 @@ export default defineComponent({
         return;
       }
 
+      if (correlationLocked.value) {
+        navigateToLogs(buildQueryDetails(spanMap.value[spanId] ?? span));
+        return;
+      }
       const correlationData = searchObj.data.traceDetails.correlationProps;
       if (correlationData?.logStreams?.length) {
         navigateToCorrelatedLogs(correlationData);
@@ -3475,6 +3506,8 @@ export default defineComponent({
       handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
       hasReplaySession,
+      rumLocked,
+      rumLockedReason,
       filteredStreamOptions,
       filterStreamFn,
       streamSearchValue,

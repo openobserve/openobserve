@@ -476,7 +476,7 @@ describe("Ingestion", () => {
             ConfirmDialog: { template: "<div />" },
             OButton: { template: "<button><slot /></button>" },
             OTabs: { template: "<div><slot /></div>" },
-            ORouteTab: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
             "router-view": { template: "<div />" },
           },
         },
@@ -539,7 +539,7 @@ describe("Ingestion", () => {
             ConfirmDialog: { template: "<div />" },
             OButton: { template: "<button><slot /></button>" },
             OTabs: { template: "<div><slot /></div>" },
-            ORouteTab: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
             "router-view": { template: "<div />" },
           },
         },
@@ -1052,6 +1052,91 @@ describe("Ingestion", () => {
 
       const routerView = wrapper.find(".router-view");
       expect(routerView.exists()).toBe(true);
+    });
+  });
+
+  describe("RUM license lock", () => {
+    const mountLocked = async () => {
+      const w = mount(Ingestion, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: {
+            ConfirmDialog: true,
+            OTooltip: { template: "<span><slot /></span>" },
+            OButton: {
+              name: "OButton",
+              template: "<button @click=\"$emit('click')\"><slot /></button>",
+              props: { variant: String, size: String, disabled: Boolean, iconLeft: String },
+              emits: ["click"],
+            },
+            OTabs: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
+            "router-view": { template: "<div />" },
+          },
+        },
+      });
+      await flushPromises();
+      return w;
+    };
+
+    afterEach(() => {
+      store.state.zoConfig.features = {};
+    });
+
+    it("never requests the RUM token when rum is locked", async () => {
+      store.state.zoConfig.features = { rum: "locked" };
+      queryClient.clear();
+      apiKeysService.listRUMTokens.mockClear();
+
+      const w = await mountLocked();
+      await w.vm.getRUMToken();
+
+      expect(apiKeysService.listRUMTokens).not.toHaveBeenCalled();
+      w.unmount();
+    });
+
+    it("renders the RUM token button disabled with a lock when rum is locked", async () => {
+      store.state.zoConfig.features = { rum: "locked" };
+      if (!router.hasRoute("frontendMonitoring")) {
+        router.addRoute({
+          name: "frontendMonitoring",
+          path: "/rum-lock-test",
+          component: { template: "<div />" },
+        });
+      }
+      const before = router.currentRoute.value.fullPath;
+      await router.push({ name: "frontendMonitoring" });
+      const w = await mountLocked();
+
+      const btn = w
+        .findAllComponents({ name: "OButton" })
+        .find((b: any) => b.attributes("data-test") === "ingestion-reset-token-btn");
+      expect(btn?.props("disabled")).toBe(true);
+      expect(btn?.props("iconLeft")).toBe("lock");
+      w.unmount();
+      await router.push(before);
+    });
+
+    it("keeps the section tabs, search and Manage Tokens live on a locked page", async () => {
+      const w = await mountLocked();
+      const exempt = w.findAll("[data-feature-lock-exempt]");
+      const inExempt = (selector: string) => exempt.some((e: any) => e.find(selector).exists());
+      expect(inExempt('[data-test="recommended-list-search-input"]')).toBe(true);
+      expect(inExempt('[data-test="ingestion-manage-tokens-btn"]')).toBe(true);
+      expect(inExempt(".route-tab-stub")).toBe(true);
+      w.unmount();
+    });
+
+    it("requests the RUM token when rum is enabled", async () => {
+      store.state.zoConfig.features = { rum: "enabled" };
+      queryClient.clear();
+      apiKeysService.listRUMTokens.mockClear();
+
+      const w = await mountLocked();
+
+      expect(apiKeysService.listRUMTokens).toHaveBeenCalled();
+      w.unmount();
     });
   });
 

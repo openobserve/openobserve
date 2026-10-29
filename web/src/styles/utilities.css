@@ -81,6 +81,55 @@
   box-shadow: var(--shadow-lg) !important;
 }
 
+/* License-locked page: controls, drag handles and splitters lose pointer input and look disabled, while scroll containers and FeatureLockExempt navigation stay live. Consumer: components/common/FeatureLockBoundary.vue. */
+@utility feature-locked-content {
+  &
+    :is(
+      a[href],
+      button,
+      input,
+      select,
+      textarea,
+      label,
+      summary,
+      [contenteditable="true"],
+      [role="button"],
+      [role="link"],
+      [role="tab"],
+      [role="checkbox"],
+      [role="radio"],
+      [role="switch"],
+      [role="combobox"],
+      [role="menuitem"],
+      [role="option"],
+      [role="slider"],
+      [role="separator"],
+      [draggable="true"],
+      .vue-flow__node,
+      .vue-flow__handle,
+      .vue-flow__edge,
+      .q-btn,
+      .q-field,
+      .q-toggle,
+      .q-checkbox,
+      .q-radio,
+      .q-tab,
+      .q-item--clickable
+    ):not([data-feature-lock-exempt] *) {
+    pointer-events: none;
+  }
+  &
+    :is(a[href], button, .q-btn, .q-field, .q-toggle, .q-checkbox, .q-radio, .q-tab):not(
+      :disabled,
+      [aria-disabled="true"],
+      [data-o2-btn],
+      [data-feature-lock-exempt] *
+    ) {
+    color: var(--color-text-disabled);
+    opacity: 0.6;
+  }
+}
+
 /* Announcement message markup comes from v-html, so links and code inherit the operator-chosen banner colour. */
 @utility announcement-message {
   overflow-wrap: anywhere;

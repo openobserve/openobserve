@@ -30,7 +30,19 @@
       </div>
 
       <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
-        <OEmptyState size="hero" preset="no-access" data-test="llm-providers-forbidden" />
+        <OEmptyState
+          v-if="Array.isArray(forbidden)"
+          size="hero"
+          preset="no-access"
+          :title="t('featureLock.toastTitle')"
+          :description="
+            forbidden.length
+              ? t('featureLock.toastMessage', { features: raw(featureNames(forbidden)) })
+              : t('featureLock.toastMessageGeneric')
+          "
+          data-test="llm-providers-license-denied"
+        />
+        <OEmptyState v-else size="hero" preset="no-access" data-test="llm-providers-forbidden" />
       </div>
 
       <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
@@ -189,7 +201,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -217,9 +229,12 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
+const { featureNames } = useFeatureNames();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -273,7 +288,7 @@ const isFetching = providersList.isFetching;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = providersList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 const lastUpdatedAt = providersList.dataUpdatedAt;
 // The grouped access toast already reports a 403; a second red toast adds nothing.

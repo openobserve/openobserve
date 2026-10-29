@@ -159,6 +159,7 @@ import { durationFormatter, getDuration } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -305,7 +306,7 @@ export default defineComponent({
     };
 
     const loadingState = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     const queries = ref([]);
 
     const deleteDialog = ref({
@@ -608,7 +609,7 @@ export default defineComponent({
           runningQueriesSummary.value = getRunningQueriesSummary();
         })
         .catch((error: any) => {
-          forbidden.value = error?.response?.status === 403;
+          forbidden.value = forbiddenState(error);
           // The grouped access toast already reports a 403; a second red toast adds nothing.
           if (!forbidden.value) {
             toast({

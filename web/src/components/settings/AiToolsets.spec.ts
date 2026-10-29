@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import AiToolsets from "./AiToolsets.vue";
+import aiToolsetsService from "@/services/ai_toolsets";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -68,6 +70,59 @@ describe("AiToolsets list view state", () => {
       filterQuery: "xyz",
       pageSize: 100,
     });
+  });
+});
+
+describe("AiToolsets license lock", () => {
+  const mountWithEmpty = () =>
+    mount(AiToolsets, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: {
+          AddAiToolset: true,
+          ConfirmDialog: true,
+          OTable: { template: "<div><slot name='empty' /></div>" },
+          OEmptyState: { name: "OEmptyState", template: "<div data-test='empty-stub' />" },
+          LicenseDeniedState: {
+            name: "LicenseDeniedState",
+            props: ["features"],
+            template: "<div data-test='denied-stub' />",
+          },
+        },
+      },
+    });
+
+  beforeEach(() => {
+    queryClient.clear();
+    vi.mocked(aiToolsetsService.list).mockClear();
+  });
+
+  afterEach(() => {
+    store.state.zoConfig.features = {};
+  });
+
+  it("requests no toolsets and shows the license-denied state when ai_toolsets is locked", async () => {
+    store.state.zoConfig.features = { ai_toolsets: "locked" };
+    const w = mountWithEmpty();
+    await flushPromises();
+    expect(aiToolsetsService.list).not.toHaveBeenCalled();
+    expect(w.findComponent({ name: "LicenseDeniedState" }).props("features")).toEqual([
+      "ai_toolsets",
+    ]);
+    await (w.vm as any).refreshData();
+    expect(aiToolsetsService.list).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("loads the toolsets and keeps the regular empty state when ai_toolsets is enabled", async () => {
+    store.state.zoConfig.features = { ai_toolsets: "enabled" };
+    const w = mountWithEmpty();
+    await flushPromises();
+    expect(aiToolsetsService.list).toHaveBeenCalled();
+    expect(w.find("[data-test='denied-stub']").exists()).toBe(false);
+    expect(w.find("[data-test='empty-stub']").exists()).toBe(true);
+    w.unmount();
   });
 });
 

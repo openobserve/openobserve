@@ -392,6 +392,51 @@ describe("OnCallOwnership", () => {
     expect(correlation.getDimensionAnalytics).toHaveBeenCalledTimes(1);
   });
 
+  it("skips the correlation reads while correlation is license-locked", async () => {
+    store.state.zoConfig.features = { correlation: "locked" };
+    try {
+      render();
+      await flushPromises();
+      expect(service.ownershipStats).toHaveBeenCalled();
+      expect(correlation.getServicesList).not.toHaveBeenCalled();
+      expect(correlation.getIdentityConfig).not.toHaveBeenCalled();
+      expect(correlation.getDimensionAnalytics).not.toHaveBeenCalled();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("waits for a late config and makes no correlation read when it says locked", async () => {
+    const saved = store.state.zoConfig;
+    store.state.zoConfig = {} as any;
+    try {
+      render();
+      await flushPromises();
+      expect(correlation.getServicesList).not.toHaveBeenCalled();
+      store.state.zoConfig = { ...saved, features: { correlation: "locked" } } as any;
+      await flushPromises();
+      expect(correlation.getServicesList).not.toHaveBeenCalled();
+      expect(correlation.getIdentityConfig).not.toHaveBeenCalled();
+      expect(correlation.getDimensionAnalytics).not.toHaveBeenCalled();
+    } finally {
+      store.state.zoConfig = saved;
+    }
+  });
+
+  it("reads correlation once the late config lands unlocked", async () => {
+    const saved = store.state.zoConfig;
+    store.state.zoConfig = {} as any;
+    try {
+      render();
+      await flushPromises();
+      store.state.zoConfig = { ...saved } as any;
+      await flushPromises();
+      expect(correlation.getServicesList).toHaveBeenCalledTimes(1);
+    } finally {
+      store.state.zoConfig = saved;
+    }
+  });
+
   /// A team with no unrouted traffic and a server without the endpoint look
   /// identical from here, and neither deserves an error.
   it("survives an unrouted endpoint that is not there", async () => {

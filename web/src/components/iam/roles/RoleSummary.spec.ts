@@ -4,6 +4,8 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { raw } from "@/types/i18n";
+import { defineComponent, h, ref } from "vue";
+import { provideFeatureLock } from "@/composables/useFeatureLock";
 
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
@@ -49,6 +51,33 @@ describe("RoleSummary - empty role", () => {
     await readonly!.trigger("click");
 
     expect(wrapper.emitted("preset")?.at(-1)).toEqual(["readonly"]);
+  });
+
+  it("offers no preset on a license-locked page", async () => {
+    const LockedPage = defineComponent({
+      setup() {
+        provideFeatureLock(ref("rbac"));
+        return () => h(RoleSummary, { modules: [], loading: false });
+      },
+    });
+    const wrapper = mount(LockedPage, { global: { plugins: [i18n, store, router] } });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="edit-role-summary-empty"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="edit-role-summary-empty"] button')).toHaveLength(0);
+  });
+
+  it("says the license lacks the feature instead of offering presets when the load was denied", async () => {
+    const wrapper = mount(RoleSummary, {
+      global: { plugins: [i18n, store, router] },
+      props: { modules: [], loading: false, licenseDenied: ["rbac"] },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="edit-role-summary-license-denied"]').text()).toContain(
+      "Your license does not include",
+    );
+    expect(wrapper.find('[data-test="edit-role-summary-empty"]').exists()).toBe(false);
   });
 
   // Presets must not flash while the saved grants are still loading.

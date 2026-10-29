@@ -11,6 +11,7 @@ import type {
   DateTimeMode,
 } from "./ODateTimeRange.types";
 import { computed, ref, useAttrs, watch, type Ref } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -57,6 +58,7 @@ const props = withDefaults(defineProps<DateTimeRangeProps>(), {
 
 const emit = defineEmits<DateTimeRangeEmits>();
 defineSlots<DateTimeRangeSlots>();
+const isDisabled = useLockedDisabled(() => props.disabled);
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
@@ -72,7 +74,7 @@ const _popoverOpen = ref(false);
 const popoverOpen = computed({
   get: () => _popoverOpen.value,
   set: (val: boolean) => {
-    if (!props.disabled) _popoverOpen.value = val;
+    if (!isDisabled.value) _popoverOpen.value = val;
   },
 });
 
@@ -234,7 +236,7 @@ function handleRangeChange(value: DateRange | undefined) {
 
 // ── Apply actions ──────────────────────────────────────────────
 function selectRelative(unit: RelativeUnit, amount: number) {
-  if (isRelativeDisabled(unit, amount) || props.disabled) return;
+  if (isRelativeDisabled(unit, amount) || isDisabled.value) return;
   stagedRelativeUnit.value = unit;
   stagedRelativeAmount.value = amount;
   if (props.autoApply) commitRelative();
@@ -295,7 +297,7 @@ const triggerClasses = computed(() => [
   hasError.value
     ? "border-datepicker-error-border"
     : "border-datepicker-border hover:border-datepicker-hover-border",
-  props.disabled
+  isDisabled.value
     ? "opacity-60 cursor-not-allowed bg-datepicker-disabled-bg border-datepicker-disabled-border"
     : "cursor-pointer",
 ]);
@@ -328,7 +330,7 @@ const triggerClasses = computed(() => [
           role="button"
           :aria-expanded="popoverOpen"
           :aria-haspopup="true"
-          :aria-disabled="disabled || undefined"
+          :aria-disabled="isDisabled || undefined"
           :tabindex="inputTabindex"
           data-test="datetimerange-trigger"
         >
@@ -425,7 +427,7 @@ const triggerClasses = computed(() => [
                 v-for="val in RELATIVE_OPTIONS[unit]"
                 :key="val"
                 type="button"
-                :disabled="isRelativeDisabled(unit, val) || disabled"
+                :disabled="isRelativeDisabled(unit, val) || isDisabled"
                 :class="[
                   'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring h-7 w-8 text-xs tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                   stagedRelativeUnit === unit &&
@@ -452,14 +454,14 @@ const triggerClasses = computed(() => [
               v-model="customAmount"
               type="number"
               min="1"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 w-16 border px-2 text-xs tabular-nums outline-none disabled:opacity-50"
               data-test="datetimerange-custom-amount"
               @keydown.enter="applyCustomRelative"
             />
             <select
               v-model="customUnit"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 flex-1 border px-2 text-xs outline-none disabled:opacity-50"
               data-test="datetimerange-custom-unit"
             >
@@ -475,10 +477,10 @@ const triggerClasses = computed(() => [
             <span class="text-datepicker-relative-label text-xs">{{ t("common.timezone") }}</span>
             <button
               type="button"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="rounded-default border-datepicker-inner-border bg-datepicker-bg text-datepicker-text flex h-7 w-full items-center justify-between border px-2 text-xs outline-none disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-timezone-trigger"
-              @click="!disabled && (tzOpen = !tzOpen)"
+              @click="!isDisabled && (tzOpen = !tzOpen)"
             >
               <span class="truncate">{{ tzLabel(stagedTimezone) }}</span>
               <svg
@@ -497,7 +499,7 @@ const triggerClasses = computed(() => [
               </svg>
             </button>
             <div
-              v-if="tzOpen && !disabled"
+              v-if="tzOpen && !isDisabled"
               class="rounded-default border-datepicker-inner-border overflow-hidden border"
             >
               <input
@@ -540,7 +542,7 @@ const triggerClasses = computed(() => [
           >
             <button
               type="button"
-              :disabled="disabled || stagedRelativeAmount <= 0"
+              :disabled="isDisabled || stagedRelativeAmount <= 0"
               class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-relative-apply"
               @click="commitRelative"
@@ -559,7 +561,7 @@ const triggerClasses = computed(() => [
           <!-- Range calendar -->
           <RangeCalendarRoot
             :model-value="stagedRange"
-            :disabled="disabled"
+            :disabled="isDisabled"
             :min-value="minDate ? tryParseDate(minDate) : undefined"
             :max-value="maxDate ? tryParseDate(maxDate) : undefined"
             week-start-on="0"
@@ -658,7 +660,7 @@ const triggerClasses = computed(() => [
               v-model="stagedStartTime"
               :label="t('common.startTime')"
               :with-seconds="withSeconds"
-              :disabled="disabled"
+              :disabled="isDisabled"
               data-test="datetimerange-start-time"
               @change="autoApply && emitAbsolute()"
             />
@@ -666,7 +668,7 @@ const triggerClasses = computed(() => [
               v-model="stagedEndTime"
               :label="t('common.endTime')"
               :with-seconds="withSeconds"
-              :disabled="disabled"
+              :disabled="isDisabled"
               data-test="datetimerange-end-time"
               @change="autoApply && emitAbsolute()"
             />
@@ -677,10 +679,10 @@ const triggerClasses = computed(() => [
             <span class="text-datepicker-label text-xs">{{ t("common.timezone") }}</span>
             <button
               type="button"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="rounded-default border-datepicker-inner-border bg-datepicker-bg text-datepicker-text flex h-9 w-full items-center justify-between border px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-timezone-trigger"
-              @click="!disabled && (tzOpen = !tzOpen)"
+              @click="!isDisabled && (tzOpen = !tzOpen)"
             >
               <span class="truncate">{{ tzLabel(stagedTimezone) }}</span>
               <svg
@@ -699,7 +701,7 @@ const triggerClasses = computed(() => [
               </svg>
             </button>
             <div
-              v-if="tzOpen && !disabled"
+              v-if="tzOpen && !isDisabled"
               class="rounded-default border-datepicker-inner-border overflow-hidden border"
             >
               <input
@@ -739,7 +741,7 @@ const triggerClasses = computed(() => [
           <div v-if="!autoApply" class="flex justify-end">
             <button
               type="button"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-apply"
               @click="handleApply"

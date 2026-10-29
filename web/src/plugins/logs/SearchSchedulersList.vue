@@ -367,6 +367,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -418,7 +419,7 @@ export default defineComponent({
     );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     const showSearchResults = ref(false);
     const toBeCancelled = ref({});
     const confirmCancel = ref(false);
@@ -594,7 +595,7 @@ export default defineComponent({
             }
           })
           .catch((e) => {
-            forbidden.value = e?.response?.status === 403;
+            forbidden.value = forbiddenState(e);
             if (!forbidden.value) {
               toast({
                 variant: "error",
