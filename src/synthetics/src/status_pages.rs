@@ -146,7 +146,7 @@ pub async fn refresh_snapshot(org_id: &str, page_id: &str) -> Result<(), infra::
     .await
 }
 
-pub async fn run() {
+pub async fn run(stop: crate::StopToken) {
     let interval = config::get_config()
         .synthetics
         .status_page_rebuild_interval
@@ -164,7 +164,10 @@ pub async fn run() {
     // deletions and refreshes `last_triggered_at` for the dead-probe rule.
     let mut rt = RebuilderState::default();
     loop {
-        tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
+        if stop.sleep(std::time::Duration::from_secs(interval)).await {
+            tracing::info!("[status_pages] rebuilder stopped");
+            return;
+        }
         if let Err(e) = tick(&mut hashes, &mut down_streaks, &mut rt).await {
             tracing::error!("[status_pages] rebuild tick failed: {e}");
         }

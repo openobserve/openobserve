@@ -95,18 +95,25 @@ static INSTANCE_ID: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
-pub async fn run() {
+pub async fn run(stop: crate::StopToken) {
     let instance_id = INSTANCE_ID.as_str();
     tracing::info!(instance_id = %instance_id, "[synthetics dispatcher] started");
 
     loop {
-        tokio::time::sleep(TICK).await;
+        if stop.sleep(TICK).await {
+            tracing::info!("[synthetics dispatcher] stopped");
+            return;
+        }
 
         let db = get_orm_client_rw().await;
 
         let now_us = config::utils::time::now_micros();
 
         for pool in dispatcher_pools().await {
+            // Ownership lost mid-tick: lease nothing more.
+            if stop.is_cancelled() {
+                return;
+            }
             let rows = match synthetics_jobs::lease_batch(
                 db,
                 &pool,
@@ -126,7 +133,7 @@ pub async fn run() {
             };
 
             for row in rows {
-                tokio::spawn(invoke_probe(row));
+                tokio::spawn(invoke_probe(row, stop.clone()));
             }
         }
     }
@@ -449,7 +456,13 @@ async fn report_to_stream(
 }
 
 /// Invokes the browser probe Lambda for a leased check row.
-async fn invoke_probe(row: synthetics_jobs::LeasedRow) {
+async fn invoke_probe(row: synthetics_jobs::LeasedRow, stop: crate::StopToken) {
+    // Leased just before ownership moved: do not start the probe here. The
+    // lease expires and the new owner's reaper re-queues the row.
+    if stop.is_cancelled() {
+        tracing::info!(job_id = %row.id, "[synthetics dispatcher] ownership lost — not invoking");
+        return;
+    }
     // Derive AWS region from the job's location field.
     let region = match aws_region_from_location(&row.location) {
         Some(r) => r.to_owned(),
