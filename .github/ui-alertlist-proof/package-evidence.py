@@ -7,8 +7,61 @@ import sys
 import tarfile
 
 MAX_FILES = 5000
-MAX_RAW_BYTES = 512 * 1024 * 1024
+MAX_RAW_BYTES = 1024 * 1024 * 1024
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
+MAX_DIAGNOSTIC_BYTES = 32 * 1024 * 1024
+MAX_DIAGNOSTIC_FILE_BYTES = 4 * 1024 * 1024
+MAX_DIAGNOSTIC_FILES = 128
+
+
+def diagnostic_paths():
+    paths = ["proof/result.json", "proof/trials.json", "proof/gates.json", "proof/environment.json"]
+    for version in ("baseline-normal", "candidate-normal", "baseline-shuffle", "candidate-shuffle"):
+        paths.extend("proof/" + version + suffix for suffix in (
+            ".json", ".json.progress.jsonl", ".log", ".resources.txt", ".launch.json",
+            "-merge.log", "-merge.resources.txt", "-merge.launch.json",
+            "-coverage/coverage-summary.json", "-summary-differences.json", "-covered-location-differences.json",
+        ))
+    paths.extend(("runner.txt", "runtime.txt", "npm-cache-hit.txt", "install-resources.txt", "install.log",
+                  "proof-driver.log", "final-web-diff.txt", "proof/body-parity.json", "proof/source-inventory.json",
+                  "proof/effective-config.mts", "proof/effective-reporter.mjs"))
+    return paths
+
+
+def retain_diagnostics(source, destination):
+    result = {"complete": True, "bytes": 0, "files": [], "omitted": []}
+    for name in diagnostic_paths():
+        path = source
+        try:
+            for part in Path(name).parts:
+                path = path / part
+                mode = path.lstat().st_mode
+                if stat.S_ISLNK(mode) or not (stat.S_ISDIR(mode) or stat.S_ISREG(mode)):
+                    raise ValueError("Diagnostic path must not contain symlinks or special files")
+            if not stat.S_ISREG(mode):
+                raise ValueError("Diagnostic must be a regular file")
+            size = path.stat().st_size
+            limit = min(MAX_DIAGNOSTIC_FILE_BYTES, MAX_DIAGNOSTIC_BYTES - result["bytes"])
+            if limit <= 0 or len(result["files"]) >= MAX_DIAGNOSTIC_FILES:
+                raise ValueError("Diagnostic byte or file count limit reached")
+            with path.open("rb") as stream:
+                data = stream.read(limit)
+            truncated = len(data) < size
+            retained = name + (".truncated" if truncated else "")
+            target = destination / "diagnostics" / retained
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            result["files"].append({"path": name, "retainedPath": "diagnostics/" + retained,
+                                    "originalBytes": size, "bytes": len(data), "truncated": truncated,
+                                    "sha256": hashlib.sha256(data).hexdigest()})
+            result["bytes"] += len(data)
+            result["complete"] = result["complete"] and not truncated
+        except FileNotFoundError:
+            continue
+        except (OSError, ValueError) as error:
+            result["complete"] = False
+            result["omitted"].append({"path": name, "error": str(error)})
+    return result
 
 
 class LimitedWriter:
@@ -27,11 +80,13 @@ class LimitedWriter:
 
 def package(source, destination, max_raw=MAX_RAW_BYTES, max_archive=MAX_ARCHIVE_BYTES):
     destination.mkdir(parents=True, exist_ok=True)
-    manifest = {"complete": False, "files": [], "rawBytes": 0}
+    manifest = {"complete": False, "archiveStatus": "not completed", "files": [], "rawBytes": 0}
     archive = destination / "evidence.tar.gz"
     try:
         if not source.is_dir() or source.is_symlink():
             raise ValueError("Evidence directory missing or is a symlink")
+        manifest["diagnostics"] = retain_diagnostics(source, destination)
+        (destination / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         for path in sorted(source.rglob("*")):
             mode = path.lstat().st_mode
             if stat.S_ISDIR(mode):
@@ -53,9 +108,11 @@ def package(source, destination, max_raw=MAX_RAW_BYTES, max_archive=MAX_ARCHIVE_
                     tar.add(source / entry["path"], arcname=entry["path"], recursive=False)
         manifest["archiveBytes"] = archive.stat().st_size
         manifest["complete"] = True
+        manifest["archiveStatus"] = "complete"
     except (OSError, ValueError) as error:
         archive.unlink(missing_ok=True)
         manifest["error"] = str(error)
+        manifest["archiveStatus"] = "failed"
     finally:
         (destination / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest["complete"]

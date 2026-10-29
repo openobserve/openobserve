@@ -4,6 +4,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("packager", Path(__file__).with_name("package-evidence.py"))
 packager = importlib.util.module_from_spec(spec)
@@ -63,6 +64,79 @@ class EvidenceTests(unittest.TestCase):
         self.assertFalse(packager.package(self.source, self.destination, max_archive=20))
         self.assertIn("Compressed", self.manifest()["error"])
         self.assertFalse((self.destination / "evidence.tar.gz").exists())
+
+    def write_diagnostics(self):
+        files = {
+            "proof/result.json": b'{"success":false,"comparisonVerified":false}\n',
+            "proof/baseline-shuffle.json": b'{"tests":[{"name":"case","state":"failed"}]}\n',
+            "proof/baseline-shuffle.json.progress.jsonl": b'{"name":"case","error":"expected row"}\n',
+            "proof/baseline-shuffle.log": b"AssertionError: expected row\n",
+            "proof/baseline-shuffle.resources.txt": b"Maximum resident set size: 123\n",
+            "proof/baseline-shuffle-coverage/coverage-summary.json": b'{"total":{"lines":{"covered":3,"total":5}}}\n',
+        }
+        for name, data in files.items():
+            path = self.source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        return files
+
+    def assert_diagnostics_preserved(self, files):
+        manifest = self.manifest()
+        self.assertFalse(manifest["complete"])
+        self.assertEqual(manifest["archiveStatus"], "failed")
+        self.assertTrue(manifest["diagnostics"]["complete"])
+        for name, data in files.items():
+            self.assertEqual((self.destination / "diagnostics" / name).read_bytes(), data)
+        self.assertFalse((self.destination / "evidence.tar.gz").exists())
+
+    def test_raw_overflow_preserves_failure_details_and_source_counts(self):
+        files = self.write_diagnostics()
+        (self.source / "optional-blob.json").write_bytes(b"x" * 1024)
+        self.assertFalse(packager.package(self.source, self.destination, max_raw=512))
+        self.assert_diagnostics_preserved(files)
+
+    def test_compressed_overflow_preserves_failure_details_and_source_counts(self):
+        files = self.write_diagnostics()
+        self.assertFalse(packager.package(self.source, self.destination, max_archive=20))
+        self.assert_diagnostics_preserved(files)
+
+    def test_fallback_rejects_symlinked_parent(self):
+        external = self.root / "outside"
+        external.mkdir()
+        (external / "result.json").write_text("private external content")
+        (self.source / "proof").symlink_to(external, target_is_directory=True)
+        self.assertFalse(packager.package(self.source, self.destination))
+        self.assertEqual(self.manifest()["diagnostics"]["files"], [])
+        self.assertFalse(self.manifest()["diagnostics"]["complete"])
+        self.assertFalse((self.destination / "diagnostics" / "proof" / "result.json").exists())
+
+    def test_fallback_byte_limits_mark_partial_files_explicitly(self):
+        self.write_diagnostics()
+        with patch.object(packager, "MAX_DIAGNOSTIC_FILE_BYTES", 8), patch.object(packager, "MAX_DIAGNOSTIC_BYTES", 10):
+            self.assertFalse(packager.package(self.source, self.destination, max_raw=1))
+        diagnostics = self.manifest()["diagnostics"]
+        self.assertFalse(diagnostics["complete"])
+        self.assertEqual(diagnostics["bytes"], 10)
+        self.assertTrue(diagnostics["omitted"])
+        for entry in diagnostics["files"]:
+            self.assertTrue(entry["truncated"])
+            self.assertTrue(entry["retainedPath"].endswith(".truncated"))
+            self.assertLessEqual(entry["bytes"], 8)
+
+    def test_fallback_and_full_archive_file_limits_remain_enforced(self):
+        self.write_diagnostics()
+        with patch.object(packager, "MAX_DIAGNOSTIC_FILES", 1), patch.object(packager, "MAX_FILES", 1):
+            self.assertFalse(packager.package(self.source, self.destination))
+        diagnostics = self.manifest()["diagnostics"]
+        self.assertEqual(len(diagnostics["files"]), 1)
+        self.assertFalse(diagnostics["complete"])
+        self.assertIn("file count limit", self.manifest()["error"])
+
+    def test_diagnostic_paths_are_bounded_and_relative(self):
+        paths = packager.diagnostic_paths()
+        self.assertEqual(len(paths), len(set(paths)))
+        self.assertLessEqual(len(paths), packager.MAX_DIAGNOSTIC_FILES)
+        self.assertTrue(all(not Path(name).is_absolute() and ".." not in Path(name).parts for name in paths))
 
 
 if __name__ == "__main__":
