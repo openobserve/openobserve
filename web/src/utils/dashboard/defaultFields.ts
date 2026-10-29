@@ -90,6 +90,45 @@ export const buildDefaultSqlFields = (
   };
 };
 
+const NUMERIC_SCHEMA_TYPE = /^(u?int|float|double|decimal)/i;
+
+/** The stream's first numeric column that is not a timestamp, the value a raw-value chart can summarise. */
+export const firstNumericField = (
+  groupedFields: any[],
+  streamName?: string,
+  timestampColumn = "_timestamp",
+): string | null => {
+  const streams = streamName
+    ? (groupedFields ?? []).filter((stream: any) => stream?.name === streamName)
+    : (groupedFields ?? []);
+  const timestamps = new Set(["_timestamp", timestampColumn]);
+  for (const stream of streams) {
+    const field = (stream?.schema ?? []).find(
+      (candidate: any) =>
+        typeof candidate?.name === "string" &&
+        !timestamps.has(candidate.name) &&
+        NUMERIC_SCHEMA_TYPE.test(String(candidate?.type ?? "")),
+    );
+    if (field) return field.name;
+  }
+  return null;
+};
+
+/** A raw, unaggregated y field on `column`, as a raw-value chart reads it. */
+export const rawValueYField = (column: string) => ({
+  label: "",
+  alias: "y_axis_1",
+  column,
+  color: null,
+  type: "build",
+  functionName: null,
+  args: [{ type: "field", value: { field: column } }],
+  sortBy: null,
+  isDerived: false,
+  havingConditions: [],
+  treatAsNonTimestamp: true,
+});
+
 // Chart types that drive their own builder and must not get the cartesian x/y seed.
 // heatmap is included because its measure lives on the Z/value axis — its Y axis is
 // a dimension that disallows aggregation, so a count(_timestamp) Y seed is invalid.
@@ -114,6 +153,7 @@ export const buildDefaultBuilderFields = (
   streamType: string,
   groupedFields: any[],
   streamName?: string,
+  timestampColumn = "_timestamp",
 ): { x: any[]; y: any[] } => {
   if (SKIP_SEED_TYPES.includes(chartType)) return { x: [], y: [] };
   const { x, y } = buildDefaultSqlFields(streamType, groupedFields, streamName);

@@ -17,6 +17,7 @@ import { gt } from "@/types/i18n";
 import echartsTokens from "echarts/lib/visual/tokens.js";
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { formatAxisTickValue } from "./axisTickFormat";
 import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
 import { formatDate } from "./dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
@@ -883,13 +884,11 @@ export const convertPromQLData = async (
         // other (short panels fit fewer labels than ECharts offers)
         hideOverlap: true,
         formatter: function (name: any) {
-          return formatUnitValue(
-            getUnitValue(
-              name,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
+          return formatAxisTickValue(
+            name,
+            panelSchema.config?.unit,
+            panelSchema.config?.unit_custom,
+            panelSchema.config?.decimals,
           );
         },
       },
@@ -1329,7 +1328,8 @@ export const convertPromQLData = async (
               },
             ],
             detail: {
-              valueAnimation: true,
+              // A counting label keeps animating after a same-value re-render snaps the dial, so a throttled tab freezes it on a stale number.
+              valueAnimation: false,
               offsetCenter: [0, 0],
             },
             ...gaugeOverrideTooltip(seriesOverrides, seriesName),

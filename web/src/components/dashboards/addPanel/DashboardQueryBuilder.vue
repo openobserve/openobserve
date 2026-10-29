@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       !promqlBuilderMode &&
       dashboardPanelData.data.type != 'geomap' &&
       dashboardPanelData.data.type != 'maps' &&
-      dashboardPanelData.data.type != 'sankey'
+      !isFlowChart(dashboardPanelData.data.type)
     "
   >
     <!-- x axis container -->
@@ -675,6 +675,7 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { useStore } from "vuex";
 import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
@@ -1552,6 +1553,7 @@ export default defineComponent({
     return {
       shouldShowPromQLQueryType,
       showXAxis,
+      isFlowChart,
       t,
       FIELD_FUNCTION_MENU_WIDTH,
       panelName,

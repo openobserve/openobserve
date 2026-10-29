@@ -228,6 +228,14 @@ describe("OnCallMembers", () => {
     expect(wrapper.find('[data-test="oncall-members-user-select"]').text()).toContain("cara@o2.ai");
   });
 
+  it("names the member picker for a screen reader", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-members-user-select"]').attributes("aria-label")).toBe(
+      "People to add",
+    );
+  });
+
   // Losing the picker must not lose the ability to add anybody.
   it("degrades to a free-text field when the user list cannot be loaded", async () => {
     users.orgUsers.mockRejectedValue(new Error("boom"));
@@ -235,7 +243,9 @@ describe("OnCallMembers", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-members-user-select"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-members-email-input"]').exists()).toBe(true);
+    const input = wrapper.find('[data-test="oncall-members-email-input"]');
+    expect(input.exists()).toBe(true);
+    expect(input.attributes("aria-label")).toBe("People to add");
   });
 
   // Already on the team means nothing left to add.
