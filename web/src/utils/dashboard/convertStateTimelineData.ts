@@ -16,7 +16,8 @@
 import { gt } from "@/types/i18n";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { format as echartsFormat } from "echarts/core";
-import { CHART_SELECTION_FILL, chartColor, dataZoomBrushStyle } from "@/utils/chartTheme";
+import { CHART_SELECTION_FILL, chartBg, chartColor, dataZoomBrushStyle } from "@/utils/chartTheme";
+import { colorLuminance } from "./chartLabelContrast";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber, durationFormatter } from "@/utils/formatters";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
@@ -560,9 +561,12 @@ const buildStateStyles = (
 const isNumericState = (state: string) => state.trim() !== "" && Number.isFinite(Number(state));
 
 /** The sequential shade for a value at `t` (0 lowest, 1 highest) of the panel's range. */
-const cellShade = (t: number, theme: string) =>
-  // Pale stops vanish on a light panel and dark ones on a dark panel, so dark theme runs the scale backwards from mid blue.
-  samplePalette(CELLS_SCALE, theme === "dark" ? 0.9 - 0.7 * t : 0.2 + 0.8 * t);
+const cellShade = (t: number) =>
+  // Pale stops vanish on a light panel and dark ones on a dark panel, so a dark background runs the scale backwards from mid blue.
+  samplePalette(
+    CELLS_SCALE,
+    (colorLuminance(chartBg()) ?? 1) < 0.5 ? 0.9 - 0.7 * t : 0.2 + 0.8 * t,
+  );
 
 /** Cells-mode styles: a mapping wins, then a threshold step, then a sequential shade for numbers or a palette colour for text. */
 const buildCellStyles = (
@@ -598,7 +602,6 @@ const buildCellStyles = (
       numeric && range
         ? cellShade(
             range.max > range.min ? (Number(state) - range.min) / (range.max - range.min) : 1,
-            theme,
           )
         : null;
     const color =

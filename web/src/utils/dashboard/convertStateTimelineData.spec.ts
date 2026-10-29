@@ -38,6 +38,7 @@ import {
   buildTimeCells,
 } from "./convertStateTimelineData";
 import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkProcessor";
+import { invalidateChartTheme } from "@/utils/chartTheme";
 
 // jsdom has no token stylesheet, so each token resolves to its own name and stays distinguishable.
 vi.mock("@/utils/chartTheme", async (importOriginal) => ({
@@ -1598,19 +1599,20 @@ describe("state timeline cells display", () => {
       const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
-    const shadesFor = (theme: string) =>
-      segmentsOf(
-        convertStateTimelineData(
-          statusPanel(),
-          data,
-          { ...store, state: { ...store.state, theme } },
-          null,
-          sqlMeta,
-          null,
-        ),
-      ).map((d: any) => luminance(d.itemStyle.color));
-    const light = shadesFor("light");
-    const dark = shadesFor("dark");
+    const shadesFor = (background: string) => {
+      document.documentElement.style.setProperty("--color-surface-base", background);
+      invalidateChartTheme();
+      try {
+        return segmentsOf(
+          convertStateTimelineData(statusPanel(), data, store, null, sqlMeta, null),
+        ).map((d: any) => luminance(d.itemStyle.color));
+      } finally {
+        document.documentElement.style.removeProperty("--color-surface-base");
+        invalidateChartTheme();
+      }
+    };
+    const light = shadesFor("#ffffff");
+    const dark = shadesFor("#111111");
     expect(Math.max(...light)).toBeLessThan(0.9);
     expect(Math.min(...dark)).toBeGreaterThan(0.08);
     expect(Math.max(...dark)).toBeLessThan(0.9);
