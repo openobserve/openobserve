@@ -8,18 +8,6 @@ const INTERNAL_STREAMS = ['_rumdata', '_rumlog'];
 const HIDE_LABEL = 'Hide internal streams';
 const SHOW_LABEL = 'Show internal streams';
 
-/** Splits the picker rows at the "Internal streams" header into the stream names above and below it. */
-function splitAtHeader(rows) {
-  const headerIndex = rows.findIndex((r) => r.kind === 'header');
-  const names = (part) => part.filter((r) => r.kind === 'option').map((r) => r.value);
-  return {
-    headerIndex,
-    header: rows[headerIndex],
-    above: names(rows.slice(0, headerIndex)),
-    below: names(rows.slice(headerIndex + 1)),
-  };
-}
-
 test.describe("Logs stream picker internal streams", () => {
   // Serial: the seeded streams are shared, and a parallel worker's afterAll would delete them mid-run.
   test.describe.configure({ mode: 'serial' });
@@ -78,7 +66,7 @@ test.describe("Logs stream picker internal streams", () => {
     await pm.logsPage.expectSelectedStreamLabel(USER_STREAM);
     await pm.logsPage.openStreamPicker();
 
-    const { headerIndex, header, above, below } = splitAtHeader(await pm.logsPage.getStreamPickerRows());
+    const { headerIndex, header, above, below } = await pm.logsPage.getStreamPickerSplit();
 
     expect(headerIndex, 'the picker must render an Internal streams header').toBeGreaterThan(0);
     expect(header.text).toBe(`Internal streams · ${below.length} Hide`);
@@ -96,12 +84,12 @@ test.describe("Logs stream picker internal streams", () => {
     await pm.logsPage.pickStreamByTypedFilter(USER_STREAM, USER_STREAM);
     await pm.logsPage.expectSelectedStreamLabel(USER_STREAM);
     await pm.logsPage.openStreamPicker();
-    const internalCount = splitAtHeader(await pm.logsPage.getStreamPickerRows()).below.length;
+    const internalCount = (await pm.logsPage.getStreamPickerSplit()).below.length;
 
     await pm.logsPage.getStreamPickerHeaderAction().click();
     await expect(pm.logsPage.getStreamPickerHeaderAction()).toHaveAttribute('aria-label', SHOW_LABEL);
     const hiddenText = `Internal streams · ${internalCount} hidden Show`;
-    const collapsed = splitAtHeader(await pm.logsPage.getStreamPickerRows());
+    const collapsed = await pm.logsPage.getStreamPickerSplit();
     expect(collapsed.header.text).toBe(hiddenText);
     expect(collapsed.below).toEqual([]);
 
@@ -109,13 +97,13 @@ test.describe("Logs stream picker internal streams", () => {
     await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.openStreamPicker();
     await expect(pm.logsPage.getStreamPickerHeaderAction()).toHaveAttribute('aria-label', SHOW_LABEL);
-    const afterReload = splitAtHeader(await pm.logsPage.getStreamPickerRows());
+    const afterReload = await pm.logsPage.getStreamPickerSplit();
     expect(afterReload.header.text).toBe(hiddenText);
     expect(afterReload.below).toEqual([]);
 
     await pm.logsPage.getStreamPickerHeaderAction().click();
     await expect(pm.logsPage.getStreamPickerHeaderAction()).toHaveAttribute('aria-label', HIDE_LABEL);
-    const shown = splitAtHeader(await pm.logsPage.getStreamPickerRows());
+    const shown = await pm.logsPage.getStreamPickerSplit();
     expect(shown.header.text).toBe(`Internal streams · ${internalCount} Hide`);
     expect(shown.below).toEqual(expect.arrayContaining(INTERNAL_STREAMS));
   });
@@ -130,7 +118,7 @@ test.describe("Logs stream picker internal streams", () => {
 
     await pm.logsPage.getStreamPickerHeaderAction().click();
     await expect(pm.logsPage.getStreamPickerHeaderAction()).toHaveAttribute('aria-label', SHOW_LABEL);
-    const { header, below } = splitAtHeader(await pm.logsPage.getStreamPickerRows());
+    const { header, below } = await pm.logsPage.getStreamPickerSplit();
     expect(header.text).toMatch(/^Internal streams · \d+ hidden Show$/);
     expect(below).toEqual([selected]);
     expect(below).not.toContain(other);
@@ -153,13 +141,13 @@ test.describe("Logs stream picker internal streams", () => {
     await page.keyboard.press('Enter');
     await expect(action).toHaveAttribute('aria-label', SHOW_LABEL);
     await expect(action).toBeFocused();
-    expect(splitAtHeader(await pm.logsPage.getStreamPickerRows()).header.text).toMatch(
+    expect((await pm.logsPage.getStreamPickerSplit()).header.text).toMatch(
       /^Internal streams · \d+ hidden match(es)? Show$/
     );
 
     await page.keyboard.press('Enter');
     await expect(action).toHaveAttribute('aria-label', HIDE_LABEL);
-    expect(splitAtHeader(await pm.logsPage.getStreamPickerRows()).below).toEqual(
+    expect((await pm.logsPage.getStreamPickerSplit()).below).toEqual(
       expect.arrayContaining(INTERNAL_STREAMS)
     );
 
@@ -209,6 +197,6 @@ test.describe("Logs stream picker internal streams", () => {
     await pm.logsPage.pressInStreamPickerSearch('Space');
     await expect(action).toHaveAttribute('aria-label', HIDE_LABEL);
     await expect(header).toHaveAttribute('data-highlighted', '');
-    await expect(page.locator(pm.logsPage.indexDropDownSearch)).toHaveValue('');
+    await pm.logsPage.expectStreamPickerSearchValue('');
   });
 });

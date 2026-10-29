@@ -45,6 +45,7 @@ pub struct Stream {
     pub pattern_associations: Vec<PatternAssociation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_derived: Option<bool>,
+    /// True for streams OpenObserve writes itself; omitted when false.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub is_internal: bool,
 }

@@ -56,7 +56,7 @@ export interface SelectOption {
   disabled?: boolean;
   /** When true, renders the item as a non-selectable group header */
   header?: boolean;
-  /** Header only: secondary detail about the group, e.g. how many options it holds. */
+  /** Header only, and only in listbox mode (searchable or multiple): secondary detail such as how many options the group holds. */
   headerCount?: I18nText;
   /** Header only: label of an action on the header; activating it emits `header-action`, and an empty label means no action. */
   headerAction?: I18nText;

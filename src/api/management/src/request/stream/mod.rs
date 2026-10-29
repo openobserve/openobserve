@@ -464,7 +464,7 @@ pub async fn delete(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "list"})),
         ("x-o2-mcp" = json!({
-            "description": "List all streams in the organization, you can filter by type and keyword.",
+            "description": "List all streams in the organization, you can filter by type and keyword. is_internal marks streams OpenObserve writes itself and is omitted when false.",
             "category": "streams",
             "summary_fields": ["name", "stream_type", "stats.storage_size", "is_internal"],
             "pinned": true

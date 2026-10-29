@@ -1023,10 +1023,12 @@ pub fn is_system_stream(org_id: &str, stream_name: &str) -> bool {
     if stream_name.starts_with("_o2_") {
         return true;
     }
-    // Non-underscore names other than `triggers` are written only to `_meta`; users may reuse them.
+    // Besides `triggers` and `usage` (per-org usage reporting), non-underscore names are written
+    // only to `_meta`; users may reuse them.
     if INTERNAL_STREAM_NAMES.contains(&stream_name) {
         return stream_name.starts_with('_')
             || stream_name == TRIGGERS_STREAM
+            || stream_name == USAGE_STREAM
             || org_id == META_ORG_ID;
     }
     match stream_name {
@@ -1753,7 +1755,6 @@ mod tests {
     #[test]
     fn test_is_system_stream_scopes_meta_only_names_to_meta() {
         for name in [
-            USAGE_STREAM,
             AUDIT_STREAM,
             STATS_STREAM,
             ERROR_STREAM,
@@ -1778,6 +1779,7 @@ mod tests {
             "_llm_experiment",
             "_anomalies",
             TRIGGERS_STREAM,
+            USAGE_STREAM,
             "_rumdata",
             "_rumlog",
             "_sessionreplay",

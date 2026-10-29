@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :multiple="selectionMode === 'multi'"
           :row-click-single-select="selectionMode === 'multi'"
           pin-selected-in-groups
+          :search-debounce="150"
           class="w-full"
           @update:model-value="handleStreamSelection"
           @open="streamPickerOpen = true"
@@ -85,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="group in quickPickGroups" :key="group.id">
               <OSelectHeaderRow
                 v-if="group.header"
-                :data-test="`logs-search-stream-quick-pick-header-${group.id}`"
+                :data-test="`logs-search-stream-group-header-${group.id}`"
                 :label="group.header.label"
                 :count="group.header.headerCount"
                 :action="group.header.headerAction"
@@ -94,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <span
                 v-else
-                :data-test="`logs-search-stream-quick-pick-label-${group.id}`"
+                :data-test="`logs-search-stream-group-label-${group.id}`"
                 class="text-text-secondary mb-0.5 text-center text-xs font-medium"
               >
                 {{ group.label }}

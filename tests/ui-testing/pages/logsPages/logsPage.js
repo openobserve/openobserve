@@ -13390,6 +13390,23 @@ export class LogsPage {
         await this.page.locator(this.indexDropDownSearch).fill(text);
     }
 
+    /** Splits the picker rows at the "Internal streams" header into the stream names above and below it. */
+    async getStreamPickerSplit() {
+        const rows = await this.getStreamPickerRows();
+        const headerIndex = rows.findIndex((r) => r.kind === 'header');
+        const names = (part) => part.filter((r) => r.kind === 'option').map((r) => r.value);
+        return {
+            headerIndex,
+            header: rows[headerIndex],
+            above: names(rows.slice(0, headerIndex)),
+            below: names(rows.slice(headerIndex + 1)),
+        };
+    }
+
+    async expectStreamPickerSearchValue(value) {
+        await expect(this.page.locator(this.indexDropDownSearch)).toHaveValue(value);
+    }
+
     /** Presses a key with focus in the picker's search box, where the list's keyboard navigation lives. */
     async pressInStreamPickerSearch(key) {
         await this.page.locator(this.indexDropDownSearch).press(key);

@@ -3105,7 +3105,9 @@ describe("Stream picker — internal streams", () => {
   };
   const quickPickLabels = () =>
     wrapper
-      .findAll('[data-test^="logs-search-stream-quick-pick-"]')
+      .findAll(
+        '[data-test^="logs-search-stream-quick-pick-"], [data-test^="logs-search-stream-group-"]',
+      )
       .filter(
         (el: any) =>
           el.attributes("data-test") !== "logs-search-stream-quick-pick-more" &&
@@ -3113,7 +3115,7 @@ describe("Stream picker — internal streams", () => {
       )
       .map((el: any) => words(el.element));
   const quickPickAction = () =>
-    wrapper.find('[data-test="logs-search-stream-quick-pick-header-internal-action"]');
+    wrapper.find('[data-test="logs-search-stream-group-header-internal-action"]');
 
   beforeEach(async () => {
     localStorage.clear();
