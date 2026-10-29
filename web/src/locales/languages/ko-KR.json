@@ -1275,6 +1275,8 @@
     "tookChip": "{took} ms",
     "scanSize": "스캔 크기",
     "deltaScanSize": "델타 스캔 크기",
+    "scannedSoFar": "스캔한 크기: {size}",
+    "resultsProgressLabel": "검색 진행률",
     "histogramTitleError": "히스토그램 제목을 생성하는 중 오류가 발생했습니다.",
     "selectLogStream": "로그 스트림 선택",
     "searchInspect": "검색 검사",
