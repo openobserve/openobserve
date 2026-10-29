@@ -16,7 +16,7 @@
 //! Fleet management: every permission is an OpenFGA check, as on dashboards, and never a role.
 
 #[cfg(feature = "enterprise")]
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use axum::{
     extract::{Path, Query},
@@ -1911,6 +1911,10 @@ async fn permitted_fleets(
     }
 }
 
+/// Per-fleet checks in flight at once when withholding token values.
+#[cfg(feature = "enterprise")]
+const FLEET_CHECK_CONCURRENCY: usize = 16;
+
 /// An enrollment token ingests into the org, so only a caller who may change its fleet sees it.
 #[cfg(feature = "enterprise")]
 async fn withhold_token_values(
@@ -1918,21 +1922,27 @@ async fn withhold_token_values(
     user_id: &str,
     items: &mut [config::meta::fleet::EnrollmentToken],
 ) {
-    let mut writable: HashMap<String, bool> = HashMap::new();
+    use futures::StreamExt;
+
+    let mut fleets: Vec<String> = items
+        .iter()
+        .filter(|t| t.token.is_some())
+        .map(|t| t.fleet.id.clone())
+        .collect();
+    fleets.sort_unstable();
+    fleets.dedup();
+    let writable: HashSet<String> = futures::stream::iter(fleets)
+        .map(|fleet| async move {
+            fleet_allowed(org_id, user_id, &fleet, "PUT")
+                .await
+                .then_some(fleet)
+        })
+        .buffer_unordered(FLEET_CHECK_CONCURRENCY)
+        .filter_map(|fleet| async move { fleet })
+        .collect()
+        .await;
     for item in items.iter_mut() {
-        if item.token.is_none() {
-            continue;
-        }
-        let fleet = &item.fleet.id;
-        let allowed = match writable.get(fleet) {
-            Some(allowed) => *allowed,
-            None => {
-                let allowed = fleet_allowed(org_id, user_id, fleet, "PUT").await;
-                writable.insert(fleet.clone(), allowed);
-                allowed
-            }
-        };
-        if !allowed {
+        if !writable.contains(&item.fleet.id) {
             item.token = None;
         }
     }

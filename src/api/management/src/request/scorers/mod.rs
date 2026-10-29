@@ -56,32 +56,46 @@ fn scorer_error_response(value: ScorerError) -> Response {
     }
 }
 
-/// Remote scorer credentials stay with those who may change the scorer.
+/// Per-scorer PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
+
+/// Remote scorer credentials stay with those who may change the scorer: one org-wide check for
+/// standard writers and `_all_` grants, then one check per scorer that has something to redact.
 async fn redact_unwritable(org_id: &str, user_id: &str, scorers: &mut [ScorerResponseBody]) {
-    let mut writable: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
-    for scorer in scorers.iter_mut().filter(|s| s.has_credentials()) {
-        let allowed = match writable.get(&scorer.entity_id) {
-            Some(allowed) => *allowed,
-            None => {
-                let allowed = check_permissions(
-                    &scorer.entity_id,
-                    org_id,
-                    user_id,
-                    "scorers",
-                    "PUT",
-                    None,
-                    false,
-                    false,
-                    true,
-                )
-                .await;
-                writable.insert(scorer.entity_id.clone(), allowed);
-                allowed
-            }
-        };
-        if !allowed {
-            scorer.redact_credentials();
-        }
+    use futures::StreamExt;
+
+    let mut ids: Vec<String> = scorers
+        .iter()
+        .filter(|s| s.has_credentials())
+        .map(|s| s.entity_id.clone())
+        .collect();
+    if ids.is_empty()
+        || check_permissions(
+            org_id, org_id, user_id, "scorers", "PUT", None, true, false, false,
+        )
+        .await
+    {
+        return;
+    }
+    ids.sort_unstable();
+    ids.dedup();
+    let writable: std::collections::HashSet<String> = futures::stream::iter(ids)
+        .map(|id| async move {
+            check_permissions(
+                &id, org_id, user_id, "scorers", "PUT", None, false, false, true,
+            )
+            .await
+            .then_some(id)
+        })
+        .buffer_unordered(PERMISSION_CONCURRENCY)
+        .filter_map(|id| async move { id })
+        .collect()
+        .await;
+    for scorer in scorers
+        .iter_mut()
+        .filter(|s| s.has_credentials() && !writable.contains(&s.entity_id))
+    {
+        scorer.redact_credentials();
     }
 }
 
