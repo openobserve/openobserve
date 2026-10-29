@@ -43,6 +43,7 @@ const COMPARISON: Record<string, FilterOperatorId> = {
 
 const FUNCTION_OPERATORS: Record<string, FilterOperatorId> = {
   str_match: "contains",
+  str_match_ignore_case: "contains_ci",
   re_match: "regex",
   re_not_match: "not_regex",
 };
@@ -198,8 +199,11 @@ class Parser {
     const ends = text.startsWith("%");
     const inner = text.slice(ends ? 1 : 0, starts ? -1 : undefined);
     if (inner.includes("%")) return null;
-    if (negate)
-      return starts && ends ? this.condition(connector, field, "not_contains", [inner]) : null;
+    if (negate) {
+      if (starts && ends) return this.condition(connector, field, "not_contains", [inner]);
+      if (starts) return this.condition(connector, field, "not_starts_with", [inner]);
+      return ends ? this.condition(connector, field, "not_ends_with", [inner]) : null;
+    }
     if (starts && ends) return this.condition(connector, field, "contains", [inner]);
     if (starts) return this.condition(connector, field, "starts_with", [inner]);
     if (ends) return this.condition(connector, field, "ends_with", [inner]);
@@ -230,15 +234,25 @@ class Parser {
       this.pos++;
       return this.likePredicate(connector, field, negate);
     }
-    if (!negate && this.keyword("IS")) {
-      this.pos++;
-      const isNot = this.keyword("NOT");
-      if (isNot) this.pos++;
-      if (!this.keyword("NULL")) return null;
+    if (!negate && this.keyword("IS")) return this.isPredicate(connector, field);
+    return null;
+  }
+
+  private isPredicate(connector: FilterConnector, field: string): FilterCondition | null {
+    const is = this.tokens[this.pos++].text;
+    const isNot = this.keyword("NOT");
+    let not = is === is.toLowerCase() ? "not" : "NOT";
+    if (isNot) not = this.tokens[this.pos++].text;
+    if (this.keyword("NULL")) {
       this.pos++;
       return this.condition(connector, field, isNot ? "is_not_null" : "is_null", []);
     }
-    return null;
+    if (!this.keyword("TRUE") && !this.keyword("FALSE")) return null;
+    const literal = this.tokens[this.pos++].text;
+    const condition = this.condition(connector, field, isNot ? "neq" : "eq", [
+      literal.toLowerCase(),
+    ]);
+    return { ...condition, isSpelling: { is, not, literal } };
   }
 }
 

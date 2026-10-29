@@ -103,9 +103,23 @@ describe("QueryFilterBar", () => {
     mountBar();
     await openBar();
     expect(input()).not.toBeNull();
-    expect(rowKeys()).toEqual(["level", "status", "ok"]);
+    expect(rowKeys()).toEqual(["level", "status", "ok", "\u0000group"]);
     await type("sta");
     expect(rowKeys()).toEqual(["status"]);
+  });
+
+  it("keeps the list open and the caret focused when the press lands on a group's box", async () => {
+    mountBar({
+      modelValue: parseSqlFilter("status >= 500 AND (level = 'error' OR level = 'warn')")!,
+    });
+    await openBar();
+    const groupBox = wrapper!.find('[data-test="query-filter-bar-group-1"]').element;
+    const press = new PointerEvent("pointerdown", { bubbles: true, cancelable: true });
+    groupBox.dispatchEvent(press);
+    await flushPromises();
+    expect(press.defaultPrevented).toBe(true);
+    expect(document.activeElement?.getAttribute("data-test")).toBe("query-filter-bar-input");
+    expect(rows().length).toBeGreaterThan(0);
   });
 
   it("builds a chip with the keyboard: field, operator, value, then reopens the field list", async () => {
@@ -351,11 +365,50 @@ describe("QueryFilterBar", () => {
     expect(sql(state)).toBe("match_all('timeout')");
   });
 
+  it("names operators as dashboards and alerts do, with a plain-language hint", async () => {
+    mountBar({ modelValue: parseSqlFilter("level IN ('a', 'b') AND str_match(level, 'x')")! });
+    expect(segment("level", "operator").text()).toBe("IN");
+    await openBar();
+    await type("level");
+    await press("Enter");
+    const contains = rows().find((row) =>
+      row.getAttribute("data-test")!.endsWith("-item-contains"),
+    )!;
+    expect(contains.textContent).toContain("Contains");
+    const eq = rows().find((row) => row.getAttribute("data-test")!.endsWith("-item-eq"))!;
+    expect(eq.textContent!.replace(/\s+/g, "")).toBe("=is");
+  });
+
   describe("AND / OR", () => {
     it("joins chips with AND by default and toggles a connector when it is clicked", async () => {
       const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
       expect(wrapper!.find('[data-test="query-filter-bar-mode"]').exists()).toBe(false);
       await wrapper!.find('[data-test="query-filter-bar-connector-1"]').trigger("click");
+      expect(sql(state)).toBe("level = 'a' OR level = 'b'");
+    });
+
+    it("toggles a connector from the keyboard", async () => {
+      const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
+      const connector = wrapper!.find('[data-test="query-filter-bar-connector-1"]');
+      expect(connector.element.tagName).toBe("BUTTON");
+      await connector.trigger("keydown", { key: "Enter" });
+      expect(sql(state)).toBe("level = 'a' OR level = 'b'");
+      await wrapper!
+        .find('[data-test="query-filter-bar-connector-1"]')
+        .trigger("keydown", { key: " " });
+      expect(sql(state)).toBe("level = 'a' AND level = 'b'");
+    });
+
+    it("sets the next connector by typing or, and Backspace puts it back to AND", async () => {
+      const state = mountBar({ modelValue: parseSqlFilter("level = 'a'")! });
+      await openBar();
+      await type("or ");
+      expect(wrapper!.find('[data-test="query-filter-bar-pending-connector"]').text()).toBe("OR");
+      await press("Backspace");
+      expect(wrapper!.find('[data-test="query-filter-bar-pending-connector"]').text()).toBe("AND");
+      await type("or ");
+      await type("level=b");
+      await press("Enter");
       expect(sql(state)).toBe("level = 'a' OR level = 'b'");
     });
 
@@ -373,6 +426,118 @@ describe("QueryFilterBar", () => {
       await type(")");
       expect(sql(state)).toBe("status >= 500 AND (level = 'error' OR level = 'warn')");
     });
+  });
+
+  describe("caret position", () => {
+    it("draws the caret and the half-built chip inside the group being typed into", async () => {
+      mountBar({ modelValue: parseSqlFilter("level = 'a'")! });
+      await openBar();
+      await type("(");
+      await type("level=b");
+      await press("Enter");
+      const group = wrapper!.find('[data-test="query-filter-bar-group-1"]');
+      expect(group.find('[data-test="query-filter-bar-input"]').exists()).toBe(true);
+      await type("level");
+      await press("Enter");
+      expect(group.find('[data-test="query-filter-bar-draft"]').exists()).toBe(true);
+    });
+
+    it("inserts at the front, where the old first chip takes the typed connector", async () => {
+      const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
+      await openBar();
+      await press("ArrowLeft");
+      await press("ArrowLeft");
+      await type("or ");
+      await type("level=c");
+      await press("Enter");
+      expect(sql(state)).toBe("level = 'c' OR level = 'a' AND level = 'b'");
+    });
+
+    it("puts the caret in a group whose box is pressed, so the next chip lands there", async () => {
+      const state = mountBar({
+        modelValue: parseSqlFilter("status >= 500 AND (level = 'error' OR level = 'warn')")!,
+      });
+      const box = wrapper!.find('[data-test="query-filter-bar-group-1"]').element;
+      box.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+      await flushPromises();
+      await type("or ");
+      await type("level=info");
+      await press("Enter");
+      expect(sql(state)).toBe(
+        "status >= 500 AND (level = 'error' OR level = 'warn' OR level = 'info')",
+      );
+    });
+
+    it("steps into a group on Backspace instead of deleting it whole", async () => {
+      const state = mountBar({
+        modelValue: parseSqlFilter("status >= 500 AND (level = 'error' OR level = 'warn')")!,
+      });
+      await openBar();
+      await press("Backspace");
+      const group = wrapper!.find('[data-test="query-filter-bar-group-1"]');
+      expect(group.find('[data-test="query-filter-bar-input"]').exists()).toBe(true);
+      await press("Backspace");
+      await press("Backspace");
+      expect(sql(state)).toBe("status >= 500 AND level = 'error'");
+    });
+
+    it("drops an unfilled group and returns the caret to the end when the user leaves", async () => {
+      const state = mountBar({ modelValue: parseSqlFilter("level = 'a'")! });
+      await openBar();
+      await type("(");
+      expect(state.tree.items).toHaveLength(2);
+      const elsewhere = document.createElement("button");
+      document.body.appendChild(elsewhere);
+      elsewhere.focus();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await flushPromises();
+      expect(state.tree.items).toHaveLength(1);
+      expect(wrapper!.find('[data-test="query-filter-bar-group-1"]').exists()).toBe(false);
+    });
+
+    it("drops only the group it opened, never an empty group that was loaded", async () => {
+      const loaded = parseSqlFilter("level = 'a'")!;
+      const saved = {
+        ...loaded,
+        items: [
+          ...loaded.items,
+          { kind: "group" as const, id: "kept", connector: "AND" as const, items: [] },
+        ],
+      };
+      const state = mountBar({ modelValue: saved });
+      await openBar();
+      await type("(");
+      expect(state.tree.items).toHaveLength(3);
+      await type(")");
+      expect(state.tree.items.map((item) => item.id)).toEqual([loaded.items[0].id, "kept"]);
+    });
+
+    it("keeps the caret where it is on Escape", async () => {
+      const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
+      await openBar();
+      await press("ArrowLeft");
+      await press("Escape");
+      await type("level=c");
+      await press("Enter");
+      expect(sql(state)).toBe("level = 'a' AND level = 'c' AND level = 'b'");
+    });
+  });
+
+  it("folds deep groups only in the vertical layout, without emitting a change", async () => {
+    const deep = "level = 'a' AND (level = 'b' OR (level = 'c' AND (level = 'd' OR status = 1)))";
+    const onChange = vi.fn();
+    mountBar({
+      modelValue: parseSqlFilter(deep)!,
+      layout: "vertical",
+      "onUpdate:modelValue": onChange,
+    });
+    const summary = wrapper!.find('[data-test="query-filter-bar-summary-1-1-1"]');
+    expect(summary.text()).toBe("level = d OR status = 1");
+    await wrapper!.find('[data-test="query-filter-bar-expand-1-1-1"]').trigger("click");
+    expect(wrapper!.find('[data-test="query-filter-bar-row-1-1-1-0"]').exists()).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+    await wrapper!.setProps({ layout: "horizontal" });
+    expect(wrapper!.find('[data-test^="query-filter-bar-summary-"]').exists()).toBe(false);
   });
 
   it("limits PromQL to label matchers without connectors", async () => {

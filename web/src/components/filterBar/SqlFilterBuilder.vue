@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { emptyFilterGroup, filterTreeToSql, type FilterGroup } from "@/utils/query/filterBar";
 import { parseSqlFilter } from "@/utils/query/filterBarParser";
 import QueryFilterBar from "./QueryFilterBar.vue";
@@ -38,8 +37,6 @@ const { t } = useI18nTyped();
 const tree = ref<FilterGroup>(emptyFilterGroup());
 const unparsable = ref(false);
 let lastEmitted: string | null = null;
-
-const preview = computed(() => filterTreeToSql(tree.value, props.fields));
 
 // The query can change outside the bar (a field-list click, a saved view, the URL); re-read it unless it is our own echo.
 watch(
@@ -105,16 +102,11 @@ function clearAndBuild() {
         :fields-loading="fieldsLoading"
         size="sm"
         appearance="plain"
+        :max-rows="3"
         :data-test="`${dataTest}-bar`"
         @update:model-value="onTreeChange"
         @submit="emit('submit')"
       />
-      <OTruncatedText
-        v-if="preview"
-        class="text-text-secondary text-2xs min-w-0 px-1 font-mono"
-        :data-test="`${dataTest}-preview`"
-        >{{ raw(`WHERE ${preview}`) }}</OTruncatedText
-      >
     </template>
   </div>
 </template>

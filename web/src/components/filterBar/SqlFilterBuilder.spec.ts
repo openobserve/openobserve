@@ -42,12 +42,10 @@ const mountBuilder = (query: string) => {
 const chips = () => wrapper!.findAll('[data-test^="b-bar-chip-"][data-test$="-field"]');
 
 describe("SqlFilterBuilder", () => {
-  it("draws a filter-mode query as chips with a WHERE preview", () => {
+  it("draws a filter-mode query as chips, with no preview line to cut off", () => {
     mountBuilder("level = 'error' AND status >= 500");
     expect(chips()).toHaveLength(2);
-    expect(wrapper!.find('[data-test="b-preview"]').text()).toBe(
-      "WHERE level = 'error' AND status >= 500",
-    );
+    expect(wrapper!.find('[data-test="b-preview"]').exists()).toBe(false);
   });
 
   it("blends the bar into the editor surface instead of drawing an input frame", () => {

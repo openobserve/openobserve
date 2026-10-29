@@ -22,6 +22,7 @@ const fields: FilterField[] = [
   { name: "status", type: "number" },
   { name: "ok", type: "boolean" },
   { name: "k8s-pod", type: "string" },
+  { name: "duration", type: "number" },
 ];
 
 const roundTrip = (sql: string) => {
@@ -66,6 +67,41 @@ describe("parseSqlFilter", () => {
       "level = 'error' AND service = 'cart'",
     );
     expect(roundTrip("status = 1 OR (level = 'a')")).toBe("status = 1 OR level = 'a'");
+  });
+
+  it("reads the logs field list's boolean include/exclude as = and != chips", () => {
+    const include = parseSqlFilter("ok is true")!.items[0] as FilterCondition;
+    expect(include).toMatchObject({ field: "ok", operator: "eq", values: ["true"] });
+    const exclude = parseSqlFilter("ok is not false")!.items[0] as FilterCondition;
+    expect(exclude).toMatchObject({ field: "ok", operator: "neq", values: ["false"] });
+  });
+
+  it("writes a boolean IS test back exactly as typed", () => {
+    for (const sql of ["ok is true", "ok is not true", "ok is false", "ok IS NOT FALSE"])
+      expect(roundTrip(sql)).toBe(sql);
+    expect(roundTrip("level = 'a' AND ok is not true")).toBe("level = 'a' AND ok is not true");
+  });
+
+  it("keeps the IS spelling when the chip's value or negation changes", () => {
+    const tree = parseSqlFilter("ok is true")!;
+    const node = tree.items[0] as FilterCondition;
+    expect(filterTreeToSql({ ...tree, items: [{ ...node, values: ["false"] }] }, fields)).toBe(
+      "ok is false",
+    );
+    expect(filterTreeToSql({ ...tree, items: [{ ...node, operator: "neq" }] }, fields)).toBe(
+      "ok is not true",
+    );
+    expect(filterTreeToSql({ ...tree, items: [{ ...node, operator: "gt" }] }, fields)).toBe(
+      "ok > true",
+    );
+  });
+
+  it("parses the traces field list's include/exclude terms", () => {
+    expect(roundTrip("service_name='api'")).toBe("service_name = 'api'");
+    expect(roundTrip("service_name!='o''brien'")).toBe("service_name != 'o''brien'");
+    expect(roundTrip("duration>=1200")).toBe("duration >= 1200");
+    expect(roundTrip("(level='a' or level='b')")).toBe("(level = 'a' OR level = 'b')");
+    expect(roundTrip("(level!='a' and level!='b')")).toBe("(level != 'a' AND level != 'b')");
   });
 
   it("keeps the connector of each node", () => {

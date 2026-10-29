@@ -13,9 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { InjectionKey } from "vue";
 import type { I18nText } from "@/types/i18n";
 import type { FilterTokenPart } from "@/lib/core/Badge/OFilterToken.types";
-import type { FilterDialect, FilterField, FilterGroup, FilterNode } from "@/utils/query/filterBar";
+import type {
+  FilterConnector,
+  FilterDialect,
+  FilterField,
+  FilterGroup,
+  FilterNode,
+  FilterOperatorId,
+} from "@/utils/query/filterBar";
+import type {
+  FilterConnectorMode,
+  FilterIssue,
+  FilterLayout,
+  FilterProfileName,
+} from "./filterProfiles";
 
 export interface QueryFilterBarProps {
   modelValue: FilterGroup;
@@ -26,14 +40,26 @@ export interface QueryFilterBarProps {
   freeText?: boolean;
   /** Let the user name a field that is not in `fields` (labels not loaded yet). */
   allowCustomFields?: boolean;
+  /** Edit by a named profile's rules; `dialect`, `freeText` and `allowCustomFields` are then ignored. */
+  profile?: FilterProfileName;
+  /** Overrides the profile's layout. */
+  layout?: FilterLayout;
   /** Suggested values for a field; `search` is the typed needle, empty for the first page. */
   loadValues?: (field: string, search: string) => Promise<string[]>;
+  /** Values listed first for every field, e.g. dashboard `$variables`. */
+  extraValueSuggestions?: (field: string) => string[];
+  /** Problems to mark on their chips, from FilterBuilder's validation. */
+  issues?: FilterIssue[];
+  /** A soft warning for a chip's value, e.g. one not seen in recent data. */
+  valueHint?: (field: string, values: string[]) => I18nText | undefined;
   fieldsLoading?: boolean;
   placeholder?: I18nText;
   disabled?: boolean;
   size?: "sm" | "md";
   /** `plain` blends the bar into the editor surface it replaces. */
   appearance?: "field" | "plain";
+  /** Lines of chips shown before the bar scrolls inside itself; it grows freely when unset. */
+  maxRows?: number;
   dataTest?: string;
 }
 
@@ -51,12 +77,26 @@ export interface QueryFilterBarExpose {
 
 export interface FilterBarNodesProps {
   items: FilterNode[];
-  /** Draw the AND/OR connector between nodes. */
-  connectors: boolean;
+  /** The group these items belong to; the tail slot renders inside the matching group. */
+  groupId: string;
+  /** Index path of the group, `-` joined, empty for the root; test ids carry it. */
+  path?: string;
+  /** `and-only` draws no AND/OR between nodes. */
+  connectorMode: FilterConnectorMode;
   editingId?: string | null;
   editPart?: FilterTokenPart | null;
   armedId?: string | null;
-  openGroupId?: string | null;
+  /** The group the caret is in, and where among its items; the `caret` slot renders there. */
+  caretGroupId?: string | null;
+  /** Null keeps the caret out of these nodes. */
+  caretIndex?: number | null;
+  /** Ids of chips that have a validation problem. */
+  invalidIds?: Set<string>;
+  /** Picks PromQL's own spelling of the regex operators. */
+  dialect?: FilterDialect;
+  disabled?: boolean;
+  /** Whether group `id` can be ungrouped without changing what the filter matches. */
+  canUngroup?: (_id: string) => boolean;
   dataTest: string;
 }
 
@@ -64,4 +104,45 @@ export interface FilterBarNodesEmits {
   (_e: "edit", _id: string, _part: FilterTokenPart, _element: HTMLElement): void;
   (_e: "remove", _id: string): void;
   (_e: "toggle-connector", _id: string): void;
+  /** Lift a group's items into its parent. */
+  (_e: "ungroup", _id: string): void;
 }
+
+export interface FilterBarRowsProps extends FilterBarNodesProps {
+  /** Group level of these items, the root being 1. */
+  level?: number;
+  /** Whether a group may be added inside the group `id`. */
+  canGroupIn: (_id: string) => boolean;
+  /** Why no more conditions can be added; adding is disabled while set. */
+  limitReason?: I18nText;
+  /** Connector a new line in this group takes, shown on the half-built line. */
+  nextConnector?: FilterConnector;
+  /** Groups drawn as one summary line instead of their lines. */
+  foldedIds?: Set<string>;
+}
+
+export interface FilterBarRowsEmits extends FilterBarNodesEmits {
+  (_e: "add-condition", _groupId: string): void;
+  (_e: "add-group", _groupId: string): void;
+  /** Start a new condition on the line after node `id`. */
+  (_e: "add-after", _id: string): void;
+  /** Fold or unfold group `id`. */
+  (_e: "toggle-fold", _groupId: string): void;
+}
+
+export interface FilterBarCaretSlotProps {
+  groupId: string;
+  /** The caret's place among the group's items. */
+  index: number;
+}
+
+/** What a chip reads from the bar it sits in, without threading props through every nested group. */
+export interface FilterBarChipContext {
+  fieldLabel: (field: string) => string | undefined;
+  valueHint: (field: string, values: string[]) => I18nText | undefined;
+  issueMessage: (nodeId: string) => I18nText | undefined;
+  operatorName: (id: FilterOperatorId) => I18nText;
+}
+
+export const FILTER_BAR_CHIP_CONTEXT: InjectionKey<FilterBarChipContext> =
+  Symbol("filterBarChipContext");

@@ -16,82 +16,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OFilterToken from "@/lib/core/Badge/OFilterToken.vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { conditionValueLabel, OPERATORS, type FilterCondition } from "@/utils/query/filterBar";
-import type { FilterBarNodesEmits, FilterBarNodesProps } from "./QueryFilterBar.types";
-import { operatorChipLabel } from "./useFilterBarEditor";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import FilterBarChip from "./FilterBarChip.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import type {
+  FilterBarNodesEmits,
+  FilterBarNodesProps,
+  FilterBarCaretSlotProps,
+} from "./QueryFilterBar.types";
 
 defineOptions({ name: "FilterBarNodes" });
 
-withDefaults(defineProps<FilterBarNodesProps>(), {
+const props = withDefaults(defineProps<FilterBarNodesProps>(), {
+  path: "",
   editingId: null,
   editPart: null,
   armedId: null,
-  openGroupId: null,
+  caretGroupId: null,
+  caretIndex: null,
+  invalidIds: undefined,
+  dialect: "sql",
+  disabled: false,
+  canUngroup: undefined,
 });
 const emit = defineEmits<FilterBarNodesEmits>();
+defineSlots<{ caret?(_props: FilterBarCaretSlotProps): unknown }>();
 
 const { t } = useI18nTyped();
 
-const testKey = (condition: FilterCondition) => condition.field || "text";
-
-const fieldLabel = (condition: FilterCondition): I18nText =>
-  condition.field ? raw(condition.field) : t("filterBar.textField");
-
-const operatorLabel = (condition: FilterCondition): I18nText | undefined =>
-  condition.field ? operatorChipLabel(condition.operator, t) : undefined;
-
-const valueLabel = (condition: FilterCondition): I18nText | undefined =>
-  OPERATORS[condition.operator].arity === "none" ? undefined : raw(conditionValueLabel(condition));
+const pathOf = (index: number) => (props.path ? `${props.path}-${index}` : String(index));
+const caretAt = (index: number) =>
+  props.groupId === props.caretGroupId &&
+  props.caretIndex !== null &&
+  Math.min(props.caretIndex, props.items.length) === index;
 </script>
 
 <template>
   <template v-for="(item, index) in items" :key="item.id">
+    <slot v-if="caretAt(index)" name="caret" :group-id="groupId" :index="index" />
     <OTag
-      v-if="connectors && index > 0"
+      v-if="connectorMode !== 'and-only' && index > 0"
       clickable
       size="xs"
       shape="rounded"
       variant="default-soft"
+      :disabled="disabled"
       :label="raw(item.connector)"
       :aria-label="t('filterBar.toggleConnector')"
-      :data-test="`${dataTest}-connector-${index}`"
+      :data-test="`${dataTest}-connector-${pathOf(index)}`"
       @click.stop="emit('toggle-connector', item.id)"
     />
-    <OFilterToken
-      v-if="item.kind === 'condition'"
-      :field="fieldLabel(item)"
-      :operator="operatorLabel(item)"
-      :value="valueLabel(item)"
-      :active-part="item.id === editingId ? (editPart ?? 'value') : null"
-      :armed="item.id === armedId"
-      removable
-      :remove-label="t('filterBar.removeFilter')"
-      :data-test="`${dataTest}-chip-${testKey(item)}`"
-      @select="(part, element) => emit('edit', item.id, part, element)"
-      @remove="emit('remove', item.id)"
-    />
-    <template v-else>
-      <span class="text-text-secondary font-mono text-sm" aria-hidden="true">{{ raw("(") }}</span>
+    <span
+      v-if="item.kind === 'group'"
+      class="rounded-default border-border-subtle bg-surface-subtle inline-flex max-w-full min-w-min flex-wrap items-center gap-1.5 border py-0.5 ps-1.5 pe-0.5"
+      :data-filter-group="item.id"
+      :data-filter-index="index"
+      :data-test="`${dataTest}-group-${pathOf(index)}`"
+    >
       <FilterBarNodes
         :items="item.items"
-        :connectors="connectors"
+        :group-id="item.id"
+        :path="pathOf(index)"
+        :connector-mode="connectorMode"
+        :dialect="dialect"
         :editing-id="editingId"
         :edit-part="editPart"
         :armed-id="armedId"
-        :open-group-id="openGroupId"
+        :caret-group-id="caretGroupId"
+        :caret-index="caretIndex"
+        :invalid-ids="invalidIds"
+        :disabled="disabled"
+        :can-ungroup="canUngroup"
         :data-test="dataTest"
         @edit="(id, part, element) => emit('edit', id, part, element)"
         @remove="emit('remove', $event)"
         @toggle-connector="emit('toggle-connector', $event)"
-      />
-      <span
-        v-if="item.id !== openGroupId"
-        class="text-text-secondary font-mono text-sm"
-        aria-hidden="true"
-        >{{ raw(")") }}</span
+        @ungroup="emit('ungroup', $event)"
       >
-    </template>
+        <template #caret="slotProps">
+          <slot name="caret" v-bind="slotProps" />
+        </template>
+      </FilterBarNodes>
+      <span v-if="item.items.length && (canUngroup?.(item.id) ?? true)" class="inline-flex">
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          icon-left="unfold-more"
+          :disabled="disabled"
+          :aria-label="t('filterBar.ungroup')"
+          :data-test="`${dataTest}-ungroup-${pathOf(index)}`"
+          @mousedown.prevent
+          @click.stop="emit('ungroup', item.id)"
+        />
+        <OTooltip :content="t('filterBar.ungroup')" />
+      </span>
+    </span>
+    <FilterBarChip
+      v-else
+      :node="item"
+      :dialect="dialect"
+      :active-part="item.id === editingId ? (editPart ?? 'value') : null"
+      :armed="item.id === armedId"
+      :invalid="Boolean(invalidIds?.has(item.id))"
+      :disabled="disabled"
+      :data-filter-index="index"
+      :data-test="dataTest"
+      @edit="(part, element) => emit('edit', item.id, part, element)"
+      @remove="emit('remove', item.id)"
+    />
   </template>
+  <slot v-if="caretAt(items.length)" name="caret" :group-id="groupId" :index="items.length" />
 </template>
