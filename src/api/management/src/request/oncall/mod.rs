@@ -1549,6 +1549,14 @@ pub async fn set_team_channel(
                 .filter(|n| !n.is_empty())
                 .collect::<Vec<_>>()
         });
+        if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_slack_app_destinations(
+            &org_id,
+            requested.as_deref().unwrap_or_default(),
+        )
+        .await
+        {
+            return to_response(e);
+        }
         match infra::table::oncall_teams::set_channel(&org_id, &team_id, requested.clone()).await {
             Ok(false) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
             Err(e) => internal_error("set_team_channel", &e),

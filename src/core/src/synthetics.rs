@@ -108,7 +108,7 @@ pub async fn notify_check_result(n: CheckNotification) {
                 let msg = match destination_type {
                     DestinationType::Email(_) => build_email_html(&n),
                     DestinationType::Sns(_) => build_plain_text(&n),
-                    DestinationType::Http(_) => build_slack_json(&n),
+                    DestinationType::Http(_) | DestinationType::SlackApp(_) => build_slack_json(&n),
                 };
 
                 let subject = if n.recovery {
@@ -1064,7 +1064,9 @@ async fn notify_location_down(
                         affected
                     ),
                     DestinationType::Sns(_) => text.clone(),
-                    DestinationType::Http(_) => serde_json::json!({ "text": text }).to_string(),
+                    DestinationType::Http(_) | DestinationType::SlackApp(_) => {
+                        serde_json::json!({ "text": text }).to_string()
+                    }
                 };
                 if let Err(e) = crate::alerts::alert::dispatch_notification(
                     org_id,

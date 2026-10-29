@@ -344,6 +344,8 @@ impl TriggerStatus {
                         status.failed += 1
                     }
                     usage::RunOutcome::Skipped => status.warning += 1,
+                    // An ack event is not a run, so it says nothing about the trigger health.
+                    usage::RunOutcome::AckEvent => {}
                 }
             }
         }

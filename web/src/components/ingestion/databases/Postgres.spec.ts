@@ -74,6 +74,7 @@ describe("postgresCard builder", () => {
     });
     expect(card.steps.map((s) => s.id)).toEqual([
       "prepare",
+      "quick-install",
       "install",
       "configure",
       "run",

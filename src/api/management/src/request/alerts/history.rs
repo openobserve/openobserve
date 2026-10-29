@@ -41,7 +41,16 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
-/// Every column the data query reads but `downtime_id`, which [history_columns] adds.
+/// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
+const OPTIONAL_HISTORY_COLUMNS: [&str; 5] = [
+    "downtime_id",
+    "acked_by",
+    "ack_action",
+    "ack_source",
+    "taken_over_from",
+];
+
+/// Every column the data query reads but [OPTIONAL_HISTORY_COLUMNS].
 const HISTORY_COLUMNS: &str = "_timestamp, org, key, status, level, actual_value, \
      threshold_value, threshold_operator, group_label, value_is_lower_bound, is_realtime, \
      is_silenced, start_time, end_time, retries, delay_in_secs, evaluation_took_in_secs, \
@@ -132,6 +141,16 @@ pub struct AlertHistoryEntry {
     /// The downtime that suppressed this run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub downtime_id: Option<String>,
+    /// Whose ack withheld this run's send, or who acted on an `ack_event` row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acked_by: Option<String>,
+    /// `ack`, `unack` or `take_over`, on `ack_event` rows.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ack_action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ack_source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taken_over_from: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -424,6 +443,10 @@ pub async fn get_alert_history(
                     group_label: None,
                     value_is_lower_bound: None,
                     downtime_id: None,
+                    acked_by: None,
+                    ack_action: None,
+                    ack_source: None,
+                    taken_over_from: None,
                 }
             })
             .collect();
@@ -834,11 +857,11 @@ pub async fn get_alert_history(
                 .filter(|s| !s.is_empty())
                 .map(String::from),
             value_is_lower_bound: hit.get("value_is_lower_bound").and_then(|v| v.as_bool()),
-            downtime_id: hit
-                .get("downtime_id")
-                .and_then(|v| v.as_str())
-                .filter(|s| !s.is_empty())
-                .map(String::from),
+            downtime_id: hit_text(&hit, "downtime_id"),
+            acked_by: hit_text(&hit, "acked_by"),
+            ack_action: hit_text(&hit, "ack_action"),
+            ack_source: hit_text(&hit, "ack_source"),
+            taken_over_from: hit_text(&hit, "taken_over_from"),
         });
     }
 
@@ -935,13 +958,24 @@ fn triggers_schema(read: infra::errors::Result<Schema>) -> Result<Schema, Respon
     })
 }
 
-/// [HISTORY_COLUMNS], with `downtime_id` once the stream has it: an upgraded stream learns it late.
+/// [HISTORY_COLUMNS] plus each optional column the stream has; an upgraded stream learns them late.
 fn history_columns(schema: &Schema) -> String {
-    if schema.field_with_name("downtime_id").is_ok() {
-        format!("{HISTORY_COLUMNS}, downtime_id")
-    } else {
-        HISTORY_COLUMNS.to_string()
+    let mut columns = HISTORY_COLUMNS.to_string();
+    for column in OPTIONAL_HISTORY_COLUMNS {
+        if schema.field_with_name(column).is_ok() {
+            columns.push_str(", ");
+            columns.push_str(column);
+        }
     }
+    columns
+}
+
+/// A non-empty text column of a history hit.
+fn hit_text(hit: &serde_json::Value, column: &str) -> Option<String> {
+    hit.get(column)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
 }
 
 /// The downtime filters of the history read, quoted with the same single-quote escaping.
@@ -1238,6 +1272,10 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -1296,6 +1334,10 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1343,6 +1385,10 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -1572,6 +1618,10 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
         };
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -1616,6 +1666,10 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1666,6 +1720,10 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1709,6 +1767,10 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1786,5 +1848,27 @@ mod tests {
         let mut current = upgraded;
         current.push(field("downtime_id"));
         assert!(history_columns(&Schema::new(current)).ends_with(", downtime_id"));
+    }
+
+    #[test]
+    fn ack_columns_are_read_once_the_stream_has_them() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        fields.push(field("acked_by"));
+        let columns = history_columns(&Schema::new(fields.clone()));
+        assert!(columns.ends_with(", acked_by"), "{columns}");
+        assert!(!columns.contains("ack_action"), "{columns}");
+        for name in ["ack_action", "ack_source", "taken_over_from"] {
+            fields.push(field(name));
+        }
+        assert!(
+            history_columns(&Schema::new(fields))
+                .ends_with(", acked_by, ack_action, ack_source, taken_over_from")
+        );
+        let hit = serde_json::json!({"acked_by": "dana@acme.com", "ack_action": ""});
+        assert_eq!(hit_text(&hit, "acked_by").as_deref(), Some("dana@acme.com"));
+        assert_eq!(hit_text(&hit, "ack_action"), None);
     }
 }

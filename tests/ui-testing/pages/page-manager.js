@@ -39,6 +39,7 @@ import CreateAlertFromSourceDialogPage from "./alertsPages/createAlertFromSource
 import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
+import { AlertAckPage } from "./alertsPages/alertAckPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
 import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
@@ -223,6 +224,7 @@ class PageManager {
     this.alertLibraryPage = new AlertLibraryPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
+    this.alertAckPage = new AlertAckPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
     this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);

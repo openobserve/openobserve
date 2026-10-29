@@ -238,6 +238,9 @@ mod tests {
 
     fn with_schedule(schedule: DowntimeSchedule) -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: "d1".to_string(),
             org: "acme".to_string(),
             folder_id: "default".to_string(),

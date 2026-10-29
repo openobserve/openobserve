@@ -49,7 +49,14 @@ def test_form_path(client: OpenObserveClient, slack_org: str, team: str) -> None
     assert body["channelId"] == "C0ALERTS"
     assert body["installation"]["team_name"] == "Acme"
     assert set(body["installation"]) == {"id", "team_name", "status", "linking"}
-    assert team_destinations(client, slack_org, team) == [], "the form path creates no destination itself"
+    # B7: the form path creates the Slack app destination for the channel picked on Slack's consent screen.
+    assert body["destination"]["channel_id"] == "C0ALERTS"
+    assert body["destination"]["name"].startswith("slack-alerts")
+    assert body["channel_default_set"] is True
+    assert "destination_refusal" not in body
+    app = client.get(f"alerts/destinations/{body['destination']['name']}", org=slack_org).json()
+    assert app["type"] == "slack_app" and app["installation_id"] == body["installation"]["id"]
+    assert team_destinations(client, slack_org, team) == [], "no webhook destination is created any more"
 
     saved = client.post(
         "alerts/destinations", json=form_destination_payload(f"slack_{team.lower()}", body), org=slack_org
@@ -70,7 +77,9 @@ def test_settings_path_creates_the_destination_and_default(client: OpenObserveCl
     assert body["destination"]["channel_id"] == "C0OPS"
     assert body["channel_default_set"] is True
     assert "webhookUrl" not in body, "no webhook URL outside the form path"
-    assert [d["name"] for d in team_destinations(client, slack_org, team)] == [body["destination"]["name"]]
+    app = client.get(f"alerts/destinations/{body['destination']['name']}", org=slack_org).json()
+    assert app["type"] == "slack_app" and app["channel_id"] == "C0OPS", app
+    assert team_destinations(client, slack_org, team) == [], "Settings creates a Slack app destination, not a webhook"
     assert channel_default(client, slack_org, body["installation"]["id"], "C0OPS")["set_from"] == "install"
 
 
@@ -136,7 +145,9 @@ def test_a_second_org_gets_a_connect_ticket(client: OpenObserveClient, slack_org
     assert connected.json()["connected"] is True
     assert connected.json()["destination"]["channel_id"] == "C0OPS"
     assert connected.json()["channel_default_set"] is True
-    assert len(team_destinations(client, second_org, team)) == 1
+    app = client.get(f"alerts/destinations/{connected.json()['destination']['name']}", org=second_org).json()
+    assert app["type"] == "slack_app", app
+    assert team_destinations(client, second_org, team) == []
 
     reused = client.post(path, json={"connect_ticket": body["connect_ticket"]}, org=second_org)
     assert reused.status_code == 410, reused.text

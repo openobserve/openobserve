@@ -15,7 +15,7 @@ import {
   genAiResponseAttributes,
   sha256,
 } from "./telemetry.mjs";
-import { selectOwnReviewComment } from "./src/comments.mjs";
+import { REVIEW_PASS_TAG, reviewPassCount, reviewPassTag, selectOwnReviewComment } from "./src/comments.mjs";
 import {
   buildReviewPayload,
   existingFingerprints,
@@ -98,8 +98,11 @@ const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
 const NOTICE_TAG = "<!-- o2-review-notice -->";
 // Login of the token that posts the review; anyone else's comment carrying the marker must never become <previous_review>.
 const REVIEW_BOT_LOGIN = process.env.REVIEW_BOT_LOGIN || "";
-// Kill switch for the inline review comments; the summary comment is posted either way.
-const REVIEW_INLINE = (process.env.REVIEW_INLINE || "true").toLowerCase() !== "false";
+// Inline review comments are opt-in; the summary comment is posted either way.
+const REVIEW_INLINE = (process.env.REVIEW_INLINE || "false").toLowerCase() === "true";
+// Paid reviews per PR; the count lives in the review comment, so deleting that comment resets it.
+const REVIEW_MAX_PASSES = Number.parseInt(process.env.REVIEW_MAX_PASSES, 10) > 0 ? Number.parseInt(process.env.REVIEW_MAX_PASSES, 10) : 2;
+const REVIEW_IGNORE_PASS_LIMIT = process.env.REVIEW_IGNORE_PASS_LIMIT === "true";
 // Where the raw findings JSON is written for the workflow to upload; unset skips it.
 const REVIEW_ARTIFACT_DIR = process.env.REVIEW_ARTIFACT_DIR || "";
 
@@ -1020,6 +1023,7 @@ function sanitizeReviewBody(body) {
   // Strip EVERY marker (not just ours) wherever it appears, so a model that echoes a marker
   // from the prompt or from a previous review can't end up carrying two of them.
   cleaned = cleaned.replace(new RegExp(ANY_REVIEW_MARKER, "gi"), "");
+  cleaned = cleaned.replace(new RegExp(REVIEW_PASS_TAG, "gi"), "");
 
   // Drop any preamble the model emitted before the review proper ("Now I have all the
   // context. Let me produce the consolidated review."). Runs after marker stripping so a
@@ -1552,6 +1556,14 @@ async function main() {
         console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingCommentId}`);
       }
     }
+    const passesDone = existingReview ? reviewPassCount(existingReview) : 0;
+    TRACE.setSpanAttributes(rootSpan, { "review.passes_done": passesDone, "review.max_passes": REVIEW_MAX_PASSES });
+    if (passesDone >= REVIEW_MAX_PASSES && !REVIEW_IGNORE_PASS_LIMIT) {
+      console.log(`[${isoNow()}] PR #${prNumber} already had ${passesDone}/${REVIEW_MAX_PASSES} reviews; skipping. Dispatch the workflow with ignore_pass_limit to review again.`);
+      outcome = "skipped";
+      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_limit_reached" });
+      return;
+    }
 
     // 6. Run reviewers in parallel
     let impact = "";
@@ -1664,6 +1676,12 @@ async function main() {
     // Sanitize and validate before posting
     const sanitizeSpan = TRACE.startSpan("ai_review.sanitize", {}, rootSpan);
     finalReview = sanitizeReviewBody(finalReview);
+    // A run where every reviewer failed reviewed nothing, so it does not use up a pass.
+    const passes = allAgentsFailed ? passesDone : passesDone + 1;
+    if (passes >= REVIEW_MAX_PASSES) {
+      finalReview += `\n\n> [!NOTE]\n> This PR has used its ${REVIEW_MAX_PASSES} automatic reviews; later pushes are not reviewed. Run the AI Code Review workflow by hand with \`ignore_pass_limit\` to review it again.`;
+    }
+    finalReview += `\n${reviewPassTag(passes)}`;
     TRACE.endSpan(sanitizeSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 
