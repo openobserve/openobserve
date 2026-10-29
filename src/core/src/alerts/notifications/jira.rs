@@ -379,7 +379,7 @@ pub async fn setup(org_id: &str, req: SetupRequest) -> Result<Value> {
 }
 
 /// The saved destination to take the token from, read only when no token was typed.
-fn saved_destination_name(req: &SetupRequest) -> Option<&str> {
+pub fn saved_destination_name(req: &SetupRequest) -> Option<&str> {
     req.destination
         .as_deref()
         .filter(|name| req.token.trim().is_empty() && !name.is_empty())
