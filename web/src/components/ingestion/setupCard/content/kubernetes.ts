@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Kubernetes setup card: install → optionally instrument for traces (language libraries or eBPF) → verify.
+// Kubernetes setup card: install → optionally instrument for traces (language libraries or eBPF)
+// → optionally send eBPF network flow metrics → verify.
 //
 // Step 1 deliberately offers ONLY the two endpoint choices — external (reach
 // OpenObserve over the network) and internal (OpenObserve runs in this same
@@ -130,6 +131,16 @@ const EBPF_UPGRADE = `helm repo update openobserve
 helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
   --version '>=0.6.0' --reset-then-reuse-values \\
   --set ebpf.enabled=true{flags}`;
+
+const EBPF_NETWORK_DOC_URL =
+  "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/metrics.md#13-ebpf-network-flows";
+
+// Network flows arrive in chart 0.8.0. Reusing values keeps any trace selectors set above.
+const EBPF_NETWORK_UPGRADE = `helm repo update openobserve
+helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
+  --version '>=0.8.0' --reset-then-reuse-values \\
+  --set ebpf.enabled=true \\
+  --set ebpf.network.enabled=true`;
 
 const instrumentVariants = (t: TranslateFn): RichCardStepVariant[] =>
   LANGUAGES.map((l) => ({
@@ -269,6 +280,15 @@ export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn):
         variants: instrumentChoices(t),
       },
       {
+        id: "network",
+        titleKey: "ingestion.setupCard.k8sNetworkFlowsTitle",
+        descriptionKey: "ingestion.setupCard.k8sNetworkFlowsDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
+        completeOn: "copy",
+        code: { lang: "bash", raw: EBPF_NETWORK_UPGRADE },
+        note: t("ingestion.setupCard.k8sNetworkFlowsNote"),
+      },
+      {
         id: "verify",
         titleKey: "ingestion.setupCard.verifyDataTitle",
         descriptionKey: "ingestion.setupCard.verifyK8sDataDesc",
@@ -348,6 +368,7 @@ kubectl get pods -n openobserve-collector`,
         url: "https://github.com/open-telemetry/opentelemetry-operator",
       },
       { label: t("ingestion.setupCard.ebpfTracingGuideLink"), url: EBPF_DOC_URL },
+      { label: t("ingestion.setupCard.ebpfNetworkFlowsGuideLink"), url: EBPF_NETWORK_DOC_URL },
     ],
   };
 }
