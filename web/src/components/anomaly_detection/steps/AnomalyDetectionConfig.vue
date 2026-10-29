@@ -41,64 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.anomaly.filters") }}
           </div>
           <div class="min-w-0 flex-1 basis-60">
-            <!-- :key must be the array INDEX — the fields bind by index-based
-                 name and do not re-bind, so a stable-id key would leave inputs
-                 shifted on a mid-list delete. -->
-            <div
-              v-for="(filter, idx) in filterRows"
-              :key="idx"
-              class="mb-2 flex flex-wrap items-center gap-2"
-              data-test="anomaly-filter-row"
-            >
-              <OFormSelect
-                :name="`filters[${idx}].field`"
-                :data-test="`anomaly-filter-field-${idx}`"
-                :options="filteredStreamFields"
-                :placeholder="filter.field ? raw('') : t('alerts.anomaly.fieldPlaceholder')"
-                class="alert-v3-select filter-field-select max-w-50 min-w-50"
-                :loading="loadingFields"
-              >
-                <template #empty>
-                  <div class="text-muted-foreground px-3 py-2">
-                    {{
-                      config.stream_name
-                        ? t("alerts.anomaly.noFieldsFound")
-                        : t("alerts.anomaly.selectStreamFirst")
-                    }}
-                  </div>
-                </template>
-              </OFormSelect>
-              <OFormSelect
-                :name="`filters[${idx}].operator`"
-                :data-test="`anomaly-filter-operator-${idx}`"
-                :options="filterOperators"
-                class="alert-v3-select max-w-27.5 min-w-27.5"
-              />
-              <OFormInput
-                v-if="operatorNeedsValue(filter.operator)"
-                :name="`filters[${idx}].value`"
-                :data-test="`anomaly-filter-value-${idx}`"
-                :placeholder="t('alerts.placeholders.value')"
-                class="alert-v3-input max-w-40"
-              />
-              <OButton
-                :aria-label="t('common.remove')"
-                variant="ghost"
-                size="icon-sm"
-                data-test="anomaly-filter-row-remove"
-                @click="removeFilter(idx)"
-                icon-left="close"
-              />
-            </div>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              class="mt-2"
-              data-test="anomaly-filter-add"
-              @click="addFilter"
-            >
-              {{ t("alerts.anomaly.addFilter") }}
-            </OButton>
+            <FilterBuilder
+              profile="anomaly"
+              :model-value="filterRows"
+              :fields="filterFields"
+              :fields-loading="loadingFields"
+              :load-values="loadFilterValues"
+              :placeholder="config.stream_name ? undefined : t('alerts.anomaly.selectStreamFirst')"
+              data-test="anomaly-filter-builder"
+              @update:model-value="onFiltersChange"
+            />
           </div>
         </div>
 
@@ -688,12 +640,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import {
-  ANOMALY_FILTER_OPERATORS,
-  operatorNeedsValue,
-} from "@/utils/alerts/anomalyFilterOperators";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -715,7 +664,6 @@ import {
   formatAnomalySeconds,
   hasTimestampAliasInSql,
   lookBackWindowFloorSeconds,
-  makeAnomalyFilterRow,
   type AnomalyDetectionConfigForm,
   type AnomalyFilterRow,
   type AnomalyStoredIntervals,
@@ -725,8 +673,8 @@ export default defineComponent({
   name: "AnomalyDetectionConfig",
 
   components: {
+    FilterBuilder,
     QueryEditor,
-    OButton,
     OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,
@@ -765,25 +713,6 @@ export default defineComponent({
       { label: raw("SQL"), value: "custom_sql" },
     ]);
 
-    // The array itself stays English: each entry IS the persisted operator and
-    // is matched by identity (operatorNeedsValue, the SQL builders).
-    // Split label from value so the dropdown reads in the user's language, the
-    // same way AddCondition.vue does — the keys are already shared.
-    const OPERATOR_LABEL_KEYS: Record<string, string> = {
-      Contains: "dashboard.filterOperators.contains",
-      "Starts With": "dashboard.filterOperators.startsWith",
-      "Ends With": "dashboard.filterOperators.endsWith",
-      "Not Contains": "dashboard.filterOperators.notContains",
-      "Is Null": "dashboard.filterOperators.isNull",
-      "Is Not Null": "dashboard.filterOperators.isNotNull",
-    };
-    const filterOperators = computed(() =>
-      ANOMALY_FILTER_OPERATORS.map((op) => {
-        const key = OPERATOR_LABEL_KEYS[op as string];
-        // SQL/PromQL tokens (=, IN, str_match, …) are syntax, not copy.
-        return { label: key ? t(key as any) : raw(op as string), value: op as string };
-      }),
-    );
     const detectionFunctions = ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
     // One s/m/h/d grammar shared with the server's parse_interval (§4.5) — "90s" and "1d" must render.
     const intervalUnits = computed(() => [
@@ -1131,6 +1060,7 @@ export default defineComponent({
     } = useSqlSuggestions();
     const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
+    const filterFields = ref<FilterField[]>([]);
     const filteredDetectionFields = ref<string[]>([]);
     const loadingFields = ref(false);
 
@@ -1166,6 +1096,7 @@ export default defineComponent({
         updateFieldKeywords([]);
         numericStreamFields.value = [];
         filteredStreamFields.value = [];
+        filterFields.value = [];
         filteredDetectionFields.value = [];
         return;
       }
@@ -1191,6 +1122,12 @@ export default defineComponent({
           .map((f: any) => f.name)
           .sort();
         filteredStreamFields.value = allStreamFields.value;
+        filterFields.value = toFilterFields(
+          fieldsArray.map((f: any) => ({
+            name: f.name,
+            type: f.field_type || f.data_type || f.type,
+          })),
+        ).sort((a, b) => a.name.localeCompare(b.name));
         filteredDetectionFields.value = requiresNumericField(detectionFunction.value as string)
           ? numericStreamFields.value
           : allStreamFields.value;
@@ -1199,6 +1136,7 @@ export default defineComponent({
         updateFieldKeywords([]);
         numericStreamFields.value = [];
         filteredStreamFields.value = [];
+        filterFields.value = [];
         filteredDetectionFields.value = [];
       } finally {
         loadingFields.value = false;
@@ -1271,14 +1209,13 @@ export default defineComponent({
       );
     });
 
-    // Structural mutations go through the form.
-    const addFilter = () => {
-      form.pushFieldValue("filters", makeAnomalyFilterRow());
+    const onFiltersChange = (next: unknown) => {
+      form.setFieldValue("filters", next as AnomalyFilterRow[]);
     };
 
-    const removeFilter = (idx: number) => {
-      form.removeFieldValue("filters", idx);
-    };
+    // No stream context means no value lookup; the picker then takes typed values only.
+    const loadFilterValues = (field: string, search: string) =>
+      resolveFieldValues(field, { prefix: search }).catch(() => [] as string[]);
 
     // The parent (AddAlert wizard via useAlertForm) still calls
     // anomalyStep2Ref.validate() to gate Next/Save — drive it through
@@ -1295,8 +1232,6 @@ export default defineComponent({
       store,
       form,
       queryTabOptions,
-      filterOperators,
-      operatorNeedsValue,
       detectionFunctions,
       intervalUnits,
       retrainIntervalOptions,
@@ -1308,8 +1243,9 @@ export default defineComponent({
       filteredDetectionFields,
       loadingFields,
       onDetectionFunctionChange,
-      addFilter,
-      removeFilter,
+      filterFields,
+      onFiltersChange,
+      loadFilterValues,
       validate,
       hasTimestampAlias,
       hasSqlError,

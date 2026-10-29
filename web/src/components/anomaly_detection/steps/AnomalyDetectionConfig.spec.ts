@@ -32,8 +32,6 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
@@ -141,12 +139,12 @@ const getForm = (w: VueWrapper): any => (w.vm as any).form;
 const fieldError = (w: VueWrapper, name: string): string | undefined =>
   firstFieldError(getForm(w).getFieldMeta(name)?.errors);
 
-// Rendered values of the filters[i].field selects, in render order.
-const renderedFilterFields = (w: VueWrapper): unknown[] =>
+// Field names on the filter chips, in render order.
+const renderedFilterFields = (w: VueWrapper): string[] =>
   w
-    .findAllComponents(OFormSelect)
-    .filter((c: any) => /^filters\[\d+\]\.field$/.test(c.props("name") || ""))
-    .map((c: any) => c.findComponent(OSelect).props("modelValue"));
+    .findAll('[data-test^="anomaly-filter-builder-chip-"]')
+    .map((c) => c.attributes("data-test")!.replace("anomaly-filter-builder-chip-", ""))
+    .filter((key) => !/-(field|operator|value|remove)$/.test(key));
 
 // The sensitivity tiers, in render order: Auto, then Conservative, Balanced, Aggressive (band width in σ).
 const SENSITIVITY_TIERS = ["auto", 4, 3, 2.5];
@@ -1053,53 +1051,46 @@ describe("AnomalyDetectionConfig", () => {
     });
   });
 
-  // =========================================================================
-  // filters[] field-array (Rule ① — indexed names + :key=index). The
-  // non-negotiable gate: delete a NON-last row and assert the RENDERED inputs
-  // (each OFormSelect→OSelect model-value), not just form.state.values.
-  // =========================================================================
-  describe("filters[] field-array — rendered inputs stay in sync on non-last delete", () => {
-    it("removing the MIDDLE of three filter rows leaves the rendered field selects correct", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "alpha", operator: "=", value: "1" },
-          { field: "beta", operator: "=", value: "2" },
-          { field: "gamma", operator: "=", value: "3" },
-        ],
-      });
-      await flushPromises();
-      await nextTick();
+  // Rows the user does not touch must be written back exactly as loaded.
+  describe("filters[] — shared filter builder", () => {
+    const saved = [
+      { field: "alpha", operator: "=", value: "1" },
+      { field: "beta", operator: "IN", value: "'a', 'b'" },
+      { field: "gamma", operator: "Is Not Null", value: "" },
+    ];
 
-      // sanity — all three rendered in order
+    it("draws one chip per saved row, in order", async () => {
+      wrapper = mountConfig({ filters: saved.map((f) => ({ ...f })) });
+      await flushPromises();
+      const builder = wrapper.findComponent({ name: "FilterBuilder" });
+      expect(builder.props("profile")).toBe("anomaly");
       expect(renderedFilterFields(wrapper)).toEqual(["alpha", "beta", "gamma"]);
+    });
 
-      (wrapper.vm as any).removeFilter(1); // delete "beta" (non-last)
-      await nextTick();
+    it("removing the middle chip keeps the other rows byte-identical in the form and the config", async () => {
+      const { wrapper: w, config } = mountReturning({ filters: saved.map((f) => ({ ...f })) });
+      wrapper = w;
       await flushPromises();
 
-      // form DATA is correct
-      expect(getForm(wrapper).state.values.filters.map((f: any) => f.field)).toEqual([
-        "alpha",
-        "gamma",
-      ]);
+      await wrapper.find('[data-test="anomaly-filter-builder-chip-beta-remove"]').trigger("click");
+      await flushPromises();
+      await nextTick();
 
-      // the RENDERED inputs must match — not shifted, not blank (:key=index)
+      expect(getForm(wrapper).state.values.filters).toEqual([saved[0], saved[2]]);
+      expect(config.filters).toEqual([saved[0], saved[2]]);
       expect(renderedFilterFields(wrapper)).toEqual(["alpha", "gamma"]);
     });
 
-    it("addFilter / removeFilter mutate the form array (single source of truth)", async () => {
+    it("writes a builder edit back in the flat row format", async () => {
       wrapper = mountConfig({ filters: [] });
       await flushPromises();
-      const form = getForm(wrapper);
-
-      (wrapper.vm as any).addFilter();
-      (wrapper.vm as any).addFilter();
+      wrapper
+        .findComponent({ name: "FilterBuilder" })
+        .vm.$emit("update:modelValue", [{ field: "level", operator: "<>", value: "debug" }]);
       await nextTick();
-      expect(form.state.values.filters.length).toBe(2);
-
-      (wrapper.vm as any).removeFilter(0);
-      await nextTick();
-      expect(form.state.values.filters.length).toBe(1);
+      expect(getForm(wrapper).state.values.filters).toEqual([
+        { field: "level", operator: "<>", value: "debug" },
+      ]);
     });
   });
 

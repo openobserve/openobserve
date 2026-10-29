@@ -112,6 +112,9 @@ const topRowMenu = (wrapper: VueWrapper, name: string) =>
     .find((row) => row.find("td").text().includes(name))!
     .find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
 
+// The label filter bar is the shared FilterBuilder; tests drive it through its model and value loader.
+const filterBuilder = (wrapper: VueWrapper) => wrapper.findComponent({ name: "FilterBuilder" });
+
 const settle = async () => {
   await flushPromises();
   await new Promise((resolve) => setTimeout(resolve, 60));
@@ -440,23 +443,22 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-    await flushPromises();
-    await nextTick();
-
+    const builder = filterBuilder(wrapper);
+    expect(builder.props("profile")).toBe("profiles");
+    const values = await builder.props("loadValues")("k8s_pod_name", "");
     expect(mocks.tagValues).toHaveBeenCalledWith(
       orgIdentifier,
       "profiles-a",
       expect.objectContaining({ tag: "k8s_pod_name" }),
     );
+    expect(Array.isArray(values)).toBe(true);
 
-    await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue("pod-a");
-    await flushPromises();
-    await nextTick();
+    builder.vm.$emit("update:modelValue", [{ key: "k8s_pod_name", op: "=", value: "pod-a" }]);
+    await settle();
 
-    expect(wrapper.find('[data-test="profiles-filter-chip-k8s_pod_name"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="profiles-filter-builder-chip-k8s_pod_name"]').exists()).toBe(
+      true,
+    );
     const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
     expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-a" }]);
   });
@@ -466,51 +468,44 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    for (const value of ["pod-a", "pod-b"]) {
-      await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-      await nextTick();
-      await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-      await flushPromises();
-      await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue(value);
-      await flushPromises();
-      await nextTick();
-    }
+    filterBuilder(wrapper).vm.$emit("update:modelValue", [
+      { key: "k8s_pod_name", op: "=", value: "pod-a" },
+      { key: "service", op: "=", value: "api" },
+      { key: "k8s_pod_name", op: "=", value: "pod-b" },
+    ]);
+    await settle();
 
-    expect(wrapper.findAll('[data-test="profiles-filter-chip-k8s_pod_name"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-test="profiles-filter-builder-chip-k8s_pod_name"]')).toHaveLength(
+      1,
+    );
     const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
-    expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-b" }]);
+    expect(lastSeriesPayload.filters).toEqual([
+      { key: "k8s_pod_name", op: "=", value: "pod-b" },
+      { key: "service", op: "=", value: "api" },
+    ]);
   });
 
-  it("edits a filter chip in place, without narrowing its own value list", async () => {
+  it("does not narrow a label's value list by its own filter", async () => {
     mocks.merge.mockResolvedValue(mergeResponse);
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-    await flushPromises();
-    await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue("pod-a");
-    await flushPromises();
-    await nextTick();
+    filterBuilder(wrapper).vm.$emit("update:modelValue", [
+      { key: "k8s_pod_name", op: "=", value: "pod-a" },
+      { key: "service", op: "=", value: "api" },
+    ]);
+    await settle();
     mocks.tagValues.mockClear();
 
-    await wrapper.find('[data-test="profiles-filter-edit-k8s_pod_name"]').trigger("click");
-    await flushPromises();
-    await nextTick();
-
+    await filterBuilder(wrapper).props("loadValues")("k8s_pod_name", "");
     expect(mocks.tagValues).toHaveBeenCalledWith(
       orgIdentifier,
       "profiles-a",
-      expect.objectContaining({ tag: "k8s_pod_name", filters: [] }),
+      expect.objectContaining({
+        tag: "k8s_pod_name",
+        filters: [{ key: "service", op: "=", value: "api" }],
+      }),
     );
-
-    await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue("pod-b");
-    await flushPromises();
-    await nextTick();
-
-    const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
-    expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-b" }]);
   });
 
   it("steps the bytes axis on round binary values with the shared short labels", async () => {
@@ -599,7 +594,9 @@ describe("Profiles page", () => {
     await wrapper.find('[data-test="profiles-breakdown-chip-0"]').trigger("click");
     await flushPromises();
 
-    expect(wrapper.find('[data-test="profiles-filter-chip-k8s_pod_name"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="profiles-filter-builder-chip-k8s_pod_name"]').exists()).toBe(
+      true,
+    );
     expect(mocks.merge).toHaveBeenCalledWith(
       orgIdentifier,
       "profiles-a",
@@ -1335,7 +1332,7 @@ describe("Profiles page", () => {
     });
   });
 
-  it("reloads tag values when the service or profile type changes", async () => {
+  it("asks for tag values under the current service and profile type", async () => {
     mocks.meta.mockResolvedValue({
       data: {
         ...profileMetaResponse.data,
@@ -1349,32 +1346,17 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-    await flushPromises();
-    await nextTick();
-    mocks.tagValues.mockClear();
-
     await wrapper.find('[data-test="profiles-service-select"] select').setValue("service-b");
-    await flushPromises();
-    await nextTick();
-
-    expect(mocks.tagValues).toHaveBeenCalledWith(
-      orgIdentifier,
-      "profiles-a",
-      expect.objectContaining({ service_name: "service-b", tag: "k8s_pod_name" }),
-    );
-
-    mocks.tagValues.mockClear();
     await wrapper.find('[data-test="profiles-type-select"] select').setValue("heap\u0000bytes");
-    await flushPromises();
-    await nextTick();
+    await settle();
+    mocks.tagValues.mockClear();
 
+    await filterBuilder(wrapper).props("loadValues")("k8s_pod_name", "");
     expect(mocks.tagValues).toHaveBeenCalledWith(
       orgIdentifier,
       "profiles-a",
       expect.objectContaining({
+        service_name: "service-b",
         profile_type: "heap",
         profile_unit: "bytes",
         tag: "k8s_pod_name",
@@ -1388,9 +1370,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
+    expect(await filterBuilder(wrapper).props("loadValues")("k8s_pod_name", "")).toEqual([]);
     await flushPromises();
 
     expect(wrapper.find('[data-test="profiles-error-banner"]').exists()).toBe(false);
@@ -1398,7 +1378,7 @@ describe("Profiles page", () => {
     expect(wrapper.find('[data-test="profiles-top-table"]').exists()).toBe(true);
   });
 
-  it("drops tag values that arrive after the draft tag is cleared", async () => {
+  it("drops tag values that arrive after the stream changes", async () => {
     let resolveTag:
       ((value: { data: { tag: string; values: string[]; took: number } }) => void) | undefined;
     mocks.tagValues.mockImplementation(
@@ -1411,20 +1391,13 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-    await nextTick();
-
+    const pending = filterBuilder(wrapper).props("loadValues")("k8s_pod_name", "");
     await wrapper.find('[data-test="profiles-stream-select"] select').setValue("profiles-b");
     await flushPromises();
     await nextTick();
 
     resolveTag?.({ data: { tag: "k8s_pod_name", values: ["stale-pod"], took: 1 } });
-    await flushPromises();
-    await nextTick();
-
-    expect(wrapper.text()).not.toContain("stale-pod");
+    expect(await pending).toEqual([]);
   });
 
   it("opens the top table sorted by Self, and sorts by Total on a header click", async () => {
@@ -1619,8 +1592,12 @@ describe("Profiles page", () => {
         }),
         expect.objectContaining({ signal: expect.anything() }),
       );
-      expect(wrapper.find('[data-test="profiles-filter-chip-trace_id"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="profiles-filter-chip-span_id"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-filter-builder-chip-trace_id"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="profiles-filter-builder-chip-span_id"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="profiles-view-flame"]').attributes("data-state")).toBe("on");
     });
 
@@ -1687,7 +1664,9 @@ describe("Profiles page", () => {
       expect(mocks.meta).toHaveBeenCalledTimes(1);
       expect(mocks.series).toHaveBeenCalledTimes(1);
       expect(mocks.merge).toHaveBeenCalledTimes(1);
-      expect(wrapper.find('[data-test="profiles-filter-chip-trace_id"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-filter-builder-chip-trace_id"]').exists()).toBe(
+        true,
+      );
     });
 
     it("re-seeds when the route query changes", async () => {
@@ -1799,7 +1778,7 @@ describe("Profiles page", () => {
         start_time: (mocks.nowMs - 15 * 60 * 1000) * 1000,
         end_time: mocks.nowMs * 1000,
       });
-      expect(wrapper.find('[data-test^="profiles-filter-chip-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test^="profiles-filter-builder-chip-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="profiles-view-top"]').attributes("data-state")).toBe("on");
     });
   });

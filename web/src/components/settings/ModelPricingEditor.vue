@@ -266,59 +266,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Tier Body -->
                 <div class="tier-body flex flex-col gap-3 p-3 px-4">
-                  <!-- Condition row (non-default tiers only) -->
                   <div
-                    v-if="idx > 0 && tier.condition"
+                    v-if="idx > 0"
                     class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
+                    :data-test="`model-pricing-tier-filter-${idx}`"
                   >
-                    <div class="mb-2 flex items-center justify-between gap-2">
-                      <OText variant="section">
-                        {{ t("modelPricing.applyTierWhen") }}
-                      </OText>
-                      <OButton
-                        variant="ghost"
-                        size="icon-xs-sq"
-                        type="button"
-                        :data-test="`model-pricing-tier-condition-remove-btn-${idx}`"
-                        @click="removeCondition(idx)"
-                      >
-                        <OIcon name="close" size="xs" />
-                        <OTooltip
-                          :side-offset="4"
-                          :content="t('modelPricing.removeUsageCondition')"
-                        />
-                      </OButton>
+                    <OText variant="section">
+                      {{ t("modelPricing.applyTierWhen") }}
+                    </OText>
+                    <div class="text-2xs mt-px mb-2 opacity-55">
+                      {{ t("modelPricing.attributeRulesDesc") }}
                     </div>
-                    <div class="flex flex-nowrap items-end gap-2">
-                      <div class="min-w-32.5 flex-1">
-                        <OFormInput
-                          :name="`tiers[${idx}].condition.usage_key`"
-                          :label="t('modelPricing.usageKeyCol')"
-                          :placeholder="
-                            t('modelPricing.usageKeyPlaceholder', {
-                              example: raw('input'),
-                            })
-                          "
-                          :data-test="`model-pricing-tier-condition-key-input-${idx}`"
-                        />
-                      </div>
-                      <div class="w-22.5 shrink-0">
-                        <OFormSelect
-                          :name="`tiers[${idx}].condition.operator`"
-                          :options="operators"
-                          label-key="label"
-                          value-key="value"
-                          :data-test="`model-pricing-tier-condition-operator-select-${idx}`"
-                        />
-                      </div>
-                      <div class="w-35 shrink-0">
-                        <OFormInput
-                          :name="`tiers[${idx}].condition.value`"
-                          :label="t('modelPricing.threshold')"
-                          type="number"
-                          :data-test="`model-pricing-tier-condition-value-input-${idx}`"
-                        />
-                      </div>
+                    <FilterBuilder
+                      profile="model-pricing"
+                      :model-value="tierFilter(tier)"
+                      :fields="tierFilterFields(tier)"
+                      :data-test="`model-pricing-tier-filter-builder-${idx}`"
+                      @update:model-value="(next) => setTierFilter(idx, next)"
+                    />
+                    <div
+                      v-if="tierFilterErrors(idx).length"
+                      class="text-input-error-text mt-1 flex flex-col text-xs"
+                      role="alert"
+                      :data-test="`model-pricing-tier-filter-errors-${idx}`"
+                    >
+                      <span v-for="message in tierFilterErrors(idx)" :key="message">{{
+                        message
+                      }}</span>
                     </div>
                   </div>
 
@@ -395,93 +369,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
-                  <div
-                    v-if="idx > 0 && tierRules(tier).length"
-                    class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
-                    :data-test="`model-pricing-tier-rules-${idx}`"
-                  >
-                    <OText variant="section">
-                      {{ t("modelPricing.attributeRules") }}
-                    </OText>
-                    <div class="text-2xs mt-px mb-2 opacity-55">
-                      {{ t("modelPricing.attributeRulesDesc") }}
-                    </div>
-                    <!-- Index keys: form fields bind to their name once, see the price-row note below. -->
-                    <div
-                      v-for="(rule, ruleIdx) in tierRules(tier)"
-                      :key="ruleIdx"
-                      class="flex flex-nowrap items-end gap-2 py-0.5"
-                    >
-                      <div class="min-w-50 flex-1">
-                        <OFormInput
-                          :name="`tiers[${idx}].rules[${ruleIdx}].keys`"
-                          :label="t('modelPricing.ruleKeys')"
-                          :placeholder="
-                            t('modelPricing.ruleKeysPlaceholder', {
-                              example: raw(
-                                'openai.response.service_tier, openai.request.service_tier',
-                              ),
-                            })
-                          "
-                          :data-test="`model-pricing-tier-rule-keys-input-${idx}-${ruleIdx}`"
-                        />
-                      </div>
-                      <div class="w-30 shrink-0">
-                        <OFormSelect
-                          :name="`tiers[${idx}].rules[${ruleIdx}].op`"
-                          :options="ruleOperatorOptions(rule.op)"
-                          :label="t('modelPricing.ruleOperator')"
-                          label-key="label"
-                          value-key="value"
-                          :searchable="false"
-                          :data-test="`model-pricing-tier-rule-op-select-${idx}-${ruleIdx}`"
-                        />
-                      </div>
-                      <div v-if="SET_RULE_OPS.includes(rule.op)" class="w-45 shrink-0">
-                        <OFormInput
-                          :name="`tiers[${idx}].rules[${ruleIdx}].values`"
-                          :label="t('modelPricing.ruleValues')"
-                          :placeholder="
-                            t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })
-                          "
-                          :data-test="`model-pricing-tier-rule-values-input-${idx}-${ruleIdx}`"
-                        />
-                      </div>
-                      <div v-else-if="NUMERIC_RULE_OPS.includes(rule.op)" class="w-35 shrink-0">
-                        <OFormInput
-                          :name="`tiers[${idx}].rules[${ruleIdx}].value`"
-                          :label="t('modelPricing.threshold')"
-                          type="number"
-                          :data-test="`model-pricing-tier-rule-value-input-${idx}-${ruleIdx}`"
-                        />
-                      </div>
-                      <div class="flex h-8.5 items-center">
-                        <OButton
-                          variant="outline-destructive"
-                          size="icon"
-                          type="button"
-                          :data-test="`model-pricing-tier-rule-remove-btn-${idx}-${ruleIdx}`"
-                          @click="removeRule(idx, ruleIdx)"
-                        >
-                          <OIcon name="delete" size="sm" />
-                          <OTooltip :side-offset="4" :content="t('modelPricing.removeRule')" />
-                        </OButton>
-                      </div>
-                    </div>
-                  </div>
-
                   <!-- Add a restriction to a non-default tier -->
                   <div v-if="idx > 0" class="flex flex-wrap items-center gap-2">
-                    <OButton
-                      v-if="!tier.condition"
-                      variant="outline"
-                      size="sm-action"
-                      type="button"
-                      :data-test="`model-pricing-tier-add-condition-btn-${idx}`"
-                      @click="addCondition(idx)"
-                    >
-                      {{ t("modelPricing.addUsageCondition") }}
-                    </OButton>
                     <OButton
                       variant="outline"
                       size="sm-action"
@@ -490,16 +379,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="addWindow(idx)"
                     >
                       {{ t("modelPricing.addTimeWindow") }}
-                    </OButton>
-                    <OButton
-                      variant="outline"
-                      size="sm-action"
-                      type="button"
-                      :disabled="tierRules(tier).length >= MAX_RULES_PER_TIER"
-                      :data-test="`model-pricing-tier-add-rule-btn-${idx}`"
-                      @click="addRule(idx)"
-                    >
-                      {{ t("modelPricing.addRule") }}
                     </OButton>
                     <div class="ms-auto flex shrink-0 items-end gap-1">
                       <div class="w-30">
@@ -802,8 +681,16 @@ import { useMutation } from "@tanstack/vue-query";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import {
+  TIER_RULE_OPERATORS,
+  TIER_USAGE_OPERATORS,
+  TIER_USAGE_PAYLOAD,
+  type ModelPricingFilter,
+} from "@/components/filterBar/codecs";
+import type { FilterField } from "@/utils/query/filterBar";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import UtcHoursBar, { type UtcHoursWindow } from "@/components/settings/UtcHoursBar.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
@@ -821,7 +708,6 @@ import {
   findUnreachableTiers,
   KNOWN_RULE_OPS,
   makeModelPricingSchema,
-  MAX_RULES_PER_TIER,
   MAX_TIERS,
   NUMERIC_RULE_OPS,
   splitList,
@@ -1110,9 +996,15 @@ function ruleToForm(rule: any): ModelPricingTierRule {
     keys: (rule?.keys ?? []).join(", "),
     op,
     values: (rule?.values ?? []).join(", "),
-    // An operator this build does not know keeps its threshold verbatim until the user picks one.
-    value: KNOWN_RULE_OPS.includes(op) ? Number(rule?.value ?? 0) || 0 : (rule?.value ?? ""),
+    value: ruleValueToForm(op, rule?.value),
   };
+}
+
+// An unknown operator keeps its threshold verbatim; a threshold rule still being written stays blank, not 0.
+function ruleValueToForm(op: string, value: unknown): number | string {
+  const blank = value === undefined || value === null || value === "";
+  if (blank && NUMERIC_RULE_OPS.includes(op)) return "";
+  return KNOWN_RULE_OPS.includes(op) ? Number(value ?? 0) || 0 : ((value as number | string) ?? "");
 }
 
 /** Form rule → API rule; only the fields the operator reads are sent. */
@@ -1125,19 +1017,66 @@ function ruleToModel(rule: any) {
   const values = splitList(rule?.values);
   const value = String(rule?.value ?? "").trim();
   if (SET_RULE_OPS.includes(op)) out.values = values;
-  else if (NUMERIC_RULE_OPS.includes(op)) out.value = Number(rule?.value);
-  else if (!KNOWN_RULE_OPS.includes(op)) {
+  else if (NUMERIC_RULE_OPS.includes(op)) {
+    if (value !== "") out.value = Number(value);
+  } else if (!KNOWN_RULE_OPS.includes(op)) {
     if (values.length) out.values = values;
     if (value !== "" && Number.isFinite(Number(value))) out.value = Number(value);
   }
   return out;
 }
 
-/** The operator list, plus a loaded operator this build does not know so the select still shows it. */
-function ruleOperatorOptions(op: string) {
-  return !op || KNOWN_RULE_OPS.includes(op)
-    ? ruleOperators
-    : [...ruleOperators, { label: raw(op), value: op }];
+/** A tier's usage condition and rules in the API shape the filter builder edits. */
+function tierFilter(tier: any): ModelPricingFilter {
+  return { condition: tier?.condition ?? null, rules: tierRules(tier).map(ruleToModel) };
+}
+
+function setTierFilter(idx: number, next: unknown) {
+  const filter = next as ModelPricingFilter;
+  patchTier(idx, (tier) => ({
+    ...tier,
+    condition: filter.condition ?? null,
+    rules: (filter.rules ?? []).map(ruleToForm),
+  }));
+}
+
+// Usage keys come from the tier's prices; attribute keys are typed, the OpenAI pair being the common one.
+function tierFilterFields(tier: any): FilterField[] {
+  const keys = [
+    ...new Set(
+      [
+        ...(tier?.prices ?? []).map((row: any) => String(row?.key ?? "").trim()),
+        String(tier?.condition?.usage_key ?? "").trim(),
+        "input",
+        "output",
+      ].filter(Boolean),
+    ),
+  ];
+  return [
+    ...keys.map((name): FilterField => ({
+      name,
+      type: "number",
+      payload: TIER_USAGE_PAYLOAD,
+      operators: TIER_USAGE_OPERATORS,
+    })),
+    ...keys.map((key): FilterField => ({
+      name: `usage.${key}`,
+      type: "number",
+      operators: TIER_RULE_OPERATORS,
+    })),
+    { name: "openai.response.service_tier, openai.request.service_tier", type: "string" },
+  ];
+}
+
+// The schema checks the condition and rules by path; with no input per path, the errors are listed under the builder.
+const fieldMeta = form.useStore((s: any) => s.fieldMeta ?? {});
+function tierFilterErrors(idx: number): string[] {
+  const prefixes = [`tiers[${idx}].condition`, `tiers[${idx}].rules`];
+  const messages = Object.entries(fieldMeta.value as Record<string, any>)
+    .filter(([path]) => prefixes.some((prefix) => path.startsWith(prefix)))
+    .map(([, meta]) => firstFieldError(meta?.errors))
+    .filter((message): message is string => Boolean(message));
+  return [...new Set(messages)];
 }
 
 /** True when the tier has no restriction at all, i.e. the backend treats it as the default. */
@@ -1241,26 +1180,6 @@ const usageTemplates = [
   },
 ];
 
-const ruleOperators = [
-  { label: t("modelPricing.ruleOpIn"), value: "in" },
-  { label: t("modelPricing.ruleOpNotIn"), value: "not_in" },
-  { label: t("modelPricing.ruleOpExists"), value: "exists" },
-  { label: t("modelPricing.ruleOpNotExists"), value: "not_exists" },
-  { label: raw(">"), value: "gt" },
-  { label: raw(">="), value: "gte" },
-  { label: raw("<"), value: "lt" },
-  { label: raw("<="), value: "lte" },
-];
-
-const operators = [
-  { label: raw(">"), value: "gt" },
-  { label: raw(">="), value: "gte" },
-  { label: raw("<"), value: "lt" },
-  { label: raw("<="), value: "lte" },
-  { label: raw("="), value: "eq" },
-  { label: raw("!="), value: "neq" },
-];
-
 // ── Field-array operations (whole-array setFieldValue; `formTiers`
 //    (form.useStore) re-syncs reactively + re-renders) ──────────────────────
 function addTier() {
@@ -1285,17 +1204,6 @@ function patchTier(idx: number, patch: (_tier: any) => any) {
   setTiers(formTiers.value.map((tier: any, i: number) => (i === idx ? patch(tier) : tier)));
 }
 
-function addCondition(idx: number) {
-  patchTier(idx, (tier) => ({
-    ...tier,
-    condition: { usage_key: "input", operator: "gt", value: 200000 },
-  }));
-}
-
-function removeCondition(idx: number) {
-  patchTier(idx, (tier) => ({ ...tier, condition: null }));
-}
-
 // Seeded with DeepSeek's first peak window (01:00-04:00 UTC) — the common case
 // this exists for, and a concrete example of the HH:MM format.
 function addWindow(idx: number) {
@@ -1309,29 +1217,6 @@ function removeWindow(tierIdx: number, winIdx: number) {
   patchTier(tierIdx, (tier) => ({
     ...tier,
     utc_windows: (tier.utc_windows ?? []).filter((_: any, j: number) => j !== winIdx),
-  }));
-}
-
-// Seeded with OpenAI Flex so the "response key first, request key as fallback" order is visible.
-function addRule(idx: number) {
-  patchTier(idx, (tier) => ({
-    ...tier,
-    rules: [
-      ...(tier.rules ?? []),
-      {
-        keys: "openai.response.service_tier, openai.request.service_tier",
-        op: "in",
-        values: "flex",
-        value: 0,
-      },
-    ],
-  }));
-}
-
-function removeRule(tierIdx: number, ruleIdx: number) {
-  patchTier(tierIdx, (tier) => ({
-    ...tier,
-    rules: (tier.rules ?? []).filter((_: any, j: number) => j !== ruleIdx),
   }));
 }
 
