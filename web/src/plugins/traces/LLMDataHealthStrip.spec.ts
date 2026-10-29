@@ -126,3 +126,27 @@ describe("LLMDataHealthStrip unpriced models detail", () => {
     );
   });
 });
+
+describe("LLMDataHealthStrip summary row", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => wrapper?.unmount());
+
+  it("gives only failing checks a chip and folds passing ones into one link", () => {
+    wrapper = mountStrip(
+      [{ model: "acme", spans: 12, tokens: 1000 }],
+      {},
+      {
+        extraChecks: [
+          { id: "zero_duration_spans", status: "pass", affected: 0, total: 40 },
+          { id: "missing_session_id", status: "pass", affected: 0, total: 40 },
+        ],
+      },
+    );
+    expect(wrapper.find('[data-test="llm-data-health-chip-unpriced_models"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="llm-data-health-chip-zero_duration_spans"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="llm-data-health-passing"]').text()).toBe("2 passing");
+  });
+});
