@@ -67,7 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-name="{ row }">
         <div class="flex min-w-0 flex-col">
-          <span class="truncate font-medium">{{ row.name }}</span>
+          <span class="flex min-w-0 items-center gap-2">
+            <span class="truncate font-medium">{{ row.name }}</span>
+            <EditorDraftDot
+              v-if="configDrafts.ids.has(row.id)"
+              :saved-at="configDrafts.savedAt(row.id)"
+              :data-test="`fleet-configurations-${row.id}-draft-dot`"
+            />
+          </span>
           <span class="text-text-secondary truncate text-xs">{{ row.description }}</span>
         </div>
       </template>
@@ -147,6 +154,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useRoute, useRouter } from "vue-router";
 import { isForbidden, setPendingImport, useFleetConfigs, type ConfigRow } from "./useFleetApi";
 
@@ -158,6 +167,7 @@ const route = useRoute();
 const router = useRouter();
 
 const list = useFleetConfigs();
+const configDrafts = useEditorDraftIds("fleet_config");
 const loading = list.loading;
 const forbidden = computed(() => isForbidden(list.error.value));
 // A failed refetch keeps the stale rows on screen.

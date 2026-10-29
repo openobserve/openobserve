@@ -57,8 +57,6 @@ pub mod destinations;
 pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
-pub mod grouping;
-#[cfg(feature = "enterprise")]
 pub mod incidents;
 pub mod lifecycle;
 #[cfg(feature = "enterprise")]

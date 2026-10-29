@@ -42,40 +42,27 @@ import type {
   VerificationRefusalBody,
 } from "@/ts/interfaces/oncall";
 import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import {
+  MICROS_PER_DAY,
+  MICROS_PER_HOUR,
+  MICROS_PER_MINUTE,
+  MICROS_PER_WEEK,
+} from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 
-/**
- * Who holds `rule` at `atMicros`.
- *
- * Mirrors `ShiftRule::member_at`: floor division so instants before the anchor
- * resolve backwards instead of collapsing onto shift 0, and an exclusive upper
- * bound so the handover instant belongs to the incoming person. Returning
- * `null` for an unusable rule is deliberate — an unstaffed level has to read as
- * a coverage gap, never as a silently chosen fallback.
- *
- * Takes a **shift rule**, not a rotation: the roster and the cadence moved down
- * a level when rotations became named objects, and a rotation with several
- * rules has no single roster to ask about.
- */
-export function memberAt(rule: ShiftRule, atMicros: number): string | null {
-  const { members, shift_micros: shift, anchor_micros: anchor } = rule;
-  if (!members?.length || !shift || shift <= 0) return null;
-  const index = Math.floor((atMicros - anchor) / shift);
-  // JS `%` keeps the sign of the dividend, so a pre-anchor index needs the
-  // extra wrap; without it, index -1 of a 3-person rotation yields -1.
-  const wrapped = ((index % members.length) + members.length) % members.length;
-  return members[wrapped] ?? null;
+/** Who holds `rule` at `atMicros`, counted in the team's `timezone` like `ShiftRule::member_at`; `null` if unusable. */
+export function memberAt(rule: ShiftRule, atMicros: number, timezone: string): string | null {
+  if (!isCountable(rule)) return null;
+  return memberOfShift(rule, localShiftIndex(rule, atMicros, timezone));
 }
 
-/** Instant the shift containing `atMicros` ends, i.e. the next handover. */
-export function nextHandover(rule: ShiftRule, atMicros: number): number | null {
-  const { shift_micros: shift, anchor_micros: anchor } = rule;
-  if (!rule.members?.length || !shift || shift <= 0) return null;
-  return anchor + (Math.floor((atMicros - anchor) / shift) + 1) * shift;
+/** Instant the shift containing `atMicros` ends, i.e. the next handover; mirrors `ShiftRule::next_handover`. */
+export function nextHandover(rule: ShiftRule, atMicros: number, timezone: string): number | null {
+  if (!isCountable(rule)) return null;
+  return shiftBoundary(rule, localShiftIndex(rule, atMicros, timezone) + 1, timezone);
 }
 
 /** One person's turn: when it starts, when it ends, and whose it is. */
@@ -95,22 +82,21 @@ export interface Shift {
  * this exists to render the answer rather than the configuration. Pure, so the
  * boundary arithmetic is testable without mounting anything.
  */
-export function upcomingShifts(rule: ShiftRule, fromMicros: number, count: number): Shift[] {
-  const { shift_micros: shift, anchor_micros: anchor, members } = rule;
-  if (!members?.length || !shift || shift <= 0 || count <= 0) return [];
-
-  const firstIndex = Math.floor((fromMicros - anchor) / shift);
+export function upcomingShifts(
+  rule: ShiftRule,
+  fromMicros: number,
+  count: number,
+  timezone: string,
+): Shift[] {
+  if (!isCountable(rule) || count <= 0) return [];
+  const firstIndex = localShiftIndex(rule, fromMicros, timezone);
   const shifts: Shift[] = [];
   for (let i = 0; i < count; i++) {
     const index = firstIndex + i;
-    const startMicros = anchor + index * shift;
-    const wrapped = ((index % members.length) + members.length) % members.length;
-    shifts.push({
-      startMicros,
-      endMicros: startMicros + shift,
-      member: members[wrapped],
-      rule: rule.name,
-    });
+    const startMicros = shiftBoundary(rule, index, timezone);
+    const endMicros = shiftBoundary(rule, index + 1, timezone);
+    if (startMicros === null || endMicros === null) break;
+    shifts.push({ startMicros, endMicros, member: memberOfShift(rule, index), rule: rule.name });
   }
   return shifts;
 }
@@ -129,59 +115,6 @@ export function rotationMembers(rotation: Rotation): string[] {
     }
   }
   return out;
-}
-
-/** Shift presets offered in the schedule editor, in micros. */
-/** One band on the calendar: a person covering a span of the window. */
-export interface CalendarBand {
-  /** Empty means nobody is on call for this span. */
-  user_email: string;
-  startMicros: number;
-  endMicros: number;
-  /** Share of the visible window, 0-1, for positioning. */
-  offset: number;
-  width: number;
-}
-
-/**
- * Shifts of one shift rule, clipped to a visible window.
- *
- * Clipped rather than whole so a band never runs past the edge of the chart:
- * a week view of a fortnightly rotation would otherwise draw one band four
- * times too wide and push everything else off screen.
- */
-export function shiftBands(
-  rule: ShiftRule,
-  windowStart: number,
-  windowEnd: number,
-): CalendarBand[] {
-  const { shift_micros: shift, anchor_micros: anchor, members } = rule;
-  const span = windowEnd - windowStart;
-  if (!members?.length || !shift || shift <= 0 || span <= 0) return [];
-
-  const bands: CalendarBand[] = [];
-  const firstIndex = Math.floor((windowStart - anchor) / shift);
-  // Bounded: a one-minute shift over a month view would otherwise produce
-  // tens of thousands of unreadable slivers and lock the page.
-  const maxBands = 500;
-
-  for (let i = 0; i < maxBands; i++) {
-    const start = anchor + (firstIndex + i) * shift;
-    if (start >= windowEnd) break;
-    const end = start + shift;
-    if (end <= windowStart) continue;
-
-    const clippedStart = Math.max(start, windowStart);
-    const clippedEnd = Math.min(end, windowEnd);
-    bands.push({
-      user_email: memberAt(rule, start) ?? "",
-      startMicros: clippedStart,
-      endMicros: clippedEnd,
-      offset: (clippedStart - windowStart) / span,
-      width: (clippedEnd - clippedStart) / span,
-    });
-  }
-  return bands;
 }
 
 /**
@@ -886,7 +819,7 @@ export function resolveHolder(
 ): { member: string | null; rule: ShiftRule | null } {
   const rule = winningRule(rotation, atMicros, timezone);
   if (!rule) return { member: null, rule: null };
-  return { member: memberAt(rule, atMicros), rule };
+  return { member: memberAt(rule, atMicros, timezone), rule };
 }
 
 /**
@@ -933,11 +866,8 @@ export function resolveNextHolder(
   timezone: string,
 ): string | null {
   const rule = winningRule(rotation, atMicros, timezone);
-  if (!rule || rule.members.length < 2) return null;
-  const { members, shift_micros: shift, anchor_micros: anchor } = rule;
-  const index = Math.floor((atMicros - anchor) / shift) + 1;
-  const wrapped = ((index % members.length) + members.length) % members.length;
-  return members[wrapped] ?? null;
+  if (!rule || rule.members.length < 2 || !isCountable(rule)) return null;
+  return memberOfShift(rule, localShiftIndex(rule, atMicros, timezone) + 1);
 }
 
 /** Which overlapping rules a rule beats, and which beat it, by index. */
@@ -981,6 +911,95 @@ export function rotateMembersTo(members: string[], person: string, index: number
 export function turnLine(members: string[], holder: string | null): string[] {
   const at = holder ? members.indexOf(holder) : -1;
   return at < 0 ? [...members] : [...members.slice(at), ...members.slice(0, at)];
+}
+
+/** How far the local estimate may be walked to the real boundary; `MAX_BOUNDARY_CORRECTIONS` in Rust. */
+const MAX_BOUNDARY_CORRECTIONS = 4;
+
+/** How far past a DST gap a handover is looked for; `MAX_GAP_MINUTES` in Rust. */
+const MAX_GAP_MINUTES = 180;
+
+/** Every instant at which `timezone`'s wall clock reads `local`: none in a gap, two in a fold. [pure] */
+function instantsAtLocal(local: number, timezone: string): number[] {
+  // One transition at most within a day either side, so the offsets on both sides are all there are.
+  const offsets = new Set([
+    offsetMicrosAt(local - 26 * MICROS_PER_HOUR, timezone),
+    offsetMicrosAt(local + 26 * MICROS_PER_HOUR, timezone),
+  ]);
+  return [...offsets]
+    .map((offset) => local - offset)
+    .filter((at) => at + offsetMicrosAt(at, timezone) === local)
+    .sort((a, b) => a - b);
+}
+
+/** The instant the wall clock reads `local`: the first of a fold, the end of a gap; mirrors `from_local_micros`. [pure] */
+function fromLocalMicros(local: number, timezone: string): number | null {
+  for (let minutes = 0; minutes <= MAX_GAP_MINUTES; minutes++) {
+    const first = instantsAtLocal(local + minutes * MICROS_PER_MINUTE, timezone)[0];
+    if (first !== undefined) return first;
+  }
+  return null;
+}
+
+/** When shift `index` of `rule` begins, a wall-clock time in `timezone`; mirrors `ShiftRule::boundary`. [pure] */
+export function shiftBoundary(rule: ShiftRule, index: number, timezone: string): number | null {
+  const localAnchor = rule.anchor_micros + offsetMicrosAt(rule.anchor_micros, timezone);
+  return fromLocalMicros(localAnchor + index * rule.shift_micros, timezone);
+}
+
+/** Whether `rule` has people and a positive turn length, so its shifts can be counted. [pure] */
+function isCountable(rule: ShiftRule): boolean {
+  return !!rule.members?.length && !!rule.shift_micros && rule.shift_micros > 0;
+}
+
+/** Who holds shift `index`; JS `%` keeps the dividend's sign, so a pre-anchor index wraps twice. [pure] */
+function memberOfShift(rule: ShiftRule, index: number): string {
+  const len = rule.members.length;
+  return rule.members[((index % len) + len) % len];
+}
+
+/** The shift `atMicros` falls in, counted in `timezone`'s wall time; mirrors `ShiftRule::shift_index`. [pure] */
+function localShiftIndex(rule: ShiftRule, atMicros: number, timezone: string): number {
+  const local = (micros: number) => micros + offsetMicrosAt(micros, timezone);
+  const boundary = (index: number) => shiftBoundary(rule, index, timezone);
+  let index = Math.floor((local(atMicros) - local(rule.anchor_micros)) / rule.shift_micros);
+  // Local counts are one out across a transition, so settle against boundary instants.
+  for (let step = 0; step < MAX_BOUNDARY_CORRECTIONS; step++) {
+    const start = boundary(index);
+    if (start !== null && start > atMicros) {
+      index -= 1;
+      continue;
+    }
+    const next = boundary(index + 1);
+    if (next !== null && next <= atMicros) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  return index;
+}
+
+/** `rule`'s roster as `members`, keeping its holder at `nowMicros` and its handovers; mirrors `ShiftRule::with_roster`. [pure] */
+export function withRoster(
+  rule: ShiftRule,
+  members: string[],
+  nowMicros: number,
+  timezone: string,
+): string[] {
+  const key = (m: string) => m.trim().toLowerCase();
+  const wanted = new Set(members.map(key));
+  const len = rule.members.length;
+  const index = len && rule.shift_micros > 0 ? localShiftIndex(rule, nowMicros, timezone) : null;
+  const holder = index === null ? null : rule.members[((index % len) + len) % len];
+  const order = turnLine(rule.members, holder).filter((m) => wanted.has(key(m)));
+  const kept = new Set(order.map(key));
+  order.push(...members.filter((m) => !kept.has(key(m))));
+  // An unresolvable rule has no holder to keep, so the roster is taken as given.
+  if (index === null || !order.length) return order;
+  const start = ((index % order.length) + order.length) % order.length;
+  // Rotated so the anchor's turn arithmetic lands `order[0]` on the shift holding `nowMicros`.
+  return order.map((_, i) => order[(i - start + order.length) % order.length]);
 }
 
 /** The rostered person behind a segment: the server's scheduled holder when someone else stands in. [pure] */
@@ -1516,8 +1535,8 @@ export interface RoutingReasonView {
   mechanism: RoutingMechanism;
   /** The winning ownership rule's dimensions — chips, not a path. */
   dimensions: Record<string, string>;
-  /** The team the sentence names, when it names one. */
-  teamId: string | null;
+  /** The team as the sentence names it: its name, or its id on events written before names. */
+  team: string | null;
 }
 
 /**
@@ -1544,25 +1563,26 @@ export function parseRoutingReason(reason: string | null | undefined): RoutingRe
     notes,
     mechanism,
     dimensions: {},
-    teamId: null,
+    team: null,
     ...rest,
   });
 
-  const ownership = /^routed to (\S+) by ownership rule (.+)$/.exec(decision);
+  // Non-greedy: a team name may hold spaces, and the rule's path follows the fixed marker.
+  const ownership = /^routed to (.+?) by ownership rule (.+)$/.exec(decision);
   if (ownership) {
     return view("ownership", {
-      teamId: ownership[1],
+      team: ownership[1],
       dimensions: dimensionsOfPath(ownership[2]),
     });
   }
 
-  const explicit = /^routed to (\S+) by the alert's own setting$/.exec(decision);
-  if (explicit) return view("explicit", { teamId: explicit[1] });
+  const explicit = /^routed to (.+) by the alert's own setting$/.exec(decision);
+  if (explicit) return view("explicit", { team: explicit[1] });
 
-  const fallback = /^no ownership rule matched, so it went to the default team (\S+)$/.exec(
+  const fallback = /^no ownership rule matched, so it went to the default team (.+)$/.exec(
     decision,
   );
-  if (fallback) return view("default", { teamId: fallback[1] });
+  if (fallback) return view("default", { team: fallback[1] });
 
   if (decision.startsWith("no ownership rule matches this signal and no default team is set")) {
     return view("unrouted");
@@ -1804,18 +1824,31 @@ export function isOnCallUnavailable(err: unknown): boolean {
 /// team's. An operator in Berlin editing an Asia/Kolkata team read a handover
 /// three and a half hours from where it was, and moved it there by saving.
 
+// Building a formatter costs far more than using one, and shift counting asks for offsets per sample.
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** One cached formatter per zone for `zoneOffsetMs`; throws for a zone Intl rejects, as before. */
+function offsetFormatter(timezone: string): Intl.DateTimeFormat {
+  let fmt = offsetFormatters.get(timezone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    offsetFormatters.set(timezone, fmt);
+  }
+  return fmt;
+}
+
 /** How far `timezone` is from UTC at this instant, in ms. DST-correct. */
 function zoneOffsetMs(utcMs: number, timezone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(new Date(utcMs));
+  const parts = offsetFormatter(timezone).formatToParts(new Date(utcMs));
 
   const at = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
   // `hour12: false` reports midnight as 24 in some engines.
