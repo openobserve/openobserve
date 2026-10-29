@@ -779,6 +779,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
 
+        <div
+          v-if="dashboardPanelData.data.type === 'distribution'"
+          v-show="isConfigOptionVisible('data', 'distribution-buckets')"
+          class="flex flex-col gap-2.5"
+        >
+          <div class="flex gap-2">
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.distribution_bucket_count ?? null"
+              type="number"
+              :min="1"
+              :label="t('dashboard.distributionBucketCount')"
+              :placeholder="defaultPlaceholder(t, DISTRIBUTION_DEFAULT_BUCKETS)"
+              :disabled="dashboardPanelData.data.config.distribution_bucket_size != null"
+              data-test="dashboard-config-distribution_bucket_count"
+              @update:model-value="
+                (value: any) => setNumberConfig('distribution_bucket_count', value)
+              "
+            />
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.distribution_bucket_size ?? null"
+              type="number"
+              :min="0"
+              :label="t('dashboard.distributionBucketSize')"
+              :placeholder="defaultPlaceholder(t, t('dashboard.auto'))"
+              data-test="dashboard-config-distribution_bucket_size"
+              @update:model-value="
+                (value: any) => setNumberConfig('distribution_bucket_size', value)
+              "
+            >
+              <template #tooltip>
+                <OTooltip
+                  :content="t('dashboard.distributionBucketSizeTooltip')"
+                  max-width="15.625rem"
+                />
+              </template>
+            </OInput>
+          </div>
+          <OInput
+            :model-value="dashboardPanelData.data.config.distribution_bucket_offset ?? null"
+            type="number"
+            :label="t('dashboard.distributionBucketOffset')"
+            :placeholder="defaultPlaceholder(t, DISTRIBUTION_DEFAULT_OFFSET)"
+            data-test="dashboard-config-distribution_bucket_offset"
+            @update:model-value="
+              (value: any) => setNumberConfig('distribution_bucket_offset', value)
+            "
+          >
+            <template #tooltip>
+              <OTooltip
+                :content="t('dashboard.distributionBucketOffsetTooltip')"
+                max-width="15.625rem"
+              />
+            </template>
+          </OInput>
+        </div>
+
         <OSwitch
           v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
           v-show="isConfigOptionVisible('data', 'heatmap-histogram-mode')"
@@ -3331,6 +3389,10 @@ import {
   isRowTimeline,
 } from "@/utils/dashboard/chartTypeGroups";
 import { rawRowLimitHelp } from "@/utils/dashboard/rawRowCap";
+import {
+  DISTRIBUTION_DEFAULT_BUCKETS,
+  DISTRIBUTION_DEFAULT_OFFSET,
+} from "@/utils/dashboard/convertDistributionData";
 import { DEFAULT_TABLE_DENSITY, TABLE_DENSITIES } from "@/utils/dashboard/tableOptions";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { LEGEND_VALUE_KEYS } from "@/utils/dashboard/legendConfiguration";
@@ -4575,6 +4637,7 @@ export default defineComponent({
         "donut",
         "gauge",
         "bar-gauge",
+        "distribution",
         "sankey",
         "hostmap",
       ].includes(dashboardPanelData.data.type);
@@ -4940,6 +5003,8 @@ export default defineComponent({
       DEFAULT_MAP_CLUSTER_RADIUS,
       DEFAULT_SCATTER_SIZE_MAX,
       DEFAULT_SCATTER_SIZE_MIN,
+      DISTRIBUTION_DEFAULT_BUCKETS,
+      DISTRIBUTION_DEFAULT_OFFSET,
       pieLabelContentOptions,
       tableDensityModel,
       tableDensityOptions,

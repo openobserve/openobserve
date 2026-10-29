@@ -82,6 +82,7 @@ export const usePanelFields = ({
             .length >= 1
         );
       case "metric":
+      case "distribution":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
@@ -107,6 +108,7 @@ export const usePanelFields = ({
       case "stacked":
       case "h-stacked":
       case "state-timeline":
+      case "distribution":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1

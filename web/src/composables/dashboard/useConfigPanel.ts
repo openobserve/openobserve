@@ -371,6 +371,14 @@ export function useConfigPanel(
         label: [t("dashboard.heatmapCellGap"), t("dashboard.heatmapHideBelow")],
         visible: dashboardPanelData.data.type === "heatmap",
       },
+      "distribution-buckets": {
+        label: [
+          t("dashboard.distributionBucketCount"),
+          t("dashboard.distributionBucketSize"),
+          t("dashboard.distributionBucketOffset"),
+        ],
+        visible: dashboardPanelData.data.type === "distribution",
+      },
       "heatmap-histogram-mode": {
         label: t("dashboard.heatmapHistogramMode"),
         visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",

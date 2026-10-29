@@ -17,6 +17,7 @@ import { toRaw } from "vue";
 import {
   STATE_TIMELINE_Y_FUNCTION,
   buildDefaultBuilderFields,
+  keepRawValueFields,
 } from "@/utils/dashboard/defaultFields";
 import { isCustomSqlPanel, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import {
@@ -143,6 +144,39 @@ export const usePanelAggregation = ({
     if (!isCustomSqlPanel(type) && !NON_BUILDER_TYPES.includes(type)) returnStartersToBuilder();
 
     switch (type) {
+      case "distribution":
+        // A histogram buckets raw values, so every y field drops its aggregation and nothing is grouped by x.
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.isDerived) return;
+            itemY.functionName = null;
+            itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
+            // A HAVING on a raw, ungrouped column is invalid SQL, and the editor hides it for this type.
+            itemY.havingConditions = [];
+          });
+          keepRawValueFields(
+            query,
+            dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
+            getTimestampColumn(),
+          );
+          query.fields.x = [];
+          query.fields.z = [];
+          query.fields.breakdown = query.fields.breakdown.slice(0, 1);
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+          query.config.time_shift = [];
+        });
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        break;
+
       case "hostmap":
         dashboardPanelData.data.queries?.forEach((query: any) => {
           // A time bucket cannot name a cell, so only a plain field stays as the entity.

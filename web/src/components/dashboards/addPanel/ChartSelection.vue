@@ -136,6 +136,11 @@ export default defineComponent({
         id: "heatmap",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/distribution.svg"),
+        title: t("dashboard.chartSelection.distribution"),
+        id: "distribution",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/state-timeline.svg"),
         title: t("dashboard.stateTimelineLabel"),
         id: "state-timeline",

@@ -26,7 +26,7 @@ export const isFlowChart = (type: unknown): boolean =>
   typeof type === "string" && FLOW_TYPES.includes(type);
 
 /** Panel types that read raw, unaggregated y values and summarise them client-side. */
-export const RAW_VALUE_TYPES: readonly string[] = [];
+export const RAW_VALUE_TYPES: readonly string[] = ["distribution"];
 
 export const isRawValueChart = (type: unknown): boolean =>
   typeof type === "string" && RAW_VALUE_TYPES.includes(type);

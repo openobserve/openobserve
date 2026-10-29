@@ -659,6 +659,7 @@ export const ALL_CHART_TYPES = [
   "table",
   "heatmap",
   "state-timeline",
+  "distribution",
   "hostmap",
   "geomap",
   "sankey",

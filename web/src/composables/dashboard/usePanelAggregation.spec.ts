@@ -527,6 +527,83 @@ describe("usePanelAggregation", () => {
         expect(fields.breakdown).toEqual([]);
       });
     });
+    describe("distribution", () => {
+      const yField = (functionName: string | null) => ({
+        functionName,
+        args: [{ type: "field" }, { type: "extra" }],
+      });
+
+      it("drops aggregation, the x fields and extra breakdowns", () => {
+        const panelData = makePanelData("distribution");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x" }];
+        fields.y = [yField("count"), yField("avg")];
+        fields.breakdown = [{ alias: "b1" }, { alias: "b2" }];
+        panelData.data.queries[0].config.time_shift = [{ offSet: "1h" }] as any;
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toEqual([]);
+        expect(fields.y.map((item: any) => item.functionName)).toEqual([null, null]);
+        expect(fields.y[0].args).toHaveLength(1);
+        expect(fields.breakdown).toEqual([{ alias: "b1" }]);
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+      });
+
+      it("clears y HAVING filters left over from the previous chart type", () => {
+        const panelData = makePanelData("distribution");
+        const fields = panelData.data.queries[0].fields;
+        fields.y = [{ ...yField("count"), havingConditions: [{ operator: ">", value: 5 }] }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.y[0].havingConditions).toEqual([]);
+      });
+
+      it("never keeps a timestamp y, and falls back to a numeric column", () => {
+        const panelData: any = makePanelData("distribution");
+        panelData.meta = {
+          streamFields: {
+            groupedFields: [
+              {
+                name: "demo_app",
+                schema: [
+                  { name: "_timestamp", type: "Int64" },
+                  { name: "host", type: "Utf8" },
+                  { name: "cpu_pct", type: "Float64" },
+                ],
+              },
+            ],
+          },
+        };
+        const fields = panelData.data.queries[0].fields;
+        fields.stream = "demo_app";
+        fields.x = [{ alias: "x_axis_1", column: "_timestamp", functionName: "histogram" }];
+        fields.y = [
+          {
+            alias: "y_axis_1",
+            column: "_timestamp",
+            functionName: "count",
+            args: [{ type: "field", value: { field: "_timestamp" } }],
+          },
+        ];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.y).toHaveLength(1);
+        expect(fields.y[0]).toMatchObject({ column: "cpu_pct", functionName: null });
+      });
+
+      it("keeps a numeric y and leaves y empty when the stream has no numeric column", () => {
+        const kept = makePanelData("distribution");
+        kept.data.queries[0].fields.y = [
+          { functionName: "avg", args: [{ type: "field", value: { field: "latency_ms" } }] },
+        ];
+        makeAggregation(kept).resetAggregationFunction();
+        expect(kept.data.queries[0].fields.y[0].args[0].value.field).toBe("latency_ms");
+
+        const empty = makePanelData("distribution");
+        empty.data.queries[0].fields.y = [
+          { functionName: "count", args: [{ type: "field", value: { field: "_timestamp" } }] },
+        ];
+        makeAggregation(empty).resetAggregationFunction();
+        expect(empty.data.queries[0].fields.y).toEqual([]);
+      });
+    });
 
     describe("starter queries", () => {
       it("leaves hand-written SQL in custom mode on a switch to a builder chart", () => {

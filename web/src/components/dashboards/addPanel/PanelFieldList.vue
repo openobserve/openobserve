@@ -140,6 +140,7 @@
                   dashboardPanelData.data.type == 'area-stacked' ||
                   dashboardPanelData.data.type == 'stacked' ||
                   dashboardPanelData.data.type == 'state-timeline' ||
+                  dashboardPanelData.data.type == 'distribution' ||
                   dashboardPanelData.data.type == 'hostmap'
                 "
                 variant="ghost-neutral"
