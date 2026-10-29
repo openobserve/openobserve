@@ -89,7 +89,24 @@ export default class ChartTypeSelector {
     return this.page.evaluate(() => window.__o2HtmlPanelSentinel);
   }
 
-  // Click an element in the rendered HTML and return the tab it opens
+  async addHtmlPanelContent(html) {
+    await this.selectChartType("html");
+    await this.fillHtmlEditor(html);
+  }
+
+  // A null target asserts the sanitizer dropped it and added no rel
+  async expectHtmlLinkTarget(selector, target) {
+    const element = this.getHtmlRendererElement(selector);
+    if (target === null) {
+      await expect(element).toHaveCount(1);
+      await expect(element).not.toHaveAttribute("target");
+      await expect(element).not.toHaveAttribute("rel");
+      return;
+    }
+    await expect(element).toHaveAttribute("target", target);
+    await expect(element).toHaveAttribute("rel", "noopener noreferrer");
+  }
+
   async clickHtmlRendererElementForPopup(selector) {
     const [popup] = await Promise.all([
       this.page.context().waitForEvent("page"),
