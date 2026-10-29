@@ -461,7 +461,8 @@ pub async fn get_destination(
     description = "Retrieves a list of all alert destinations configured for an organization. Optionally filter by module \
                    type (alert or pipeline) to get specific destination categories. Returns destination names, types, and \
                    basic configuration details to help administrators manage notification routing and review available \
-                   delivery options.",
+                   delivery options. Destinations the caller may not PUT come with the URL cut to its origin and header \
+                   values and credential metadata blanked.",
     security(
         ("Authorization"= [])
     ),
