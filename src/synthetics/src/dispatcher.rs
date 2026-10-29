@@ -116,6 +116,15 @@ pub async fn run(stop: crate::StopToken) {
     let instance_id = INSTANCE_ID.as_str();
     tracing::info!(instance_id = %instance_id, "[synthetics dispatcher] started");
 
+    // o2-enterprise#3165: a Lambda probe can only report to a callback endpoint
+    // its own network reaches. Log-only; never blocks the dispatcher.
+    {
+        let cfg = config::get_config();
+        if !cfg.synthetics.lambda_browser.is_empty() || !cfg.synthetics.lambda_net.is_empty() {
+            crate::callback_endpoint::warn_if_lambda_callback_may_be_unreachable().await;
+        }
+    }
+
     loop {
         if stop.sleep(TICK).await {
             tracing::info!("[synthetics dispatcher] stopped");
