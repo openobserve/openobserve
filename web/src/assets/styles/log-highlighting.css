@@ -9,17 +9,16 @@
 }
 
 /* Syntax highlighting classes */
-/* Light values stay at or above 4.5:1 on the table's selected-row fill, not only on white. */
 .log-key {
   color: #B71C1C;
 
 }
 .log-string {
-  color: #065F46;
+  color: #047857;
 
 }
 .log-number {
-  color: #1D4ED8;
+  color: #2563eb;
 
 }
 .log-boolean {
@@ -27,7 +26,7 @@
 
 }
 .log-null {
-  color: #4B5563;
+  color: #6b7280;
 
 }
 .log-separator {
@@ -56,11 +55,11 @@
 
 }
 .log-email {
-  color: #7E22CE; /* Vivid purple for emails */
+  color: #9333EA; /* Vivid purple for emails */
 
 }
 .log-timestamp {
-  color: #1D4ED8; /* Blue for timestamps */
+  color: #2563EB; /* Blue for timestamps */
 
 }
 .log-http-method {
@@ -76,11 +75,11 @@
 
 }
 .log-uuid {
-  color: #065F46; /* Dark teal for UUIDs */
+  color: #047857; /* Dark teal for UUIDs */
 
 }
 .log-file-size {
-  color: #1D4ED8; /* Blue for file sizes (not in keyValueParser) */
+  color: #2563eb; /* Blue for file sizes (not in keyValueParser) */
 
 }
 .log-object-value {
@@ -88,7 +87,7 @@
 
 }
 .log-array-value {
-  color: #155E75; /* Calm teal for arrays */
+  color: #0E7490; /* Calm teal for arrays */
 
 }
 
