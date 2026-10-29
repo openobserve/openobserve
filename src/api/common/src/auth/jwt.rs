@@ -1102,7 +1102,7 @@ pub async fn process_domain_org_mapping(
 
         removed = orgs_to_remove.len();
         for org in orgs_to_remove {
-            if let Err(e) = users::remove_user_from_org(
+            match users::remove_user_from_org(
                 &org,
                 &user_email,
                 &get_config().auth.root_user_email,
@@ -1110,9 +1110,17 @@ pub async fn process_domain_org_mapping(
             )
             .await
             {
-                log::error!(
+                Ok(v) => {
+                    if !v.status().is_success() {
+                        log::error!(
+                            "error user {user_email} was domain mapped from org {org_id}, but failed to remove from extra org {org} with status : {}",
+                            v.status().as_str()
+                        );
+                    }
+                }
+                Err(e) => log::error!(
                     "error user {user_email} was domain mapped from org {org_id}, but failed to remove from extra org {org} : {e}"
-                );
+                ),
             }
         }
     }
