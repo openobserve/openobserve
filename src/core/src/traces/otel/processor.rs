@@ -375,7 +375,7 @@ impl OtelIngestionProcessor {
                         cost.values_mut().for_each(|v| *v = round_cost(*v));
                     }
                 }
-                if !priced {
+                if !priced && usage.values().any(|&tokens| tokens > 0) {
                     cost_status = Some(CostStatus::Unpriced);
                 }
             }
@@ -1772,6 +1772,12 @@ mod tests {
 
         let mut no_tokens = HashMap::new();
         no_tokens.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        processor.process_span(&mut no_tokens, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&no_tokens), None);
+        no_tokens.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("unknown-zero-usage"),
+        );
         processor.process_span(&mut no_tokens, &HashMap::new(), None, &[]);
         assert_eq!(cost_status(&no_tokens), None);
 

@@ -874,7 +874,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Seed built-in prices from the binary, then sync from GitHub (initial + periodic)
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
-                if let Err(e) = openobserve_builtins::model_pricing::load_seed_if_empty().await {
+                if let Err(e) = openobserve_builtins::model_pricing::load_seed().await {
                     log::error!("[model_pricing] loading seed prices failed: {e}");
                 }
                 if let Err(e) =
