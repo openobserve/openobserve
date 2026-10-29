@@ -26,6 +26,11 @@ import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
 import OnCallTeamDetail from "@/views/OnCall/OnCallTeamDetail.vue";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -114,6 +119,7 @@ const rotation = (id: string, name: string) => ({
 
 describe("OnCallTeamDetail", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.clearAllMocks();
     delete routeParams.tab;
     service.getTeam.mockResolvedValue({
@@ -796,6 +802,92 @@ describe("OnCallTeamDetail", () => {
 
       const sent = service.setSchedule.mock.calls[0][0];
       expect(sent.data.rotations.map((r: any) => r.name)).not.toContain("Primary");
+    });
+
+    it("drops the deleted rotation's draft and keeps another rotation's", async () => {
+      const scopeFor = (rotationId: string): EditorDraftScope => ({
+        kind: "oncall_schedule",
+        org: store.state.selectedOrganization.identifier,
+        entityId: `team_1/${rotationId}`,
+        userEmail: store.state.userInfo.email,
+      });
+      service.setSchedule.mockResolvedValue({ data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
+        },
+      } as never);
+      writeEditorDraft(scopeFor("rot_primary"), { data: {} });
+      writeEditorDraft(scopeFor("rot_backup"), { data: {} });
+      // A teammate's duplicate of the deleted rotation in this browser goes with it.
+      const othersCopy: EditorDraftScope = {
+        ...scopeFor("rot_primary"),
+        entityId: null,
+        variant: "team_1/clone:rot_primary",
+        userEmail: "teammate@x.io",
+      };
+      writeEditorDraft(othersCopy, { data: {} });
+      const wrapper = await openSchedule();
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
+      await flushPromises();
+      deleteConfirm(wrapper)!.vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(readEditorDraft(scopeFor("rot_primary"))).toBeNull();
+      expect(readEditorDraft(othersCopy)).toBeNull();
+      expect(readEditorDraft(scopeFor("rot_backup"))).not.toBeNull();
+    });
+
+    it("opening the editor drops drafts of rotations deleted elsewhere, and keeps the rest", async () => {
+      const base = {
+        kind: "oncall_schedule" as const,
+        org: store.state.selectedOrganization.identifier,
+        userEmail: store.state.userInfo.email,
+      };
+      const gone: EditorDraftScope = { ...base, entityId: "team_1/rot_gone" };
+      const live: EditorDraftScope = { ...base, entityId: "team_1/rot_primary" };
+      const goneClone: EditorDraftScope = {
+        ...base,
+        entityId: null,
+        variant: "team_1/clone:rot_gone",
+      };
+      const fresh: EditorDraftScope = { ...base, entityId: null, variant: "team_1/new" };
+      for (const scope of [gone, live, goneClone, fresh]) writeEditorDraft(scope, { data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as never);
+      const wrapper = await openSchedule();
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("edit", "rot_primary");
+      await flushPromises();
+
+      expect(readEditorDraft(gone)).toBeNull();
+      expect(readEditorDraft(goneClone)).toBeNull();
+      expect(readEditorDraft(live)).not.toBeNull();
+      expect(readEditorDraft(fresh)).not.toBeNull();
+    });
+
+    it("dots the Schedule and Escalation tabs while their drafts exist", async () => {
+      const scope = (kind: "oncall_schedule" | "oncall_policy"): EditorDraftScope => ({
+        kind,
+        org: store.state.selectedOrganization.identifier,
+        entityId: "team_1",
+        userEmail: store.state.userInfo.email,
+      });
+      writeEditorDraft(
+        { ...scope("oncall_schedule"), entityId: "team_1/rot_primary" },
+        { data: {} },
+      );
+      const wrapper = await openSchedule();
+
+      expect(wrapper.find('[data-test="oncall-team-tab-schedule-draft-dot"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-team-tab-policy-draft-dot"]').exists()).toBe(false);
+
+      writeEditorDraft(scope("oncall_policy"), { data: {} });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-team-tab-policy-draft-dot"]').exists()).toBe(true);
     });
 
     /// Nothing is sent until the reader confirms — the dialog is the guard, not
