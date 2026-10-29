@@ -623,6 +623,8 @@
 
   /* Flame graph (components/common/FlameGraphView.vue): label text on the light series fills, in both themes. */
   --color-flame-frame-text: var(--color-grey-800);
+  /* Grouped and unchanged frames: light in both themes so the fixed dark label stays readable. */
+  --color-flame-grouped-fill: var(--color-grey-400);
 
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-text-heading);
@@ -1546,6 +1548,7 @@
 
   /* Flame graph */
   --color-flame-frame-text: var(--color-flame-frame-text);
+  --color-flame-grouped-fill: var(--color-flame-grouped-fill);
 
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-switch-label);
