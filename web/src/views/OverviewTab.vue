@@ -655,6 +655,7 @@ import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePane
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -674,7 +675,11 @@ const isIncidentsEnabled = computed(
 );
 const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
 // a deployment with anomaly detection off answers 403 by design, which is no load failure
-const anomalyEnabled = computed(() => store.state.zoConfig?.anomaly_detection_enabled === true);
+const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
+const { locked: alertsLocked } = useLicenseLock("alerts");
+const anomalyEnabled = computed(
+  () => store.state.zoConfig?.anomaly_detection_enabled === true && !anomalyLocked.value,
+);
 
 // ── Date / time picker ───────────────────────────────────────────────────────
 const LS_TIME_KEY = "o2_overview_time";
@@ -795,7 +800,8 @@ const isForbidden = (err: unknown) => {
   return e?.status === 403 || e?.response?.status === 403;
 };
 const attemptedSections = computed<SectionKey[]>(() => {
-  const keys: SectionKey[] = ["recentEvents"];
+  const keys: SectionKey[] = [];
+  if (!alertsLocked.value) keys.push("recentEvents");
   if (anomalyEnabled.value) keys.push("anomalies");
   if (isIncidentsEnabled.value) keys.push("incidents");
   if (incidentsAccess.value.allowed) keys.push("services");
@@ -803,7 +809,9 @@ const attemptedSections = computed<SectionKey[]>(() => {
 });
 const isFailed = (key: SectionKey) =>
   !!sectionFailure[key] && attemptedSections.value.includes(key);
-const allFailed = computed(() => attemptedSections.value.every(isFailed));
+const allFailed = computed(
+  () => attemptedSections.value.length > 0 && attemptedSections.value.every(isFailed),
+);
 
 type PageState =
   "content" | "partial" | "forbidden" | "error" | "not-monitored" | "no-data" | "all-clear";
@@ -961,6 +969,11 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false) => {
   sectionFailure.anomalies = null;
+  if (anomalyLocked.value) {
+    anomalies.value = [];
+    anomalyConfigCount.value = null;
+    return;
+  }
   try {
     const org = orgId.value;
     const { startTime, endTime } = timeRange.value;
@@ -1066,6 +1079,10 @@ const loadAnomalies = async (force = false) => {
 // Alert trigger history feeds recentEvents only
 const loadHistoryAndSplit = async (force = false) => {
   sectionFailure.recentEvents = null;
+  if (alertsLocked.value) {
+    recentEvents.value = [];
+    return;
+  }
   try {
     // Exact bounds: `alertHistoryQuery` rounds only its key, so the newest minutes still reach the server.
     const historyOptions = alertHistoryQuery(orgId.value, {

@@ -438,6 +438,7 @@ import useRateLimiter from "@/composables/useRateLimiter";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { featureState } from "@/utils/featureGate";
 export default defineComponent({
   name: "Quota",
   components: {
@@ -475,17 +476,16 @@ export default defineComponent({
     const activeType = ref<any>("table");
     const activeTimeUnit = ref<string>("second");
 
-    const tabs = ref<any[]>([
+    const tabs = computed(() => [
       {
         label: t("iam.quotaPage.apiLimits"),
         value: "api-limits",
         icon: "speed",
       },
-      {
-        label: t("iam.quotaPage.roleLimits"),
-        value: "role-limits",
-        icon: "shield",
-      },
+      // Role limits list custom roles, an API the rbac license gates.
+      ...(featureState(store.state.zoConfig?.features, "rbac") === "enabled"
+        ? [{ label: t("iam.quotaPage.roleLimits"), value: "role-limits", icon: "shield" }]
+        : []),
     ]);
 
     const timeUnitTabs = ref<any[]>([

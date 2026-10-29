@@ -69,28 +69,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="onboarding-get-started-source-grid"
           >
             <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
-              <ORadio
-                v-for="option in FIRST_SOURCE_OPTIONS"
-                :key="option.id"
-                :value="option.id"
-                variant="card"
-                :disabled="busy"
-                :data-test="`onboarding-get-started-source-${option.id}`"
-              >
-                <template #label>
-                  <span class="flex items-center gap-2">
-                    <img
-                      v-if="option.logo"
-                      :src="getImageURL(option.logo)"
-                      alt=""
-                      class="size-4 shrink-0"
-                      :class="{ 'dark:invert': option.logoInvertDark }"
-                    />
-                    <OIcon v-else-if="option.icon" :name="option.icon" size="sm" class="shrink-0" />
-                    <span>{{ t(option.labelKey) }}</span>
+              <template v-for="option in FIRST_SOURCE_OPTIONS" :key="option.id">
+                <OTooltip v-if="isLocked(option)" :content="lockedReason(option)">
+                  <span class="flex">
+                    <ORadio
+                      :value="option.id"
+                      variant="card"
+                      disabled
+                      class="w-full"
+                      :data-test="`onboarding-get-started-source-${option.id}`"
+                    >
+                      <template #label>
+                        <span class="flex items-center gap-2">
+                          <OIcon
+                            name="lock"
+                            size="sm"
+                            class="shrink-0"
+                            :data-test="`onboarding-get-started-source-${option.id}-lock`"
+                          />
+                          <span>{{ t(option.labelKey) }}</span>
+                        </span>
+                      </template>
+                    </ORadio>
                   </span>
-                </template>
-              </ORadio>
+                </OTooltip>
+                <ORadio
+                  v-else
+                  :value="option.id"
+                  variant="card"
+                  :disabled="busy"
+                  :data-test="`onboarding-get-started-source-${option.id}`"
+                >
+                  <template #label>
+                    <span class="flex items-center gap-2">
+                      <img
+                        v-if="option.logo"
+                        :src="getImageURL(option.logo)"
+                        alt=""
+                        class="size-4 shrink-0"
+                        :class="{ 'dark:invert': option.logoInvertDark }"
+                      />
+                      <OIcon
+                        v-else-if="option.icon"
+                        :name="option.icon"
+                        size="sm"
+                        class="shrink-0"
+                      />
+                      <span>{{ t(option.labelKey) }}</span>
+                    </span>
+                  </template>
+                </ORadio>
+              </template>
             </div>
           </OFormRadioGroup>
         </div>
@@ -177,11 +206,15 @@ import {
   FIRST_SOURCE_OPTIONS,
   clearPrefill,
   firstSourceOption,
+  isFirstSourceLocked,
   prefillFirstSource,
   readPrefill,
   writeFirstSource,
   type FirstSourceId,
+  type FirstSourceOption,
 } from "./firstSourceOptions";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -205,6 +238,21 @@ const { t } = useI18nTyped();
 const emit = defineEmits(["removeFirstTimeLogin"]);
 
 const orgId = (): string => store.state.selectedOrganization?.identifier ?? "";
+
+const optionLocks = Object.fromEntries(
+  [...new Set(FIRST_SOURCE_OPTIONS.flatMap((o) => (o.feature ? [o.feature] : [])))].map((key) => [
+    key,
+    useLicenseLock(key),
+  ]),
+);
+const isLocked = (option: FirstSourceOption): boolean =>
+  isFirstSourceLocked(option, store.state.zoConfig?.features);
+const lockedReason = (option: FirstSourceOption) =>
+  optionLocks[option.feature ?? ""]?.lockedReason.value;
+const unlockedPick = (id: FirstSourceId | undefined): FirstSourceId | undefined => {
+  const option = firstSourceOption(id);
+  return option && isLocked(option) ? undefined : id;
+};
 
 // Login has already followed a redirectURI or marketplace link by now, so landing anywhere but Home means one was pending.
 const redirectPending = (): boolean => {
@@ -254,7 +302,8 @@ const finish = (answers: GetStartedAnswers) => {
   if (guideRoute) router.push({ name: guideRoute, query: { org_identifier: org } });
 };
 
-const sendAnswers = async (answers: GetStartedAnswers): Promise<boolean> => {
+const sendAnswers = async (picked: GetStartedAnswers): Promise<boolean> => {
+  const answers = { ...picked, firstSource: unlockedPick(picked.firstSource) };
   try {
     const res = await billings.submit_new_user_info(orgId(), {
       from: answers.from,
@@ -282,7 +331,7 @@ const doSubmit = (value: GetStartedForm) =>
   });
 
 const form = useOForm<GetStartedForm>({
-  defaultValues: getStartedDefaults(prefillFirstSource(readPrefill())),
+  defaultValues: getStartedDefaults(unlockedPick(prefillFirstSource(readPrefill()))),
   schema: makeGetStartedSchema(t),
   onSubmit: doSubmit,
 });

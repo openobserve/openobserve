@@ -141,8 +141,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="go('ingestLogs')"
           >{{ t("home.noDataState.shippers") }}</EmptyStateIngestionChip
         >
+        <OTooltip
+          v-if="store.state.zoConfig?.profiling_enabled && profilesLocked"
+          :content="profilesLockedReason"
+        >
+          <span class="inline-flex">
+            <EmptyStateIngestionChip
+              icon="lock"
+              disabled
+              class="cursor-not-allowed opacity-60"
+              data-test="home-no-data-profiles-btn"
+            >
+              {{ t("home.noDataState.profiles") }}
+            </EmptyStateIngestionChip>
+          </span>
+        </OTooltip>
         <EmptyStateIngestionChip
-          v-if="store.state.zoConfig?.profiling_enabled"
+          v-else-if="store.state.zoConfig?.profiling_enabled"
           icon="memory"
           data-test="home-no-data-profiles-btn"
           @click="go('ingestProfiles')"
@@ -173,7 +188,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { getImageURL } from "@/utils/zincutils";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import DOMPurify from "dompurify";
 
 const props = defineProps<{
@@ -193,6 +210,8 @@ defineSlots<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
+const { locked: profilesLocked, lockedReason: profilesLockedReason } =
+  useLicenseLock("continuous_profiling");
 
 const shell = computed(() => {
   if (props.alternativesOnly) return { size: "block" as const, backdrop: false };
