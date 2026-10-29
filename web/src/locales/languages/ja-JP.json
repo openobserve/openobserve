@@ -7532,6 +7532,10 @@
     "funnelSortNone": "クエリの順序",
     "funnelShowPercent": "最初のステージに対する割合を表示",
     "funnelShowPercentTooltip": "各ステージを最大ステージに対する割合で表示します。並べ替えたファネルは最大ステージで始まるか終わります。クエリ順では任意のステージになります。",
+    "nodeGraphLayout": "レイアウト",
+    "nodeGraphLayoutForce": "フォース",
+    "nodeGraphLayoutCircular": "円形",
+    "nodeGraphShowEdgeLabels": "エッジの値を表示",
     "stateValueAlign": "状態テキストの配置",
     "mapCluster": "ポイントをクラスター化",
     "mapClusterRadius": "クラスターのサイズ (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "ツリーマップ",
       "sunburst": "サンバースト",
       "funnel": "ファネル",
+      "nodeGraph": "ノードグラフ",
       "sankey": "Sankey図",
       "customChart": "カスタムチャート"
     },

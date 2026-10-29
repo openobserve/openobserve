@@ -5,7 +5,7 @@
 import { isRowTimeline } from "./chartTypeGroups";
 
 // These draw no axes and no legend.
-const NO_AXIS_TYPES: string[] = ["bar-gauge", "treemap", "sunburst", "funnel"];
+const NO_AXIS_TYPES: string[] = ["bar-gauge", "treemap", "sunburst", "funnel", "node-graph"];
 // One series per panel, so a legend has nothing to tell apart.
 const NO_LEGEND_TYPES: string[] = [...NO_AXIS_TYPES];
 // These lay out their own legend and axes, so the shared legend layout and axis width do not apply.
@@ -16,6 +16,7 @@ const OWN_LAYOUT_TYPES: string[] = [
   "treemap",
   "sunburst",
   "funnel",
+  "node-graph",
 ];
 
 interface PanelQueriesState {

@@ -22,6 +22,7 @@ import store from "@/test/unit/helpers/store";
 import { use as echartsUse } from "echarts/core";
 import {
   FunnelChart,
+  GraphChart,
   LineChart,
   PictorialBarChart,
   TreemapChart,
@@ -143,6 +144,9 @@ describe("ChartRenderer series registration", () => {
   });
   it("registers the funnel series", () => {
     expect(registeredAtImport).toContain(FunnelChart);
+  });
+  it("registers the graph series the node graph draws", () => {
+    expect(registeredAtImport).toContain(GraphChart);
   });
 });
 

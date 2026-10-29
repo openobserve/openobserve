@@ -101,6 +101,7 @@ export const usePanelFields = ({
         return sunburstLevelCount() >= SUNBURST_MAX_LEVELS;
       case "metric":
       case "distribution":
+      case "node-graph":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
@@ -144,6 +145,7 @@ export const usePanelFields = ({
             .breakdown?.length ?? 0) >= 1 || sunburstLevelCount() >= SUNBURST_MAX_LEVELS
         );
       case "funnel":
+      case "node-graph":
         return true;
       case "hostmap":
         return (
@@ -174,6 +176,8 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
         );
+      case "node-graph":
+        return true;
       case "metric":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y

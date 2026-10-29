@@ -1633,6 +1633,21 @@ describe("useConfigPanel – funnel options", () => {
     expect(shouldShowSeriesOverrides({ data: { type: "funnel" } })).toBe(false);
   });
 });
+describe("useConfigPanel – node graph options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows each option on its own chart type only", () => {
+    expect(visible("node-graph", "data", "node-graph-layout")).toBe(true);
+    expect(visible("node-graph", "data", "node-graph-edge-labels")).toBe(true);
+    expect(visible("sankey", "data", "node-graph-layout")).toBe(false);
+  });
+
+  it("shows no thresholds or series overrides on a node graph", () => {
+    expect(shouldShowThresholds({ data: { type: "node-graph", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "node-graph" } })).toBe(false);
+  });
+});
 
 describe("useConfigPanel – sparkline search visibility", () => {
   it("drops the sparkline option for an all-instant PromQL metric only", async () => {

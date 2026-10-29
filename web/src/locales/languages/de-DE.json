@@ -7532,6 +7532,10 @@
     "funnelSortNone": "Abfragereihenfolge",
     "funnelShowPercent": "Prozent der ersten Stufe anzeigen",
     "funnelShowPercentTooltip": "Jede Stufe als Prozentsatz der größten Stufe. Ein sortierter Trichter beginnt oder endet mit ihr; in Abfragereihenfolge kann es jede Stufe sein.",
+    "nodeGraphLayout": "Layout",
+    "nodeGraphLayoutForce": "Kräfte",
+    "nodeGraphLayoutCircular": "Kreisförmig",
+    "nodeGraphShowEdgeLabels": "Kantenwerte anzeigen",
     "stateValueAlign": "Ausrichtung des Statustexts",
     "mapCluster": "Punkte gruppieren",
     "mapClusterRadius": "Clustergröße (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "Treemap",
       "sunburst": "Sunburst",
       "funnel": "Trichter",
+      "nodeGraph": "Knotendiagramm",
       "sankey": "Sankey",
       "customChart": "Benutzerdefiniertes Diagramm"
     },

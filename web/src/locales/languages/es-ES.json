@@ -7532,6 +7532,10 @@
     "funnelSortNone": "Orden de la consulta",
     "funnelShowPercent": "Mostrar porcentaje de la primera etapa",
     "funnelShowPercentTooltip": "Cada etapa como porcentaje de la etapa más grande. Un embudo ordenado empieza o termina con ella; en el orden de la consulta puede ser cualquier etapa.",
+    "nodeGraphLayout": "Diseño",
+    "nodeGraphLayoutForce": "Fuerza",
+    "nodeGraphLayoutCircular": "Circular",
+    "nodeGraphShowEdgeLabels": "Mostrar valores de las aristas",
     "stateValueAlign": "Alineación del texto de estado",
     "mapCluster": "Agrupar puntos",
     "mapClusterRadius": "Tamaño del grupo (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "Mapa de árbol",
       "sunburst": "Sunburst",
       "funnel": "Embudo",
+      "nodeGraph": "Grafo de nodos",
       "sankey": "Sankey",
       "customChart": "Gráfico personalizado"
     },

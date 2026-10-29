@@ -896,6 +896,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSwitch>
         </template>
 
+        <template v-if="dashboardPanelData.data.type === 'node-graph'">
+          <OToggleGroup
+            v-show="isConfigOptionVisible('data', 'node-graph-layout')"
+            type="single"
+            label-position="top"
+            :label="t('dashboard.nodeGraphLayout')"
+            v-model="nodeGraphLayoutModel"
+            data-test="dashboard-config-node_graph_layout"
+            :data-test-selected-value="nodeGraphLayoutModel"
+          >
+            <OToggleGroupItem
+              v-for="opt in nodeGraphLayoutOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              data-test="dashboard-config-node_graph_layout-option"
+              :data-test-label="opt.label"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <OSwitch
+            v-show="isConfigOptionVisible('data', 'node-graph-edge-labels')"
+            :model-value="dashboardPanelData.data.config.node_graph_show_edge_labels === true"
+            :label="t('dashboard.nodeGraphShowEdgeLabels')"
+            data-test="dashboard-config-node_graph_show_edge_labels"
+            size="lg"
+            @update:model-value="
+              (value: any) => setFlagConfig('node_graph_show_edge_labels', value)
+            "
+          />
+        </template>
+
         <OSwitch
           v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
           v-show="isConfigOptionVisible('data', 'heatmap-histogram-mode')"
@@ -3432,6 +3464,10 @@ import {
 } from "@/utils/dashboard/cartesianOptions";
 import { DEFAULT_MAP_CLUSTER_RADIUS } from "@/utils/dashboard/geoMapCluster";
 import {
+  DEFAULT_NODE_GRAPH_LAYOUT,
+  NODE_GRAPH_LAYOUTS,
+} from "@/utils/dashboard/convertNodeGraphData";
+import {
   defaultFromData,
   defaultHint,
   defaultPlaceholder,
@@ -3940,6 +3976,14 @@ export default defineComponent({
         { label: t("dashboard.barGaugeOrientationHorizontal"), value: "horizontal" },
       ],
       DEFAULT_FUNNEL_ORIENT,
+    );
+    const nodeGraphLayoutModel = choiceModel("node_graph_layout", NODE_GRAPH_LAYOUTS);
+    const nodeGraphLayoutOptions = withDefault(
+      [
+        { label: t("dashboard.nodeGraphLayoutForce"), value: "force" },
+        { label: t("dashboard.nodeGraphLayoutCircular"), value: "circular" },
+      ],
+      DEFAULT_NODE_GRAPH_LAYOUT,
     );
     // Absent, the converters label SQL slices by percent and PromQL slices by all three, so the picker starts there.
     const pieLabelContentDefault = () =>
@@ -4735,6 +4779,7 @@ export default defineComponent({
         "treemap",
         "sunburst",
         "funnel",
+        "node-graph",
         "sankey",
         "hostmap",
       ].includes(dashboardPanelData.data.type);
@@ -5094,6 +5139,8 @@ export default defineComponent({
       funnelSortOptions,
       funnelOrientModel,
       funnelOrientOptions,
+      nodeGraphLayoutModel,
+      nodeGraphLayoutOptions,
       pieLabelContentModel,
       pieLabelContentIsDefault,
       pieLabelContentDefaultHint,

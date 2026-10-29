@@ -7532,6 +7532,10 @@
     "funnelSortNone": "Kolejność zapytania",
     "funnelShowPercent": "Pokaż procent pierwszego etapu",
     "funnelShowPercentTooltip": "Każdy etap jako procent największego etapu. Posortowany lejek zaczyna się lub kończy na nim; w kolejności zapytania może to być dowolny etap.",
+    "nodeGraphLayout": "Układ",
+    "nodeGraphLayoutForce": "Siłowy",
+    "nodeGraphLayoutCircular": "Kołowy",
+    "nodeGraphShowEdgeLabels": "Pokaż wartości krawędzi",
     "stateValueAlign": "Wyrównanie tekstu stanu",
     "mapCluster": "Grupuj punkty",
     "mapClusterRadius": "Rozmiar klastra (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "Mapa drzewa",
       "sunburst": "Wykres słoneczny",
       "funnel": "Lejek",
+      "nodeGraph": "Graf węzłów",
       "sankey": "Sankey",
       "customChart": "Wykres niestandardowy"
     },

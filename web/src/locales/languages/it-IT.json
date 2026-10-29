@@ -7532,6 +7532,10 @@
     "funnelSortNone": "Ordine della query",
     "funnelShowPercent": "Mostra percentuale della prima fase",
     "funnelShowPercentTooltip": "Ogni fase come percentuale della fase più grande. Un imbuto ordinato inizia o finisce con essa; nell'ordine della query può essere qualsiasi fase.",
+    "nodeGraphLayout": "Layout",
+    "nodeGraphLayoutForce": "Forza",
+    "nodeGraphLayoutCircular": "Circolare",
+    "nodeGraphShowEdgeLabels": "Mostra valori degli archi",
     "stateValueAlign": "Allineamento del testo di stato",
     "mapCluster": "Raggruppa punti",
     "mapClusterRadius": "Dimensione gruppo (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "Treemap",
       "sunburst": "Sunburst",
       "funnel": "Imbuto",
+      "nodeGraph": "Grafo dei nodi",
       "sankey": "Sankey",
       "customChart": "Grafico personalizzato"
     },

@@ -7532,6 +7532,10 @@
     "funnelSortNone": "Thứ tự truy vấn",
     "funnelShowPercent": "Hiển thị phần trăm so với giai đoạn đầu",
     "funnelShowPercentTooltip": "Mỗi giai đoạn theo phần trăm của giai đoạn lớn nhất. Phễu đã sắp xếp bắt đầu hoặc kết thúc bằng giai đoạn đó; theo thứ tự truy vấn, nó có thể là bất kỳ giai đoạn nào.",
+    "nodeGraphLayout": "Bố cục",
+    "nodeGraphLayoutForce": "Lực",
+    "nodeGraphLayoutCircular": "Hình tròn",
+    "nodeGraphShowEdgeLabels": "Hiển thị giá trị cạnh",
     "stateValueAlign": "Căn chỉnh văn bản trạng thái",
     "mapCluster": "Gom cụm điểm",
     "mapClusterRadius": "Kích thước cụm (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "Biểu đồ treemap",
       "sunburst": "Biểu đồ mặt trời",
       "funnel": "Phễu",
+      "nodeGraph": "Đồ thị nút",
       "sankey": "Sankey",
       "customChart": "Biểu đồ tùy chỉnh"
     },

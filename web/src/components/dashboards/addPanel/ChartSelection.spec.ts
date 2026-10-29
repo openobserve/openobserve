@@ -249,4 +249,21 @@ describe("ChartSelection", () => {
     expect(li.className.includes("cursor-not-allowed")).toBe(true);
     dashboardPanelData.data.queryType = previous;
   });
+  it("lists node graph with its own icon", async () => {
+    const item = wrapper.find("[data-test='selected-chart-node-graph-item']");
+    expect(item.exists()).toBe(true);
+    expect(item.find("img").attributes("src")).toContain("charts/node-graph.svg");
+    await item.trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["node-graph"]);
+  });
+
+  it("in PromQL mode disables node graph", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    const li = wrapper.find("[data-test='selected-chart-node-graph-item']").element.closest("li");
+    expect(li.className.includes("cursor-not-allowed")).toBe(true);
+    dashboardPanelData.data.queryType = previous;
+  });
 });

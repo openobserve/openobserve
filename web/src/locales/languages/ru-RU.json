@@ -7532,6 +7532,10 @@
     "funnelSortNone": "Порядок запроса",
     "funnelShowPercent": "Показывать процент от первого этапа",
     "funnelShowPercentTooltip": "Каждый этап в процентах от самого большого этапа. Отсортированная воронка начинается или заканчивается им; в порядке запроса это может быть любой этап.",
+    "nodeGraphLayout": "Расположение",
+    "nodeGraphLayoutForce": "Силовое",
+    "nodeGraphLayoutCircular": "Круговое",
+    "nodeGraphShowEdgeLabels": "Показывать значения рёбер",
     "stateValueAlign": "Выравнивание текста состояния",
     "mapCluster": "Группировать точки",
     "mapClusterRadius": "Размер кластера (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "Древовидная карта",
       "sunburst": "Солнечные лучи",
       "funnel": "Воронка",
+      "nodeGraph": "Граф узлов",
       "sankey": "Санкей",
       "customChart": "Пользовательский график"
     },

@@ -7532,6 +7532,10 @@
     "funnelSortNone": "Ordre de la requête",
     "funnelShowPercent": "Afficher le pourcentage de la première étape",
     "funnelShowPercentTooltip": "Chaque étape en pourcentage de la plus grande étape. Un entonnoir trié commence ou finit par elle ; dans l'ordre de la requête, ce peut être n'importe quelle étape.",
+    "nodeGraphLayout": "Disposition",
+    "nodeGraphLayoutForce": "Force",
+    "nodeGraphLayoutCircular": "Circulaire",
+    "nodeGraphShowEdgeLabels": "Afficher les valeurs des arêtes",
     "stateValueAlign": "Alignement du texte d'état",
     "mapCluster": "Regrouper les points",
     "mapClusterRadius": "Taille du groupe (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "Treemap",
       "sunburst": "Sunburst",
       "funnel": "Entonnoir",
+      "nodeGraph": "Graphe de nœuds",
       "sankey": "Sankey",
       "customChart": "Graphique personnalisé"
     },

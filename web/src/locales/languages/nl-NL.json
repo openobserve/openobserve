@@ -7532,6 +7532,10 @@
     "funnelSortNone": "Volgorde van de query",
     "funnelShowPercent": "Percentage van de eerste fase tonen",
     "funnelShowPercentTooltip": "Elke fase als percentage van de grootste fase. Een gesorteerde trechter begint of eindigt ermee; in queryvolgorde kan het elke fase zijn.",
+    "nodeGraphLayout": "Indeling",
+    "nodeGraphLayoutForce": "Kracht",
+    "nodeGraphLayoutCircular": "Cirkelvormig",
+    "nodeGraphShowEdgeLabels": "Waarden van verbindingen tonen",
     "stateValueAlign": "Uitlijning van statustekst",
     "mapCluster": "Punten clusteren",
     "mapClusterRadius": "Clustergrootte (px)",
@@ -7808,6 +7812,7 @@
       "treemap": "Treemap",
       "sunburst": "Sunburst",
       "funnel": "Trechter",
+      "nodeGraph": "Knooppuntgrafiek",
       "sankey": "Sankey",
       "customChart": "Aangepaste grafiek"
     },
