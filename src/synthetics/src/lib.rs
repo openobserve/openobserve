@@ -60,6 +60,7 @@ pub(crate) static CONFIG_SWAP_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex:
 pub const BUILT_WITH_CLOUD: bool = cfg!(feature = "cloud");
 
 pub mod alerting;
+pub mod callback_endpoint;
 pub mod dispatcher;
 pub mod job_api;
 pub mod pool;
