@@ -48,13 +48,13 @@ const URL = "view_url = '/pricing'";
 describe("pageListSql", () => {
   it("counts distinct clicks per page, busiest first", () => {
     expect(pageListSql(scope())).toBe(
-      `SELECT view_url, COUNT(DISTINCT action_id) AS clicks, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND view_url IS NOT NULL AND view_url <> '' GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT 50`,
+      `SELECT view_url, COUNT(DISTINCT COALESCE(action_id, CAST(date AS VARCHAR))) AS clicks, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND view_url IS NOT NULL AND view_url <> '' GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT 50`,
     );
   });
 
   it("filters by a lowercased substring of the URL when given a term", () => {
     expect(pageListSql(scope(), "  Pric ")).toBe(
-      `SELECT view_url, COUNT(DISTINCT action_id) AS clicks, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND view_url IS NOT NULL AND view_url <> '' AND strpos(lower(view_url), 'pric') > 0 GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT 50`,
+      `SELECT view_url, COUNT(DISTINCT COALESCE(action_id, CAST(date AS VARCHAR))) AS clicks, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND view_url IS NOT NULL AND view_url <> '' AND strpos(lower(view_url), 'pric') > 0 GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT 50`,
     );
   });
 
@@ -93,7 +93,7 @@ describe("pageListSql", () => {
 describe("deviceSplitSql", () => {
   it("buckets by viewport width and keeps unknown widths apart", () => {
     expect(deviceSplitSql(scope(), "/pricing")).toBe(
-      `SELECT CASE WHEN display_viewport_width >= 1024 THEN 'desktop' WHEN display_viewport_width >= 768 THEN 'tablet' WHEN display_viewport_width > 0 THEN 'phone' ELSE 'unknown' END AS cls, COUNT(DISTINCT action_id) AS clicks FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND ${URL} GROUP BY cls ORDER BY cls ASC`,
+      `SELECT CASE WHEN display_viewport_width >= 1024 THEN 'desktop' WHEN display_viewport_width >= 768 THEN 'tablet' WHEN display_viewport_width > 0 THEN 'phone' ELSE 'unknown' END AS cls, COUNT(DISTINCT COALESCE(action_id, CAST(date AS VARCHAR))) AS clicks FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND ${URL} GROUP BY cls ORDER BY cls ASC`,
     );
   });
 
@@ -130,7 +130,7 @@ describe("deviceClause", () => {
 describe("totalsSql", () => {
   it("counts distinct clicks, sessions and frustrated clicks once each", () => {
     expect(totalsSql(scope(), "/pricing", "all")).toBe(
-      `SELECT COUNT(DISTINCT action_id) AS clicks, COUNT(DISTINCT session_id) AS sessions, COUNT(DISTINCT CASE WHEN action_frustration_type IS NOT NULL AND action_frustration_type NOT IN ('', '[]') THEN action_id END) AS frustrated FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND ${URL}`,
+      `SELECT COUNT(DISTINCT COALESCE(action_id, CAST(date AS VARCHAR))) AS clicks, COUNT(DISTINCT session_id) AS sessions, COUNT(DISTINCT CASE WHEN action_frustration_type IS NOT NULL AND action_frustration_type NOT IN ('', '[]') THEN COALESCE(action_id, CAST(date AS VARCHAR)) END) AS frustrated FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND ${URL}`,
     );
   });
 
@@ -150,7 +150,7 @@ describe("rankingSql", () => {
   it("groups by the selector in the target JSON with a stable tie-break order", () => {
     const sql = rankingSql(scope(), "/pricing", "desktop") as string;
     expect(sql).toBe(
-      `SELECT json_get_str(_o2_action_target, 'selector') AS selector, MAX(action_target_name) AS name, COUNT(DISTINCT action_id) AS clicks, COUNT(DISTINCT session_id) AS sessions, COUNT(DISTINCT CASE WHEN action_frustration_type LIKE '%rage_click%' THEN action_id END) AS rage, COUNT(DISTINCT CASE WHEN action_frustration_type LIKE '%dead_click%' THEN action_id END) AS dead, COUNT(DISTINCT CASE WHEN action_frustration_type LIKE '%error_click%' THEN action_id END) AS err, COUNT(DISTINCT CASE WHEN action_frustration_type IS NOT NULL AND action_frustration_type NOT IN ('', '[]') THEN action_id END) AS frustrated FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND ${URL} AND display_viewport_width >= 1024 AND json_get_str(_o2_action_target, 'selector') IS NOT NULL GROUP BY selector ORDER BY clicks DESC, sessions DESC, selector ASC LIMIT 500`,
+      `SELECT json_get_str(_o2_action_target, 'selector') AS selector, MAX(action_target_name) AS name, COUNT(DISTINCT COALESCE(action_id, CAST(date AS VARCHAR))) AS clicks, COUNT(DISTINCT session_id) AS sessions, COUNT(DISTINCT CASE WHEN action_frustration_type LIKE '%rage_click%' THEN COALESCE(action_id, CAST(date AS VARCHAR)) END) AS rage, COUNT(DISTINCT CASE WHEN action_frustration_type LIKE '%dead_click%' THEN COALESCE(action_id, CAST(date AS VARCHAR)) END) AS dead, COUNT(DISTINCT CASE WHEN action_frustration_type LIKE '%error_click%' THEN COALESCE(action_id, CAST(date AS VARCHAR)) END) AS err, COUNT(DISTINCT CASE WHEN action_frustration_type IS NOT NULL AND action_frustration_type NOT IN ('', '[]') THEN COALESCE(action_id, CAST(date AS VARCHAR)) END) AS frustrated FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND ${URL} AND display_viewport_width >= 1024 AND json_get_str(_o2_action_target, 'selector') IS NOT NULL GROUP BY selector ORDER BY clicks DESC, sessions DESC, selector ASC LIMIT 500`,
     );
     expect(() => assertJoinFree(sql)).not.toThrow();
   });
@@ -158,7 +158,7 @@ describe("rankingSql", () => {
   it("counts a rage and dead click once in each split and once in the total", () => {
     const sql = rankingSql(scope(), "/pricing", "all") as string;
     expect(sql.match(/COUNT\(DISTINCT CASE WHEN/g)).toHaveLength(4);
-    expect(sql).toContain("COUNT(DISTINCT action_id) AS clicks");
+    expect(sql).toContain("COUNT(DISTINCT COALESCE(action_id, CAST(date AS VARCHAR))) AS clicks");
   });
 
   it("falls back to the legacy flat selector column", () => {
@@ -193,7 +193,7 @@ describe("request shape", () => {
       totalsSql(scope(), "/p", "all"),
       rankingSql(scope(), "/p", "all") as string,
     ]) {
-      expect(sql).toContain("COUNT(DISTINCT action_id)");
+      expect(sql).toContain("COUNT(DISTINCT COALESCE(action_id, CAST(date AS VARCHAR)))");
       expect(sql).not.toMatch(/SELECT\s+\*/);
       expect(() => assertJoinFree(sql)).not.toThrow();
     }

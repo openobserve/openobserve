@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="rootRef"
     class="h-full min-h-0"
-    :class="isFullscreen ? 'bg-surface-base' : ''"
+    :class="isFullscreen ? 'bg-surface-base fixed inset-0 z-5000' : ''"
     data-test="rum-heatmap-page"
   >
     <div class="flex h-full min-h-0 flex-col">
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :content="loadError ?? undefined"
           data-test="rum-heatmap-load-error"
         >
-          <template #actions>
+          <template v-if="!loadForbidden" #actions>
             <OButton
               variant="outline"
               size="sm"
@@ -277,7 +277,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="ms-auto flex shrink-0 items-center gap-2" data-test="rum-heatmap-actions">
             <OButton
-              v-if="fullscreenSupported"
               variant="outline"
               size="icon-xs-sq"
               :aria-label="fullscreenLabel"
@@ -353,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="hitLayerVisible"
+                      aria-hidden="true"
                       class="absolute inset-0 z-10"
                       data-test="rum-heatmap-hit-layer"
                       @mousemove="onStageMove"
@@ -390,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @keydown.space.prevent="onMarkerSelect(m.selector)"
                       >
                         <span
-                          class="absolute -start-2.5 -top-2.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[0.6875rem] font-medium text-white"
+                          class="text-text-heading text-2xs absolute -start-2.5 -top-2.5 flex h-5 min-w-5 items-center justify-center rounded-full border px-1 font-medium"
                           :class="m.badgeClass"
                           aria-hidden="true"
                           data-test="rum-heatmap-marker-badge"
@@ -660,7 +660,6 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { addCommasToNumber } from "@/utils/formatters";
-import { useFullscreenBox } from "@/composables/useFullscreenBox";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import useStreams from "@/composables/useStreams";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -685,6 +684,7 @@ import {
 import {
   deviceClause,
   deviceSplitSql,
+  isDeviceClass,
   PAGE_LIST_LIMIT,
   pageListSql,
   RANKING_LIMIT,
@@ -767,9 +767,9 @@ const PAGE_SEARCH_PANEL = "page-search";
 const FULL_SNAPSHOT = 2;
 const META = 4;
 const MARKER_TONES = {
-  high: { border: "border-status-negative", badge: "bg-status-negative" },
-  medium: { border: "border-warning", badge: "bg-warning" },
-  low: { border: "border-accent", badge: "bg-accent" },
+  high: { border: "border-status-negative", badge: "border-status-negative bg-surface-base" },
+  medium: { border: "border-warning", badge: "border-warning bg-surface-base" },
+  low: { border: "border-accent", badge: "border-accent bg-surface-base" },
 } as const;
 const HOVER_SYNC_MS = 100;
 const TIP_WIDTH_REM = 14;
@@ -788,9 +788,9 @@ const search = useAnalyticsSearch();
 const heatOpacity = ref(100);
 const autoScroll = ref(true);
 const rootRef = ref<HTMLElement | null>(null);
-const { fullscreenEl, toggle: toggleFullscreenBox } = useFullscreenBox();
+const isFullscreen = ref(false);
 const stageHover = ref("");
-const deviceClass = ref<DeviceClass>(pa.heatmap.device as DeviceClass);
+const deviceClass = ref<DeviceClass>(pa.heatmap.device);
 const pageUrl = ref("");
 const pageRows = ref<PageRow[]>([]);
 const pageOpen = ref(false);
@@ -816,6 +816,7 @@ const snapshotReady = ref(false);
 const placementsReady = ref(false);
 const snapshotError = ref<I18nText | null>(null);
 const loadError = ref<I18nText | null>(null);
+const loadForbidden = ref(false);
 const stageRef = ref<HTMLElement | null>(null);
 const scrollerRef = ref<HTMLElement | null>(null);
 const fitRef = ref<HTMLElement | null>(null);
@@ -848,7 +849,10 @@ let player: ReplayPlayer | null = null;
 let overlay: HTMLCanvasElement | null = null;
 let elementRects = new Map<string, OutlineRect>();
 let loadToken = 0;
+let linkPending = false;
+let panelAutoOpened = false;
 let retryTarget: "scope" | "page" = "scope";
+let loadedApp: string | null = null;
 let cycleEnd = Date.now() * 1000;
 let cycleRange = { start_time: 0, end_time: 0 };
 let refitFrame = 0;
@@ -922,7 +926,11 @@ const matchesQuery = (r: ElementRow) =>
 const rowFilterOn = computed(() => onlyMissing.value || onlyFrustrated.value);
 const unusedReason = computed(() => {
   if (rowFilterOn.value) return t("rum.heatmap.chipUnusedFiltered");
-  if (!unusedAvailable.value && !snapshotLoading.value) return t("rum.heatmap.chipUnusedDisabled");
+  const measured = snapshotReady.value && placementsReady.value && !snapshotError.value;
+  if (measured && !unusedAvailable.value) {
+    const pct = Math.round(MIN_PLACED_CLICK_SHARE * 100);
+    return t("rum.heatmap.chipUnusedDisabled", { pct });
+  }
   return undefined;
 });
 const visibleRows = computed<ElementRow[]>(() => {
@@ -1012,25 +1020,32 @@ const footerParts = computed(() => {
 const statItems = computed<StatCell[]>(() => {
   const loaded = strip.value;
   const { clicks, sessions, frustrated } = loaded ?? summary.value;
+  const stale = loading.value && !!loaded;
   const show = (n: number) => (loaded ? addCommasToNumber(n) : t("rum.heatmap.statPlaceholder"));
   return [
     {
       key: "clicks",
       label: t("rum.heatmap.statClicks"),
       value: show(clicks),
+      valueClass: stale ? "text-text-secondary" : undefined,
       dataTest: "rum-heatmap-stat-clicks",
     },
     {
       key: "sessions",
       label: t("rum.heatmap.statSessions"),
       value: show(sessions),
+      valueClass: stale ? "text-text-secondary" : undefined,
       dataTest: "rum-heatmap-stat-sessions",
     },
     {
       key: "frustrated",
       label: t("rum.heatmap.statFrustrated"),
       value: show(frustrated),
-      valueClass: loaded && frustrated ? "text-status-negative" : undefined,
+      valueClass: stale
+        ? "text-text-secondary"
+        : loaded && frustrated
+          ? "text-status-negative"
+          : undefined,
       dataTest: "rum-heatmap-stat-frustrated",
     },
   ];
@@ -1056,10 +1071,15 @@ const markers = computed<MarkerView[]>(() =>
         selector: g.selector,
         rank: i + 1,
         name,
-        ariaLabel: t("rum.heatmap.markerLabel", { rank: i + 1, name, count: clicks }, g.clicks),
+        ariaLabel: g.frustrated
+          ? t(
+              "rum.heatmap.markerLabelFrustrated",
+              { rank: i + 1, name, count: clicks, frustrated: addCommasToNumber(g.frustrated) },
+              g.clicks,
+            )
+          : t("rum.heatmap.markerLabel", { rank: i + 1, name, count: clicks }, g.clicks),
         borderClass: tone.border,
         badgeClass: tone.badge,
-        // Page coordinates scaled by the stage fit, which only the browser knows at runtime.
         style: {
           left: `${box.x * scale}px`,
           top: `${box.y * scale}px`,
@@ -1079,11 +1099,17 @@ const markers = computed<MarkerView[]>(() =>
 
 const tsField = () => store.state.zoConfig.timestamp_column || "_timestamp";
 
-const scope = (): AnalyticsScope => pa.scope.value;
+// Clicks are drawn on one app's snapshot, so compared apps are left out of the queries.
+const scope = (): AnalyticsScope => {
+  const { apps: _apps, appExclusions: _exclusions, ...own } = pa.scope.value;
+  return own;
+};
 const appId = computed(() => pa.state.app);
 
-function windowMicros(hours: number) {
-  return { start_time: cycleEnd - hours * 3_600_000_000, end_time: cycleEnd };
+// A range older than the lookback must still be searched, or its replays are never found.
+function replayWindow() {
+  const lookbackStart = cycleEnd - SNAPSHOT_LOOKBACK_HOURS * 3_600_000_000;
+  return { start_time: Math.min(cycleRange.start_time, lookbackStart), end_time: cycleEnd };
 }
 
 function startCycle() {
@@ -1123,7 +1149,7 @@ async function replayRows(
   sql: string,
   limit: number,
   stream = "_rumdata",
-  win = windowMicros(SNAPSHOT_LOOKBACK_HOURS),
+  win = replayWindow(),
 ): Promise<Row[]> {
   const rows = await searchRows<Row>(id, sql, limit, win, stream);
   if (!rows) throw new Error("replay lookup superseded");
@@ -1132,8 +1158,11 @@ async function replayRows(
 
 function failLoad(label: string, error: unknown, retry: "scope" | "page" = "scope") {
   retryTarget = retry;
+  // The error view unmounts the stage, so the next load must rebuild the snapshot rather than reuse it.
+  snapshotKey = "";
   console.error(`Click heatmap: ${label} failed`, error);
   strip.value = null;
+  loadForbidden.value = error instanceof ForbiddenError;
   loadError.value = t(
     error instanceof ForbiddenError ? "rum.heatmap.forbidden" : "rum.heatmap.loadFailed",
   );
@@ -1146,10 +1175,17 @@ function onRetry() {
 // The shell owns app, range and bot rules, so the page waits until they are loaded.
 function startLoad() {
   if (pa.scopeStatus.value !== "ok" || !pa.rulesReady.value) return;
+  // A page from another app would only show as an empty row, so a new app starts without one.
+  if (loadedApp !== null && loadedApp !== appId.value) {
+    pa.heatmap.pageUrl = "";
+    pageUrl.value = "";
+  }
+  loadedApp = appId.value;
   startCycle();
-  deviceClass.value = pa.heatmap.device as DeviceClass;
+  deviceClass.value = pa.heatmap.device;
   clearElementFilters();
   loadError.value = null;
+  loadForbidden.value = false;
   const known = pa.heatmap.pageUrl;
   if (!known) return loadPages(false);
   // A page named by the link needs no list to start, so its snapshot and clicks load alongside the list.
@@ -1224,6 +1260,7 @@ function resetPage(keepSnapshot = false) {
   placedSelectors.value = new Set();
   snapshotError.value = null;
   loadError.value = null;
+  loadForbidden.value = false;
   rankingLimited.value = false;
   pagesLimited.value = false;
   selectedSelector.value = "";
@@ -1234,6 +1271,7 @@ function resetPage(keepSnapshot = false) {
 async function loadPage(refreshSplit = true, newCycle = true) {
   if (newCycle) startCycle();
   const token = ++loadToken;
+  panelAutoOpened = false;
   if (refreshSplit) {
     deviceClicks.value = {};
     deviceSplitLoaded.value = false;
@@ -1521,7 +1559,6 @@ async function waitForSnapshotDom(token: number) {
   if (token === loadToken) throw new Error("snapshot did not render");
 }
 
-// Two frames let the rebuilt page lay out before anything is measured.
 const nextFrames = () =>
   new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
@@ -1568,8 +1605,7 @@ function growToFullPage(frame: { doc: Document; wrapper: HTMLElement; iframe: HT
   return full;
 }
 
-// Shrinks a wide page to the pane so the whole width is visible without sideways scrolling.
-// Returns false when the pane has no usable width yet (mid fullscreen or tab switch), so the caller retries.
+// Returns false while the pane has no usable width (mid fullscreen or tab switch), so the caller retries.
 function fitStage(accept = false): boolean {
   const scroller = scrollerRef.value;
   const fit = fitRef.value;
@@ -1587,7 +1623,6 @@ function fitStage(accept = false): boolean {
   return true;
 }
 
-// Waits two frames so the new layout is settled before re-measuring, then redraws at the new scale.
 function refit(tries = 0, resetScroll = false) {
   cancelAnimationFrame(refitFrame);
   refitFrame = requestAnimationFrame(() => {
@@ -1720,8 +1755,8 @@ function findUnusedControls(
 }
 
 function onDeviceChange(value: unknown) {
-  if (typeof value !== "string" || !value || value === deviceClass.value) return;
-  deviceClass.value = value as DeviceClass;
+  if (!isDeviceClass(value) || value === deviceClass.value) return;
+  deviceClass.value = value;
   syncHeatmapUrl();
   clearElementFilters();
   loadPage(false);
@@ -1785,7 +1820,6 @@ const tipTarget = computed(() =>
   tipSuppressed.value ? "" : tipSelector.value || stageHover.value,
 );
 
-// One card for every mode, built from the same strings as the marker label.
 const tipView = computed(() => {
   const sel = tipTarget.value;
   const i = groups.value.findIndex((g) => g.selector === sel);
@@ -1826,7 +1860,6 @@ function showTip(selector: string) {
   placeTip();
 }
 
-// Opens below the element, flipping above or left when the card would leave the visible pane.
 function placeTip() {
   const sel = tipSelector.value || stageHover.value;
   const box = markerBoxes.value[sel];
@@ -1869,16 +1902,29 @@ const isRowLit = (row: ElementRow) =>
   row.selector === rowHover.value;
 const rowClass = (row: ElementRow) => (isRowLit(row) ? "bg-surface-tint-accent" : "");
 const rowRailTone = (row: ElementRow) => (isRowLit(row) ? ("primary" as const) : null);
-const isFullscreen = computed(() => !!rootRef.value && fullscreenEl.value === rootRef.value);
-const fullscreenSupported =
-  typeof document !== "undefined" && !!document.documentElement.requestFullscreen;
 const fullscreenLabel = computed(() =>
   isFullscreen.value ? t("rum.heatmap.exitFullscreen") : t("rum.heatmap.fullscreen"),
 );
 const panelLabel = computed(() =>
   panelOpen.value ? t("rum.heatmap.hideElements") : t("rum.heatmap.showElements"),
 );
-const toggleFullscreenMode = () => toggleFullscreenBox(rootRef.value);
+
+function setFullscreen(on: boolean) {
+  isFullscreen.value = on;
+  if (on) return;
+  void nextTick(() =>
+    rootRef.value
+      ?.querySelector<HTMLElement>('[data-test="rum-heatmap-fullscreen-toggle"]')
+      ?.focus(),
+  );
+}
+
+const toggleFullscreenMode = () => setFullscreen(!isFullscreen.value);
+
+// An open page picker owns Escape, so it closes first.
+function onFullscreenKey(e: KeyboardEvent) {
+  if (e.key === "Escape" && !pageOpen.value) setFullscreen(false);
+}
 const formatOpacity = (v: number) => t("rum.heatmap.opacityValue", { pct: v });
 const hitLayerVisible = computed(
   () => viewMode.value !== "markers" && snapshotReady.value && placementsReady.value,
@@ -2024,28 +2070,49 @@ watch(
   { immediate: true },
 );
 
+// No replay still leaves the ranking worth reading, so it opens once per load.
+watch([snapshotError, () => groups.value.length], ([err, count]) => {
+  if (!err || !count || panelAutoOpened) return;
+  panelAutoOpened = true;
+  panelOpen.value = true;
+});
+
+function applyLinkChange() {
+  const { pageUrl: url, device } = pa.heatmap;
+  const deviceChanged = device !== deviceClass.value;
+  const pageChanged = !!url && url !== pageUrl.value;
+  if (!deviceChanged && !pageChanged) return;
+  if (deviceChanged) deviceClass.value = device;
+  if (pageChanged) pageUrl.value = url;
+  clearElementFilters();
+  void loadPage(pageChanged);
+}
+
 // A pasted link changes page or device without changing the shell scope.
 watch(
-  () => [pa.heatmap.pageUrl, pa.heatmap.device],
-  ([url, device]) => {
-    if (loading.value) return;
-    if (device !== deviceClass.value) {
-      deviceClass.value = device as DeviceClass;
-      clearElementFilters();
-      void loadPage(false);
-    } else if (url && url !== pageUrl.value) {
-      pageUrl.value = url;
-      clearElementFilters();
-      void loadPage();
-    }
+  () => [pa.heatmap.pageUrl, pa.heatmap.device] as const,
+  () => {
+    if (loading.value) linkPending = true;
+    else applyLinkChange();
   },
 );
+
+// A change that arrived mid-load is applied once, when the load that was running settles.
+watch(loading, (busy) => {
+  if (busy || !linkPending) return;
+  linkPending = false;
+  applyLinkChange();
+});
 
 function onWindowResize() {
   refit();
 }
 
-watch(isFullscreen, () => refit(0, true));
+watch(isFullscreen, (on) => {
+  if (on) window.addEventListener("keydown", onFullscreenKey);
+  else window.removeEventListener("keydown", onFullscreenKey);
+  refit(0, true);
+});
 watch(panelOpen, () => refit());
 
 // The scroller only exists once the page list has loaded, so observe it whenever it appears.
@@ -2070,6 +2137,7 @@ onBeforeUnmount(() => {
   clearTimeout(rowRevealTimer);
   cancelAnimationFrame(refitFrame);
   window.removeEventListener("resize", onWindowResize);
+  window.removeEventListener("keydown", onFullscreenKey);
   cancelLoads();
   resizeObserver?.disconnect();
   destroyPlayer();

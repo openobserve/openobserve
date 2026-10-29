@@ -379,15 +379,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                     <OButton
+                      v-if="row.has_replay"
                       variant="ghost"
                       size="icon-xs-sq"
                       :aria-label="t('rum.heatmap.viewHeatmap')"
-                      :disabled="heatmapOpening"
+                      :disabled="heatmapOpening === row.session_id"
                       data-test="rum-app-sessions-view-heatmap-btn"
                       @click.stop="openSessionHeatmap(row.session_id, row.start_time * 1000)"
                     >
-                      <OIcon name="local-fire-department" size="sm" />
-                      <OTooltip :content="t('rum.heatmap.viewHeatmap')" side="bottom" />
+                      <OIcon name="grid-on" size="sm" />
+                      <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
                     </OButton>
                   </div>
                 </template>
@@ -1712,7 +1713,7 @@ const getSessionStatusColor = (row: any) => {
 };
 
 const router = useRouter();
-const { openSessionHeatmap, opening: heatmapOpening } = useSessionHeatmap();
+const { openSessionHeatmap, openingSessionId: heatmapOpening } = useSessionHeatmap();
 
 // A RUM tab switch pushes Performance's range, so only a Product Analytics handoff may replace the list's own.
 let enteredFromAnalytics = false;

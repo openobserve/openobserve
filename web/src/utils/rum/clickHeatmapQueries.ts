@@ -17,8 +17,12 @@ import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { rumFieldNames } from "@/utils/rum/fields";
 import { rowScope, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
 
-export type DeviceClass = "all" | "desktop" | "tablet" | "phone";
+export const DEVICE_CLASSES = ["all", "desktop", "tablet", "phone"] as const;
+export type DeviceClass = (typeof DEVICE_CLASSES)[number];
 export type DeviceBucket = Exclude<DeviceClass, "all"> | "unknown";
+
+export const isDeviceClass = (value: unknown): value is DeviceClass =>
+  DEVICE_CLASSES.includes(value as DeviceClass);
 
 export const TABLET_MIN_WIDTH = 768;
 export const DESKTOP_MIN_WIDTH = 1024;
@@ -33,9 +37,9 @@ const NO_SIGNAL = "('', '[]')";
 
 const has = (scope: AnalyticsScope, field: string): boolean => scope.schema[field] === true;
 
-// Streams without action_id still have one row per click, so the timestamp stands in as the key.
+// Rows with a NULL action_id (mobile) fall back to the date, as Product Analytics does; without the column the timestamp is the key.
 const clickKey = (scope: AnalyticsScope): string =>
-  has(scope, "action_id") ? "action_id" : "_timestamp";
+  has(scope, "action_id") ? "COALESCE(action_id, CAST(date AS VARCHAR))" : "_timestamp";
 
 const present = (scope: AnalyticsScope, field: string): string | null => {
   const names = rumFieldNames(field).filter((n) => has(scope, n));

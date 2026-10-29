@@ -51,6 +51,14 @@ const queryPayload = vi.hoisted(() => ({
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
+const heatmapOpen = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/rum/useSessionHeatmap", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({ openSessionHeatmap: heatmapOpen, opening: ref(false) }),
+  };
+});
+
 vi.mock("@/composables/useQuery", () => ({
   default: () => ({
     buildQueryPayload: (queryPayload.build ??= vi.fn(() => ({ query: { sql: "" }, aggs: {} }))),

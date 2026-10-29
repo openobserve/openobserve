@@ -126,8 +126,6 @@ import WorkspacePremium from "~icons/material-symbols/workspace-premium-outline"
 import UnfoldLess from "~icons/material-symbols/unfold-less";
 import LeftPanelClose from "~icons/material-symbols/left-panel-close";
 import LeftPanelOpen from "~icons/material-symbols/left-panel-open";
-import RightPanelClose from "~icons/material-symbols/right-panel-close";
-import RightPanelOpen from "~icons/material-symbols/right-panel-open";
 import PinDrop from "~icons/material-symbols/pin-drop-outline";
 import Reorder from "~icons/material-symbols/reorder";
 import FirstPage from "~icons/material-symbols/first-page";
@@ -489,8 +487,6 @@ export const iconRegistry = {
   "unfold-less": UnfoldLess,
   "left-panel-close": LeftPanelClose,
   "left-panel-open": LeftPanelOpen,
-  "right-panel-close": RightPanelClose,
-  "right-panel-open": RightPanelOpen,
   "pin-drop": PinDrop,
   reorder: Reorder,
   "first-page": FirstPage,

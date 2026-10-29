@@ -30,11 +30,13 @@ export default function useSessionHeatmap() {
   const router = useRouter();
   const store = useStore();
   const opening = ref(false);
+  const openingSessionId = ref("");
 
   // The window always reaches back to the session so an old session's page is still in the list.
   async function openSessionHeatmap(sessionId: string, sessionStartUs: number) {
     if (!sessionId || opening.value) return;
     opening.value = true;
+    openingSessionId.value = sessionId;
     try {
       const org = store.state.selectedOrganization.identifier;
       const nowUs = Date.now() * 1000;
@@ -75,8 +77,9 @@ export default function useSessionHeatmap() {
       toast({ message: t("rum.heatmap.sessionOpenFailed"), variant: "error" });
     } finally {
       opening.value = false;
+      openingSessionId.value = "";
     }
   }
 
-  return { openSessionHeatmap, opening };
+  return { openSessionHeatmap, opening, openingSessionId };
 }

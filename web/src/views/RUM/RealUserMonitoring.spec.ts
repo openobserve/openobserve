@@ -32,7 +32,6 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 import RealUserMonitoring from "./RealUserMonitoring.vue";
-import { redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
 
 const Stub = { template: "<div />" };
 
@@ -49,7 +48,6 @@ const makeRouter = () =>
           { path: "sessions/view/:id", name: "SessionViewer", component: Stub },
           { path: "errors", name: "ErrorTracking", component: Stub },
           { path: "source-maps", name: "SourceMaps", component: Stub },
-          { path: "heatmaps", redirect: (to) => redirectHeatmaps(to) },
           {
             path: "performance",
             name: "RumPerformance",
@@ -59,7 +57,6 @@ const makeRouter = () =>
         ],
       },
       { path: "/product-analytics/paths", name: "productAnalyticsPaths", component: Stub },
-      { path: "/product-analytics/heatmaps", name: "productAnalyticsHeatmaps", component: Stub },
     ],
   });
 
@@ -99,22 +96,6 @@ describe("RealUserMonitoring tabs", () => {
     const tabs = wrapper!.findAll('[role="tab"]').map((t) => t.text());
     expect(tabs).toEqual(["Performance", "Sessions", "Error Tracking", "Source Maps"]);
     expect(wrapper!.find('[data-test="rum-tab-product-analytics"]').exists()).toBe(false);
-  });
-
-  it("has no Beta badge or Heatmaps tab: heatmaps moved to Product Analytics", async () => {
-    await mountAt("/rum/sessions");
-    expect(wrapper!.findAll('[data-test="beta-badge"]')).toHaveLength(0);
-    expect(wrapper!.find('[data-test="rum-tab-heatmaps"]').exists()).toBe(false);
-  });
-
-  it("sends the old heatmaps path to the Product Analytics heatmaps route, keeping the query", async () => {
-    await mountAt("/rum/heatmaps?page_url=%2Fhome&device=phone&app=web");
-    expect(router.currentRoute.value.name).toBe("productAnalyticsHeatmaps");
-    expect(router.currentRoute.value.query).toMatchObject({
-      page_url: "/home",
-      device: "phone",
-      app: "web",
-    });
   });
 
   it("keeps Performance as the default landing tab", async () => {

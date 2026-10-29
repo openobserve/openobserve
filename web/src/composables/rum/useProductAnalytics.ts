@@ -27,6 +27,7 @@ import useNamedEvents, { type NamedEventsStatus } from "@/composables/rum/useNam
 import { getConsumableRelativeTime } from "@/utils/date";
 import api from "@/services/rumProductAnalytics";
 import { rumPaError } from "@/utils/rum/rumPaApiError";
+import { isDeviceClass, type DeviceClass } from "@/utils/rum/clickHeatmapQueries";
 import {
   appProbeSql,
   entryExitSql,
@@ -113,7 +114,6 @@ type UsRange = { startUs: number; endUs: number };
 const DEFAULT_PERIOD = "7d";
 export const PICKER_LIMIT = 200;
 const SEARCH_STREAM_NOT_FOUND = 20002;
-const HEATMAP_DEVICES = ["all", "desktop", "tablet", "phone"];
 const PATH_KEYS = ["anchor", "dir", "depth", "inc", "cohort"] as const;
 const RETENTION_KEYS = ["rs", "rr", "per", "rmode"] as const;
 
@@ -157,7 +157,10 @@ const lastSubTab = ref<AnalyticsSubTab>("overview");
 const funnel = ref<FunnelDef>(defaultFunnel());
 const paths = ref<PathsDef>(defaultPaths());
 const retention = ref<RetentionDef>(defaultRetention());
-const heatmap = reactive({ pageUrl: "", device: "all" });
+const heatmap = reactive<{ pageUrl: string; device: DeviceClass }>({
+  pageUrl: "",
+  device: "all",
+});
 const trendSeries = ref<StepRef[]>([]);
 const refreshTick = ref(0);
 const syncedSignature = ref("");
@@ -419,7 +422,7 @@ export default function useProductAnalytics() {
     const device = firstString(q.device);
     Object.assign(heatmap, {
       pageUrl: firstString(q.page_url) ?? "",
-      device: device && HEATMAP_DEVICES.includes(device) ? device : "all",
+      device: isDeviceClass(device) ? device : "all",
     });
     if (!keepFunnel) {
       funnel.value = defaultFunnel();
