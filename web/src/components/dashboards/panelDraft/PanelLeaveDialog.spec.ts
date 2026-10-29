@@ -49,12 +49,20 @@ describe("PanelLeaveDialog", () => {
     expect(dialog.emitted("choose")).toEqual([["keep"]]);
   });
 
-  it("puts the sign-out note behind an info icon that counts the other drafts", async () => {
+  it("says in the dialog text that signing out discards the other drafts, and explains it behind the info icon", async () => {
     await mountDialog({ canKeepDraft: false, signingOut: true, otherDraftCount: 3 });
     expect(inDialog("o-dialog-secondary-btn")).toBeNull();
-    expect(inDialog("dashboard-panel-leave-sign-out")?.getAttribute("aria-label")).toBe(
+    expect(inDialog("dashboard-panel-leave-sign-out-others")?.textContent?.trim()).toBe(
       "Signing out also discards 3 other unsaved drafts in this browser.",
     );
+    expect(inDialog("dashboard-panel-leave-sign-out")?.getAttribute("aria-label")).toBe(
+      "Drafts are not kept when you sign out.",
+    );
+  });
+
+  it("shows no discard line when the sign-out leaves no other draft", async () => {
+    await mountDialog({ canKeepDraft: false, signingOut: true, otherDraftCount: 0 });
+    expect(inDialog("dashboard-panel-leave-sign-out-others")).toBeNull();
   });
 
   it("offers Stay beside Discard when the panel cannot be saved", async () => {

@@ -22,6 +22,8 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { pipelineObj } from "@/plugins/pipelines/useDnD";
 import {
+  beginDraftSignOut,
+  cancelDraftSignOut,
   hashDraftValue,
   readEditorDraft,
   writeEditorDraft,
@@ -155,6 +157,7 @@ const serverPipeline = () => ({
 
 let router: Router;
 let wrapper: VueWrapper | null = null;
+const logoutEntered = vi.fn(() => true);
 
 const mountEditor = async (path: string) => {
   router = createRouter({
@@ -170,6 +173,12 @@ const mountEditor = async (path: string) => {
         ],
       },
       { path: "/logs", name: "logs", component: { render: () => h("div") } },
+      {
+        path: "/logout",
+        name: "logout",
+        component: { render: () => h("div") },
+        beforeEnter: logoutEntered,
+      },
     ],
   });
   await router.push(path);
@@ -434,6 +443,53 @@ describe("PipelineEditor drafts", () => {
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("logs"));
     expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1);
     expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  const makeBasic = async () => {
+    await addValidPipeline();
+    pipelineObj.currentSelectedPipeline.nodes = [
+      streamNode("n1", "input", "same"),
+      streamNode("n2", "output", "same"),
+    ];
+    await nextTick();
+  };
+
+  it("a sign-out stopped at the basic-pipeline prompt saves on confirm but never goes on to /logout", async () => {
+    await mountEditor("/pipeline/pipelines/add");
+    await makeBasic();
+    logoutEntered.mockClear();
+
+    beginDraftSignOut();
+    const signOut = router.push("/logout");
+    await flushPromises();
+    clickLeave("editor-draft-leave-save");
+    await signOut;
+    cancelDraftSignOut();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("createPipeline");
+
+    clickIn("confirm-dialog", "o-dialog-primary-btn");
+    await vi.waitFor(() => expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1));
+    await flushPromises();
+    expect(logoutEntered).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.path).not.toBe("/logout");
+  });
+
+  it("a refused leave is not resumed by the prompt once the user has moved on", async () => {
+    await mountEditor("/pipeline/pipelines/add");
+    await makeBasic();
+
+    const navigation = router.push("/logs");
+    await flushPromises();
+    clickLeave("editor-draft-leave-save");
+    await navigation;
+    await router.push("/pipeline/pipelines/add?step=2");
+    await flushPromises();
+
+    clickIn("confirm-dialog", "o-dialog-primary-btn");
+    await vi.waitFor(() => expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1));
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("createPipeline");
   });
 
   it("the toolbar Save of a basic pipeline still opens the list after the prompt", async () => {

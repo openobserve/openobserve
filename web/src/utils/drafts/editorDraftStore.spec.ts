@@ -20,6 +20,7 @@ import {
   EDITOR_DRAFT_PREFIX,
   EDITOR_DRAFT_TTL_MS,
   cleanupEditorDrafts,
+  cleanupEditorDraftsOnce,
   clearEditorDraftsFor,
   countEditorDraftsFor,
   EDITOR_DRAFT_INDEX_KEY,
@@ -36,7 +37,6 @@ import {
   isEditorDraftStorageAvailable,
   listEditorDraftIds,
   listEditorDrafts,
-  purgeRetiredEditorDrafts,
   readEditorDraft,
   stableStringify,
   writeEditorDraft,
@@ -169,6 +169,27 @@ describe("editorDraftStore", () => {
       expect(draftKeyCount()).toBeLessThan(EDITOR_DRAFT_MAX_PER_KIND);
     });
 
+    it("on a full storage, drops expired drafts first and keeps the writer's live drafts", () => {
+      const expired = { ...scope, userEmail: "other@x.io", entityId: "stale" };
+      storeRaw(expired, Date.now() - EDITOR_DRAFT_TTL_MS - 1);
+      for (let i = 0; i < 3; i++) storeRaw({ ...scope, entityId: `mine${i}` }, Date.now() - i);
+      const original = Storage.prototype.setItem;
+      let failures = 1;
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+        this: Storage,
+        key: string,
+        value: string,
+      ) {
+        if (key === editorDraftKey(scope) && failures-- > 0) throw quotaError();
+        return original.call(this, key, value);
+      });
+
+      expect(writeEditorDraft(scope, { data: {} })).toBe(true);
+      expect(localStorage.getItem(editorDraftKey(expired))).toBeNull();
+      for (let i = 0; i < 3; i++)
+        expect(readEditorDraft({ ...scope, entityId: `mine${i}` })).not.toBeNull();
+    });
+
     it("makes room only among the writer's own drafts of that kind and org", () => {
       const others = [
         { ...scope, userEmail: "other@x.io" },
@@ -252,76 +273,51 @@ describe("editorDraftStore", () => {
       expect(draftKeyCount()).toBe(1);
     });
 
-    it("deletes every live fleet_config draft and its index entry, which may hold plaintext YAML secrets", () => {
-      const fleetKeys = [
-        `${EDITOR_DRAFT_PREFIX}fleet_config:org1:edge:me%40x.io`,
-        `${EDITOR_DRAFT_PREFIX}fleet_config:org2:new:other%40x.io`,
-      ];
-      const now = Date.now();
+    it("keeps a collector configuration draft, YAML as typed, through cleanup and login", () => {
+      const fleet = { ...scope, kind: "fleet_config" as const, entityId: "edge" };
       const yamlText = "exporters:\n  otlp:\n    headers:\n      authorization: Basic c2VjcmV0\n";
-      fleetKeys.forEach((key) =>
-        localStorage.setItem(key, JSON.stringify({ v: 1, savedAt: now, data: { yamlText } })),
-      );
-      writeEditorDraft(scope, { data: { name: "kept" } });
-      expect(JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}")).toHaveProperty([
-        fleetKeys[0],
-      ]);
-      expect(countEditorDraftsFor("me@x.io")).toBe(2);
+      writeEditorDraft(fleet, { data: { yamlText } });
 
-      expect(cleanupEditorDrafts()).toBe(2);
+      expect(cleanupEditorDrafts()).toBe(0);
+      resumeEditorDraftSession(scope.userEmail);
 
-      fleetKeys.forEach((key) => expect(localStorage.getItem(key)).toBeNull());
-      const index = JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");
-      expect(Object.keys(index)).toEqual([editorDraftKey(scope)]);
-      expect(readEditorDraft(scope)?.data).toEqual({ name: "kept" });
-      expect(countEditorDraftsFor("me@x.io")).toBe(1);
-      expect(
-        Object.keys(localStorage).some((key) =>
-          (localStorage.getItem(key) ?? "").includes("c2VjcmV0"),
-        ),
-      ).toBe(false);
+      expect(readEditorDraft(fleet)?.data).toEqual({ yamlText });
+      expect(listEditorDraftIds("fleet_config", scope.org, scope.userEmail)).toEqual(["edge"]);
     });
 
-    it("login purges retired-kind drafts and their index entries, keeping every other draft", () => {
-      const fleetKey = `${EDITOR_DRAFT_PREFIX}fleet_config:org1:edge:me%40x.io`;
-      const ghostKey = `${EDITOR_DRAFT_PREFIX}fleet_config:org2:new:me%40x.io`;
-      const expired = { ...scope, entityId: "old" };
-      writeEditorDraft(scope, { data: { name: "kept" } });
-      storeRaw(expired, Date.now() - EDITOR_DRAFT_TTL_MS - 1);
-      localStorage.setItem(fleetKey, JSON.stringify({ v: 1, savedAt: Date.now(), data: {} }));
-      const index = JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");
-      localStorage.setItem(
-        EDITOR_DRAFT_INDEX_KEY,
-        JSON.stringify({ ...index, [fleetKey]: Date.now(), [ghostKey]: Date.now() }),
-      );
+    it("reads the draft index, not the drafts themselves", () => {
+      for (let i = 0; i < 3; i++) writeEditorDraft({ ...scope, entityId: `fn${i}` }, { data: {} });
+      const getItem = vi.spyOn(Storage.prototype, "getItem");
 
-      resumeEditorDraftSession();
+      expect(cleanupEditorDrafts()).toBe(0);
 
-      expect(localStorage.getItem(fleetKey)).toBeNull();
-      expect(Object.keys(JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}"))).toEqual(
-        expect.not.arrayContaining([fleetKey, ghostKey]),
-      );
-      expect(readEditorDraft(scope)?.data).toEqual({ name: "kept" });
-      expect(localStorage.getItem(editorDraftKey(expired))).not.toBeNull();
+      const draftReads = getItem.mock.calls.filter(([key]) => key.startsWith(EDITOR_DRAFT_PREFIX));
+      expect(draftReads).toEqual([]);
     });
 
-    it("purges an index-only retired entry, and writes nothing when there is none", () => {
-      const ghostKey = `${EDITOR_DRAFT_PREFIX}fleet_config:org1:edge:me%40x.io`;
+    it("drops expired drafts by their index time", () => {
+      const now = Date.now();
+      writeEditorDraft(
+        { ...scope, entityId: "old" },
+        { data: {}, savedAt: now - EDITOR_DRAFT_TTL_MS - 1 },
+      );
       writeEditorDraft(scope, { data: {} });
-      const index = JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");
-      localStorage.setItem(EDITOR_DRAFT_INDEX_KEY, JSON.stringify({ ...index, [ghostKey]: 1 }));
-      expect(purgeRetiredEditorDrafts()).toBe(0);
-      expect(JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}")).not.toHaveProperty([
-        ghostKey,
-      ]);
 
-      const setItem = vi.spyOn(Storage.prototype, "setItem");
-      const removeItem = vi.spyOn(Storage.prototype, "removeItem");
-      const revision = editorDraftRevision.value;
-      expect(purgeRetiredEditorDrafts()).toBe(0);
-      expect(setItem).not.toHaveBeenCalled();
-      expect(removeItem).not.toHaveBeenCalled();
-      expect(editorDraftRevision.value).toBe(revision);
+      expect(cleanupEditorDrafts(now)).toBe(1);
+      expect(localStorage.getItem(editorDraftKey({ ...scope, entityId: "old" }))).toBeNull();
+      expect(readEditorDraft(scope)).not.toBeNull();
+    });
+
+    it("runs the on-open cleanup once per page load", () => {
+      const first = { ...scope, entityId: "first" };
+      const second = { ...scope, entityId: "second" };
+      storeRaw(first, Date.now() - EDITOR_DRAFT_TTL_MS - 1);
+      cleanupEditorDraftsOnce();
+      expect(localStorage.getItem(editorDraftKey(first))).toBeNull();
+
+      storeRaw(second, Date.now() - EDITOR_DRAFT_TTL_MS - 1);
+      cleanupEditorDraftsOnce();
+      expect(localStorage.getItem(editorDraftKey(second))).not.toBeNull();
     });
 
     it("leaves panel drafts alone", () => {
@@ -440,7 +436,7 @@ describe("editorDraftStore", () => {
       expect(writeEditorDraft(scope, { data: {} })).toBe(false);
       expect(draftKeyCount()).toBe(0);
 
-      resumeEditorDraftSession();
+      resumeEditorDraftSession(scope.userEmail);
       expect(writeEditorDraft(scope, { data: {} })).toBe(true);
     });
 
@@ -455,7 +451,7 @@ describe("editorDraftStore", () => {
       };
       endEditorDraftSession(scope.userEmail);
       expect(writePanelDraft(panelScope, input)).toBe(false);
-      resumeEditorDraftSession();
+      resumeEditorDraftSession(scope.userEmail);
       expect(writePanelDraft(panelScope, input)).toBe(true);
     });
 

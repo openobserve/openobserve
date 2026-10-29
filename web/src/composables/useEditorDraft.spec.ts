@@ -26,6 +26,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import {
   deleteEditorDraft,
+  editorDraftKey,
   endEditorDraftSession,
   hashDraftValue,
   resumeEditorDraftSession,
@@ -946,7 +947,10 @@ describe("useEditorDraft", () => {
   });
 
   describe("signing out", () => {
-    afterEach(() => resumeEditorDraftSession());
+    afterEach(() => {
+      cancelDraftSignOut();
+      resumeEditorDraftSession();
+    });
 
     it("offers only Save or Discard with the sign-out note, and writes nothing after the clear", async () => {
       vi.useFakeTimers();
@@ -1066,6 +1070,34 @@ describe("useEditorDraft", () => {
         new FocusEvent("focusin", { bubbles: true }),
       );
       await edit({ name: "loaded later" });
+      expect(draft.hasUnsavedChanges()).toBe(false);
+    });
+
+    it("takes the baseline on a click inside the editor with no pointer or key event, as assistive tech activates", async () => {
+      const draft = await startHost();
+      byTest("host-field")!.click();
+      await edit({ name: "ticked" });
+      expect(draft.hasUnsavedChanges()).toBe(true);
+    });
+
+    it("takes the baseline on a change inside the editor", async () => {
+      const draft = await startHost();
+      byTest("host-field")!.dispatchEvent(new Event("change", { bubbles: true }));
+      await edit({ name: "picked" });
+      expect(draft.hasUnsavedChanges()).toBe(true);
+    });
+
+    it("ignores clicks and changes outside the editor and on aria-hidden mirrors", async () => {
+      const draft = await startHost();
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      outside.click();
+      outside.dispatchEvent(new Event("change", { bubbles: true }));
+      outside.remove();
+      const mirror = byTest("host-hidden-select")!;
+      mirror.click();
+      mirror.dispatchEvent(new Event("change", { bubbles: true }));
+      await edit({ name: "set by code" });
       expect(draft.hasUnsavedChanges()).toBe(false);
     });
   });
@@ -1309,7 +1341,7 @@ describe("useEditorDraft", () => {
       try {
         const result = leave();
         await flushPromises();
-        expect(byTest("editor-draft-leave-sign-out")?.getAttribute("aria-label")).toBe(
+        expect(byTest("editor-draft-leave-sign-out-others")?.textContent?.trim()).toBe(
           "Signing out also discards 2 other unsaved drafts in this browser.",
         );
         leaveDialogButton("o-dialog-neutral-btn")!.click();
@@ -1433,6 +1465,20 @@ describe("useEditorDraft", () => {
       draft.chooseLeave("discard");
       expect(await discard).toBe(true);
       expect(onLeaveWithoutSave).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("cleanup on open", () => {
+    it("opening an editor reads no other stored draft", async () => {
+      const others = [1, 2, 3].map((i) => ({ ...editScope, entityId: `other${i}` }));
+      others.forEach((target) => seed(target, { name: "x" }));
+      const getItem = vi.spyOn(Storage.prototype, "getItem");
+
+      await startHost();
+
+      const otherKeys = new Set(others.map(editorDraftKey));
+      expect(getItem.mock.calls.filter(([key]) => otherKeys.has(key))).toEqual([]);
+      getItem.mockRestore();
     });
   });
 

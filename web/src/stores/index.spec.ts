@@ -18,6 +18,10 @@ import store from "./index";
 import { resolveLogSeverity } from "@/utils/logs/statusParser";
 import { readPanelDraft, writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import {
+  beginDraftSignOut,
+  cancelDraftSignOut,
+  editorDraftSessionEnded,
+  editorDraftSigningOut,
   endEditorDraftSession,
   readEditorDraft,
   writeEditorDraft,
@@ -129,12 +133,54 @@ describe("root store", () => {
         entityId: "fn",
         userEmail: "me@x.io",
       };
-      endEditorDraftSession();
+      await store.dispatch("logout", { draftsOf: "me@x.io" });
+      endEditorDraftSession("me@x.io");
       expect(writeEditorDraft(scope, { data: { name: "late" } })).toBe(false);
 
+      editorDraftSessionEnded.value = false;
+      expect(writeEditorDraft(scope, { data: { name: "after the reload" } })).toBe(false);
       await store.dispatch("login", { loginState: true, userInfo: { email: "me@x.io" } });
       expect(writeEditorDraft(scope, { data: { name: "fn" } })).toBe(true);
       localStorage.clear();
+    });
+
+    it("keeps a sign-out in force when a token refresh re-dispatches login for the same user", async () => {
+      const scope = {
+        kind: "function" as const,
+        org: "o",
+        entityId: "fn",
+        userEmail: "me@x.io",
+      };
+      await store.dispatch("login", { loginState: true, userInfo: { email: "me@x.io" } });
+      beginDraftSignOut();
+
+      await store.dispatch("login", { loginState: true, userInfo: { email: "me@x.io" } });
+      expect(editorDraftSigningOut.value).toBe(true);
+
+      endEditorDraftSession("me@x.io");
+      await store.dispatch("login", { loginState: true, userInfo: { email: "me@x.io" } });
+      expect(writeEditorDraft(scope, { data: { name: "after sign-out" } })).toBe(false);
+
+      await store.dispatch("logout", { draftsOf: "me@x.io" });
+      await store.dispatch("login", { loginState: true, userInfo: { email: "me@x.io" } });
+      expect(writeEditorDraft(scope, { data: { name: "refresh after logout" } })).toBe(false);
+
+      // The reload that follows a sign-out starts signed out, with this tab's flag reset.
+      store.commit("logout");
+      editorDraftSessionEnded.value = false;
+      await store.dispatch("login", { loginState: true, userInfo: { email: "me@x.io" } });
+      expect(writeEditorDraft(scope, { data: { name: "next login" } })).toBe(true);
+      localStorage.clear();
+    });
+
+    it("does not lift a sign-out while one is in progress, even on a new login", async () => {
+      await store.dispatch("logout");
+      beginDraftSignOut();
+
+      await store.dispatch("login", { loginState: true, userInfo: { email: "me@x.io" } });
+      expect(editorDraftSigningOut.value).toBe(true);
+      cancelDraftSignOut();
+      await store.dispatch("logout");
     });
   });
 

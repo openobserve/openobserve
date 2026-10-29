@@ -35,7 +35,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { usePanelDraftAutosave } from "@/composables/dashboard/usePanelDraft";
 import { registerSignOutLeaveAsker } from "@/utils/drafts/draftSession";
 import {
-  cleanupEditorDrafts,
+  cleanupEditorDraftsOnce,
   countAllDraftsFor,
   deleteEditorDraft,
   editorDraftSessionEnded,
@@ -187,13 +187,17 @@ const FIELD_BASELINE_EVENTS = ["focusin", "beforeinput"] as const;
 // Fired after a field's value changed, so keys that only move or submit never count.
 const EDIT_EVENTS = ["input", "change"] as const;
 
+// Assistive tech activates a control with a click and no pointer or key event; the window's capture phase runs before the control changes.
+const ACTIVATION_EVENTS = ["click", "change"] as const;
+
 const signingOutNow = () => editorDraftSigningOut.value || editorDraftSessionEnded.value;
 
 // A control inside `aria-hidden` (reka's native select or checkbox mirror) changes when code sets a value, not the user.
+const isUserFacing = (target: EventTarget | null): target is HTMLElement =>
+  target instanceof HTMLElement && !target.closest('[aria-hidden="true"]');
+
 const isEditable = (target: EventTarget | null): target is HTMLElement =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || target.matches("input, textarea, select")) &&
-  !target.closest('[aria-hidden="true"]');
+  isUserFacing(target) && (target.isContentEditable || target.matches("input, textarea, select"));
 
 const fieldValue = (field: HTMLElement): string => {
   if (field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio")) {
@@ -256,12 +260,14 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   let leaving = false;
   const instance = getCurrentInstance();
 
-  /** An editable control inside this editor, outside any aria-hidden mirror. */
-  const isEditorField = (target: EventTarget | null): target is HTMLElement =>
-    isEditable(target) &&
+  const isInEditor = (target: HTMLElement): boolean =>
     [...rootElements(instance), ...(options.inputRoots?.() ?? [])].some(
       (root) => !!root && root.contains(target),
     );
+
+  /** An editable control inside this editor, outside any aria-hidden mirror. */
+  const isEditorField = (target: EventTarget | null): target is HTMLElement =>
+    isEditable(target) && isInEditor(target);
 
   // Fields edited while the item was still loading, with the value the user left in each.
   const preStartEdits = new Map<HTMLElement, string>();
@@ -466,6 +472,10 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     if (isEditorField(event.target)) captureBaselineOnFirstInput();
   };
 
+  const captureBaselineOnActivation = (event: Event) => {
+    if (isUserFacing(event.target) && isInEditor(event.target)) captureBaselineOnFirstInput();
+  };
+
   // A user input after an allowed leave means the leave did not happen, so drafting resumes.
   const resumeAfterLeave = () => {
     leaving = false;
@@ -488,6 +498,9 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     FIELD_BASELINE_EVENTS.forEach((name) =>
       window.removeEventListener(name, captureBaselineOnFieldInput, true),
     );
+    ACTIVATION_EVENTS.forEach((name) =>
+      window.removeEventListener(name, captureBaselineOnActivation, true),
+    );
   };
 
   const addBaselineListeners = () => {
@@ -496,6 +509,9 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     );
     FIELD_BASELINE_EVENTS.forEach((name) =>
       window.addEventListener(name, captureBaselineOnFieldInput, true),
+    );
+    ACTIVATION_EVENTS.forEach((name) =>
+      window.addEventListener(name, captureBaselineOnActivation, true),
     );
   };
 
@@ -585,7 +601,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     scopeParts.userEmail = String(store.state.userInfo?.email ?? "");
     captureEntity();
     if (storageAvailable) {
-      cleanupEditorDrafts();
+      cleanupEditorDraftsOnce();
       const draft = readEditorDraft<T>(scope());
       if (draft) await offerRestore(draft, generation);
       if (isStale(generation)) return;

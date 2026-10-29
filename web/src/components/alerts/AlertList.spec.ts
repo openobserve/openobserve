@@ -2348,7 +2348,13 @@ describe("AlertList - editor drafts", () => {
     expect(readEditorDraft(scope(second))).not.toBeNull();
   });
 
-  it("on an unrecognised bulk-delete response, keeps drafts of alerts in folders it did not refetch", async () => {
+  const getAlertOr404 = async (_org: string, id: string) => {
+    const alert = alertsDB.find((a) => a.alert_id === id) ?? (id === "alert-ops" ? { id } : null);
+    if (!alert) throw { response: { status: 404 } };
+    return { data: { ...alert, id } };
+  };
+
+  it("on an unrecognised bulk-delete response, drops drafts only of the alerts the server no longer has", async () => {
     writeEditorDraft(scope("alert-1"), { data: draftData });
     writeEditorDraft(scope("alert-3"), { data: draftData });
     writeEditorDraft(scope("alert-ops"), { data: draftData });
@@ -2361,6 +2367,7 @@ describe("AlertList - editor drafts", () => {
       row.selected = ["alert-1", "alert-3", "alert-ops"].includes(row.alert_id);
     await nextTick();
     expect(vm.selectedAlerts).toHaveLength(3);
+    alertsSvc.get_by_alert_id.mockImplementation(getAlertOr404);
     alertsSvc.bulkDelete.mockImplementationOnce(async () => {
       alertsDB = alertsDB.filter((a) => a.alert_id !== "alert-1");
       return { data: {} };
@@ -2372,6 +2379,27 @@ describe("AlertList - editor drafts", () => {
     expect(readEditorDraft(scope("alert-1"))).toBeNull();
     expect(readEditorDraft(scope("alert-3"))).not.toBeNull();
     expect(readEditorDraft(scope("alert-ops"))).not.toBeNull();
+  });
+
+  it("on an unrecognised bulk-delete response, keeps drafts of kept alerts when the reload returns another folder", async () => {
+    writeEditorDraft(scope("alert-1"), { data: draftData });
+    writeEditorDraft(scope("alert-3"), { data: draftData });
+    const { vm } = await mountDraftList();
+    for (const row of vm.filteredResults)
+      row.selected = ["alert-1", "alert-3"].includes(row.alert_id);
+    await nextTick();
+    alertsSvc.get_by_alert_id.mockImplementation(getAlertOr404);
+    alertsSvc.bulkDelete.mockImplementationOnce(async () => {
+      alertsDB = alertsDB.filter((a) => a.alert_id !== "alert-1");
+      return { data: {} };
+    });
+    alertsSvc.listByFolderId.mockResolvedValueOnce({ data: { list: [] } });
+
+    await vm.bulkDeleteAlerts();
+    await flushPromises();
+
+    expect(readEditorDraft(scope("alert-1"))).toBeNull();
+    expect(readEditorDraft(scope("alert-3"))).not.toBeNull();
   });
 
   it("drops the draft of an alert that no longer exists when its edit link opens", async () => {

@@ -204,7 +204,7 @@ describe("MainLayout — sign out from a dirty editor", () => {
         '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-secondary-btn"]',
       ),
     ).toBeNull();
-    expect(byTest("editor-draft-leave-sign-out")?.getAttribute("aria-label")).toBe(
+    expect(byTest("editor-draft-leave-sign-out-others")?.textContent?.trim()).toBe(
       "Signing out also discards 1 other unsaved draft in this browser.",
     );
     expect(assign).not.toHaveBeenCalled();

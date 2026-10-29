@@ -188,6 +188,19 @@ describe("OnCallPolicyEditor drafts", () => {
     expect(stored?.data.rungs[0].channels).toEqual(["email", "sms"]);
   });
 
+  it("drafts a channel ticked by focus and click alone, as assistive tech activates it", async () => {
+    await mountEditor();
+    const box = smsBox()!;
+    box.focus();
+    box.click();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(1100);
+
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    const stored = readEditorDraft<{ rungs: { channels: string[] }[] }>(scope);
+    expect(stored?.data.rungs[0].channels).toEqual(["email", "sms"]);
+  });
+
   it("the drawer's ✕ with edits asks; Discard closes and keeps nothing", async () => {
     await mountEditor();
     await tickSms();

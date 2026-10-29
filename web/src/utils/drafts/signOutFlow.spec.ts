@@ -24,10 +24,13 @@ import {
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import {
+  beginDraftSignOut,
+  cancelDraftSignOut,
   draftSessionEnded,
   draftSigningOut,
   draftSignOutDiscardOnly,
   draftSignOutForced,
+  draftUserSignedOut,
   resumeDraftSession,
 } from "@/utils/drafts/draftSession";
 import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
@@ -157,6 +160,24 @@ describe("signOutThroughLeaveGuards", () => {
     );
     resumeDraftSession(email);
     expect(writeEditorDraft(scope, { data: { again: true } })).toBe(true);
+  });
+
+  it("a login with no known user keeps every signed-out user's marker", async () => {
+    const scope = { kind: "slo" as const, org: "o1", entityId: null, userEmail: email };
+    await signOutThroughLeaveGuards(router, makeStore());
+    draftSessionEnded.value = false;
+
+    resumeDraftSession(undefined);
+
+    expect(draftUserSignedOut(email)).toBe(true);
+    expect(writeEditorDraft(scope, { data: { late: true } })).toBe(false);
+  });
+
+  it("a login while a sign-out runs leaves the sign-out in force", () => {
+    beginDraftSignOut();
+    resumeDraftSession(email);
+    expect(draftSigningOut.value).toBe(true);
+    cancelDraftSignOut();
   });
 
   it("drops only the signed-out user's editor drafts", async () => {

@@ -4049,23 +4049,21 @@ export default defineComponent({
             response.data.successful.map((entry: any) => entry?.alert_id ?? entry?.id ?? entry),
           );
         } else {
-          const refetchedFolder = String(activeFolderId.value ?? "");
-          // Only the active folder is refetched, so only its rows can be proven gone.
-          const checkable = selectedAlerts.value
-            .filter(
-              (row: AlertRowRef) =>
-                String(row?.folder_name?.id ?? refetchedFolder) === refetchedFolder,
-            )
-            .map((row: AlertRowRef) => String(row?.alert_id));
+          const org = String(store.state.selectedOrganization.identifier);
+          const requested = selectedAlerts.value.map((row: AlertRowRef) => String(row?.alert_id));
           selectedAlerts.value = [];
           // Forced: the point of this branch is to hear it from the server, and an
           // unforced read inside staleTime answers from cache without asking.
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
           if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
-          const remaining = new Set(
-            allAlerts.value.map((row: AlertRowRef) => String(row?.alert_id)),
+          // The list may now show another folder, so each alert is asked for by id and only a 404 proves it gone.
+          const checks = await Promise.allSettled(
+            requested.map((id: string) => alertsService.get_by_alert_id(org, id)),
           );
-          dropAlertDrafts(checkable.filter((id) => !remaining.has(id)));
+          const gone = checks.map(
+            (check) => check.status === "rejected" && isNotFoundError(check.reason),
+          );
+          dropAlertDrafts(requested.filter((_id: string, i: number) => gone[i]));
         }
       } catch (error: any) {
         dismiss();

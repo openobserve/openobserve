@@ -71,15 +71,16 @@ describe("EditorDraftLeaveDialog", () => {
     expect(button("o-dialog-neutral-btn")?.textContent?.trim()).toBe("Discard");
   });
 
-  it("puts the sign-out note behind an info icon that counts the other drafts", async () => {
+  it("says in the dialog text that signing out discards the other drafts, and explains it behind the info icon", async () => {
     await mountDialog({ canKeepDraft: false, signingOut: true, otherDraftCount: 2 });
     expect(messageText()).toContain("Save the report or discard your changes.");
     expect(messageText()).not.toContain("draft");
+    expect(
+      document.body.querySelector('[data-test="editor-draft-leave-sign-out-others"]')?.textContent,
+    ).toContain("Signing out also discards 2 other unsaved drafts in this browser.");
     const hint = document.body.querySelector('[data-test="editor-draft-leave-sign-out"]');
     expect(hint?.tagName).toBe("BUTTON");
-    expect(hint?.getAttribute("aria-label")).toBe(
-      "Signing out also discards 2 other unsaved drafts in this browser.",
-    );
+    expect(hint?.getAttribute("aria-label")).toBe("Drafts are not kept when you sign out.");
     expect(button("o-dialog-secondary-btn")).toBeNull();
     expect(button("o-dialog-neutral-btn")).not.toBeNull();
   });
@@ -91,6 +92,9 @@ describe("EditorDraftLeaveDialog", () => {
         .querySelector('[data-test="editor-draft-leave-sign-out"]')
         ?.getAttribute("aria-label"),
     ).toBe("Drafts are not kept when you sign out.");
+    expect(
+      document.body.querySelector('[data-test="editor-draft-leave-sign-out-others"]'),
+    ).toBeNull();
   });
 
   it("hides keep draft when drafts cannot be stored", async () => {
@@ -111,7 +115,13 @@ describe("EditorDraftLeaveDialog", () => {
   });
 
   it("cannot be closed or stayed in during a forced sign-out", async () => {
-    const dialog = await mountDialog({ canKeepDraft: false, canSave: false, forced: true });
+    const dialog = await mountDialog({
+      canKeepDraft: false,
+      canSave: false,
+      forced: true,
+      signingOut: true,
+      otherDraftCount: 2,
+    });
     expect(messageText()).toBe(
       "Your session has ended, so this report cannot be saved. Discard your changes to sign out.",
     );
@@ -119,6 +129,9 @@ describe("EditorDraftLeaveDialog", () => {
     expect(button("o-dialog-secondary-btn")).toBeNull();
     expect(button("editor-draft-leave-save")).toBeNull();
     expect(document.body.querySelector('[data-test="editor-draft-leave-sign-out"]')).toBeNull();
+    expect(
+      document.body.querySelector('[data-test="editor-draft-leave-sign-out-others"]'),
+    ).toBeNull();
     await pressEscape();
     expect(dialog.emitted("choose")).toBeUndefined();
     expect(document.body.querySelector('[data-test="editor-draft-leave-dialog"]')).not.toBeNull();

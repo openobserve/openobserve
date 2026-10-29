@@ -658,6 +658,7 @@ const applyPipelineDraft = (data: PipelineDraftData) => {
 // Registered before the draft's own leave guard, so a leave Save that stops at the basic-pipeline prompt knows where to go after it.
 let leaveTarget: string | null = null;
 let basicPromptLeaveTarget: string | null = null;
+let basicPromptFrom: string | null = null;
 onBeforeRouteLeave((to) => {
   leaveTarget = to.fullPath;
 });
@@ -972,6 +973,7 @@ const savePipeline = async ({ navigate = true }: { navigate?: boolean } = {}): P
   if (!isValid && showJsonEditorDialog.value == false) {
     // The leave dialog's Save stops here too: the user answers this prompt in the editor, then the leave goes on.
     basicPromptLeaveTarget = navigate ? null : leaveTarget;
+    basicPromptFrom = router.currentRoute.value.fullPath;
     confirmDialogBasicPipeline.value = true;
     return false;
   }
@@ -987,7 +989,14 @@ const confirmSaveBasicPipeline = async () => {
     await onSubmitPipeline();
     return;
   }
-  if (await onSubmitPipeline(false)) await router.push(target);
+  if (!(await onSubmitPipeline(false))) return;
+  // The leave was refused, so it goes on only from where it started; a sign-out never does, as /logout would skip its own confirm.
+  if (
+    router.resolve(target).path === "/logout" ||
+    router.currentRoute.value.fullPath !== basicPromptFrom
+  )
+    return;
+  await router.push(target);
 };
 const validatePipeline = () => {
   // Find input node

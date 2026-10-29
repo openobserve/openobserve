@@ -48,7 +48,8 @@ export type EditorDraftKind =
   | "model_pricing"
   | "remote_task"
   | "eval_job"
-  | "eval_scorer";
+  | "eval_scorer"
+  | "fleet_config";
 
 export interface EditorDraftScope {
   kind: EditorDraftKind;
@@ -104,11 +105,6 @@ export const EDITOR_DRAFT_MAX_PER_KIND = 20;
 export const EDITOR_DRAFT_INDEX_KEY = "o2_draft_index";
 export const NEW_EDITOR_DRAFT_ID = "new";
 const NEW_VARIANT_PREFIX = `${NEW_EDITOR_DRAFT_ID}~`;
-// Earlier builds stored these kinds with secrets in plain text, so cleanup deletes whatever of them is left.
-const RETIRED_DRAFT_KINDS: ReadonlySet<string> = new Set(["fleet_config"]);
-const RETIRED_KEY_PREFIXES = [...RETIRED_DRAFT_KINDS].map(
-  (kind) => `${EDITOR_DRAFT_PREFIX}${encodeURIComponent(kind)}:`,
-);
 
 /** Bumped on every write, delete and cross-tab storage event, so list dots can re-read storage. */
 export const editorDraftRevision = ref(0);
@@ -340,9 +336,7 @@ export const isEditorDraftStorageAvailable = (): boolean => {
 const capGroup = (parsed: ParsedKey) =>
   [parsed.kind, parsed.org, parsed.userEmail].map(encodeURIComponent).join(":");
 
-const isRetiredKey = (key: string) => RETIRED_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
-
-/** Drops expired, unreadable, old-format and retired-kind drafts, then keeps only the newest `maxPerKind` of each kind per user and org. */
+/** Drops expired, unreadable and old-format drafts, then keeps only the newest `maxPerKind` of each kind per user and org; reads the index, not the drafts. */
 export const cleanupEditorDrafts = (
   now: number = Date.now(),
   maxPerKind: number = EDITOR_DRAFT_MAX_PER_KIND,
@@ -353,13 +347,13 @@ export const cleanupEditorDrafts = (
   try {
     const live = new Map<string, number>();
     const byGroup = new Map<string, { key: string; savedAt: number }[]>();
-    for (const key of draftKeys(storage)) {
+    // A rebuilt index holds 0 for an unreadable or old-format draft, so the TTL check removes those too.
+    for (const [key, savedAt] of readIndex(storage)) {
       const parsed = parseKey(key);
-      const draft = parseDraft(storage.getItem(key));
-      if (parsed && !RETIRED_DRAFT_KINDS.has(parsed.kind) && isLive(draft, now)) {
-        live.set(key, draft.savedAt);
+      if (parsed && now - savedAt <= EDITOR_DRAFT_TTL_MS) {
+        live.set(key, savedAt);
         const list = byGroup.get(capGroup(parsed)) ?? [];
-        list.push({ key, savedAt: draft.savedAt });
+        list.push({ key, savedAt });
         byGroup.set(capGroup(parsed), list);
       } else {
         storage.removeItem(key);
@@ -374,7 +368,7 @@ export const cleanupEditorDrafts = (
         removed++;
       }
     }
-    persistIndex(storage, live);
+    if (removed) persistIndex(storage, live);
   } catch {
     return removed;
   }
@@ -382,26 +376,13 @@ export const cleanupEditorDrafts = (
   return removed;
 };
 
-/** Deletes retired-kind drafts and their index entries; one key scan, and no write when there are none. */
-export const purgeRetiredEditorDrafts = (): number => {
-  const storage = getStorage();
-  if (!storage) return 0;
-  let removed = 0;
-  try {
-    const retired = draftKeys(storage).filter(isRetiredKey);
-    const raw = storage.getItem(EDITOR_DRAFT_INDEX_KEY);
-    const indexed = !!raw && RETIRED_KEY_PREFIXES.some((prefix) => raw.includes(`"${prefix}`));
-    if (!retired.length && !indexed) return 0;
-    retired.forEach((key) => storage.removeItem(key));
-    removed = retired.length;
-    updateIndex(storage, (index) => {
-      for (const key of [...index.keys()]) if (isRetiredKey(key)) index.delete(key);
-    });
-  } catch {
-    return removed;
-  }
-  bumpRevision();
-  return removed;
+let cleanedThisLoad = false;
+
+/** The cleanup an editor runs on open, done once per page load. */
+export const cleanupEditorDraftsOnce = (): void => {
+  if (cleanedThisLoad) return;
+  cleanedThisLoad = true;
+  cleanupEditorDrafts();
 };
 
 /** Keeps the newest `keep` drafts of the scope's own kind, user and org, to make room for its next write. */
@@ -487,10 +468,20 @@ export const writeEditorDraft = <T>(
     updateIndex(storage, (index) => index.set(key, savedAt));
     bumpRevision();
   };
+  const tryAttempt = () => {
+    try {
+      attempt();
+      return true;
+    } catch {
+      return false;
+    }
+  };
   try {
     attempt();
   } catch (error) {
     if (!isQuotaError(error)) return false;
+    // Expired and over-cap drafts of anyone go first, before any of this user's live drafts.
+    if (cleanupEditorDrafts() > 0 && tryAttempt()) return true;
     try {
       // Room is made only among this user's drafts of this kind in this org.
       pruneScopeGroup(storage, scope, Math.floor(EDITOR_DRAFT_MAX_PER_KIND / 2));
@@ -637,7 +628,6 @@ export const endEditorDraftSession = (userEmail: string): void => {
 /** Runs on login, and on app start with a live session; the user's other tabs may write drafts again too. */
 export const resumeEditorDraftSession = (userEmail?: string): void => {
   resumeDraftSession(userEmail);
-  purgeRetiredEditorDrafts();
 };
 
 /** Minute precision in the user's locale and timezone, the same format the panel drafts use. */

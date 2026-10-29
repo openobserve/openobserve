@@ -34,20 +34,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:neutral="emit('choose', 'discard')"
   >
     <div class="flex items-start gap-1">
-      <p class="text-text-body min-w-0 flex-1 text-sm" data-test="dashboard-panel-leave-message">
-        {{
-          !canSave
-            ? t("dashboard.panelDraft.leaveMessageDiscardOnly")
-            : canKeepDraft
-              ? t("dashboard.panelDraft.leaveMessage")
-              : t("dashboard.panelDraft.leaveMessageNoDraft")
-        }}
-      </p>
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
+        <p class="text-text-body text-sm" data-test="dashboard-panel-leave-message">
+          {{
+            !canSave
+              ? t("dashboard.panelDraft.leaveMessageDiscardOnly")
+              : canKeepDraft
+                ? t("dashboard.panelDraft.leaveMessage")
+                : t("dashboard.panelDraft.leaveMessageNoDraft")
+          }}
+        </p>
+        <p
+          v-if="signingOut && otherDraftCount > 0"
+          class="text-text-body text-sm"
+          data-test="dashboard-panel-leave-sign-out-others"
+        >
+          {{
+            t(
+              "common.editorDraft.signOutDiscardsOthers",
+              { count: otherDraftCount },
+              otherDraftCount,
+            )
+          }}
+        </p>
+      </div>
       <EditorDraftInfoHint
         v-if="signingOut"
-        :content="
-          t('common.editorDraft.signOutDiscardsOthers', { count: otherDraftCount }, otherDraftCount)
-        "
+        :content="t('common.editorDraft.signOutDiscardsOthers', { count: 0 }, 0)"
         data-test="dashboard-panel-leave-sign-out"
       />
     </div>

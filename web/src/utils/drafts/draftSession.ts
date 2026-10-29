@@ -82,11 +82,12 @@ export const markDraftSessionEnded = (userEmail?: string): void => {
   if (userEmail) writeSignedOut([...new Set([...readSignedOut(), userEmail])]);
 };
 
-/** Runs on login: this tab writes drafts again, and so does every tab of this user. */
+/** Runs on login: this tab writes drafts again, and so does every tab of this user; a no-op while a sign-out runs. */
 export const resumeDraftSession = (userEmail?: string): void => {
-  clearSignOutFlags();
+  if (draftSigningOut.value) return;
   draftSessionEnded.value = false;
-  writeSignedOut(userEmail ? readSignedOut().filter((email) => email !== userEmail) : []);
+  // An unknown user must not lift the sign-out of every other user signed out in this browser.
+  if (userEmail) writeSignedOut(readSignedOut().filter((email) => email !== userEmail));
 };
 
 /** Registers an open editor's leave-guard check; returns the unregister call. */

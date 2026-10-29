@@ -35,14 +35,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:neutral="emit('choose', 'discard')"
   >
     <div class="flex items-start gap-1">
-      <p class="text-text-body min-w-0 flex-1 text-sm" data-test="editor-draft-leave-message">
-        {{ leaveMessage }}
-      </p>
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
+        <p class="text-text-body text-sm" data-test="editor-draft-leave-message">
+          {{ leaveMessage }}
+        </p>
+        <p
+          v-if="discardsOthers"
+          class="text-text-body text-sm"
+          data-test="editor-draft-leave-sign-out-others"
+        >
+          {{
+            t(
+              "common.editorDraft.signOutDiscardsOthers",
+              { count: otherDraftCount },
+              otherDraftCount,
+            )
+          }}
+        </p>
+      </div>
       <EditorDraftInfoHint
         v-if="signingOut && !forced"
-        :content="
-          t('common.editorDraft.signOutDiscardsOthers', { count: otherDraftCount }, otherDraftCount)
-        "
+        :content="t('common.editorDraft.signOutDiscardsOthers', { count: 0 }, 0)"
         data-test="editor-draft-leave-sign-out"
       />
     </div>
@@ -93,6 +106,11 @@ const leaveMessage = computed(() => {
     ? t("common.editorDraft.leaveMessageInBrowser", { entity })
     : t("common.editorDraft.leaveMessage", { entity });
 });
+
+// Deleting the user's other drafts is destructive, so it is said in the dialog, not only behind the info icon.
+const discardsOthers = computed(
+  () => !!props.signingOut && !props.forced && props.otherDraftCount > 0,
+);
 
 // The discard-only copy offers to stay, so it carries a button for it.
 const secondaryLabel = computed<I18nText | undefined>(() => {
