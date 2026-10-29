@@ -69,9 +69,9 @@ pub enum EscalationTarget {
     User { email: String },
     /// Every member of the team — the last resort at the bottom of a ladder.
     ///
-    /// Deliberately blind to rotations and to absence: it is where a page falls
-    /// back when every rotation has failed to produce anybody, and a last resort
-    /// that filters itself down to nobody is not one.
+    /// Blind to rotations, and skips the away only while someone else is left: it
+    /// is where a page falls back when every rotation has failed to produce
+    /// anybody, and a last resort that filters itself down to nobody is not one.
     WholeTeam,
 }
 
