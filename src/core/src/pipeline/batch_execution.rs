@@ -4252,6 +4252,7 @@ mod tests {
                         operator: config::meta::alerts::Operator::EqualTo,
                         value: json::json!(value),
                         ignore_case: false,
+                        case_insensitive: None,
                     },
                 ),
             }),
@@ -4266,6 +4267,7 @@ mod tests {
                     operator: config::meta::alerts::Operator::EqualTo,
                     value: json::json!("high"),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
             ),
         }
@@ -4611,6 +4613,7 @@ mod tests {
                     operator: config::meta::alerts::Operator::EqualTo,
                     value: json::json!("high"),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
             ),
         };
@@ -5121,6 +5124,7 @@ mod tests {
                         operator: config::meta::alerts::Operator::EqualTo,
                         value: json::json!(value),
                         ignore_case: false,
+                        case_insensitive: None,
                     },
                 ),
             }),
@@ -5145,6 +5149,7 @@ mod tests {
                     operator: config::meta::alerts::Operator::EqualTo,
                     value: json::json!(50),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
             ),
         };
@@ -5226,6 +5231,7 @@ mod tests {
                                 operator: config::meta::alerts::Operator::EqualTo,
                                 value: json::json!("verify"),
                                 ignore_case: false,
+                                case_insensitive: None,
                             },
                         ),
                     }),
