@@ -179,8 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip side="bottom" :content="t('oncall.editTeam')" />
         </OButton>
+        <!-- The server refuses to delete the default team, so its row offers no Delete, as the phone menu already does. -->
         <OButton
-          v-if="canConfigure"
+          v-if="canConfigure && row.id !== defaultTeamId"
           variant="ghost"
           size="icon-sm"
           icon-left="delete-outline"

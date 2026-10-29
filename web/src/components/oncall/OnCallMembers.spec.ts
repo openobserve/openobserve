@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
@@ -778,6 +779,31 @@ describe("OnCallMembers", () => {
     });
 
     // S5: the earliest shift across every rotation, named by its own rotation.
+    // L5: a roster edit keeps the rotation ids, so the next-shift column must follow the contents, not the ids.
+    it("re-reads the next shifts when a rotation's roster changes under the same id", async () => {
+      const rule = (members: string[]) => ({
+        name: "Base",
+        members,
+        shift_micros: 604_800_000_000,
+        anchor_micros: 0,
+      });
+      const wrapper = render({
+        members: [ana],
+        rotations: [{ id: "r1", name: "Primary", shift_rules: [rule(["ana@o2.ai"])] }],
+      });
+      await flushPromises();
+      const before = oncall.resolvedSchedule.mock.calls.length;
+      // What the roster write does: it expires the team's reads.
+      await queryClient.invalidateQueries();
+
+      await wrapper.setProps({
+        rotations: [{ id: "r1", name: "Primary", shift_rules: [rule(["ana@o2.ai", "bob@o2.ai"])] }],
+      });
+      await flushPromises();
+
+      expect(oncall.resolvedSchedule.mock.calls.length).toBeGreaterThan(before);
+    });
+
     it("shows the earliest next shift across all rotations, with that rotation's name", async () => {
       const DAY = 86_400_000_000;
       const nowMicros = Date.now() * 1000;

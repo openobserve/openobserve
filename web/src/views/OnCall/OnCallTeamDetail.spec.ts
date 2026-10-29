@@ -933,6 +933,29 @@ describe("OnCallTeamDetail", () => {
       expect(service.setSchedule).not.toHaveBeenCalled();
     });
 
+    // F1 (round 13): the lane menu's delete is a human save too, so what is kept loses the default marker.
+    it("clears the default-staffing marker from the rotations a lane delete keeps", async () => {
+      service.setSchedule.mockResolvedValue({ data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [
+            { ...rotation("rot_primary", "Primary"), source: "default" },
+            { ...rotation("rot_second", "Secondary"), source: "default" },
+          ],
+        },
+      } as any);
+      const wrapper = await openSchedule();
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_second");
+      await flushPromises();
+      deleteConfirm(wrapper)!.vm.$emit("confirm");
+      await flushPromises();
+
+      const sent = service.setSchedule.mock.calls[0][0].data.rotations;
+      expect(sent.map((r: any) => [r.name, r.source])).toEqual([["Primary", undefined]]);
+    });
+
     /// Nothing is sent until the reader confirms — the dialog is the guard, not
     /// a receipt for a delete that already happened.
     it("leaves the schedule alone when the delete is cancelled", async () => {

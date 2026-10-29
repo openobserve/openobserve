@@ -777,6 +777,39 @@ describe("OnCallScheduleEditor", () => {
     ).toBe("Delete rotation");
   });
 
+  // A8: a schedule a human saved is no longer the untouched default, or the server keeps re-adding what they removed.
+  describe("the default-staffing marker", () => {
+    const defaults = () =>
+      schedule([
+        rota("Primary", [], { source: "default" }),
+        rota("Secondary", [], { source: "default" }),
+      ]);
+
+    it("is cleared from every rotation a drawer save writes", async () => {
+      const wrapper = render({ schedule: defaults() });
+      await flushPromises();
+      await openRotation(wrapper);
+      await addPerson(wrapper, 0, "bob@o2.ai");
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations;
+      expect(sent.map((r: any) => r.source)).toEqual([undefined, undefined]);
+    });
+
+    it("is cleared from what is left when a rotation is deleted", async () => {
+      const wrapper = render({ schedule: defaults() });
+      await flushPromises();
+      await openRotation(wrapper, 1);
+      await wrapper.find('[data-test="oncall-rotation-delete"]').trigger("click");
+      wrapper.findComponent({ name: "OnCallRemoveRotationDialog" }).vm.$emit("confirm");
+      await flushPromises();
+
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations;
+      expect(sent.map((r: any) => [r.name, r.source])).toEqual([["Primary", undefined]]);
+    });
+  });
+
   // C2: removing saves at once for everyone, so it is confirmed first.
   describe("removing a rotation", () => {
     async function askToRemove() {

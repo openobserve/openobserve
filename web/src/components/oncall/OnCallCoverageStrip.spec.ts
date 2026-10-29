@@ -265,6 +265,21 @@ describe("OnCallCoverageStrip", () => {
       expect(text).toContain("Nobody on call can be reached");
     });
 
+    // AI review 4405957534: a hole is every adjacent hole run, so "until" names when reachable cover really returns.
+    it("treats an unreachable stretch running into a gap as one hole", () => {
+      // Weekdays only, one unreachable person: unreachable on weekdays, nobody at weekends, so nothing reachable all window.
+      const rotations = [
+        rotation(["ana@o2.ai"], {
+          restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 0, end_minute: 1439 }],
+        }),
+      ];
+      const text = render(rotations, ["ana@o2.ai"])
+        .find('[data-test="oncall-coverage-summary"]')
+        .text();
+
+      expect(text).toBe("Nobody on call can be reached in the next 14 days");
+    });
+
     it("keeps the legend to three states while nobody is unreachable", () => {
       expect(render([rotation(["ana@o2.ai"])]).text()).not.toContain("Rostered, unreachable");
     });

@@ -506,6 +506,20 @@ describe("OnCallTeams", () => {
       expect(wrapper.find('[data-test="oncall-team-default-badge-team_1"]').exists()).toBe(false);
     });
 
+    // AI review 4405957586: the server refuses to delete the default team, so its row offers no Delete, as the phone menu already does.
+    it("offers no Delete on the default team's row", async () => {
+      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
+      service.listTeams.mockResolvedValue({
+        data: [team("team_1", "Platform"), team("team_2", "Payments")],
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-team-delete-team_2"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').exists()).toBe(true);
+    });
+
     it("offers to set as default on every team but the current one", async () => {
       service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
       service.listTeams.mockResolvedValue({

@@ -974,7 +974,8 @@ async function reportOnCallAfterRemove(email: string) {
 
 // A team switched under the tab is a different roster and a different schedule.
 watch(() => props.teamId, fetchSegments);
-watch(() => (props.rotations ?? []).map((rotation) => rotation.id).join(), fetchSegments);
+// Contents, not ids: a roster edit keeps every id and still moves who is next.
+watch(() => JSON.stringify(props.rotations ?? []), fetchSegments);
 
 onMounted(() => {
   fetchOrgUsers();

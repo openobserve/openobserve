@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="canConfigure"
           variant="outline"
           size="xs"
-          :disabled="!preview?.pages_anyone"
+          :disabled="!sendTestReady"
           data-test="oncall-ladder-send-test"
           @click="emit('send-test')"
         >
@@ -281,6 +281,14 @@ function ladderKey(entry: TeamRungSummary): string | null {
     [...rung.channels].sort(),
   ]);
 }
+
+/// `send_test_page` pages the earliest step (delays are unique per priority) of the requested priority, so the preview must be that priority's and its first step must reach somebody.
+const sendTestReady = computed(() => {
+  const preview = props.preview;
+  if (!preview?.pages_anyone || preview.priority !== props.selected) return false;
+  const first = [...preview.rungs].sort((a, b) => a.after_micros - b.after_micros)[0];
+  return !!first?.recipients.length;
+});
 
 interface PriorityGroup {
   key: string;

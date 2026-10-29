@@ -1076,6 +1076,7 @@ async function save() {
     });
     return;
   }
+  // `setTeamScheduleMutation` clears the default-staffing marker: a schedule a human saved is no longer the one nobody chose.
   const rotations = draft.value;
   saving.value = true;
   try {

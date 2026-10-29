@@ -386,7 +386,19 @@ const tracks = computed<ScheduleTrack[]>(() => {
 /// The first stretch with nobody on call. Read off the SAME runs the bands are
 /// drawn from, never resolved a second way: a sentence that disagreed with the
 /// picture above it would be worse than no sentence.
-const firstGap = computed<Run | null>(() => runs.value.find((run) => isHole(run.cover)) ?? null);
+const firstGap = computed<Run | null>(() => {
+  const first = runs.value.findIndex((run) => isHole(run.cover));
+  if (first < 0) return null;
+  // Adjacent holes are one hole: "until" must name when reachable cover returns, not when one kind of hole becomes another.
+  let last = first;
+  while (last + 1 < runs.value.length && isHole(runs.value[last + 1].cover)) last += 1;
+  const stretch = runs.value.slice(first, last + 1);
+  return {
+    from: stretch[0].from,
+    to: stretch[stretch.length - 1].to,
+    cover: stretch.some((run) => run.cover === "unreachable") ? "unreachable" : "none",
+  };
+});
 
 /// Cover the moment the strip starts, which is now.
 const coveredNow = computed(() => !isHole(runs.value[0]?.cover ?? "none"));

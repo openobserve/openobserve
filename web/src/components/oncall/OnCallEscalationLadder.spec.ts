@@ -204,13 +204,39 @@ describe("OnCallEscalationLadder", () => {
     expect(chips.find('[data-test="oncall-ladder-send-test"]').exists()).toBe(false);
   });
 
-  // Owner: the "nobody here can receive" chips are gone; the rail's unreachable badge already says it.
-  it("draws no channel warning chips", () => {
+  // AI review 4405957571: a first step that reaches nobody would send nothing, so Send test is not offered.
+  it("disables Send test while the first step reaches nobody", () => {
     const wrapper = render({
-      priorities: [{ ...priorities[0], channels: ["email", "sms", "voice"] }, priorities[1]],
+      canConfigure: true,
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 300,
+            targets: ["the whole team"],
+            recipients: [person()],
+            resolves_to_nobody: false,
+          },
+          { after_micros: 0, targets: ["the on-call"], recipients: [], resolves_to_nobody: true },
+        ],
+      }),
     });
 
-    expect(wrapper.find('[data-test="oncall-ladder-unreceivable"]').exists()).toBe(false);
+    expect(
+      wrapper.find('[data-test="oncall-ladder-send-test"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  // F2 (round 13): the confirm is built from the preview, so a preview still showing the last priority must not be sent from.
+  it("disables Send test while the preview is for another priority", () => {
+    const wrapper = render({
+      canConfigure: true,
+      selected: "P2",
+      preview: preview({ priority: "P1" }),
+    });
+
+    expect(
+      wrapper.find('[data-test="oncall-ladder-send-test"]').attributes("disabled"),
+    ).toBeDefined();
   });
 
   it("offers Send test only to someone who can configure", async () => {
