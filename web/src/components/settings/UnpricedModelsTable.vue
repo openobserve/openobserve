@@ -117,9 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center justify-end gap-1.5"
             data-test="model-pricing-unpriced-no-model"
           >
-            <span class="text-text-secondary text-xs">{{
-              t("modelPricing.unpriced.noModelHint")
-            }}</span>
+            <!-- The hint rides in a tooltip so the pinned column never outgrows its width. -->
             <OButton
               variant="outline"
               size="sm"
@@ -127,14 +125,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="openInstrumentationDocs"
             >
               {{ t("modelPricing.unpriced.instrumentationDocs") }}
+              <OTooltip :content="t('modelPricing.unpriced.noModelHint')" />
             </OButton>
           </div>
           <span
             v-else-if="row.priced_now"
-            class="text-text-secondary text-xs"
+            class="text-text-secondary inline-flex items-center gap-1 text-xs"
             data-test="model-pricing-unpriced-priced-since"
-            >{{ t("modelPricing.unpriced.historicalGap") }}</span
           >
+            {{ t("modelPricing.unpriced.noActionNeeded") }}
+            <OIcon name="info-outline" size="xs" />
+            <OTooltip :content="t('modelPricing.unpriced.historicalGap')" />
+          </span>
           <div v-else class="flex items-center justify-end gap-1">
             <OButton
               variant="outline"
@@ -146,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-if="row.matched"
-              variant="ghost"
+              variant="outline"
               size="sm"
               :loading="pendingModel === row.model"
               :disabled="!!pendingModel"
@@ -157,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-else
-              variant="ghost"
+              variant="outline"
               size="sm"
               :loading="pendingModel === row.model"
               :disabled="!!pendingModel"
@@ -237,9 +239,11 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
