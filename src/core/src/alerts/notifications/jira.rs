@@ -15,7 +15,10 @@
 
 //! Jira destination: one open issue per alert or incident, found by label, then commented on.
 
-use std::time::Duration;
+use std::{
+    sync::{Arc, LazyLock},
+    time::{Duration, Instant},
+};
 
 use anyhow::{Result, anyhow, bail};
 use config::{
@@ -32,6 +35,7 @@ use config::{
         },
     },
 };
+use dashmap::DashMap;
 use db::alerts::destinations::DestinationError;
 use reqwest::{Method, StatusCode};
 use serde::Deserialize;
@@ -63,6 +67,21 @@ const MIN_SILENCE_MINUTES: i64 = 10;
 
 const PROJECTS_PAGE: usize = 50;
 const PROJECTS_MAX: usize = 1000;
+
+const CREATEMETA_PAGE: usize = 200;
+/// Stops a server that never reports its last page.
+const CREATEMETA_MAX_PAGES: usize = 20;
+
+/// Jira's search usually catches a new issue within minutes, so 30 bridges even a slow reindex.
+const CREATED_TTL: Duration = Duration::from_secs(30 * 60);
+
+/// The key and creation time of the issue this node last made for one (site, project, label).
+type CreatedSlot = Arc<tokio::sync::Mutex<Option<(String, Instant)>>>;
+
+/// Sends for one slot run one at a time, so a search that cannot see a new issue yet adds no twin.
+// ponytail: per node, so two cluster nodes can still both create; a shared lock if that bites.
+static CREATED: LazyLock<DashMap<(String, String, String), CreatedSlot>> =
+    LazyLock::new(DashMap::new);
 
 /// Filled by OpenObserve or by its own form controls, so setup never asks for them.
 const SETUP_SKIPPED_FIELDS: [&str; 7] = [
@@ -207,6 +226,17 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
         .collect();
     let jira = Jira::new(&endpoint.url, headers, endpoint.skip_tls_verify, false)?;
 
+    let slot = created_slot(&jira.base, project_key, &label);
+    let mut created = slot.lock().await;
+    if let Some((key, _)) = created
+        .as_ref()
+        .filter(|(_, at)| at.elapsed() < CREATED_TTL)
+        && still_open(&jira, key).await
+    {
+        return comment_on(&jira, key, ctx).await;
+    }
+    *created = None;
+
     let search = if meta("jira_deployment") == "data_center" {
         "/rest/api/2/search"
     } else {
@@ -216,14 +246,7 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     let found = jira.call(Method::POST, search, Some(query)).await?;
     let open = &found["issues"][0];
     if let Some(key) = open["key"].as_str().or_else(|| open["id"].as_str()) {
-        let body = json!({"body": comment(ctx)});
-        jira.call(
-            Method::POST,
-            &format!("/rest/api/2/issue/{key}/comment"),
-            Some(body),
-        )
-        .await?;
-        return Ok(format!("commented on {key}"));
+        return comment_on(&jira, key, ctx).await;
     }
     if ctx.alert_status == STATUS_RESOLVED {
         return Ok(format!("no open Jira issue with label {label}"));
@@ -243,17 +266,54 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     fields.insert("summary".into(), json!(summary(ctx)));
     fields.insert("description".into(), json!(description(ctx)));
     fields.insert("labels".into(), json!([LABEL, label]));
-    let created = jira
+    let issue = jira
         .call(
             Method::POST,
             "/rest/api/2/issue",
             Some(json!({ "fields": fields })),
         )
         .await?;
-    Ok(format!(
-        "created {}",
-        created["key"].as_str().unwrap_or_default()
-    ))
+    let key = issue["key"].as_str().unwrap_or_default();
+    if !key.is_empty() {
+        *created = Some((key.to_string(), Instant::now()));
+    }
+    Ok(format!("created {key}"))
+}
+
+/// The slot for one issue identity; idle slots with nothing fresh are dropped so the map stays
+/// small.
+fn created_slot(base: &str, project_key: &str, label: &str) -> CreatedSlot {
+    CREATED.retain(|_, slot| {
+        Arc::strong_count(slot) > 1
+            || slot.try_lock().is_ok_and(|held| {
+                held.as_ref()
+                    .is_some_and(|(_, at)| at.elapsed() < CREATED_TTL)
+            })
+    });
+    let key = (base.to_string(), project_key.to_string(), label.to_string());
+    Arc::clone(&CREATED.entry(key).or_default())
+}
+
+/// An issue that cannot be read counts as gone, so the search decides instead.
+async fn still_open(jira: &Jira, key: &str) -> bool {
+    jira.call(
+        Method::GET,
+        &format!("/rest/api/2/issue/{key}?fields=status"),
+        None,
+    )
+    .await
+    .is_ok_and(|issue| issue["fields"]["status"]["statusCategory"]["key"] != "done")
+}
+
+async fn comment_on(jira: &Jira, key: &str, ctx: &NotificationContext) -> Result<String> {
+    let body = json!({"body": comment(ctx)});
+    jira.call(
+        Method::POST,
+        &format!("/rest/api/2/issue/{key}/comment"),
+        Some(body),
+    )
+    .await?;
+    Ok(format!("commented on {key}"))
 }
 
 /// Answers the destination form's lookups with the credentials it typed, or the saved token.
@@ -297,8 +357,8 @@ pub async fn setup(org_id: &str, req: SetupRequest) -> Result<Value> {
                 "/rest/api/2/issue/createmeta/{}/issuetypes",
                 req.project_key
             );
-            let meta = jira.call(Method::GET, &path, None).await?;
-            let issue_types: Vec<Value> = listed(&meta, "issueTypes")
+            let issue_types: Vec<Value> = all_pages(&jira, &path, "issueTypes")
+                .await?
                 .iter()
                 .filter(|t| t["subtask"].as_bool() != Some(true))
                 .map(|t| json!({"id": t["id"], "name": t["name"]}))
@@ -307,10 +367,11 @@ pub async fn setup(org_id: &str, req: SetupRequest) -> Result<Value> {
         }
         "fields" => {
             let path = format!(
-                "/rest/api/2/issue/createmeta/{}/issuetypes/{}?maxResults=200",
+                "/rest/api/2/issue/createmeta/{}/issuetypes/{}",
                 req.project_key, req.issue_type_id
             );
-            Ok(create_screen(&jira.call(Method::GET, &path, None).await?))
+            let fields = all_pages(&jira, &path, "fields").await?;
+            Ok(create_screen(&json!({ "fields": fields })))
         }
         "test_issue" => test_issue(&jira, req).await,
         other => bail!("Unknown Jira setup action '{other}'."),
@@ -472,6 +533,29 @@ async fn connect(jira: &Jira, cloud: bool) -> Result<Value> {
         "display_name": me["displayName"].as_str().unwrap_or_default(),
         "projects": projects,
     }))
+}
+
+/// Every item of a paged createmeta list; Data Center ends it with `isLast`, Cloud with `total`.
+async fn all_pages(jira: &Jira, path: &str, key: &str) -> Result<Vec<Value>> {
+    let mut items = Vec::new();
+    for _ in 0..CREATEMETA_MAX_PAGES {
+        let page_path = format!(
+            "{path}?startAt={}&maxResults={CREATEMETA_PAGE}",
+            items.len()
+        );
+        let page = jira.call(Method::GET, &page_path, None).await?;
+        let values = listed(&page, key);
+        items.extend_from_slice(values);
+        let more = match (page["isLast"].as_bool(), page["total"].as_u64()) {
+            (Some(last), _) => !last,
+            (None, Some(total)) => (items.len() as u64) < total,
+            (None, None) => false,
+        };
+        if values.is_empty() || !more {
+            break;
+        }
+    }
+    Ok(items)
 }
 
 async fn test_issue(jira: &Jira, req: SetupRequest) -> Result<Value> {
@@ -1284,8 +1368,9 @@ mod tests {
         }
     }
 
-    /// A Jira site whose search finds `open`, recording each call as `METHOD /path` and its body.
-    async fn jira_site(open: Option<&'static str>) -> (String, Seen) {
+    /// A Jira site whose search finds `open` and whose OPS-142 sits in status `category`, recording
+    /// each call as `METHOD /path` and its body. Its createmeta lists come in two pages.
+    async fn jira_site(open: Option<&'static str>, category: &'static str) -> (String, Seen) {
         let seen: Seen = Arc::default();
         let log = seen.clone();
         let app = axum::Router::new().fallback(
@@ -1296,11 +1381,40 @@ mod tests {
                     log.lock()
                         .unwrap()
                         .push((format!("{method} {}", uri.path()), body));
-                    axum::Json(match uri.path() {
-                        "/rest/api/2/search/jql" => {
+                    let second = uri
+                        .query()
+                        .is_some_and(|q| q.split('&').any(|p| p == "startAt=1"));
+                    axum::Json(match (uri.path(), second) {
+                        ("/rest/api/2/search/jql", _) => {
                             json!({"issues": open.map_or(vec![], |key| vec![json!({"key": key})])})
                         }
-                        "/rest/api/2/issue" => json!({"key": "OPS-142"}),
+                        ("/rest/api/2/issue", _) => json!({"key": "OPS-142"}),
+                        ("/rest/api/2/issue/OPS-142", _) => json!({
+                            "key": "OPS-142",
+                            "fields": {"status": {"statusCategory": {"key": category}}},
+                        }),
+                        ("/rest/api/2/issue/createmeta/OPS/issuetypes", false) => json!({
+                            "issueTypes": [{"id": "10001", "name": "Task"}],
+                            "startAt": 0, "maxResults": 1, "total": 2,
+                        }),
+                        ("/rest/api/2/issue/createmeta/OPS/issuetypes", true) => json!({
+                            "issueTypes": [{"id": "10004", "name": "Bug"}],
+                            "startAt": 1, "maxResults": 1, "total": 2,
+                        }),
+                        ("/rest/api/2/issue/createmeta/OPS/issuetypes/10004", false) => json!({
+                            "values": [{"fieldId": "summary", "name": "Summary", "required": true,
+                                        "schema": {"type": "string"}}],
+                            "isLast": false,
+                        }),
+                        ("/rest/api/2/issue/createmeta/OPS/issuetypes/10004", true) => json!({
+                            "values": [
+                                {"fieldId": "labels", "name": "Labels", "required": false,
+                                 "schema": {"type": "array", "items": "string"}},
+                                {"fieldId": "customfield_1", "name": "Notes", "required": true,
+                                 "schema": {"type": "string"}},
+                            ],
+                            "isLast": true,
+                        }),
                         _ => json!({}),
                     })
                 }
@@ -1343,7 +1457,7 @@ mod tests {
         open: Option<&'static str>,
         status: &str,
     ) -> (String, Vec<(String, Value)>) {
-        let (base, seen) = jira_site(open).await;
+        let (base, seen) = jira_site(open, "indeterminate").await;
         let mut ctx = alert_ctx();
         ctx.alert_status = status.into();
         let sent = send(&endpoint(base), &ctx).await.unwrap();
@@ -1437,6 +1551,121 @@ mod tests {
                     "no open Jira issue with label openobserve-alert-2nX8bQk3LpT0"
                 );
                 assert_eq!(calls.len(), 1);
+            },
+        );
+    }
+
+    fn paths(seen: &Seen) -> Vec<String> {
+        seen.lock()
+            .unwrap()
+            .iter()
+            .map(|(c, _)| c.clone())
+            .collect()
+    }
+
+    #[test]
+    fn incident_sends_before_the_search_sees_the_new_issue_create_it_once() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::incident_sends_before_the_search_sees_the_new_issue_create_it_once"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let endpoint = endpoint(base);
+                let (opened, joined) = (
+                    incident_ctx("new_incident_created"),
+                    incident_ctx("new_alert_correlated"),
+                );
+                let (first, second) =
+                    tokio::join!(send(&endpoint, &opened), send(&endpoint, &joined));
+                let mut sent = [first.unwrap(), second.unwrap()];
+                sent.sort();
+                assert_eq!(sent, ["commented on OPS-142", "created OPS-142"]);
+                assert_eq!(
+                    paths(&seen),
+                    [
+                        "POST /rest/api/2/search/jql",
+                        "POST /rest/api/2/issue",
+                        "GET /rest/api/2/issue/OPS-142",
+                        "POST /rest/api/2/issue/OPS-142/comment",
+                    ]
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_remembered_issue_that_is_done_falls_back_to_the_search() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_remembered_issue_that_is_done_falls_back_to_the_search"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "done").await;
+                let endpoint = endpoint(base);
+                let ctx = incident_ctx("new_incident_created");
+                assert_eq!(send(&endpoint, &ctx).await.unwrap(), "created OPS-142");
+                assert_eq!(send(&endpoint, &ctx).await.unwrap(), "created OPS-142");
+                assert_eq!(
+                    paths(&seen),
+                    [
+                        "POST /rest/api/2/search/jql",
+                        "POST /rest/api/2/issue",
+                        "GET /rest/api/2/issue/OPS-142",
+                        "POST /rest/api/2/search/jql",
+                        "POST /rest/api/2/issue",
+                    ]
+                );
+            },
+        );
+    }
+
+    async fn setup_on_site(action: &str, issue_type_id: &str) -> Value {
+        let (base, _) = jira_site(None, "").await;
+        let mut req = setup_req("secret", None, &base, "ops@acme.com");
+        req.action = action.into();
+        req.project_key = "OPS".into();
+        req.issue_type_id = issue_type_id.into();
+        setup("default", req).await.unwrap()
+    }
+
+    #[test]
+    fn issue_types_on_a_later_page_are_listed() {
+        isolated(
+            concat!(module_path!(), "::issue_types_on_a_later_page_are_listed"),
+            &[("ZO_SSRF_ALLOW_LOOPBACK", "true")],
+            || async {
+                assert_eq!(
+                    setup_on_site("issue_types", "").await,
+                    json!({"issue_types": [
+                        {"id": "10001", "name": "Task"},
+                        {"id": "10004", "name": "Bug"},
+                    ]})
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn fields_on_a_later_page_are_read() {
+        isolated(
+            concat!(module_path!(), "::fields_on_a_later_page_are_read"),
+            &[("ZO_SSRF_ALLOW_LOOPBACK", "true")],
+            || async {
+                assert_eq!(
+                    setup_on_site("fields", "10004").await,
+                    json!({
+                        "has_labels": true,
+                        "priorities": [],
+                        "required_fields": [
+                            {"id": "customfield_1", "name": "Notes", "kind": "text", "options": []},
+                        ],
+                    })
+                );
             },
         );
     }
