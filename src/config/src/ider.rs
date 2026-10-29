@@ -97,7 +97,8 @@ pub fn generate_trace_id() -> String {
 /// Returns the timestamp in microseconds since Unix epoch, or None if parsing fails
 pub fn get_start_time_from_trace_id(trace_id: &str) -> Option<i64> {
     // First, convert the hex string back to UUID format if needed
-    let uuid_str = if trace_id.len() == 32 {
+    // Byte slicing below needs ASCII; non-ASCII input fails UUID parsing in the else branch.
+    let uuid_str = if trace_id.len() == 32 && trace_id.is_ascii() {
         // Convert from hex format (32 chars) to UUID format (with hyphens)
         format!(
             "{}-{}-{}-{}-{}",
@@ -483,6 +484,17 @@ mod tests {
             invalid_timestamp_result.is_none(),
             "Should return None for trace_id with invalid timestamp range"
         );
+    }
+
+    #[test]
+    fn test_get_start_time_from_trace_id_non_ascii_32_bytes() {
+        let non_ascii = format!("a{}{}", "\u{e9}".repeat(6), "a".repeat(19));
+        assert_eq!(non_ascii.len(), 32);
+        assert!(!non_ascii.is_char_boundary(8));
+        assert_eq!(get_start_time_from_trace_id(&non_ascii), None);
+
+        let valid = generate_trace_id();
+        assert!(get_start_time_from_trace_id(&valid).is_some());
     }
 
     #[test]
