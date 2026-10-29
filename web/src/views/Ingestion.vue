@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+          !rumTokenForbidden &&
           store.state.organizationData.rumToken.rum_token != ''
         "
         variant="primary"
@@ -74,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+          !rumTokenForbidden &&
           store.state.organizationData.rumToken.rum_token == ''
         "
         variant="primary"
@@ -265,6 +267,8 @@ export default defineComponent({
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
     const confirmRUMUpdate = ref<boolean>(false);
+    // A viewer may not read the RUM token, so it may neither generate nor reset one.
+    const rumTokenForbidden = ref(false);
     const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
@@ -394,14 +398,17 @@ export default defineComponent({
         }
       });
 
-    // A read failure stays silent: the card falls back to its Generate action.
+    // A 403 hides the token actions; any other read failure falls back to the Generate action.
     const getRUMToken = () => {
       return queryClient
         .fetchQuery(rumTokensQuery(store.state.selectedOrganization.identifier))
         .then((res: any) => {
+          rumTokenForbidden.value = false;
           store.dispatch("setRUMToken", res.data);
         })
-        .catch(() => {});
+        .catch((e: any) => {
+          rumTokenForbidden.value = e?.response?.status === 403;
+        });
     };
 
     const updatePasscode = () => {
@@ -648,6 +655,7 @@ export default defineComponent({
       getImageURL,
       ingestTabType,
       getRUMToken,
+      rumTokenForbidden,
       tabs,
       activeTab,
       copyToClipboardFn,
