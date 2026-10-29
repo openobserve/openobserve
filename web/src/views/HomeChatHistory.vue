@@ -208,7 +208,7 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input text-text-body placeholder:text-text-muted min-w-0 flex-1 border-0 bg-transparent py-[0.375em] text-[0.8125em] outline-none placeholder:opacity-70"
+          class="hch-search-input text-text-body placeholder:text-input-placeholder min-w-0 flex-1 border-0 bg-transparent py-[0.375em] text-[0.8125em] outline-none"
           :placeholder="t('chatHistory.search')"
           :aria-label="t('chatHistory.search')"
           type="text"
