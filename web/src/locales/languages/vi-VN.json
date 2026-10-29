@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": "Chỉ tệp .json",
     "fileUploadJsonTab": "Tải lên tệp / JSON",
     "urlImportTab": "Nhập bằng URL",
-    "relativeTimeAgo": "Cách đây {value} {unit}",
-    "relativeTimePast": "Trong {value} {unit} qua",
     "metrics": "Chỉ số",
     "traces": "Trace",
     "browserTime": "Thời gian trình duyệt",

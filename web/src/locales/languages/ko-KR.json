@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": ".json 파일만",
     "fileUploadJsonTab": "파일 업로드 / JSON",
     "urlImportTab": "URL 가져오기",
-    "relativeTimeAgo": "{value} {unit} 전",
-    "relativeTimePast": "지난 {value} {unit}",
     "metrics": "메트릭",
     "traces": "트레이스",
     "browserTime": "브라우저 시간",

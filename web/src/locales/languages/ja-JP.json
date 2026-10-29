@@ -933,8 +933,6 @@
     "jsonFilesOnlyHint": ".jsonファイルのみ",
     "fileUploadJsonTab": "ファイルアップロード / JSON",
     "urlImportTab": "URLインポート",
-    "relativeTimeAgo": "{value}{unit}前",
-    "relativeTimePast": "過去{value}{unit}",
     "metrics": "メトリクス",
     "traces": "トレース",
     "browserTime": "ブラウザ時間",
