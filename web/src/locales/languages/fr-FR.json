@@ -669,6 +669,7 @@
     "dateRangeCopied": "Plage de dates copiée",
     "dateRangePasted": "Plage de dates collée",
     "dateRangePasteError": "Impossible d'analyser la plage de dates",
+    "dateRangePasteBlocked": "Ce navigateur a bloqué la lecture du presse-papiers. Appuyez sur {shortcut} avec le sélecteur ouvert pour coller.",
     "pastSecond": "Dernière {count} seconde | Dernières {count} secondes",
     "pastMinute": "Dernière {count} minute | Dernières {count} minutes",
     "pastHour": "Dernière {count} heure | Dernières {count} heures",
@@ -11578,7 +11579,8 @@
         "dailySentence": "Tous les jours · {time} pendant {duration} · {zone}",
         "weeklySentence": "Chaque semaine le {days} · {time} pendant {duration} · {zone}",
         "fromNoEnd": "{schedule}, à partir du {start} sans date de fin",
-        "fromUntil": "{schedule}, du {start} au {until}"
+        "fromUntil": "{schedule}, du {start} au {until}",
+        "onceFor": "Une fois, {duration}"
       },
       "validation": {
         "conditionRequired": "Ajoutez une condition ou supprimez le bloc de conditions.",
@@ -11919,8 +11921,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 h",
-          "2h": "2 h",
           "4h": "4 h",
+          "24h": "24 h",
           "custom": "Personnalisé"
         },
         "endsAt": "Se termine le",
@@ -11934,7 +11936,34 @@
         "mutedTooltip": "Mis en sourdine par {name} jusqu'à {end}",
         "exclude": "Exclure une fenêtre…",
         "firingMuted": "Déclenchée · en sourdine",
-        "firingMutedTooltip": "Toujours déclenchée. Les notifications sont mises en sourdine par {name}."
+        "firingMutedTooltip": "Toujours déclenchée. Les notifications sont mises en sourdine par {name}.",
+        "untilClear": "Jusqu'à résolution",
+        "untilClearHint": "Se termine lorsque l'alerte se rétablit, ou après 24 h au plus tard.",
+        "confirmUntilClear": "Mettre en sourdine jusqu'à résolution",
+        "titleOne": "Mettre en sourdine {name}",
+        "subtitleOne": "L'alerte continue de s'exécuter et conserve son historique. Les notifications, les pages d'astreinte et les workflows sont suspendus jusqu'à la fin de la fenêtre.",
+        "untilTime": "Jusqu'à {time}.",
+        "groups": "Groupes",
+        "groupsThis": "Ce groupe",
+        "groupsAll": "Tous les groupes de cette alerte",
+        "addGroup": "Ajouter un groupe en alerte",
+        "groupsHint": "Seuls ces groupes sont en sourdine ; les autres continuent de notifier",
+        "confirm24h": {
+          "title": "Mettre en sourdine pendant 24 heures ?",
+          "message": "« Jusqu'à résolution » met fin à la sourdine dès que l'alerte se rétablit.",
+          "useUntilClear": "Utiliser jusqu'à résolution",
+          "ok": "Sourdine 24 h"
+        },
+        "muteGroup": "Mettre ce groupe en sourdine",
+        "endNow": "Terminer la sourdine maintenant",
+        "endMute": "Terminer la sourdine",
+        "mutedUntilClear": "En sourdine jusqu'à résolution · 24 h au maximum",
+        "mutedUntilClearGroups": "En sourdine jusqu'à résolution · {count} groupe | En sourdine jusqu'à résolution · {count} groupes",
+        "mutedGroups": "En sourdine · {count} groupe · se termine dans {duration} | En sourdine · {count} groupes · se termine dans {duration}",
+        "mutedUntilClearTooltip": "Mis en sourdine par {name} jusqu'au rétablissement de l'alerte, au plus tard {end}",
+        "mutedGroupsTooltip": "Mis en sourdine par {name} jusqu'à {end}. Groupes : {labels}",
+        "mutedUntilClearGroupsTooltip": "Mis en sourdine par {name} jusqu'au rétablissement de l'alerte, au plus tard {end}. Groupes : {labels}",
+        "untilTomorrow": "Jusqu'à demain {time}."
       },
       "corrected": "Corrigé",
       "correctedBy": "Score corrigé par {names}",
@@ -12020,7 +12049,66 @@
           "sent": "Test envoyé à {count} destination | Test envoyé à {count} destinations",
           "failed": "Le test n'a pas atteint {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "Jusqu'à résolution",
+        "atMost": "24 h au maximum",
+        "endsWhenClears": "se termine à la résolution",
+        "byTime": "à {time}",
+        "whenCleared": "lors de la résolution",
+        "endedBy": "terminé par {product}",
+        "createdFrom": "depuis {source}"
+      },
+      "groupTarget": "Groupe : {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Mise en sourdine rapide depuis une alerte",
+      "endedLabel": "terminé"
+    },
+    "ack": {
+      "acknowledge": "Prendre en charge",
+      "acknowledgeGroups": "Prendre en charge {count} groupe en alerte | Prendre en charge {count} groupes en alerte",
+      "unacknowledge": "Annuler la prise en charge",
+      "takeOver": "Prendre le relais",
+      "chip": "Pris en charge par {who} via {source} · {time}",
+      "chipTooltip": "Pris en charge par {who} à {time} depuis {source}",
+      "firingAcknowledged": "En alerte · prise en charge",
+      "tile": "Pris en charge",
+      "groupsAcknowledged": "{count} pris en charge",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "astreinte",
+        "incident": "incident"
+      },
+      "history": {
+        "dedupSuppressed": "supprimée par accusé de réception ({who})",
+        "acked": "Accusé de réception donné par {who} depuis {source}",
+        "ackedViaPage": "Accusé de réception donné par {who} via la notification {page}",
+        "ackedViaIncident": "Accusé de réception donné par {who} via l'incident {incident}",
+        "unacked": "Accusé de réception retiré par {who} depuis {source}",
+        "unackedResume": "Accusé de réception retiré par {who} depuis {source} · les répétitions reprennent à {time}",
+        "takenOver": "Repris par {who} de {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Vous ne pouvez pas accuser réception de cette alerte. Accuser réception et Mettre en sourdine nécessitent le rôle Admin ou Editor, ou d'être le répondant d'astreinte de l'alerte.",
+        "mute": "Vous ne pouvez pas mettre cette alerte en sourdine. Accuser réception et Mettre en sourdine nécessitent le rôle Admin ou Editor, ou d'être le répondant d'astreinte de l'alerte.",
+        "onCall": "D'astreinte : {people}",
+        "canAct": "Peuvent agir : {people}",
+        "people": "D'astreinte : {onCall}. Peuvent agir : {canAct}"
+      },
+      "errors": {
+        "notFiring": "Cette alerte n'est pas déclenchée, il n'y a donc aucun accusé de réception possible.",
+        "firingChanged": "L'alerte s'est déclenchée à nouveau depuis le chargement de cette page. Actualisez et réessayez."
       }
+    },
+    "groupActions": {
+      "menu": "Actions de groupe",
+      "viewHistory": "Afficher l'historique de ce groupe"
+    },
+    "firingState": {
+      "level": "Niveau",
+      "firingSince": "Déclenchée depuis",
+      "firingFor": "déclenchée depuis {duration}",
+      "incident": "Incident"
     }
   },
   "alert_dependencies": {
@@ -12549,13 +12637,14 @@
       "openSlackSettings": "Configurez-la dans Réglages › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Envoyer des notifications aux canaux Slack",
+      "slackDescription": "Publie un nouveau message avec votre webhook et votre modèle. À utiliser pour les notifications d'astreinte ou des mises en page Slack personnalisées.",
       "discordDescription": "Envoyer des notifications aux canaux Discord",
       "msteamsDescription": "Envoyer des notifications aux canaux Teams",
       "emailDescription": "Envoyer des notifications par e-mail au format HTML",
       "pagerdutyDescription": "Créer des incidents dans PagerDuty",
       "opsgenieDescription": "Créer des alertes dans Opsgenie",
-      "servicenowDescription": "Créer des incidents dans ServiceNow"
+      "servicenowDescription": "Créer des incidents dans ServiceNow",
+      "slackAppDescription": "Met à jour les alertes planifiées sur place. Accusez réception, mettez en sourdine et analysez depuis Slack. Nécessite un espace de travail connecté."
     },
     "import": {
       "title": "Importer une destination",
@@ -12597,7 +12686,8 @@
     "severityCriticalDescription": "Incidents de priorité la plus élevée",
     "severityErrorDescription": "Incidents d'erreur standard",
     "severityWarningDescription": "Incidents de niveau d'avertissement",
-    "severityInfoDescription": "Incidents informatifs"
+    "severityInfoDescription": "Incidents informatifs",
+    "urlRecipientsChannel": "URL / destinataires / canal"
   },
   "pipeline_destinations": {
     "header": "Destinations des pipelines",
@@ -13120,7 +13210,7 @@
     "groupIntegrations": "Intégrations",
     "groupAccount": "Compte",
     "slackApp": "Slack",
-    "slackAppDesc": "Posez des questions à OpenObserve depuis Slack",
+    "slackAppDesc": "Posez des questions à OpenObserve et agissez sur les alertes depuis Slack",
     "generalDesc": "Thème, valeurs par défaut des requêtes et préférences principales",
     "orgDesc": "Paramètres et identifiants de l'organisation",
     "cipherKeysDesc": "Clés de chiffrement pour les champs sensibles",
@@ -20618,7 +20708,9 @@
         "succeeded": "Réussi",
         "failed": "Échoué",
         "skipped": "Ignoré",
-        "pending": "En attente"
+        "pending": "En attente",
+        "acknowledged": "Accusé de réception",
+        "ackevent": "Événement d'accusé de réception"
       },
       "alertLevel": {
         "ok": "OK",
@@ -20921,7 +21013,16 @@
       "alertSavedSuccessfully": "Alerte enregistrée avec succès.",
       "alertUpdatedSuccessfully": "Alerte mise à jour avec succès.",
       "openingDedupConfig": "Ouverture de la configuration de déduplication pour : {name}",
-      "editingAlert": "Modification de l'alerte : {name}"
+      "editingAlert": "Modification de l'alerte : {name}",
+      "ack": {
+        "acked": "Accusé de réception pour {name}",
+        "ackedGroups": "Accusé de réception pour {count} groupe de {name} | Accusé de réception pour {count} groupes de {name}",
+        "alreadyAcked": "Accusé de réception déjà donné par {who}",
+        "unacked": "Accusé de réception retiré pour {name}",
+        "takenOver": "Vous avez repris l'accusé de réception de {name}",
+        "failed": "Impossible d'accuser réception de {name}",
+        "unackFailed": "Impossible de retirer l'accusé de réception de {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Clé de chiffrement mise à jour avec succès",
@@ -21233,7 +21334,14 @@
       "muted": "Mise en sourdine de {count} élément jusqu'à {time}. Classé dans {folder}. | Mise en sourdine de {count} éléments jusqu'à {time}. Classés dans {folder}.",
       "muteFailed": "Impossible de créer la sourdine",
       "viewDowntime": "Voir la période de maintenance",
-      "itemsDropped": "{count} élément choisi est en dehors des dossiers choisis et a été supprimé. | {count} éléments choisis sont en dehors des dossiers choisis et ont été supprimés."
+      "itemsDropped": "{count} élément choisi est en dehors des dossiers choisis et a été supprimé. | {count} éléments choisis sont en dehors des dossiers choisis et ont été supprimés.",
+      "mutedUntilClear": "{name} mise en sourdine jusqu'à sa résolution, au plus tard à {time}",
+      "alreadyMuted": "{name} est déjà en sourdine jusqu'à {time}",
+      "muteChanged": "Cette mise en sourdine a changé depuis le chargement de la page. Elle se termine désormais à {time}.",
+      "muteEnded": "Mise en sourdine terminée. Les notifications reprennent.",
+      "mutedOne": "{name} mise en sourdine jusqu'à {time}",
+      "timeTomorrow": "{time} demain",
+      "notQuickMute": "Cette mise en sourdine a été définie sur la page Périodes de maintenance. Modifiez-la à cet endroit."
     }
   },
   "cipherKeys": {
@@ -26699,7 +26807,10 @@
       "managedBy": "géré par l'administrateur de votre instance",
       "managedTitle": "Géré par l'administrateur de votre instance.",
       "managedDetail": "Les identifiants, la liaison et les organisations qui utilisent {team} sont définis dans _meta.",
-      "managedQuestions": "Questions : {contact}"
+      "managedQuestions": "Questions : {contact}",
+      "outboundQueue": "Message d'alerte : {count} en file d'attente, le plus ancien {age} | Messages d'alerte : {count} en file d'attente, le plus ancien {age}",
+      "outboundEmpty": "Aucun message d'alerte en file d'attente",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Valeurs par défaut des canaux",
@@ -26735,7 +26846,8 @@
       "instanceAdminOnly": "Administrateur d'instance uniquement",
       "ownOrgOnlyHint": "Sur un espace de travail d'instance, vous associez les canaux à votre propre organisation",
       "claimableHint": "Canaux non revendiqués et canaux détenus par {org}",
-      "servedOrgsHint": "Toute organisation desservie par cet espace de travail"
+      "servedOrgsHint": "Toute organisation desservie par cet espace de travail",
+      "alertRoutes": "{count} destination | {count} destinations"
     },
     "people": {
       "title": "Personnes liées",
@@ -26889,6 +27001,83 @@
       "remove": "Retirer",
       "saved": "Organisations enregistrées",
       "saveFailed": "Les organisations n'ont pas pu être enregistrées."
+    },
+    "destination": {
+      "appTile": "application {product}",
+      "webhookTile": "webhook {product}",
+      "twoWay": "Bidirectionnel",
+      "recommendedForAlertResponse": "Recommandé pour la réponse aux alertes",
+      "choiceHint": "Les notifications d'astreinte et les super clusters utilisent le webhook. Les envois manuels et en temps réel depuis une destination de type application Slack sont des publications distinctes.",
+      "unavailableReason": "Nécessite l'application Slack Enterprise sur un cluster unique",
+      "unavailableFlag": "Désactivé sur ce serveur ; demandez à votre opérateur de définir {variable}",
+      "unavailableMasterKey": "Nécessite une clé de chiffrement sur ce serveur ; demandez à votre opérateur de définir {variable}",
+      "unavailableCloud": "Pas encore activé pour votre région Cloud",
+      "unavailableNoAccess": "Demandez à un administrateur de l'organisation d'activer l'application Slack",
+      "postOnly": "Publication uniquement",
+      "switchToApp": "Passer à l'application {product}",
+      "switchThis": "Basculer cette destination",
+      "switchBack": "Revenir en arrière",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Espace de travail",
+      "channel": "Canal",
+      "mention": "Mention",
+      "mentionCritical": "{'@'}here pour les alertes critiques, aucune pour les autres",
+      "mentionNone": "Aucune",
+      "mentionHelp": "Utilisée lors des répétitions et des changements de niveau",
+      "refireReuse": "Réutilisation en cas de nouvelle alerte (minutes)",
+      "refireReuseHelp": "Une nouvelle alerte dans ce délai modifie le message précédent au lieu d'en publier un nouveau",
+      "buttons": "Boutons Prendre en charge, Mettre en sourdine et Investiguer",
+      "buttonsHelp": "Résoudre est ajouté lorsque l'alerte en cours a un incident ou une notification d'astreinte",
+      "autoInvestigate": "Investiguer automatiquement pour les alertes critiques",
+      "autoInvestigateHelp": "S'exécute en tant que compte de service IA de l'organisation, avec ses accès ; publie les résultats dans le fil de l'alerte",
+      "templateDefault": "Modèle {product} par défaut ({name})",
+      "sendTest": "Envoyer un test",
+      "setsDefault": "Définit l'organisation par défaut de #{channel} sur {org}",
+      "answersFor": "#{channel} répond aux questions pour l'organisation {org}. Les alertes de {thisOrg} sont publiées ici et leurs fils répondent dans {thisOrg} ; la valeur par défaut du canal reste inchangée.",
+      "sharedTag": "Partagé · {product} Connect",
+      "sharedTitle": "#{channel} est partagé avec des personnes extérieures à {workspace}.",
+      "sharedDetail": "Elles verront les noms, valeurs, graphiques et liens des alertes. Leurs clics sur les boutons sont refusés.",
+      "sharedConfirm": "Je comprends, publier les alertes dans ce canal partagé",
+      "sharedRequired": "Confirmez que les alertes peuvent être publiées dans ce canal partagé",
+      "versionMismatch": "Les nœuds exécutent des versions différentes. Mettez d'abord à niveau chaque nœud.",
+      "oncallNotAllowed": "Une destination de l'application {product} ne peut pas être un canal d'équipe d'astreinte",
+      "answersForAnother": "#{channel} répond aux questions pour une autre organisation. Les alertes de {thisOrg} sont publiées ici et leurs fils répondent dans {thisOrg} ; la valeur par défaut du canal reste inchangée.",
+      "oncallTag": "Salle d'astreinte",
+      "oncallTitle": "Les notifications d'astreinte de l'équipe {team} sont aussi publiées dans #{channel} via {destination}.",
+      "oncallDetail": "Les alertes ici sont publiées séparément.",
+      "oncallConfirm": "Je comprends, publier les alertes dans cette salle d'astreinte",
+      "oncallRequired": "Confirmez que les alertes peuvent être publiées dans cette salle d'astreinte",
+      "workspaceRequired": "Choisissez un espace de travail",
+      "refireRange": "Saisissez un nombre entier de minutes de 0 à {max}",
+      "connectTitle": "Connectez {product} pour publier des alertes avec des boutons",
+      "connectDetail": "Choisissez un canal sur l'écran de {product} et autorisez. OpenObserve crée cette destination pour ce canal.",
+      "connected": "{name} a été créé pour #{channel}. Vérifiez ses réglages et enregistrez.",
+      "saveFailed": "La destination n'a pas pu être enregistrée.",
+      "switched": "{name} publie désormais via l'application {product}",
+      "switchedBack": "{name} publie à nouveau via son webhook",
+      "switchFailed": "Impossible de basculer {name} : {reason}",
+      "switchedAll": "{count} destination basculée | {count} destinations basculées",
+      "switchThisDetail": "Basculez-la vers l'application {product} pour les boutons Prendre en charge, Mettre en sourdine et Investiguer. Son nom, son modèle et ses alertes restent identiques ; Revenir en arrière restaure le webhook."
+    },
+    "switchAll": {
+      "title": "{count} destination webhook publie dans cet espace de travail. | {count} destinations webhook publient dans cet espace de travail.",
+      "detail": "Basculez-le vers l'application {product} pour les boutons Prendre en charge, Mettre en sourdine et Examiner. Son nom, son modèle et ses alertes restent inchangés ; le retour en arrière restaure le webhook. | Basculez-les vers l'application {product} pour les boutons Prendre en charge, Mettre en sourdine et Examiner. Les noms, modèles et alertes restent inchangés ; le retour en arrière restaure le webhook.",
+      "review": "Vérifier",
+      "action": "Tout basculer",
+      "summary": "{switched} basculé(s) · {count} n'ont pas pu être basculé(s)"
+    },
+    "oncallUnlinked": {
+      "title": "Membres d'astreinte non liés à {product}",
+      "description": "Les notifications ne peuvent pas leur envoyer de message direct, et leurs clics sur les boutons d'alerte et de notification restent en attente jusqu'à ce qu'ils soient liés",
+      "remind": "Leur envoyer un rappel",
+      "columnPerson": "Personne",
+      "columnTeam": "Équipe",
+      "columnNextShift": "Prochaine garde",
+      "columnReminder": "Rappel",
+      "dmSent": "Message direct envoyé {time}",
+      "notSent": "Non envoyé",
+      "reminded": "Rappel envoyé à {count} personne | Rappel envoyé à {count} personnes",
+      "remindFailed": "Les rappels n'ont pas pu être envoyés."
     }
   },
   "fleet": {

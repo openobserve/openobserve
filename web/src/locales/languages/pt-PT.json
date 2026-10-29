@@ -669,6 +669,7 @@
     "dateRangeCopied": "Intervalo de datas copiado",
     "dateRangePasted": "Intervalo de datas colado",
     "dateRangePasteError": "Não foi possível analisar o intervalo de datas",
+    "dateRangePasteBlocked": "Este navegador bloqueou a leitura da área de transferência. Prima {shortcut} com o seletor aberto para colar.",
     "pastSecond": "Último {count} segundo | Últimos {count} segundos",
     "pastMinute": "Último {count} minuto | Últimos {count} minutos",
     "pastHour": "Última {count} hora | Últimas {count} horas",
@@ -11578,7 +11579,8 @@
         "dailySentence": "Diariamente · {time} durante {duration} · {zone}",
         "weeklySentence": "Semanalmente em {days} · {time} durante {duration} · {zone}",
         "fromNoEnd": "{schedule}, a partir de {start} sem data de fim",
-        "fromUntil": "{schedule}, de {start} até {until}"
+        "fromUntil": "{schedule}, de {start} até {until}",
+        "onceFor": "Uma vez, {duration}"
       },
       "validation": {
         "conditionRequired": "Adicione uma condição ou remova o bloco de condição.",
@@ -11919,8 +11921,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 h",
-          "2h": "2 h",
           "4h": "4 h",
+          "24h": "24 h",
           "custom": "Personalizado"
         },
         "endsAt": "Termina em",
@@ -11934,7 +11936,34 @@
         "mutedTooltip": "Silenciado por {name} até {end}",
         "exclude": "Excluir uma janela…",
         "firingMuted": "A disparar · silenciado",
-        "firingMutedTooltip": "Continua a disparar. As notificações estão silenciadas por {name}."
+        "firingMutedTooltip": "Continua a disparar. As notificações estão silenciadas por {name}.",
+        "untilClear": "Até que recupere",
+        "untilClearHint": "Termina quando o alerta recuperar, ou após 24 h, no máximo.",
+        "confirmUntilClear": "Silenciar até que recupere",
+        "titleOne": "Silenciar {name}",
+        "subtitleOne": "Continua a ser executado e mantém o histórico. As notificações, os acionamentos e os fluxos de trabalho param até que a janela termine.",
+        "untilTime": "Até {time}.",
+        "groups": "Grupos",
+        "groupsThis": "Este grupo",
+        "groupsAll": "Todos os grupos deste alerta",
+        "addGroup": "Adicionar um grupo disparado",
+        "groupsHint": "Apenas estes grupos são silenciados; os outros grupos continuam a notificar",
+        "confirm24h": {
+          "title": "Silenciar durante 24 horas?",
+          "message": "A opção Até que recupere termina o silenciamento assim que o alerta recuperar.",
+          "useUntilClear": "Usar até que recupere",
+          "ok": "Silenciar 24 h"
+        },
+        "muteGroup": "Silenciar este grupo",
+        "endNow": "Terminar silenciamento agora",
+        "endMute": "Terminar silenciamento",
+        "mutedUntilClear": "Silenciado até que recupere · 24 h no máximo",
+        "mutedUntilClearGroups": "Silenciado até que recupere · {count} grupo | Silenciado até que recupere · {count} grupos",
+        "mutedGroups": "Silenciado · {count} grupo · termina daqui a {duration} | Silenciado · {count} grupos · termina daqui a {duration}",
+        "mutedUntilClearTooltip": "Silenciado por {name} até o alerta recuperar, {end} no máximo",
+        "mutedGroupsTooltip": "Silenciado por {name} até {end}. Grupos: {labels}",
+        "mutedUntilClearGroupsTooltip": "Silenciado por {name} até o alerta recuperar, {end} no máximo. Grupos: {labels}",
+        "untilTomorrow": "Até {time} de amanhã."
       },
       "corrected": "Corrigido",
       "correctedBy": "Pontuação corrigida por {names}",
@@ -12020,7 +12049,66 @@
           "sent": "Teste enviado para {count} destino | Teste enviado para {count} destinos",
           "failed": "O teste não chegou a {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "Até que recupere",
+        "atMost": "24 h no máximo",
+        "endsWhenClears": "termina quando recupera",
+        "byTime": "até {time}",
+        "whenCleared": "quando recuperou",
+        "endedBy": "terminado por {product}",
+        "createdFrom": "de {source}"
+      },
+      "groupTarget": "Grupo: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Silenciamento rápido a partir de um alerta",
+      "endedLabel": "terminado"
+    },
+    "ack": {
+      "acknowledge": "Reconhecer",
+      "acknowledgeGroups": "Reconhecer {count} grupo disparado | Reconhecer {count} grupos disparados",
+      "unacknowledge": "Desfazer reconhecimento",
+      "takeOver": "Assumir",
+      "chip": "Reconhecido por {who} via {source} · {time}",
+      "chipTooltip": "Reconhecido por {who} em {time} a partir de {source}",
+      "firingAcknowledged": "Disparado · reconhecido",
+      "tile": "Reconhecidos",
+      "groupsAcknowledged": "{count} reconhecidos",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "piquete",
+        "incident": "incidente"
+      },
+      "history": {
+        "dedupSuppressed": "suprimido por reconhecimento ({who})",
+        "acked": "Reconhecido por {who} a partir de {source}",
+        "ackedViaPage": "Reconhecido por {who} através do acionamento {page}",
+        "ackedViaIncident": "Reconhecido por {who} através do incidente {incident}",
+        "unacked": "Reconhecimento anulado por {who} a partir de {source}",
+        "unackedResume": "Reconhecimento anulado por {who} a partir de {source} · as repetições retomam às {time}",
+        "takenOver": "Assumido por {who}, substituindo {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Não pode reconhecer este alerta. Reconhecer e silenciar exigem a função de Administrador ou Editor, ou ser o responsável de piquete do alerta.",
+        "mute": "Não pode silenciar este alerta. Reconhecer e silenciar exigem a função de Administrador ou Editor, ou ser o responsável de piquete do alerta.",
+        "onCall": "De piquete: {people}",
+        "canAct": "Podem agir: {people}",
+        "people": "De piquete: {onCall}. Podem agir: {canAct}"
+      },
+      "errors": {
+        "notFiring": "Este alerta não está disparado, pelo que não há nada para reconhecer.",
+        "firingChanged": "O alerta voltou a disparar desde que esta página foi carregada. Atualize e tente novamente."
       }
+    },
+    "groupActions": {
+      "menu": "Ações de grupo",
+      "viewHistory": "Ver o histórico deste grupo"
+    },
+    "firingState": {
+      "level": "Nível",
+      "firingSince": "Disparado desde",
+      "firingFor": "disparado há {duration}",
+      "incident": "Incidente"
     }
   },
   "alert_dependencies": {
@@ -12549,13 +12637,14 @@
       "openSlackSettings": "Configure-a em Definições › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Enviar notificações para canais do Slack",
+      "slackDescription": "Publica uma nova mensagem com o seu webhook e template. Utilize para acionamentos ou layouts personalizados do Slack.",
       "discordDescription": "Enviar notificações para canais do Discord",
       "msteamsDescription": "Enviar notificações para canais do Teams",
       "emailDescription": "Enviar notificações por e-mail formatadas em HTML",
       "pagerdutyDescription": "Criar incidentes no PagerDuty",
       "opsgenieDescription": "Criar alertas no Opsgenie",
-      "servicenowDescription": "Criar incidentes no ServiceNow"
+      "servicenowDescription": "Criar incidentes no ServiceNow",
+      "slackAppDescription": "Atualiza os alertas agendados no próprio local. Reconheça, silencie e investigue a partir do Slack. Requer um espaço de trabalho ligado."
     },
     "import": {
       "title": "Importar Destino",
@@ -12597,7 +12686,8 @@
     "severityCriticalDescription": "Incidentes de maior prioridade",
     "severityErrorDescription": "Incidentes de erro padrão",
     "severityWarningDescription": "Incidentes de nível de aviso",
-    "severityInfoDescription": "Incidentes informativos"
+    "severityInfoDescription": "Incidentes informativos",
+    "urlRecipientsChannel": "URL / destinatários / canal"
   },
   "pipeline_destinations": {
     "header": "Destinos de Pipelines",
@@ -13120,7 +13210,7 @@
     "groupIntegrations": "Integrações",
     "groupAccount": "Conta",
     "slackApp": "Slack",
-    "slackAppDesc": "Faça perguntas ao OpenObserve a partir do Slack",
+    "slackAppDesc": "Faça perguntas ao OpenObserve e atue sobre alertas a partir do Slack",
     "generalDesc": "Tema, padrões de consulta e preferências essenciais",
     "orgDesc": "Parâmetros e identificadores da organização",
     "cipherKeysDesc": "Chaves de encriptação para campos sensíveis",
@@ -20618,7 +20708,9 @@
         "succeeded": "Sucesso",
         "failed": "Falhou",
         "skipped": "Ignorado",
-        "pending": "Pendente"
+        "pending": "Pendente",
+        "acknowledged": "Reconhecido",
+        "ackevent": "Evento de reconhecimento"
       },
       "alertLevel": {
         "ok": "Ok",
@@ -20921,7 +21013,16 @@
       "alertSavedSuccessfully": "Alerta guardado com sucesso.",
       "alertUpdatedSuccessfully": "Alerta atualizado com sucesso.",
       "openingDedupConfig": "A abrir configuração de deduplicação para: {name}",
-      "editingAlert": "A editar alerta: {name}"
+      "editingAlert": "A editar alerta: {name}",
+      "ack": {
+        "acked": "{name} reconhecido",
+        "ackedGroups": "{count} grupo de {name} reconhecido | {count} grupos de {name} reconhecidos",
+        "alreadyAcked": "Já reconhecido por {who}",
+        "unacked": "Reconhecimento de {name} anulado",
+        "takenOver": "Assumiu o reconhecimento de {name}",
+        "failed": "Não foi possível reconhecer {name}",
+        "unackFailed": "Não foi possível anular o reconhecimento de {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Chave de cifra atualizada com sucesso",
@@ -21233,7 +21334,14 @@
       "muted": "Silenciado {count} item até {time}. Arquivado em {folder}. | Silenciados {count} itens até {time}. Arquivados em {folder}.",
       "muteFailed": "Não foi possível criar o silenciamento",
       "viewDowntime": "Ver janela de manutenção",
-      "itemsDropped": "{count} item selecionado está fora das pastas escolhidas e foi removido. | {count} itens selecionados estão fora das pastas escolhidas e foram removidos."
+      "itemsDropped": "{count} item selecionado está fora das pastas escolhidas e foi removido. | {count} itens selecionados estão fora das pastas escolhidas e foram removidos.",
+      "mutedUntilClear": "Silenciado {name} até normalizar, o mais tardar às {time}",
+      "alreadyMuted": "{name} já está silenciado até {time}",
+      "muteChanged": "Este silenciamento foi alterado desde que a página foi carregada. Termina agora em {time}.",
+      "muteEnded": "O silenciamento terminou. As notificações são retomadas.",
+      "mutedOne": "{name} silenciado até {time}",
+      "timeTomorrow": "amanhã às {time}",
+      "notQuickMute": "Este silenciamento foi definido na página de janelas de manutenção. Altere-o nessa página."
     }
   },
   "cipherKeys": {
@@ -26699,7 +26807,10 @@
       "managedBy": "gerido pelo administrador da sua instância",
       "managedTitle": "Gerido pelo administrador da sua instância.",
       "managedDetail": "As credenciais, a associação e as organizações que utilizam {team} são definidas em _meta.",
-      "managedQuestions": "Dúvidas: {contact}"
+      "managedQuestions": "Dúvidas: {contact}",
+      "outboundQueue": "Mensagens de alerta: {count} em fila, a mais antiga com {age} | Mensagens de alerta: {count} em fila, a mais antiga com {age}",
+      "outboundEmpty": "Nenhuma mensagem de alerta em fila",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Predefinições de canais",
@@ -26735,7 +26846,8 @@
       "instanceAdminOnly": "Apenas administrador da instância",
       "ownOrgOnlyHint": "Num espaço de trabalho de instância, associa os canais à sua própria organização",
       "claimableHint": "Canais por atribuir e canais pertencentes a {org}",
-      "servedOrgsHint": "Qualquer organização servida por este espaço de trabalho"
+      "servedOrgsHint": "Qualquer organização servida por este espaço de trabalho",
+      "alertRoutes": "{count} destino | {count} destinos"
     },
     "people": {
       "title": "Pessoas associadas",
@@ -26889,6 +27001,83 @@
       "remove": "Remover",
       "saved": "Organizações guardadas",
       "saveFailed": "Não foi possível guardar as organizações."
+    },
+    "destination": {
+      "appTile": "Aplicação {product}",
+      "webhookTile": "Webhook {product}",
+      "twoWay": "Bidirecional",
+      "recommendedForAlertResponse": "Recomendado para resposta a alertas",
+      "choiceHint": "Os acionamentos e os super clusters utilizam o webhook. Os envios manuais e em tempo real a partir de um destino de aplicação Slack são publicações separadas.",
+      "unavailableReason": "Requer a aplicação Slack Enterprise num único cluster",
+      "unavailableFlag": "Desativado neste servidor; peça ao seu operador para definir {variable}",
+      "unavailableMasterKey": "Precisa de uma chave de encriptação neste servidor; peça ao seu operador para definir {variable}",
+      "unavailableCloud": "Ainda não está ativado para a sua região Cloud",
+      "unavailableNoAccess": "Peça a um administrador da organização para ativar a aplicação Slack",
+      "postOnly": "Apenas publicar",
+      "switchToApp": "Mudar para a aplicação {product}",
+      "switchThis": "Mudar este destino",
+      "switchBack": "Reverter",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Espaço de trabalho",
+      "channel": "Canal",
+      "mention": "Menção",
+      "mentionCritical": "{'@'}here para críticos, nenhuma para os restantes",
+      "mentionNone": "Nenhuma",
+      "mentionHelp": "Utilizada em repetições e atualizações de nível",
+      "refireReuse": "Reutilização de novo disparo (minutos)",
+      "refireReuseHelp": "Um novo disparo dentro deste período edita a mensagem anterior em vez de publicar uma nova",
+      "buttons": "Botões Assumir, Silenciar e Investigar",
+      "buttonsHelp": "Resolver é adicionado quando o disparo tiver um incidente ou um acionamento",
+      "autoInvestigate": "Investigar automaticamente para alertas críticos",
+      "autoInvestigateHelp": "É executado como a conta de serviço de IA da organização, com o respetivo acesso; publica os resultados na conversa do alerta",
+      "templateDefault": "Modelo predefinido do {product} ({name})",
+      "sendTest": "Enviar teste",
+      "setsDefault": "Define a organização predefinida de #{channel} como {org}",
+      "answersFor": "#{channel} responde a perguntas para a organização {org}. Os alertas de {thisOrg} são publicados aqui e as respetivas conversas respondem em {thisOrg}; a predefinição do canal mantém-se inalterada.",
+      "sharedTag": "Partilhado · {product} Connect",
+      "sharedTitle": "O #{channel} é partilhado com pessoas fora de {workspace}.",
+      "sharedDetail": "Verão os nomes, valores, gráficos e ligações dos alertas. Os seus cliques nos botões são recusados.",
+      "sharedConfirm": "Compreendo, publicar alertas neste canal partilhado",
+      "sharedRequired": "Confirme que os alertas podem ser publicados neste canal partilhado",
+      "versionMismatch": "Os nós executam versões diferentes. Atualize todos os nós primeiro.",
+      "oncallNotAllowed": "Um destino da aplicação {product} não pode ser um canal da equipa de piquete",
+      "answersForAnother": "#{channel} responde a perguntas para outra organização. Os alertas de {thisOrg} são publicados aqui e as respetivas conversas respondem em {thisOrg}; a predefinição do canal mantém-se inalterada.",
+      "oncallTag": "Sala de piquete",
+      "oncallTitle": "Os acionamentos de piquete da equipa {team} também são publicados em #{channel} através de {destination}.",
+      "oncallDetail": "Os alertas aqui são publicados separadamente.",
+      "oncallConfirm": "Compreendo, publicar alertas nesta sala de piquete",
+      "oncallRequired": "Confirme que os alertas podem ser publicados nesta sala de piquete",
+      "workspaceRequired": "Escolha um espaço de trabalho",
+      "refireRange": "Introduza minutos inteiros de 0 a {max}",
+      "connectTitle": "Ligue o {product} para publicar alertas com botões",
+      "connectDetail": "Escolha um canal no ecrã do {product} e selecione Permitir. O OpenObserve cria este destino para esse canal.",
+      "connected": "{name} foi criado para #{channel}. Verifique as definições e guarde.",
+      "saveFailed": "Não foi possível guardar o destino.",
+      "switched": "{name} publica agora através da aplicação {product}",
+      "switchedBack": "{name} volta a publicar através do seu webhook",
+      "switchFailed": "Não foi possível mudar {name}: {reason}",
+      "switchedAll": "{count} destino mudado | {count} destinos mudados",
+      "switchThisDetail": "Mude-o para a aplicação {product} para obter os botões Assumir, Silenciar e Investigar. O nome, o modelo e os alertas mantêm-se iguais; Reverter restaura o webhook."
+    },
+    "switchAll": {
+      "title": "{count} destino de webhook publica neste espaço de trabalho. | {count} destinos de webhook publicam neste espaço de trabalho.",
+      "detail": "Mude-o para a aplicação {product} para os botões Assumir, Silenciar e Investigar. O nome, o modelo e os alertas mantêm-se iguais; Reverter restaura o webhook. | Mude-os para a aplicação {product} para os botões Assumir, Silenciar e Investigar. Os nomes, os modelos e os alertas mantêm-se iguais; Reverter restaura o webhook.",
+      "review": "Rever",
+      "action": "Mudar tudo",
+      "summary": "{switched} mudados · {count} não puderam ser mudados"
+    },
+    "oncallUnlinked": {
+      "title": "Membros de piquete não associados ao {product}",
+      "description": "Os acionamentos não lhes podem enviar mensagens diretas, e os seus cliques nos botões de alerta e de acionamento ficam pendentes até estarem associados",
+      "remind": "Enviar lembrete",
+      "columnPerson": "Pessoa",
+      "columnTeam": "Equipa",
+      "columnNextShift": "Próximo turno",
+      "columnReminder": "Lembrete",
+      "dmSent": "Mensagem direta enviada {time}",
+      "notSent": "Não enviado",
+      "reminded": "Lembrete enviado a {count} pessoa | Lembrete enviado a {count} pessoas",
+      "remindFailed": "Não foi possível enviar os lembretes."
     }
   },
   "fleet": {
