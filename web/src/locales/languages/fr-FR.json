@@ -12449,7 +12449,6 @@
     "statReady": "Prêt à l'emploi",
     "statNeedsData": "Non ingéré",
     "statAll": "Tous",
-    "notIngested": "Non ingéré : {stream}",
     "notIngestedHint": "Cette organisation ne reçoit pas {stream}, donc cette alerte ne se déclencherait jamais. Ajoutez-la quand même et elle commencera à fonctionner dès que les données arriveront.",
     "alertCount": "{count} alerte | {count} alertes",
     "noCollectorTitle": "Rien ici ne correspond encore à vos données",
@@ -12477,7 +12476,7 @@
     "enterprise": "Enterprise",
     "enterpriseHint": "Les alertes de détection d'anomalies nécessitent OpenObserve Enterprise.",
     "card": {
-      "customize": "Personnaliser"
+      "customizeTooltip": "Ouvre l'éditeur d'alertes prérempli"
     },
     "drawer": {
       "dataAvailable": "Données disponibles",

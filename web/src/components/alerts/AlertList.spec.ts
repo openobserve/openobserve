@@ -2660,6 +2660,34 @@ describe("AlertList - first run and the alert library", () => {
     expect(wrapper.find('[data-test="alert-list-empty-import"]').text()).toContain("Import alert");
   });
 
+  const emptyActions = (wrapper: any) =>
+    emptyState(wrapper)
+      .findAllComponents({ name: "OButton" })
+      .filter((b: any) => (b.attributes("data-test") ?? "").startsWith("alert-list-empty-"))
+      .map((b: any) => ({
+        id: b.attributes("data-test"),
+        variant: b.props("variant"),
+        size: b.props("size"),
+      }));
+
+  it("leads the first-run actions with the library, at lg size, when the library is shown", async () => {
+    const wrapper = await mountEmpty();
+    expect(emptyActions(wrapper)).toEqual([
+      { id: "alert-list-empty-alert-library", variant: "primary", size: "lg" },
+      { id: "alert-list-empty-import", variant: "outline", size: "lg" },
+      { id: "alert-list-empty-new-alert", variant: "outline", size: "lg" },
+    ]);
+  });
+
+  it("leads with New alert as the primary action when the library is hidden", async () => {
+    (store.state as any).zoConfig.custom_hide_menus = "alertLibrary";
+    const wrapper = await mountEmpty();
+    expect(emptyActions(wrapper)).toEqual([
+      { id: "alert-list-empty-new-alert", variant: "primary", size: "lg" },
+      { id: "alert-list-empty-import", variant: "outline", size: "lg" },
+    ]);
+  });
+
   it("starts a new alert from the empty state, as the header's New alert does", async () => {
     const wrapper = await mountEmpty();
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);

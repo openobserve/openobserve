@@ -12449,7 +12449,6 @@
     "statReady": "Klaar voor gebruik",
     "statNeedsData": "Niet opgenomen",
     "statAll": "Alle",
-    "notIngested": "Niet opgenomen: {stream}",
     "notIngestedHint": "Deze organisatie ontvangt geen {stream}, dus dit alarm zou nooit afgaan. Voeg het toch toe en het zal werken zodra de gegevens arriveren.",
     "alertCount": "{count} melding | {count} meldingen",
     "noCollectorTitle": "Niets hier komt nog overeen met uw gegevens.",
@@ -12477,7 +12476,7 @@
     "enterprise": "Enterprise",
     "enterpriseHint": "Alerts voor anomaliedetectie vereisen OpenObserve Enterprise.",
     "card": {
-      "customize": "Aanpassen"
+      "customizeTooltip": "Opent de waarschuwingseditor vooraf ingevuld"
     },
     "drawer": {
       "dataAvailable": "Gegevens beschikbaar",

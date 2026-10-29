@@ -12444,7 +12444,6 @@
     "statReady": "可立即使用",
     "statNeedsData": "未攝取",
     "statAll": "全部",
-    "notIngested": "未攝取：{stream}",
     "notIngestedHint": "此組織目前未接收 {stream}，因此此警示永遠不會觸發。您仍可將其加入，等數據到達後便會開始運作。",
     "alertCount": "{count} 個警示 | {count} 個警示",
     "noCollectorTitle": "這裡尚無與您的資料相符的項目",
@@ -12472,7 +12471,7 @@
     "enterprise": "Enterprise",
     "enterpriseHint": "異常偵測警示需要 OpenObserve Enterprise。",
     "card": {
-      "customize": "自訂"
+      "customizeTooltip": "開啟已預先填入的警示編輯器"
     },
     "drawer": {
       "dataAvailable": "資料可用",
