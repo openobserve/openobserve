@@ -59,7 +59,7 @@ fn scorer_error_response(value: ScorerError) -> Response {
 /// Remote scorer credentials stay with those who may change the scorer.
 async fn redact_unwritable(org_id: &str, user_id: &str, scorers: &mut [ScorerResponseBody]) {
     let mut writable: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
-    for scorer in scorers {
+    for scorer in scorers.iter_mut().filter(|s| s.has_credentials()) {
         let allowed = match writable.get(&scorer.entity_id) {
             Some(allowed) => *allowed,
             None => {

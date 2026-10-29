@@ -188,6 +188,13 @@ pub struct ScorerResponseBody {
 }
 
 impl ScorerResponseBody {
+    /// Whether [`Self::redact_credentials`] has anything to blank, so a caller can skip the check.
+    pub fn has_credentials(&self) -> bool {
+        ["endpoint", "auth", "custom_headers"]
+            .iter()
+            .any(|key| self.params.get(key).is_some_and(|v| !v.is_null()))
+    }
+
     /// A remote scorer's endpoint, auth and header values call the customer's service; the
     /// endpoint keeps its origin and the auth and header names stay.
     pub fn redact_credentials(&mut self) {
@@ -717,6 +724,7 @@ mod tests {
             "custom_headers": [{"key": "X-Tenant", "value": "t3n"}],
         });
         let mut body = ScorerResponseBody::from(s);
+        assert!(body.has_credentials());
         body.redact_credentials();
         assert_eq!(
             body.params,
@@ -733,5 +741,9 @@ mod tests {
         basic.redact_credentials();
         assert_eq!(basic.params["auth"]["username"], "u");
         assert_eq!(basic.params["auth"]["password"], "");
+
+        let mut judge = ScorerResponseBody::from(sample_scorer());
+        judge.params = serde_json::json!({"prompt": "Is it faithful?"});
+        assert!(!judge.has_credentials());
     }
 }
