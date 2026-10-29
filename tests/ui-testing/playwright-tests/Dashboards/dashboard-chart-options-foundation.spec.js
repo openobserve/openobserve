@@ -58,7 +58,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await setupPromQLChartWithConfig(page, pm, dashboardName, { chartType: "stacked", query: "cpu_usage" });
     await configs.setPromqlSeriesLimit(1);
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await waitForPanelRenderSettled(page, pm);
+    expect(await waitForPanelRenderSettled(page, pm), "panel never finished loading").toBe(true);
 
     const seriesCapChip = pm.dashboardNotices.noticeChip("series-cap");
     await expect(seriesCapChip).toBeVisible({ timeout: 20000 });
@@ -92,7 +92,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     expect(start).not.toBeNull();
     expect(end).not.toBeNull();
     expect(start).toBe(end);
-    await waitForPanelRenderSettled(page, pm);
+    expect(await waitForPanelRenderSettled(page, pm), "panel never finished loading").toBe(true);
 
     await pm.dashboardPanelActions.savePanel();
     await reopenPanelConfig(page, pm);
@@ -115,7 +115,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await expect(configs.aggregation).toBeVisible();
     await configs.selectAggregation("Max (maximum value)");
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await waitForPanelRenderSettled(page, pm);
+    expect(await waitForPanelRenderSettled(page, pm), "panel never finished loading").toBe(true);
 
     await pm.dashboardPanelActions.savePanel();
     await reopenPanelConfig(page, pm);
@@ -137,7 +137,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await expect(configs.aggregation).toBeHidden();
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await waitForPanelRenderSettled(page, pm);
+    expect(await waitForPanelRenderSettled(page, pm), "panel never finished loading").toBe(true);
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -161,7 +161,7 @@ test.describe("Dashboard chart options — stacked thresholds and maps pan/zoom"
       await configs.selectThresholdsShowAs("Shaded band");
       await configs.addThresholdStep(5);
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await waitForPanelRenderSettled(page, pm);
+      expect(await waitForPanelRenderSettled(page, pm), "panel never finished loading").toBe(true);
 
       await pm.dashboardPanelActions.savePanel();
       await reopenPanelConfig(page, pm);
@@ -186,7 +186,7 @@ test.describe("Dashboard chart options — stacked thresholds and maps pan/zoom"
     await configs.toggleMapRoam();
     await expect(configs.mapRoamBtn).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await waitForPanelRenderSettled(page, pm);
+    expect(await waitForPanelRenderSettled(page, pm), "panel never finished loading").toBe(true);
 
     await pm.dashboardPanelActions.savePanel();
     await reopenPanelConfig(page, pm);
