@@ -187,6 +187,28 @@ pub struct ScorerResponseBody {
     pub updated_at: i64,
 }
 
+impl ScorerResponseBody {
+    /// A remote scorer's auth and header values call the customer's endpoint; the names stay.
+    pub fn redact_credentials(&mut self) {
+        if let Some(auth) = self.params.get_mut("auth").and_then(Value::as_object_mut) {
+            for field in ["token", "password"] {
+                if let Some(value) = auth.get_mut(field) {
+                    *value = Value::String(String::new());
+                }
+            }
+        }
+        let headers = self
+            .params
+            .get_mut("custom_headers")
+            .and_then(Value::as_array_mut);
+        for header in headers.into_iter().flatten() {
+            if let Some(value) = header.get_mut("value") {
+                *value = Value::String(String::new());
+            }
+        }
+    }
+}
+
 /// HTTP response body for listing Scorers.
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -678,5 +700,32 @@ mod tests {
         let list = ListScorersResponseBody::from(vec![s]);
         assert_eq!(list.list.len(), 1);
         assert_eq!(list.list[0].name, "faithfulness_judge");
+    }
+
+    #[test]
+    fn redaction_blanks_remote_auth_and_header_values_only() {
+        let mut s = sample_scorer();
+        s.params = serde_json::json!({
+            "endpoint": "https://eval.example.com/score",
+            "auth": {"type": "api_key", "token": "k3y", "header_name": "X-Api-Key"},
+            "custom_headers": [{"key": "X-Tenant", "value": "t3n"}],
+        });
+        let mut body = ScorerResponseBody::from(s);
+        body.redact_credentials();
+        assert_eq!(
+            body.params,
+            serde_json::json!({
+                "endpoint": "https://eval.example.com/score",
+                "auth": {"type": "api_key", "token": "", "header_name": "X-Api-Key"},
+                "custom_headers": [{"key": "X-Tenant", "value": ""}],
+            })
+        );
+
+        let mut basic = ScorerResponseBody::from(sample_scorer());
+        basic.params =
+            serde_json::json!({"auth": {"type": "basic", "username": "u", "password": "p"}});
+        basic.redact_credentials();
+        assert_eq!(basic.params["auth"]["username"], "u");
+        assert_eq!(basic.params["auth"]["password"], "");
     }
 }
