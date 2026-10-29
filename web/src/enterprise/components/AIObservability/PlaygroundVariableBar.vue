@@ -38,7 +38,7 @@
           })
         }}
       </span>
-      <div class="inline-flex items-stretch self-center">
+      <div class="inline-flex items-stretch self-center [&_button:focus-visible]:z-1">
         <OButton
           variant="outline"
           size="icon-xs-sq"
@@ -75,7 +75,7 @@
          bench where the repetition implied per-bench values. Schema stays in the
          column: a variant can run a provider that supports it beside one that
          does not. -->
-    <div class="inline-flex items-stretch self-center">
+    <div class="inline-flex items-stretch self-center [&_button:focus-visible]:z-1">
       <OButton
         variant="outline"
         size="xs"

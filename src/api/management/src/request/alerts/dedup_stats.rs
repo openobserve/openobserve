@@ -32,8 +32,6 @@ pub struct DedupSummaryResponse {
     pub passed_total: i64,
     /// Suppression rate (0.0 to 1.0)
     pub suppression_rate: f64,
-    /// Current pending batches (grouping)
-    pub pending_batches: i64,
     /// Timestamp when data was collected
     pub timestamp: i64,
 }
@@ -71,13 +69,6 @@ pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
         .filter(|alert| alert.deduplication.as_ref().is_some_and(|d| d.enabled))
         .count();
 
-    // Get current pending batches count from in-memory state
-    #[cfg(feature = "enterprise")]
-    let pending_batches = openobserve_core::alerts::grouping::get_pending_batch_count(&org_id);
-
-    #[cfg(not(feature = "enterprise"))]
-    let pending_batches = 0;
-
     // For suppressions/passed counts, we'll use database for now
     // In future, could query Prometheus metrics for time-series data
     #[cfg(feature = "enterprise")]
@@ -100,7 +91,6 @@ pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
         suppressions_total,
         passed_total,
         suppression_rate,
-        pending_batches,
         timestamp: config::utils::time::now_micros(),
     };
 
@@ -126,14 +116,12 @@ mod tests {
             suppressions_total: 100,
             passed_total: 200,
             suppression_rate: 0.333,
-            pending_batches: 3,
             timestamp: 1000,
         };
         assert_eq!(r.total_alerts, 10);
         assert_eq!(r.alerts_with_dedup, 5);
         assert_eq!(r.suppressions_total, 100);
         assert_eq!(r.passed_total, 200);
-        assert_eq!(r.pending_batches, 3);
     }
 
     #[test]
@@ -144,7 +132,6 @@ mod tests {
             suppressions_total: 0,
             passed_total: 0,
             suppression_rate: 0.0,
-            pending_batches: 0,
             timestamp: 0,
         };
         assert_eq!(r.total_alerts, 0);

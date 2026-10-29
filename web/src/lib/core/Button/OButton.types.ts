@@ -75,6 +75,7 @@ export type ButtonSize =
   | "sm"
   | "sm-action"
   | "md"
+  | "cta"
   | "lg"
   | "icon"
   | "icon-xs"
