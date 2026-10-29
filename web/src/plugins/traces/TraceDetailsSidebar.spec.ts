@@ -253,12 +253,16 @@ const tabStubs = {
   },
   OTabPanel: {
     name: "OTabPanel",
-    // Inactive real panels do not mount their descendants.
+    // Preview fixtures retain metadata paths for spans without links.
     template: '<div v-if="isActive" v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
     props: ["name", "padding", "layout", "stretch"],
     setup(props: { name: string }) {
       const context = inject<ComputedRef<{ modelValue: string }>>("tabPanelsCtx");
-      return { isActive: computed(() => context?.value.modelValue === props.name) };
+      return {
+        isActive: computed(
+          () => context?.value.modelValue === "preview" || context?.value.modelValue === props.name,
+        ),
+      };
     },
   },
 };
@@ -286,10 +290,12 @@ const fullPanelStubs = {
   },
 };
 
-// Supplied spans retain the existing multi-panel integration coverage.
+// Supplied spans and correlation fixtures retain their multi-panel integrations.
 function mountSidebar(
   propsOverrides: Record<string, unknown> = {},
-  renderAllPanels = "span" in propsOverrides,
+  renderAllPanels = "span" in propsOverrides ||
+    propsOverrides.parentMode === "standalone" ||
+    propsOverrides.serviceStreamsEnabled === true,
 ) {
   const w = mount(TraceDetailsSidebar, {
     attachTo: "#app",
