@@ -324,7 +324,7 @@ describe("useAgentScope — Shape 1 (allAgents:true, Sessions/LLM)", () => {
     expect(scope.agents.value).toEqual([agentB]);
   });
 
-  it("a caller that joined a load waits for a forced refresh started after it", async () => {
+  it("the starter and joiners of a load wait for a forced refresh started after them", async () => {
     const scope = useAgentScope({
       filterMode: ref("agent"),
       activeStream: ref(""),
@@ -336,19 +336,21 @@ describe("useAgentScope — Shape 1 (allAgents:true, Sessions/LLM)", () => {
     const entry = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
     const forced = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
     listAgents.mockReturnValueOnce(entry.promise).mockReturnValueOnce(forced.promise);
-    const initialLoad = scope.loadAgents();
+    const seen: Record<string, GenAiAgentListItem[]> = {};
+    const starter = scope.loadAgents().then(() => {
+      seen.starter = scope.agents.value;
+    });
     await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(1));
-    let joinerAgents: GenAiAgentListItem[] | null = null;
     const joiner = scope.loadAgents().then(() => {
-      joinerAgents = scope.agents.value;
+      seen.joiner = scope.agents.value;
     });
     const refresh = scope.loadAgents(undefined, undefined, true);
     entry.resolve({ agents: [agentA] });
     await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2));
-    expect(joinerAgents).toBeNull();
+    expect(seen).toEqual({});
     forced.resolve({ agents: [agentB] });
-    await Promise.all([initialLoad, joiner, refresh]);
-    expect(joinerAgents).toEqual([agentB]);
+    await Promise.all([starter, joiner, refresh]);
+    expect(seen).toEqual({ starter: [agentB], joiner: [agentB] });
   });
 });
 
