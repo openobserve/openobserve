@@ -16,16 +16,12 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { computed, reactive } from "vue";
-// Mock the useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(),
   useDashboardPanelData: vi.fn(),
 }));
 
-// In the app all config sections start collapsed (see searchLabelsConfig +
-// useConfigPanel.spec, which owns that behaviour). This integration spec
-// asserts that the correct controls render/bind *when a section is open*, so we
-// force every section expanded at mount by overriding DEFAULT_EXPANDED_SECTIONS.
+// Broad integration cases need every control mounted; focused groups open their own sections.
 vi.mock("@/utils/dashboard/searchLabelsConfig", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   const allExpanded = Object.fromEntries(
@@ -40,6 +36,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
+import { DEFAULT_EXPANDED_SECTIONS, type SectionId } from "@/utils/dashboard/searchLabelsConfig";
 
 const mockDashboardPanelData = {
   data: {
@@ -113,6 +110,7 @@ const mockDashboardPanelData = {
 
 describe("ConfigPanel", () => {
   let wrapper: any;
+  const mountedWrappers: ReturnType<typeof mount>[] = [];
 
   const defaultProps = {
     dashboardPanelData: mockDashboardPanelData,
@@ -127,21 +125,28 @@ describe("ConfigPanel", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const section of Object.keys(DEFAULT_EXPANDED_SECTIONS) as SectionId[]) {
+      DEFAULT_EXPANDED_SECTIONS[section] = true;
+    }
 
     store.state.selectedOrganization = { identifier: "test-org" };
-
-    // Reset any potential state contamination between tests
-    if (wrapper) {
-      wrapper.unmount();
-      wrapper = null;
-    }
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
+    for (const mounted of mountedWrappers) {
+      if (mounted.exists()) mounted.unmount();
     }
+    mountedWrappers.length = 0;
+    wrapper = undefined;
   });
+
+  const openSections = (...sections: SectionId[]) => {
+    beforeEach(() => {
+      for (const section of Object.keys(DEFAULT_EXPANDED_SECTIONS) as SectionId[]) {
+        DEFAULT_EXPANDED_SECTIONS[section] = sections.includes(section);
+      }
+    });
+  };
 
   const createWrapper = (props = {}, options = {}) => {
     const pageKey = options.promqlMode ? "promql" : "dashboard";
@@ -154,7 +159,7 @@ describe("ConfigPanel", () => {
       selectedStreamFields: props.dashboardPanelData?.meta?.stream?.selectedStreamFields || [],
     });
 
-    return mount(ConfigPanel, {
+    const mounted = mount(ConfigPanel, {
       props: {
         ...defaultProps,
         ...props,
@@ -180,9 +185,13 @@ describe("ConfigPanel", () => {
         },
       },
     });
+    mountedWrappers.push(mounted);
+    return mounted;
   };
 
   describe("gauge section", () => {
+    openSections("gauge", "valueTransformations");
+
     const gaugeData = (queryConfig: Record<string, any> = {}) => {
       const data = JSON.parse(JSON.stringify(mockDashboardPanelData));
       data.data.type = "gauge";
@@ -235,6 +244,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("state timeline options", () => {
+    openSections("stateTimeline");
+
     it("shows the defaults for a fresh panel that has none of its keys, and writes on change", async () => {
       const panelData = {
         ...mockDashboardPanelData,
@@ -340,6 +351,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Description Field", () => {
+    openSections("general");
+
     it("should bind description value to input", async () => {
       const panelDataWithDescription = {
         data: {
@@ -529,6 +542,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("PromQL series limit", () => {
+    openSections("general");
+
     const panelOf = (type: string) => ({
       ...mockDashboardPanelData,
       data: {
@@ -574,6 +589,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Line thickness", () => {
+    openSections("lineStyle");
+
     const panelOf = (line_thickness: unknown) =>
       reactive({
         ...mockDashboardPanelData,
@@ -615,6 +632,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Axis labels mode", () => {
+    openSections("axis");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,
       data: {
@@ -749,6 +768,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Heatmap colour scale min / max", () => {
+    openSections("data");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) =>
       reactive({
         ...mockDashboardPanelData,
@@ -824,6 +845,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Heatmap palette, reverse and colour scale", () => {
+    openSections("data");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) =>
       reactive({
         ...mockDashboardPanelData,
@@ -955,6 +978,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Heatmap y-axis order, buckets and range", () => {
+    openSections("axis");
+
     const panelOf = (config: Record<string, unknown> = {}, yType = "Int64", customQuery = false) =>
       reactive({
         ...mockDashboardPanelData,
@@ -1102,6 +1127,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Legend values", () => {
+    openSections("legend");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,
       data: {
@@ -1139,6 +1166,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Time shift (Comparison against)", () => {
+    openSections("comparison");
+
     const shiftedPanel = (queryType: string) => ({
       ...mockDashboardPanelData,
       data: {
@@ -1508,6 +1537,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Show Gridlines Toggle", () => {
+    openSections("axis");
+
     it("should render show gridlines toggle", () => {
       wrapper = createWrapper();
 
@@ -1562,6 +1593,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Trellis Group By Y-Axis Configuration", () => {
+    openSections("layout");
+
     it("should show group by y-axis toggle for trellis layout", () => {
       const trellisEnabledData = {
         ...mockDashboardPanelData,
@@ -1693,6 +1726,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Connect Null Values Configuration", () => {
+    openSections("data");
+
     it("should initialize connect_nulls as false by default", () => {
       wrapper = createWrapper();
 
@@ -1745,6 +1780,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("No Value Replacement Configuration", () => {
+    openSections("data");
+
     it("should initialize no_value_replacement as empty string by default", () => {
       wrapper = createWrapper();
 
@@ -1796,6 +1833,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Locale Format in the Unit dropdown", () => {
+    openSections("data");
+
     const makePanel = (config: Record<string, unknown>) =>
       reactive({
         ...mockDashboardPanelData,
@@ -1854,6 +1893,8 @@ describe("ConfigPanel", () => {
     });
   });
   describe("Table Configuration Options", () => {
+    openSections("table");
+
     it("should initialize table_transpose as false by default", () => {
       wrapper = createWrapper();
 
@@ -1906,6 +1947,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Field Overrides button", () => {
+    openSections("fieldOverrides");
+
     it("should render its own button and emit open-field-overrides on click", async () => {
       const tableData = {
         ...mockDashboardPanelData,
@@ -2150,6 +2193,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Chart Type Specific Gridlines Visibility", () => {
+    openSections("axis", "data");
+
     it("should show gridlines toggle for supported chart types", () => {
       const supportedTypes = [
         "line",
@@ -2242,6 +2287,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Legend Type Options Configuration", () => {
+    openSections("legend");
+
     it("should show legend type selector when legends are enabled and trellis is not active", () => {
       const panelData = {
         ...mockDashboardPanelData,
@@ -2439,6 +2486,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Complex Trellis Configuration Scenarios", () => {
+    openSections("layout");
+
     it("should handle trellis with custom layout and extreme column numbers", () => {
       const trellisData = {
         ...mockDashboardPanelData,
@@ -2998,6 +3047,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Table Pagination Configuration", () => {
+    openSections("table");
+
     it("should show pagination toggle for table panels", () => {
       const tableData = {
         ...mockDashboardPanelData,
@@ -3496,6 +3547,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Area fill", () => {
+    openSections("lineStyle");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,
       data: {
@@ -3558,6 +3611,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Scatter point size and opacity", () => {
+    openSections("lineStyle");
+
     const panelOf = (type: string) => ({
       ...mockDashboardPanelData,
       data: {
@@ -3624,6 +3679,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Bar width and bar track", () => {
+    openSections("axis");
+
     const panelOf = (type: string) => ({
       ...mockDashboardPanelData,
       data: {

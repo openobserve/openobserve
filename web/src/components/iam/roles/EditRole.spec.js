@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, enableAutoUnmount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -8,6 +8,8 @@ import { queryClient } from "@/composables/query/queryClient";
 
 // Every test here mounts the whole role editor, which runs ~5x slower on CI than locally — the 5s default times out.
 vi.setConfig({ testTimeout: 20000 });
+
+enableAutoUnmount(afterEach);
 
 // Mock toast so we can assert notification calls
 const mockToast = vi.fn();

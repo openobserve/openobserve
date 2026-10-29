@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { computed, inject, type ComputedRef } from "vue";
 
 // Hoisted mock references — available inside vi.mock factories so individual
 // tests can assert against them without re-mocking entire modules.
@@ -252,10 +253,17 @@ const tabStubs = {
   },
   OTabPanel: {
     name: "OTabPanel",
-    // Always render content — activeTab is now parent-controlled via prop;
-    // the OTabPanel visibility is verified through the emit tests instead.
-    template: '<div v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
+    // Preview fixtures retain metadata paths for spans without links.
+    template: '<div v-if="isActive" v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
     props: ["name", "padding", "layout", "stretch"],
+    setup(props: { name: string }) {
+      const context = inject<ComputedRef<{ modelValue: string }>>("tabPanelsCtx");
+      return {
+        isActive: computed(
+          () => context?.value.modelValue === "preview" || context?.value.modelValue === props.name,
+        ),
+      };
+    },
   },
 };
 
@@ -274,8 +282,21 @@ const baseStubs = {
   ...tabStubs,
 };
 
-// Mount factory — eliminates duplication of common mount options
-function mountSidebar(propsOverrides: Record<string, unknown> = {}) {
+const fullPanelStubs = {
+  ...baseStubs,
+  OTabPanel: {
+    ...tabStubs.OTabPanel,
+    template: '<div v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
+  },
+};
+
+// Supplied spans and correlation fixtures retain their multi-panel integrations.
+function mountSidebar(
+  propsOverrides: Record<string, unknown> = {},
+  renderAllPanels = "span" in propsOverrides ||
+    propsOverrides.parentMode === "standalone" ||
+    propsOverrides.serviceStreamsEnabled === true,
+) {
   const w = mount(TraceDetailsSidebar, {
     attachTo: "#app",
     props: {
@@ -286,7 +307,7 @@ function mountSidebar(propsOverrides: Record<string, unknown> = {}) {
     },
     global: {
       plugins: [i18n, router, mockStore],
-      stubs: { ...baseStubs },
+      stubs: renderAllPanels ? fullPanelStubs : baseStubs,
     },
   });
 
@@ -736,6 +757,12 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Tabs functionality", () => {
+    beforeEach(async () => {
+      wrapper.unmount();
+      wrapper = mountSidebar({}, true);
+      await wrapper.vm.$nextTick();
+    });
+
     it("should have all required tabs", () => {
       const tabs = wrapper.findAll('[data-test="trace-details-sidebar-tabs"]');
       expect(tabs.length).toBeGreaterThan(0);
@@ -891,6 +918,7 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Events tab", () => {
     beforeEach(async () => {
+      await wrapper.setProps({ activeTab: "events" });
       const eventsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-events"]');
       await eventsTab.trigger("click");
     });
@@ -1214,6 +1242,7 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Error tab", () => {
     beforeEach(async () => {
+      await wrapper.setProps({ activeTab: "error" });
       const exceptionsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-error"]');
       await exceptionsTab.trigger("click");
     });
@@ -1236,7 +1265,7 @@ describe("TraceDetailsSidebar", async () => {
           ],
         });
 
-        errorWrapper = mountSidebar();
+        errorWrapper = mountSidebar({ activeTab: "error" });
 
         const exceptionsTab = errorWrapper.find('[data-test="trace-details-sidebar-tabs-error"]');
         await exceptionsTab.trigger("click");
@@ -1260,6 +1289,7 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Links tab", () => {
     beforeEach(async () => {
+      await wrapper.setProps({ activeTab: "links" });
       const linksTab = wrapper.find('[data-test="trace-details-sidebar-tabs-links"]');
       await linksTab.trigger("click");
     });
@@ -2163,7 +2193,7 @@ describe("TraceDetailsSidebar", async () => {
           plugins: [i18n, router],
           provide: { store: mockStore },
           stubs: {
-            ...baseStubs,
+            ...fullPanelStubs,
             LLMContentRenderer: {
               template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId" :data-content="content"><slot /></div>`,
               props: [

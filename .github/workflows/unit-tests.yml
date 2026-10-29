@@ -19,6 +19,8 @@ concurrency:
 env:
   COLUMNS: 150
   ZO_RESULT_CACHE_ENABLED: true
+  UI_NODE_VERSION: "24.22.0"
+  UI_NPM_VERSION: "11.19.1"
   # coverage mapping needs no DWARF; dropping debuginfo (test inherits dev) cuts compile and link time
   CARGO_PROFILE_DEV_DEBUG: "0"
 
@@ -33,6 +35,8 @@ jobs:
     outputs:
       has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
       has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
+      ui_shards: ${{ steps.ui_matrix.outputs.ui_shards }}
+      ui_shard_count: ${{ steps.ui_matrix.outputs.ui_shard_count }}
     steps:
       # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
       - if: github.event_name == 'pull_request'
@@ -61,6 +65,10 @@ jobs:
           else
             echo "has_ui_changes=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Read UI shard configuration
+        id: ui_matrix
+        run: node web/scripts/ui-tests/run.mjs matrix >> "$GITHUB_OUTPUT"
 
   backend_static_checks:
     needs: [check_changes]
@@ -252,37 +260,152 @@ jobs:
           done
           echo "All backend checks completed successfully"
 
-  ui_unit_tests:
+  ui_unit_test_shards:
+    name: UI unit shard ${{ matrix.shard }}
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 45
     runs-on:
       labels: ubicloud-standard-8
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.check_changes.outputs.ui_shards) }}
     permissions:
       contents: read
+      actions: read
 
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ${{ env.UI_NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         working-directory: web
         timeout-minutes: 5
-        run: npm ci
+        run: |
+          test "$(node --version)" = "v${UI_NODE_VERSION}"
+          test "$(npm --version)" = "${UI_NPM_VERSION}"
+          npm ci
 
-      - name: Run frontend unit tests with coverage and check thresholds
+      - name: Run frontend unit test shard with coverage
         working-directory: web
-        run: ./coverage.sh check
+        run: ./coverage.sh shard ${{ matrix.shard }}
+
+      - name: Upload shard coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-unit-shard-${{ matrix.shard }}-${{ needs.check_changes.outputs.ui_shard_count }}
+          path: web/.vitest-reports/ui-unit-shard-${{ matrix.shard }}-${{ needs.check_changes.outputs.ui_shard_count }}/
+          include-hidden-files: true
+          overwrite: true
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Wait for terminal shard success and artifacts
+        if: matrix.shard == fromJSON(needs.check_changes.outputs.ui_shard_count)
+        id: ui_artifacts
+        working-directory: web
+        timeout-minutes: 10
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ui-tests/coordinate.mjs
+
+      - name: Download shard coverage
+        if: matrix.shard == fromJSON(needs.check_changes.outputs.ui_shard_count)
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.ui_artifacts.outputs.artifact_ids }}
+          path: web/.vitest-reports
+          merge-multiple: false
+
+      # The successful step records immutable inputs so later shard reruns cannot reuse stale coverage.
+      - name: Merge UI coverage [${{ steps.ui_artifacts.outputs.artifact_ids }}]
+        if: matrix.shard == fromJSON(needs.check_changes.outputs.ui_shard_count)
+        working-directory: web
+        run: ./coverage.sh merge
+
+  # The matrix dependency also reruns this required gate when an individual shard is rerun.
+  ui_unit_tests:
+    needs: [check_changes, ui_unit_test_shards]
+    if: ${{ always() && needs.check_changes.outputs.has_ui_changes == 'true' }}
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Require every shard and coordinator to pass
+        run: |
+          if [ "${{ needs.ui_unit_test_shards.result }}" != "success" ]; then
+            echo "A UI shard or coverage merge failed or was skipped: ${{ needs.ui_unit_test_shards.result }}"
+            exit 1
+          fi
+
+      - name: Verify merged artifact freshness
+        uses: actions/github-script@v9
+        env:
+          UI_TEST_SHARD_COUNT: ${{ needs.check_changes.outputs.ui_shard_count }}
+        with:
+          retries: 0
+          script: |
+            const count = Number(process.env.UI_TEST_SHARD_COUNT);
+            const attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+            if (!Number.isSafeInteger(count) || count < 1 || !Number.isSafeInteger(attempt) || attempt < 1) {
+              throw new Error('Invalid UI shard count or run attempt');
+            }
+            const params = { ...context.repo, run_id: context.runId, per_page: 100 };
+            const { data: run } = await github.rest.actions.getWorkflowRun(params);
+            if (run.id !== context.runId || run.run_attempt !== attempt || run.conclusion === 'cancelled') {
+              throw new Error('Workflow run changed or was cancelled');
+            }
+            const names = Array.from({ length: count }, (_, index) => `UI unit shard ${index + 1}`);
+            const latest = new Map();
+            for (let current = attempt; current >= 1 && latest.size < count; current--) {
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+                ...params, attempt_number: current,
+              });
+              const seen = new Set();
+              for (const job of jobs) {
+                if (!names.includes(job.name)) continue;
+                if (seen.has(job.name)) throw new Error(`Duplicate UI shard job: ${job.name}`);
+                seen.add(job.name);
+                if (!latest.has(job.name)) latest.set(job.name, { ...job, attempt: current });
+              }
+            }
+            for (const name of names) {
+              const job = latest.get(name);
+              if (!job || job.run_id !== context.runId || job.status !== 'completed' || job.conclusion !== 'success') {
+                throw new Error(`${name} has not succeeded; rerun failed jobs`);
+              }
+            }
+            const coordinator = latest.get(names.at(-1));
+            const merges = (coordinator.steps || []).filter((step) => /^Merge UI coverage \[[0-9,]+\]$/.test(step.name));
+            if (merges.length !== 1 || merges[0].status !== 'completed' || merges[0].conclusion !== 'success') {
+              throw new Error('No successful complete coverage merge; rerun the coordinator shard');
+            }
+            const mergedIds = merges[0].name.match(/\[([0-9,]+)\]/)[1].split(',');
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, params);
+            const currentIds = [];
+            for (let index = 1; index <= count; index++) {
+              const name = `ui-unit-shard-${index}-${count}`;
+              const matches = artifacts.filter((artifact) => artifact.name === name);
+              if (matches.length !== 1 || matches[0].expired || !Number.isSafeInteger(matches[0].id)) {
+                throw new Error(`Missing, expired or duplicate ${name}; rerun all jobs`);
+              }
+              currentIds.push(String(matches[0].id));
+            }
+            if (JSON.stringify(mergedIds) !== JSON.stringify(currentIds) ||
+                [...latest.values()].some((job) => job.attempt > coordinator.attempt)) {
+              throw new Error('Shard artifacts changed after coverage merge; rerun the coordinator shard or all jobs');
+            }
+            core.info(`Verified ${count} successful partitions and their exact merged artifact IDs`);
 
   ui_code_quality:
     needs: [check_changes]
@@ -299,13 +422,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: ${{ env.UI_NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         working-directory: web
-        run: npm ci
+        run: |
+          test "$(node --version)" = "v${UI_NODE_VERSION}"
+          test "$(npm --version)" = "${UI_NPM_VERSION}"
+          npm ci
+
+      - name: Verify UI shard partition and report validation
+        working-directory: web
+        run: node --test scripts/ui-tests/*.test.mjs
 
       - name: Prettier format check (any unformatted file fails)
         working-directory: web
