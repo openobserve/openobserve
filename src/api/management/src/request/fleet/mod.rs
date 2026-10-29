@@ -1078,7 +1078,7 @@ pub async fn create_config(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "GetFleetConfig",
-    summary = "Get a configuration with its draft and version history; the draft YAML is masked without fleet_configs PUT",
+    summary = "Get a configuration with its draft and version history; the draft YAML is masked without fleet_configs PUT or POST",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1106,7 +1106,7 @@ pub async fn get_config(
         let fleets = permitted.as_ref();
         match o2_enterprise::enterprise::fleet::configs::get_config(&org_id, &id, fleets).await {
             Ok(mut detail) => {
-                if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "PUT").await
+                if !can_edit_configs(&org_id, &user_email.user_id).await
                     && let Some(draft) = detail.draft.as_mut()
                 {
                     draft.yaml = masked_yaml(&draft.yaml);
@@ -1268,7 +1268,7 @@ pub async fn publish_config_version(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "GetFleetConfigVersion",
-    summary = "Get one published version's YAML and hash; the YAML is masked without fleet_configs PUT",
+    summary = "Get one published version's YAML and hash; the YAML is masked without fleet_configs PUT or POST",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1293,7 +1293,7 @@ pub async fn get_config_version(
         }
         match o2_enterprise::enterprise::fleet::configs::get_version(&org_id, &id, version).await {
             Ok(mut v) => {
-                if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "PUT").await {
+                if !can_edit_configs(&org_id, &user_email.user_id).await {
                     v.yaml = masked_yaml(&v.yaml);
                 }
                 MetaHttpResponse::json(v)
@@ -1938,6 +1938,14 @@ async fn withhold_token_values(
     }
 }
 
+/// Saving a draft (PUT) and publishing (POST) both write the YAML back, so either caller reads
+/// it whole: a masked copy published as is would replace the stored credentials.
+#[cfg(feature = "enterprise")]
+async fn can_edit_configs(org_id: &str, user_id: &str) -> bool {
+    allowed_on(FLEET_CONFIGS, org_id, user_id, "PUT").await
+        || allowed_on(FLEET_CONFIGS, org_id, user_id, "POST").await
+}
+
 /// Exporter credentials are for configuration editors; unparsable YAML is withheld whole.
 #[cfg(feature = "enterprise")]
 fn masked_yaml(yaml: &str) -> String {
@@ -2348,6 +2356,22 @@ mod tests {
         );
         openfga_off();
         forget(root, "default");
+        forget(custom, ORG);
+    }
+
+    #[tokio::test]
+    async fn a_draft_saver_or_a_publisher_reads_configuration_yaml_whole() {
+        let custom = "configs-yaml@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        for (grants, whole) in [
+            (&[(FLEET_CONFIGS, "GET")][..], false),
+            (&[(FLEET_CONFIGS, "GET"), (FLEET_CONFIGS, "PUT")][..], true),
+            (&[(FLEET_CONFIGS, "GET"), (FLEET_CONFIGS, "POST")][..], true),
+        ] {
+            openfga_on(grants, None);
+            assert_eq!(can_edit_configs(ORG, custom).await, whole, "{grants:?}");
+        }
+        openfga_off();
         forget(custom, ORG);
     }
 
