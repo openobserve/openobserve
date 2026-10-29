@@ -52,7 +52,8 @@ vi.mock("@/composables/useUnauthorizedErrorGrouper", () => ({ addUnauthorizedErr
 import config from "../aws-exports";
 import store from "../stores";
 import axios from "axios";
-import http, { attemptTokenRefresh } from "./http";
+import http, { attemptTokenRefresh, refreshSession } from "./http";
+import { clearSessionStorageExcept } from "@/utils/clearSessionStorage";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -268,4 +269,229 @@ describe("403 handling", () => {
       expect(addUnauthorizedError).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("401 handling", () => {
+  let onRejected: (error: any) => Promise<any>;
+  const instance = {
+    interceptors: {
+      response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
+    },
+    get: vi.fn(),
+    request: vi.fn(),
+  };
+  const unauthorized = (extra: Record<string, unknown> = {}) => ({
+    response: { status: 401, data: {} },
+    request: { responseURL: "http://localhost:5080/api/acme/ai/capabilities" },
+    config: { url: "/api/acme/ai/capabilities", assistantManaged: true, ...extra },
+  });
+
+  beforeEach(() => {
+    vi.mocked(store.dispatch).mockClear();
+    instance.get.mockReset().mockResolvedValue({ status: 200 });
+    instance.request.mockReset().mockResolvedValue({ data: { can_chat: true } });
+    vi.mocked(axios.create).mockReturnValue(instance as any);
+    http();
+  });
+
+  afterEach(() => {
+    (config as any).isEnterprise = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+  });
+
+  it("refreshes the SSO token and retries an assistant request once, without logging out", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    await expect(onRejected(unauthorized())).resolves.toEqual({ data: { can_chat: true } });
+    expect(instance.get).toHaveBeenCalledWith("/config/dex_refresh");
+    expect(instance.request).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "/api/acme/ai/capabilities", assistantRetried: true }),
+    );
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("hands a failed SSO refresh and a second 401 back to the assistant caller", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    instance.get.mockRejectedValueOnce(new Error("refresh failed"));
+    const failed = unauthorized();
+    await expect(onRejected(failed)).rejects.toBe(failed);
+    const retried = unauthorized({ assistantRetried: true });
+    await expect(onRejected(retried)).rejects.toBe(retried);
+    expect(instance.get).toHaveBeenCalledTimes(1);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects with the retry's own error when the refresh worked but the retry failed", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    const retryError = { response: { status: 403, data: {} }, config: {} };
+    instance.request.mockRejectedValueOnce(retryError);
+    const first = unauthorized();
+    await expect(onRejected(first)).rejects.toBe(retryError);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("sends one dex_refresh for concurrent assistant and normal 401s", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    let finish!: (res: { status: number }) => void;
+    instance.get.mockReturnValueOnce(new Promise((r) => (finish = r)));
+    const capabilities = onRejected(unauthorized());
+    const probe = onRejected(unauthorized({ url: "/api/acme/ai/chats/x/cancel" }));
+    const normal = attemptTokenRefresh("/api/acme/streams");
+    finish({ status: 200 });
+    await Promise.all([capabilities, probe, normal]);
+    expect(instance.get.mock.calls.filter(([url]) => url === "/config/dex_refresh")).toHaveLength(
+      1,
+    );
+    expect(instance.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs out only the normal caller when an assistant-started refresh fails", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    let fail!: (err: Error) => void;
+    instance.get.mockReturnValueOnce(new Promise((_r, reject) => (fail = reject)));
+    const failed = unauthorized();
+    const assistantCall = onRejected(failed);
+    const normal = attemptTokenRefresh("/api/acme/streams");
+    fail(new Error("refresh token rotated"));
+    await expect(assistantCall).rejects.toBe(failed);
+    await expect(normal).rejects.toThrow("Refresh failed");
+    expect(instance.get.mock.calls.filter(([url]) => url === "/config/dex_refresh")).toHaveLength(
+      1,
+    );
+    expect(store.dispatch).toHaveBeenCalledTimes(1);
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+  });
+
+  it("hands an assistant-managed 401 back to the caller without logging out", async () => {
+    const error = {
+      response: { status: 401, data: {} },
+      request: { responseURL: "http://localhost:5080/api/acme/ai/capabilities" },
+      config: { url: "/api/acme/ai/capabilities", assistantManaged: true },
+    };
+    await expect(onRejected(error)).rejects.toBe(error);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("refreshSession (round 1 E-01)", () => {
+  let reloadMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    (config as any).isCloud = "false";
+    (config as any).isEnterprise = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+    vi.mocked(store.dispatch).mockClear();
+    reloadMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+    sessionStorage.setItem("o2.assistant.draft:k1:s1", "draft");
+    sessionStorage.setItem("other", "x");
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  const untouched = () => {
+    expect(store.dispatch).not.toHaveBeenCalled();
+    expect(reloadMock).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("other")).toBe("x");
+  };
+
+  it("answers expired at once on Cloud, without the logout attemptTokenRefresh does", async () => {
+    (config as any).isCloud = "true";
+    const instance = buildAxiosMock(() => Promise.resolve({ status: 200 }));
+    await expect(refreshSession()).resolves.toBe("expired");
+    expect(instance.get).not.toHaveBeenCalled();
+    untouched();
+  });
+
+  it("answers expired at once without SSO", async () => {
+    (config as any).isEnterprise = "true";
+    await expect(refreshSession()).resolves.toBe("expired");
+    untouched();
+  });
+
+  it("refreshes through dex_refresh on SSO", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    const instance = buildAxiosMock(() => Promise.resolve({ status: 200 }));
+    await expect(refreshSession()).resolves.toBe("refreshed");
+    expect(instance.get).toHaveBeenCalledWith("/config/dex_refresh");
+    untouched();
+  });
+
+  it("answers expired on a failed SSO refresh and never calls /config/logout", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    const instance = buildAxiosMock(() => Promise.reject(new Error("rotated")));
+    await expect(refreshSession()).resolves.toBe("expired");
+    expect(instance.get).not.toHaveBeenCalledWith("/config/logout");
+    untouched();
+  });
+
+  it("shares the refresh attemptTokenRefresh already started", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    let finish!: (res: { status: number }) => void;
+    const instance = buildAxiosMock(() => new Promise((r) => (finish = r)));
+    const normal = attemptTokenRefresh("/api/acme/streams");
+    const assistant = refreshSession();
+    finish({ status: 200 });
+    await expect(Promise.all([normal, assistant])).resolves.toEqual([undefined, "refreshed"]);
+    expect(instance.get.mock.calls.filter(([url]) => url === "/config/dex_refresh")).toHaveLength(
+      1,
+    );
+  });
+});
+
+describe("clearSessionStorageExcept", () => {
+  afterEach(() => sessionStorage.clear());
+
+  it("keeps the assistant drafts and removes everything else", () => {
+    sessionStorage.setItem("o2.assistant.draft:k1:s1", "a");
+    sessionStorage.setItem("o2.assistant.draft:k2:s2", "b");
+    sessionStorage.setItem("o2.assistant.tab:k1", "t");
+    sessionStorage.setItem("searchState", "s");
+    clearSessionStorageExcept(/^o2\.assistant\.draft:/);
+    expect(Object.keys(sessionStorage).sort()).toEqual([
+      "o2.assistant.draft:k1:s1",
+      "o2.assistant.draft:k2:s2",
+    ]);
+  });
+
+  it("does nothing when storage is blocked", () => {
+    const spy = vi.spyOn(Storage.prototype, "key").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    sessionStorage.setItem("a", "1");
+    expect(() => clearSessionStorageExcept(/^x/)).not.toThrow();
+    spy.mockRestore();
+  });
+
+  it("keeps drafts when a non-assistant 401 still logs out (the logout path stays)", async () => {
+    (config as any).isCloud = "false";
+    (config as any).isEnterprise = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+    sessionStorage.setItem("o2.assistant.draft:k1:s1", "a");
+    sessionStorage.setItem("searchState", "s");
+    const reloadMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+    await expect(attemptTokenRefresh("/api/acme/streams")).rejects.toThrow();
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+    expect(reloadMock).toHaveBeenCalled();
+    expect(Object.keys(sessionStorage)).toEqual(["o2.assistant.draft:k1:s1"]);
+  });
 });

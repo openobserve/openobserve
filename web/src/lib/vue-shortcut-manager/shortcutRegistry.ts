@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import type { I18nKey } from "@/types/i18n";
 /**
  * Single source of truth for every keyboard shortcut in the app.
@@ -69,6 +70,8 @@ export interface ShortcutCapabilities {
   rbacEnabled: boolean;
   aiEnabled: boolean;
   downtimesEnabled: boolean;
+  /** `useAssistantCapability().assistantCanChat` with the v2 flag on, else false. */
+  assistantCanChat: boolean;
 }
 
 export interface ShortcutModule {
@@ -94,6 +97,9 @@ const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.mode
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
 const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
 const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
+// Every assistant row is gated on the flag too, so the cheatsheet is unchanged with it off.
+const assistantChat = (c: ShortcutCapabilities) =>
+  isAssistantV2() && c.aiEnabled && c.assistantCanChat;
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
@@ -104,6 +110,14 @@ const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
  */
 export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.global", pages: ["shortcuts.pages.global"] },
+  {
+    titleKey: "shortcuts.modules.assistant",
+    pages: [
+      "shortcuts.pages.assistant",
+      "shortcuts.pages.assistantComposer",
+      "shortcuts.pages.queryEditor",
+    ],
+  },
   {
     titleKey: "shortcuts.modules.logs",
     pages: [
@@ -225,6 +239,96 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+b",
         descriptionKey: "shortcuts.actions.aiChatToggle",
         visible: aiChat,
+      },
+      {
+        id: "assistantOpen",
+        keyForWindows: "ctrl+i",
+        keyForMac: "meta+i",
+        descriptionKey: "shortcuts.actions.assistantOpen",
+        // Deliberate: it opens or focuses the assistant from any field (constraint 37).
+        skipInInput: false,
+        visible: assistantChat,
+      },
+    ],
+  },
+
+  // ── O2 Assistant ────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.assistant",
+    scope: "assistant",
+    visible: assistantChat,
+    shortcuts: [
+      {
+        id: "assistantClose",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.assistantClose",
+        allowInInput: true,
+        visible: () => false,
+      },
+      {
+        id: "assistantHistory",
+        keyForWindows: "ctrl+shift+h",
+        keyForMac: "meta+shift+h",
+        descriptionKey: "shortcuts.actions.assistantHistory",
+        allowInInput: true,
+        visible: assistantChat,
+      },
+    ],
+  },
+
+  // ── O2 Assistant — composer (the composer's own keydown acts first, so IME is seen) ──
+  {
+    pageKey: "shortcuts.pages.assistantComposer",
+    scope: "assistantComposer",
+    visible: assistantChat,
+    shortcuts: [
+      {
+        id: "assistantComposerSend",
+        display: "enter",
+        descriptionKey: "shortcuts.actions.assistantComposerSend",
+        visible: assistantChat,
+      },
+      {
+        id: "assistantComposerNewline",
+        display: "shift+enter",
+        descriptionKey: "shortcuts.actions.assistantComposerNewline",
+        visible: assistantChat,
+      },
+      {
+        id: "assistantComposerRecall",
+        display: "up",
+        descriptionKey: "shortcuts.actions.assistantComposerRecall",
+        visible: assistantChat,
+      },
+      {
+        id: "assistantGoToAnswer",
+        keyForWindows: "ctrl+up",
+        keyForMac: "meta+up",
+        descriptionKey: "shortcuts.actions.assistantGoToAnswer",
+        visible: assistantChat,
+      },
+    ],
+  },
+
+  // ── Query editor (Monaco binds these itself, so the editor wins while typing) ──
+  {
+    pageKey: "shortcuts.pages.queryEditor",
+    scope: "editor",
+    visible: assistantChat,
+    shortcuts: [
+      {
+        id: "assistantHelper",
+        keyForWindows: "ctrl+i",
+        keyForMac: "meta+i",
+        descriptionKey: "shortcuts.actions.assistantHelper",
+        visible: assistantChat,
+      },
+      {
+        id: "editorTabFocusMode",
+        keyForWindows: "ctrl+m",
+        keyForMac: "ctrl+shift+m",
+        descriptionKey: "shortcuts.actions.editorTabFocusMode",
+        visible: assistantChat,
       },
     ],
   },
@@ -1156,7 +1260,18 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "ai-toolsets",
     visible: enterprise,
     shortcuts: [
-      { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
+      {
+        id: "aiToolsetsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.aiToolsetsRefresh",
+        visible: () => !isAssistantV2(),
+      },
+      {
+        id: "assistantToolsetsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.assistantToolsetsRefresh",
+        visible: () => isAssistantV2(),
+      },
     ],
   },
 

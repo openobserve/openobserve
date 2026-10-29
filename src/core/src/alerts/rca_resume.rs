@@ -417,6 +417,10 @@ pub(crate) mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         }
     }
 
@@ -439,6 +443,9 @@ pub(crate) mod tests {
             end_seq: None,
             started_at: 1,
             ended_at: Some(2),
+            first_event_at: None,
+            version_of: None,
+            decisions: None,
         };
         turn_rows::Entity::insert(turn_rows::ActiveModel::from(row).reset_all())
             .exec(infra::db::get_orm_client_rw().await)

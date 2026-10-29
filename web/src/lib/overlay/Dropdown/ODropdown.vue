@@ -291,6 +291,7 @@ onBeforeUnmount(() => {
 
     <DropdownMenuPortal>
       <DropdownMenuContent
+        :data-dd-privacy="privacy"
         :side="side"
         :align="align"
         :side-offset="sideOffset"

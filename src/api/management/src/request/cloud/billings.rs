@@ -457,6 +457,8 @@ pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes)
 
     match o2_cloud_billings::handle_strip_wb_event(signature, &payload_str).await {
         Ok(orgs) => {
+            // Other nodes fall back to the cache TTL; this one shows a re-anchored period at once.
+            openobserve_core::trial_quota::forget_billing_periods();
             for (org_id, sub_type) in orgs {
                 let org = match organization::get_org(&org_id).await {
                     None => continue,

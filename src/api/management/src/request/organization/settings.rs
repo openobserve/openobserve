@@ -129,7 +129,13 @@ pub async fn create(
 )]
 pub async fn get(Path(org_id): Path<String>) -> Response {
     match get_org_setting(&org_id).await {
-        Ok(data) => (StatusCode::OK, Json(OrganizationSettingResponse { data })).into_response(),
+        Ok(data) => (
+            StatusCode::OK,
+            Json(OrganizationSettingResponse {
+                data: without_ai(data),
+            }),
+        )
+            .into_response(),
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();
@@ -454,6 +460,12 @@ fn apply_settings_payload(
     field_found
 }
 
+/// `ai` is read only through `/ai/settings`, which hides all but `enabled` from non-admins.
+fn without_ai(mut data: OrganizationSetting) -> OrganizationSetting {
+    data.ai = None;
+    data
+}
+
 fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool>) -> bool {
     let Some(enabled) = value else {
         return false;
@@ -465,6 +477,19 @@ fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_general_settings_read_never_carries_the_assistant_settings() {
+        let data = OrganizationSetting {
+            ai: Some(Default::default()),
+            ..Default::default()
+        };
+        let body = serde_json::to_value(OrganizationSettingResponse {
+            data: without_ai(data),
+        })
+        .unwrap();
+        assert!(body["data"].get("ai").is_none(), "{body}");
+    }
 
     #[test]
     fn test_merge_red_insights_enabled_sets_and_leaves() {

@@ -230,6 +230,19 @@ async fn run() -> Result<(), anyhow::Error> {
             } else {
                 log::info!("MCP is disabled, skipping MCP tool registry");
             }
+            // The assistant's MCP changes reach the action ledger only through this recorder.
+            #[cfg(feature = "enterprise")]
+            openobserve_api_management::request::ai::activity::register_recorder();
+            #[cfg(feature = "enterprise")]
+            {
+                let ai = &o2_enterprise::enterprise::common::config::get_config().ai;
+                if !openobserve_mcp::approval::set_secret(&ai.internal_secret) && ai.enabled {
+                    log::warn!(
+                        "[AI] O2_AI_INTERNAL_SECRET is unset: the assistant's changes are not checked for the user's approval"
+                    );
+                }
+                openobserve_api_management::request::ai::grants::register_grant_check();
+            }
 
             // init enterprise
             #[cfg(feature = "enterprise")]

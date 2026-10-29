@@ -29,6 +29,10 @@ export interface CodeBlockProps {
   filename?: string;
   /** Show the copy button. Default: true. */
   copyable?: boolean;
+  /** Syntax-highlight the code (default true); off renders escaped plain text, for code that is still streaming. */
+  highlight?: boolean;
+  /** Show the language and actions row (default true); off when the host already labels the code. */
+  toolbar?: boolean;
   /** Toast shown on a successful copy. */
   copyMessage?: I18nText;
   /** Tooltips for the reveal/hide toggle (when `codeMasked` is set). */
@@ -65,6 +69,16 @@ export interface CodeBlockProps {
   dataTest?: string;
   /** Name of the credential inside `code`, shown as a toolbar link and in the copy toast. */
   tokenName?: string;
+  /** highlight.js output made elsewhere (the assistant's worker); shown instead of highlighting here. The caller vouches it holds only hljs spans. */
+  highlightedHtml?: string;
+  /** Code longer than this renders as plain text, so one large block cannot stall the tab. */
+  highlightMaxChars?: number;
+  /** Names the code scroller and makes it a focusable region, for code a keyboard user must scroll. */
+  scrollLabel?: I18nText;
+  /** Extra classes for the Copy button, e.g. a larger touch target. */
+  copyButtonClass?: string;
+  /** "aa" raises the language label and the weakest token colours to 4.5:1 (default "default"). */
+  contrast?: "default" | "aa";
 }
 
 /** `partial` is true for a copy of a text selection, false for a whole-block copy. */

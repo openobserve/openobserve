@@ -1,0 +1,31 @@
+[
+  {
+    "role": "user",
+    "content": "Delete the stale alert",
+    "sentAt": 1772418120000,
+    "turnId": "t-pend-1"
+  },
+  {
+    "role": "assistant",
+    "content": "Deleting it needs your approval.",
+    "contentBlocks": [
+      {
+        "type": "text",
+        "text": "Deleting it needs your approval."
+      },
+      {
+        "type": "approval",
+        "approval": {
+          "id": "t-pend-1:1",
+          "kind": "delete",
+          "total": 1,
+          "noDecision": true
+        }
+      },
+      {
+        "type": "error",
+        "errorType": "stream_dropped"
+      }
+    ]
+  }
+]

@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
     <TrialPeriod v-if="!isChildOrg" class="mb-3" currentPage="billing"></TrialPeriod>
     <!-- AI Credits card: shown to child orgs too, whose AI use draws on the same credits -->
+    <AssistantCreditsCard v-if="assistantV2" class="mb-4" @subscribe="scrollToPlans" />
     <div
-      v-if="aiUsage"
+      v-else-if="aiUsage"
       class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default mb-3 flex w-full flex-col gap-2 border px-4 py-2.5 text-left shadow-none transition-shadow duration-200 hover:shadow-sm"
     >
       <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -154,7 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="loading" class="text-center text-xl font-medium font-semibold">
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
-      <div v-else class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
+      <div
+        v-else
+        :id="assistantV2 ? 'billing-plans' : undefined"
+        class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3"
+      >
         <ProPlan
           :planType="planType"
           :billingProvider="billingProvider"
@@ -180,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineAsyncComponent, defineComponent, ref, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
@@ -188,6 +193,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService, { type AiUsage } from "@/services/billings";
 import PaidAiUsageControl from "./PaidAiUsageControl.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+
+// Loaded only when the v2 card renders, so the legacy page never pulls in the assistant runtime.
+const AssistantCreditsCard = defineAsyncComponent(() => import("./AssistantCreditsCard.vue"));
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -220,6 +229,7 @@ export default defineComponent({
     OTag,
     OButton,
     PaidAiUsageControl,
+    AssistantCreditsCard,
   },
 
   emits: ["update:proSubscription"],
@@ -231,7 +241,8 @@ export default defineComponent({
     this.loading = true;
     this.fetchMembership();
     // Credits and pricing load independently: neither may hold back the other or the plans.
-    this.fetchAiUsage();
+    // The v2 card reads the usage every credit surface shares.
+    if (!this.assistantV2) this.fetchAiUsage();
     this.fetchPricingData();
     await this.loadSubscription();
   },
@@ -261,6 +272,9 @@ export default defineComponent({
       } catch {
         // AI usage is not available.
       }
+    },
+    scrollToPlans() {
+      document.getElementById("billing-plans")?.scrollIntoView({ block: "start" });
     },
     contactSales() {
       window.open(siteURL.contactSales, "_blank");
@@ -426,6 +440,7 @@ export default defineComponent({
     const billingProvider = ref("");
     const subscriptionType = ref("");
     const aiUsage = ref<AiUsage | null>(null);
+    const assistantV2 = isAssistantV2();
     const aiIcon = computed(() =>
       isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
@@ -481,6 +496,7 @@ export default defineComponent({
       billingProvider,
       subscriptionType,
       aiUsage,
+      assistantV2,
       aiIcon,
       aiUsageRatio,
       aiUsageVariant,

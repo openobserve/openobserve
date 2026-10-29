@@ -98,4 +98,13 @@ describe("OFile", () => {
     wrapper = mount(OFile, { props: { errorMessage: "Required" } });
     expect(wrapper.text()).toContain("Required");
   });
+
+  it("exposes open() to a control that hides the field behind its own button", () => {
+    wrapper = mount(OFile);
+    const input = wrapper.get('input[type="file"]').element as HTMLInputElement;
+    let clicked = 0;
+    input.addEventListener("click", () => (clicked += 1));
+    (wrapper.vm as unknown as { open(): void }).open();
+    expect(clicked).toBe(1);
+  });
 });

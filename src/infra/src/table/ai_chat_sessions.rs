@@ -16,13 +16,13 @@
 //! The `ai_chat_sessions` index over `_o2_ai_chat_events`: ownership, watermark, epoch fencing.
 
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    QueryTrait, Set, SqlErr,
-    sea_query::{Expr, Func},
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, Set, SqlErr,
+    sea_query::{Expr, Func, LikeExpr},
 };
 
 pub use super::entity::ai_chat_sessions::Model;
-use super::entity::{ai_chat_sessions::*, ai_chat_turns};
+use super::entity::{ai_chat_imports, ai_chat_sessions::*, ai_chat_turns};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
@@ -40,6 +40,9 @@ pub const NO_SEQ: i64 = -1;
 /// Deleted chats keep being purged this long, for replicas that were down at delete time.
 pub const REPLICA_REPURGE_WINDOW_MICROS: i64 = 7 * 24 * 60 * 60 * 1_000_000;
 
+/// Cap on `search_text`; the newest prompts win.
+pub const SEARCH_TEXT_MAX_CHARS: usize = 8192;
+
 /// Outcome of [`bind_opencode_session`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Binding {
@@ -56,6 +59,48 @@ pub struct ListCursor {
     pub session_id: String,
 }
 
+/// Narrows [`list_for_user`]: all empty lists every chat.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ListFilter {
+    /// Case-insensitive text matched against the title and the typed prompts.
+    pub q: Option<String>,
+    /// Only these agent types (when non-empty).
+    pub agent_types: Vec<String>,
+    /// Never these agent types.
+    pub exclude_agent_types: Vec<String>,
+    /// Only pinned chats.
+    pub pinned_only: bool,
+}
+
+impl ListFilter {
+    fn condition(&self) -> Condition {
+        let mut cond = Condition::all();
+        if !self.agent_types.is_empty() {
+            cond = cond.add(Column::AgentType.is_in(self.agent_types.iter().map(String::as_str)));
+        }
+        if !self.exclude_agent_types.is_empty() {
+            cond = cond.add(
+                Column::AgentType.is_not_in(self.exclude_agent_types.iter().map(String::as_str)),
+            );
+        }
+        if self.pinned_only {
+            cond = cond.add(Column::Pinned.eq(true));
+        }
+        if let Some(q) = self.q.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
+            let pattern = format!("%{}%", escape_like(&q.to_lowercase()));
+            cond = cond.add(
+                Condition::any()
+                    .add(
+                        Expr::expr(Func::lower(Expr::col(Column::Title)))
+                            .like(LikeExpr::new(pattern.clone()).escape('\\')),
+                    )
+                    .add(Expr::col(Column::SearchText).like(LikeExpr::new(pattern).escape('\\'))),
+            );
+        }
+        cond
+    }
+}
+
 /// A new chat forked from a share (see [`insert_fork`]).
 #[derive(Debug, Clone)]
 pub struct NewFork<'a> {
@@ -67,6 +112,21 @@ pub struct NewFork<'a> {
     pub title: &'a str,
     pub share_id: &'a str,
     pub seed_seq: i64,
+    /// The seed JSON copied now, so revoking the share never empties the fork.
+    pub seed: Option<&'a serde_json::Value>,
+}
+
+/// A new chat holding imported browser turns (see [`insert_import_with`]).
+#[derive(Debug, Clone)]
+pub struct NewImport<'a> {
+    pub org_id: &'a str,
+    pub session_id: &'a str,
+    pub user_id: &'a str,
+    pub user_email: &'a str,
+    pub agent_type: &'a str,
+    pub title: &'a str,
+    pub pinned: bool,
+    pub search_text: &'a str,
 }
 
 /// `column` moved forward to `value`, never back (NULL is unset): the read window never shrinks.
@@ -82,6 +142,24 @@ fn not_before(column: Column, value: i64) -> sea_orm::sea_query::SimpleExpr {
 
 fn db_err(e: impl ToString) -> errors::Error {
     errors::DbError::SeaORMError(e.to_string()).into()
+}
+
+/// Lowercased, newest `SEARCH_TEXT_MAX_CHARS` characters.
+fn capped_search_text(text: &str) -> String {
+    let lower = text.to_lowercase();
+    let skip = lower.chars().count().saturating_sub(SEARCH_TEXT_MAX_CHARS);
+    lower.chars().skip(skip).collect()
+}
+
+fn escape_like(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if matches!(c, '%' | '_' | '\\') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
 }
 
 pub async fn get(org_id: &str, session_id: &str) -> Result<Option<Model>, errors::Error> {
@@ -152,6 +230,10 @@ pub async fn get_or_create_with<C: ConnectionTrait>(
         forked_from_share: Set(None),
         fork_seed_seq: Set(None),
         replica_purged_at: Set(None),
+        pinned: Set(false),
+        pinned_at: Set(None),
+        seed: Set(None),
+        search_text: Set(None),
     };
     if let Err(e) = Entity::insert(record).exec(conn).await {
         match e.sql_err() {
@@ -195,11 +277,78 @@ pub async fn insert_fork_with<C: ConnectionTrait>(
         forked_from_share: Set(Some(fork.share_id.to_string())),
         fork_seed_seq: Set(Some(fork.seed_seq)),
         replica_purged_at: Set(None),
+        pinned: Set(false),
+        pinned_at: Set(None),
+        seed: Set(fork.seed.map(|v| v.to_string())),
+        search_text: Set(None),
     };
     Entity::insert(record).exec(conn).await.map_err(db_err)?;
     get_with(conn, fork.org_id, fork.session_id)
         .await?
         .ok_or_else(|| errors::Error::Message("ai_chat_sessions row vanished after insert".into()))
+}
+
+/// Create an imported chat's index row; its title counts as the user's, so nothing renames it.
+pub async fn insert_import_with<C: ConnectionTrait>(
+    conn: &C,
+    import: &NewImport<'_>,
+    now: i64,
+) -> Result<(), errors::Error> {
+    let record = ActiveModel {
+        org_id: Set(import.org_id.to_string()),
+        session_id: Set(import.session_id.to_string()),
+        user_id: Set(import.user_id.to_string()),
+        user_email: Set(import.user_email.to_string()),
+        opencode_session_id: Set(None),
+        agent_type: Set(import.agent_type.to_string()),
+        title: Set(import.title.to_string()),
+        title_source: Set(TITLE_FROM_USER.to_string()),
+        status: Set(STATUS_ACTIVE.to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+        first_event_at: Set(None),
+        last_event_at: Set(None),
+        last_committed_seq: Set(NO_SEQ),
+        session_epoch: Set(1),
+        last_turn_id: Set(None),
+        forked_from_share: Set(None),
+        fork_seed_seq: Set(None),
+        replica_purged_at: Set(None),
+        pinned: Set(import.pinned),
+        pinned_at: Set(import.pinned.then_some(now)),
+        seed: Set(None),
+        search_text: Set(Some(capped_search_text(import.search_text))),
+    };
+    Entity::insert(record)
+        .exec_without_returning(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(())
+}
+
+/// How many active forks of `share_id` `user_id` has.
+pub async fn count_forks(
+    org_id: &str,
+    user_id: &str,
+    share_id: &str,
+) -> Result<u64, errors::Error> {
+    count_forks_with(get_orm_client_ro().await, org_id, user_id, share_id).await
+}
+
+pub async fn count_forks_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_id: &str,
+    share_id: &str,
+) -> Result<u64, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserId.eq(user_id))
+        .filter(Column::ForkedFromShare.eq(share_id))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
+        .count(conn)
+        .await
+        .map_err(db_err)
 }
 
 /// The rows of `session_ids` in `org_id` that exist, in no particular order.
@@ -526,6 +675,77 @@ pub async fn rename_with<C: ConnectionTrait>(
         .await
         .map_err(db_err)?;
     Ok(result.rows_affected == 1)
+}
+
+/// Pins or unpins the user's active chat; `false` without one.
+pub async fn set_pinned(
+    org_id: &str,
+    session_id: &str,
+    user_id: &str,
+    pinned: bool,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    set_pinned_with(
+        get_orm_client_rw().await,
+        (org_id, session_id, user_id),
+        pinned,
+        now,
+    )
+    .await
+}
+
+pub async fn set_pinned_with<C: ConnectionTrait>(
+    conn: &C,
+    (org_id, session_id, user_id): (&str, &str, &str),
+    pinned: bool,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::Pinned, Expr::value(pinned))
+        .col_expr(Column::PinnedAt, Expr::value(pinned.then_some(now)))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::UserId.eq(user_id))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected == 1)
+}
+
+/// Adds a typed prompt to what `q` searches; best effort, so a lost race only loses one prompt.
+pub async fn append_search_text(
+    org_id: &str,
+    session_id: &str,
+    prompt: &str,
+) -> Result<(), errors::Error> {
+    append_search_text_with(get_orm_client_rw().await, org_id, session_id, prompt).await
+}
+
+pub async fn append_search_text_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    prompt: &str,
+) -> Result<(), errors::Error> {
+    let Some(row) = get_with(conn, org_id, session_id).await? else {
+        return Ok(());
+    };
+    let joined = match row.search_text.as_deref().filter(|t| !t.is_empty()) {
+        Some(old) => format!("{old}\n{prompt}"),
+        None => prompt.to_string(),
+    };
+    Entity::update_many()
+        .col_expr(
+            Column::SearchText,
+            Expr::value(Some(capped_search_text(&joined))),
+        )
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(())
 }
 
 /// Tombstone a chat so every read and write stops; `false` without an active chat of `user_id`.
@@ -971,16 +1191,15 @@ pub async fn set_refreshed_range_with<C: ConnectionTrait>(
 pub async fn list_for_user(
     org_id: &str,
     user_id: &str,
-    after: Option<&ListCursor>,
-    limit: u64,
+    page: (Option<&ListCursor>, u64),
+    filter: &ListFilter,
     running_since: i64,
 ) -> Result<Vec<Model>, errors::Error> {
     list_for_user_with(
         get_orm_client_ro().await,
-        org_id,
-        user_id,
-        after,
-        limit,
+        (org_id, user_id),
+        page,
+        filter,
         running_since,
     )
     .await
@@ -988,10 +1207,9 @@ pub async fn list_for_user(
 
 pub async fn list_for_user_with<C: ConnectionTrait>(
     conn: &C,
-    org_id: &str,
-    user_id: &str,
-    after: Option<&ListCursor>,
-    limit: u64,
+    (org_id, user_id): (&str, &str),
+    (after, limit): (Option<&ListCursor>, u64),
+    filter: &ListFilter,
     running_since: i64,
 ) -> Result<Vec<Model>, errors::Error> {
     let running = ai_chat_turns::Entity::find()
@@ -1001,6 +1219,12 @@ pub async fn list_for_user_with<C: ConnectionTrait>(
         .filter(ai_chat_turns::Column::Status.eq(super::ai_chat_turns::TURN_RUNNING))
         .filter(ai_chat_turns::Column::StartedAt.gte(running_since))
         .into_query();
+    let imported = ai_chat_imports::Entity::find()
+        .select_only()
+        .column(ai_chat_imports::Column::SessionId)
+        .filter(ai_chat_imports::Column::OrgId.eq(org_id))
+        .filter(ai_chat_imports::Column::UserId.eq(user_id))
+        .into_query();
     let mut query = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::UserId.eq(user_id))
@@ -1009,8 +1233,10 @@ pub async fn list_for_user_with<C: ConnectionTrait>(
             Condition::any()
                 .add(Column::LastCommittedSeq.ne(NO_SEQ))
                 .add(Column::ForkedFromShare.is_not_null())
-                .add(Column::SessionId.in_subquery(running)),
-        );
+                .add(Column::SessionId.in_subquery(running))
+                .add(Column::SessionId.in_subquery(imported)),
+        )
+        .filter(filter.condition());
     if let Some(cursor) = after {
         query = query.filter(
             Condition::any()
@@ -1044,6 +1270,7 @@ mod tests {
         for stmt in [
             schema.create_table_from_entity(Entity),
             schema.create_table_from_entity(ai_chat_turns::Entity),
+            schema.create_table_from_entity(ai_chat_imports::Entity),
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
@@ -1091,6 +1318,7 @@ mod tests {
             title: "p99 regression (copy)",
             share_id: "share-1",
             seed_seq: 7,
+            seed: None,
         };
         let row = insert_fork_with(&db, &fork, 10).await.unwrap();
         assert_eq!(row.user_id, BOB);
@@ -1432,7 +1660,7 @@ mod tests {
         assert!(mark_deleted_with(&db, ORG, "s1", ALICE, 99).await.unwrap());
         // mark_deleted bumped s1's updated_at; it is still excluded.
 
-        let page1 = list_for_user_with(&db, ORG, ALICE, None, 2, 0)
+        let page1 = list_for_user_with(&db, (ORG, ALICE), (None, 2), &ListFilter::default(), 0)
             .await
             .unwrap();
         let ids: Vec<_> = page1.iter().map(|r| r.session_id.as_str()).collect();
@@ -1442,9 +1670,15 @@ mod tests {
             updated_at: last.updated_at,
             session_id: last.session_id.clone(),
         };
-        let page2 = list_for_user_with(&db, ORG, ALICE, Some(&cursor), 10, 0)
-            .await
-            .unwrap();
+        let page2 = list_for_user_with(
+            &db,
+            (ORG, ALICE),
+            (Some(&cursor), 10),
+            &ListFilter::default(),
+            0,
+        )
+        .await
+        .unwrap();
         let ids: Vec<_> = page2.iter().map(|r| r.session_id.as_str()).collect();
         assert_eq!(ids, vec!["s3", "s2"]);
         // Only the owner can delete.
@@ -1455,13 +1689,13 @@ mod tests {
         cleared.sort();
         assert_eq!(cleared, vec!["s0", "s2", "s3", "s4"]);
         assert!(
-            list_for_user_with(&db, ORG, ALICE, None, 10, 0)
+            list_for_user_with(&db, (ORG, ALICE), (None, 10), &ListFilter::default(), 0)
                 .await
                 .unwrap()
                 .is_empty()
         );
         assert_eq!(
-            list_for_user_with(&db, ORG, BOB, None, 10, 0)
+            list_for_user_with(&db, (ORG, BOB), (None, 10), &ListFilter::default(), 0)
                 .await
                 .unwrap()
                 .len(),
@@ -1470,12 +1704,18 @@ mod tests {
     }
 
     async fn listed(db: &sea_orm::DatabaseConnection, running_since: i64) -> Vec<String> {
-        list_for_user_with(db, ORG, ALICE, None, 10, running_since)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|r| r.session_id)
-            .collect()
+        list_for_user_with(
+            db,
+            (ORG, ALICE),
+            (None, 10),
+            &ListFilter::default(),
+            running_since,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|r| r.session_id)
+        .collect()
     }
 
     #[tokio::test]
@@ -1507,9 +1747,17 @@ mod tests {
             title: "copy",
             share_id: "share-1",
             seed_seq: 3,
+            seed: Some(&serde_json::json!({"turns": []})),
         };
         insert_fork_with(&db, &fork, 50).await.unwrap();
         assert_eq!(listed(&db, 0).await, vec!["fork", "used"]);
+        assert_eq!(
+            count_forks_with(&db, ORG, ALICE, "share-1").await.unwrap(),
+            1
+        );
+        assert_eq!(count_forks_with(&db, ORG, BOB, "share-1").await.unwrap(), 0);
+        let row = get_with(&db, ORG, "fork").await.unwrap().unwrap();
+        assert_eq!(row.seed.as_deref(), Some(r#"{"turns":[]}"#));
     }
 
     #[tokio::test]
@@ -1697,5 +1945,88 @@ mod tests {
             .all(db)
             .await
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn list_filters_search_title_and_prompts_agent_type_and_pins() {
+        let db = db().await;
+        used_chat(&db, "s1", ALICE, 100).await;
+        used_chat(&db, "s2", ALICE, 101).await;
+        get_or_create_with(&db, ORG, "s3", ALICE, "a@x", "sre", 102)
+            .await
+            .unwrap();
+        advance_watermark_with(&db, ORG, "s3", 1, NO_SEQ, 0, 102, 102, 102)
+            .await
+            .unwrap();
+        assert!(
+            rename_with(&db, ORG, "s1", ALICE, "Checkout LATENCY")
+                .await
+                .unwrap()
+        );
+        append_search_text_with(&db, ORG, "s2", "Why is 100%_done slow?")
+            .await
+            .unwrap();
+        let ids = |filter: ListFilter| {
+            let db = &db;
+            async move {
+                list_for_user_with(db, (ORG, ALICE), (None, 10), &filter, 0)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|r| r.session_id)
+                    .collect::<Vec<_>>()
+            }
+        };
+        let q = |q: &str| ListFilter {
+            q: Some(q.to_string()),
+            ..Default::default()
+        };
+        assert_eq!(ids(q("latency")).await, ["s1"]);
+        assert_eq!(ids(q("100%_D")).await, ["s2"]);
+        assert!(ids(q("100%x")).await.is_empty());
+        let include = ListFilter {
+            agent_types: vec!["sre".into()],
+            ..Default::default()
+        };
+        assert_eq!(ids(include).await, ["s3"]);
+        let exclude = ListFilter {
+            exclude_agent_types: vec!["sre".into()],
+            ..Default::default()
+        };
+        assert_eq!(ids(exclude).await, ["s2", "s1"]);
+        let pinned = ListFilter {
+            pinned_only: true,
+            ..Default::default()
+        };
+        assert!(ids(pinned.clone()).await.is_empty());
+        assert!(
+            set_pinned_with(&db, (ORG, "s2", ALICE), true, 7)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !set_pinned_with(&db, (ORG, "s2", BOB), true, 7)
+                .await
+                .unwrap()
+        );
+        assert_eq!(ids(pinned.clone()).await, ["s2"]);
+        let row = get_with(&db, ORG, "s2").await.unwrap().unwrap();
+        assert_eq!((row.pinned, row.pinned_at), (true, Some(7)));
+        assert!(
+            set_pinned_with(&db, (ORG, "s2", ALICE), false, 8)
+                .await
+                .unwrap()
+        );
+        let row = get_with(&db, ORG, "s2").await.unwrap().unwrap();
+        assert_eq!((row.pinned, row.pinned_at), (false, None));
+    }
+
+    #[test]
+    fn search_text_keeps_the_newest_characters_lowercased() {
+        let long = format!("{}TAIL", "x".repeat(SEARCH_TEXT_MAX_CHARS));
+        let capped = capped_search_text(&long);
+        assert_eq!(capped.chars().count(), SEARCH_TEXT_MAX_CHARS);
+        assert!(capped.ends_with("tail"));
+        assert_eq!(escape_like("a%b_c\\"), "a\\%b\\_c\\\\");
     }
 }

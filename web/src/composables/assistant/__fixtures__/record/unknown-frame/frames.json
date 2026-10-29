@@ -1,0 +1,40 @@
+{
+  "schema": "o2-assistant-record-case/1",
+  "timezone": "UTC",
+  "turns": [
+    {
+      "turn_id": "t-unk-1",
+      "created": 1772418180000000,
+      "user": {
+        "text": "Why 5xx?"
+      },
+      "frames": [
+        {
+          "type": "status"
+        },
+        {
+          "type": "hologram",
+          "payload": {
+            "x": 1
+          }
+        },
+        {
+          "type": "message_delta",
+          "content": "The 5xx come from payments."
+        },
+        {
+          "type": "hologram",
+          "payload": {
+            "x": 2
+          }
+        },
+        {
+          "type": "complete"
+        }
+      ],
+      "status": "completed",
+      "first_seq": 1,
+      "last_seq": 6
+    }
+  ]
+}

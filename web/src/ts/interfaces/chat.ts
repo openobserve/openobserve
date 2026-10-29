@@ -1,3 +1,4 @@
+import type { ContextChip } from "@/composables/assistant/pure";
 import type { I18nText } from "@/types/i18n";
 
 export interface ToolCall {
@@ -33,7 +34,24 @@ export interface NavigationAction {
 
 // Content block for interleaved display (tool calls and text in order)
 export interface ContentBlock {
-  type: "tool_call" | "text" | "error" | "navigation" | "status";
+  type:
+    | "tool_call"
+    | "text"
+    | "error"
+    | "navigation"
+    | "status"
+    | "turn_outcome"
+    | "attachment"
+    | "trail"
+    | "query"
+    | "link"
+    | "findings"
+    | "footer"
+    | "approval"
+    | "approval_result"
+    | "plan"
+    | "policy"
+    | "consent_note";
   // For tool_call type:
   tool?: string;
   message?: I18nText;
@@ -59,10 +77,35 @@ export interface ContentBlock {
   navigationAction?: NavigationAction; // Optional navigation button for tool calls
   // Marker of a turn still being generated, or one the user stopped:
   turnStatus?: "running" | "stopped";
+  // For turn_outcome type: how the turn ended, kept so a reload renders the same block.
+  outcome?: TurnOutcomeRecord;
+  // For attachment type: one delimiter block of a stored user message.
+  attachment?: { name: string; body: string; hidden?: boolean };
+}
+
+/** The stored end of a turn that did not simply answer; ids, codes and the server's text only. */
+export interface TurnOutcomeRecord {
+  kind: "failed" | "stopped" | "doneNotSaved" | "expired" | "restored" | "cancelledElsewhere";
+  code?: string;
+  steps?: number;
+  cancelUnconfirmed?: boolean;
+  action?: string;
+  retryable?: boolean;
+  httpStatus?: number;
+  traceId?: string;
+  turnId?: string;
+  sessionId?: string;
+  serverMessage?: string;
+  reason?: string;
+  at?: number;
+  /** How long the turn ran, for "Connection lost after {elapsed}". */
+  elapsedMs?: number;
 }
 
 // Image attachment for multimodal chat
 export interface ImageAttachment {
+  /** The assistant composer's key for the image; filenames repeat across pastes. */
+  id?: string;
   data: string; // Base64-encoded image data
   mimeType: "image/png" | "image/jpeg";
   filename: string;
@@ -79,6 +122,22 @@ export interface ChatMessage {
   contentBlocks?: ContentBlock[]; // Sequential blocks for interleaved display
   images?: ImageAttachment[]; // Optional images for multimodal messages
   feedback?: "thumbs_up" | "thumbs_down"; // User feedback vote for assistant messages
+  /** Epoch ms the user sent the message. */
+  sentAt?: number;
+  /** Who wrote a user message, when not the reader (Slack-era records). */
+  author?: string;
+  /** Earlier attempts of an assistant answer, oldest first; the message itself is the latest. */
+  versions?: ChatMessage[];
+  /** The `x-o2-assistant-turn-id` of the turn this message belongs to. */
+  turnId?: string;
+  /** The context chips sent with a user message, as the composer held them. */
+  chips?: ContextChip[];
+  /** 1-based number of the user message an edit-and-resend came from. */
+  editedFrom?: number;
+  /** The window a "Re-run for now" prompt evaluates, epoch ms. */
+  rerunFor?: { from: number; to: number };
+  /** The page's absolute time window when the prompt was sent, epoch ms. */
+  sentWindow?: { from: number; to: number };
 }
 
 /** Where one stored turn's messages sit in a folded message list, for incremental merges. */

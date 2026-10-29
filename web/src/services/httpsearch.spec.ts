@@ -222,6 +222,18 @@ describe("httpsearch service", () => {
         expect(store.dispatch).toHaveBeenCalledWith("logout");
       });
 
+      it("keeps the assistant drafts when it clears sessionStorage", async () => {
+        sessionStorage.setItem("o2.assistant.draft:k1:s1", "draft");
+        sessionStorage.setItem("searchState", "x");
+        const error = { response: { status: 401, data: {} } };
+
+        await expect(errorHandler(error)).rejects.toEqual(error);
+
+        expect(sessionStorage.getItem("o2.assistant.draft:k1:s1")).toBe("draft");
+        expect(sessionStorage.getItem("searchState")).toBeNull();
+        sessionStorage.clear();
+      });
+
       it("clears localStorage but keeps every user's drafts", async () => {
         localStorage.setItem("userInfo", "token");
         localStorage.setItem("o2_draft:function:o:f:me%40x.io", "{}");

@@ -72,12 +72,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @column-order-change="onColumnReorder"
                 @close-column="onCloseColumn"
                 @cell-contextmenu="handleCellContextMenu"
+                v-bind="assistantV2 ? { focusToolbar: true } : {}"
               >
                 <!-- `column` is the OTableColumnDef, so `column.meta` (not
                `column.columnDef.meta`) holds disableCellAction. -->
-                <template #cell-hover-actions="{ row, column, active }">
+                <template #cell-hover-actions="{ row, column, active, menu }">
+                  <ODropdown v-if="assistantV2 && menu">
+                    <template #trigger>
+                      <OButton
+                        variant="ghost"
+                        size="icon-sm"
+                        class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                        :aria-label="t('assistant.entry.rowActions')"
+                        data-test="traces-search-result-row-menu"
+                      >
+                        <OIcon name="more-vert" size="sm" />
+                      </OButton>
+                    </template>
+                    <AiEntryButton v-bind="traceRowDoor(row, 'explain')" appearance="menu-item" />
+                    <AiEntryButton
+                      v-bind="traceRowDoor(row, 'add_to_chat')"
+                      appearance="menu-item"
+                    />
+                  </ODropdown>
+                  <template v-else-if="assistantV2 && active && !contextMenuOpen">
+                    <CellActions
+                      v-if="showCellActions && !column.meta?.disableCellAction"
+                      :column="column"
+                      :row="row"
+                      :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
+                      :hide-search-term-actions="false"
+                      :hide-ai="true"
+                      @copy="copyToClipboard(column.id, row[column.id])"
+                      @add-search-term="
+                        (field, value, action) => addSearchTerm(field, value, action, row)
+                      "
+                    />
+                    <AiEntryButton
+                      v-bind="traceRowDoor(row, 'explain')"
+                      appearance="toolbar-icon"
+                    />
+                    <AiEntryButton
+                      v-bind="traceRowDoor(row, 'add_to_chat')"
+                      appearance="toolbar-icon"
+                    />
+                  </template>
                   <CellActions
-                    v-if="
+                    v-else-if="
+                      !assistantV2 &&
                       showCellActions &&
                       active &&
                       !contextMenuOpen &&
@@ -239,6 +281,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("logs.cellActions.excludeTerm") }}
               </OContextMenuItem>
             </template>
+            <template v-if="assistantV2">
+              <OContextMenuSeparator />
+              <AiEntryButton
+                v-bind="traceRowDoor(contextCell.row, 'explain')"
+                appearance="menu-item"
+              />
+              <AiEntryButton
+                v-bind="traceRowDoor(contextCell.row, 'add_to_chat')"
+                appearance="menu-item"
+              />
+            </template>
           </template>
         </OContextMenu>
       </div>
@@ -247,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from "vue";
 import { nextRowTarget } from "@/utils/rowNavigation";
 import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
 import { announceTracesRowNav as announce } from "@/plugins/traces/composables/tracesRowNav";
@@ -271,6 +324,8 @@ import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OContextMenu from "@/lib/overlay/ContextMenu/OContextMenu.vue";
 import OContextMenuItem from "@/lib/overlay/ContextMenu/OContextMenuItem.vue";
 import OContextMenuLabel from "@/lib/overlay/ContextMenu/OContextMenuLabel.vue";
@@ -278,6 +333,9 @@ import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparat
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TracesNoEventsState from "@/plugins/traces/TracesNoEventsState.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { traceRowBuild, tracesDoorBase } from "@/plugins/traces/tracesDoors";
 
 interface Props {
   hits: any[];
@@ -471,6 +529,31 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const { searchObj, updatedLocalLogFilterField } = useTraces();
+
+const assistantV2 = isAssistantV2();
+const loadedOrg = assistantV2
+  ? useLoadedOrg(
+      () => props.hits,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const traceRowDoor = (row: Record<string, unknown>, verb: "explain" | "add_to_chat") => ({
+  verb,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg?.value,
+  objectKind: "trace" as const,
+  label: t(verb === "explain" ? "assistant.entry.explainTrace" : "assistant.entry.addTrace"),
+  tooltip: t(
+    verb === "explain" ? "assistant.entry.tooltip.explainTrace" : "assistant.entry.tooltip.add",
+  ),
+  dataTest:
+    verb === "explain" ? ("ai-entry-trace-explain" as const) : ("ai-entry-trace-add" as const),
+  build: traceRowBuild(() => tracesDoorBase(searchObj, store.state), row),
+  objectKey: String(row.trace_id ?? row.span_id ?? ""),
+});
 const { buildColumns } = useTracesTableColumns();
 
 const timestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");

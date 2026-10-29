@@ -19,6 +19,7 @@ import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import enLocale from "@/locales/languages/en-US.json";
 import store from "@/stores";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 /** Every `meta.titleKey` in a route tree, children included. */
 const collectTitleKeys = (routes: any[]): string[] =>
@@ -988,5 +989,80 @@ describe("useManagementRoutes", () => {
         expect(enMessage(titleKey), `no en-US message for "${titleKey}"`).toBeTypeOf("string");
       }
     });
+  });
+});
+
+describe("useManagementRoutes assistant settings", () => {
+  const findChild = () =>
+    useManagementRoutes()[0].children.find((r: any) => r.name === "assistantSettings");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    config.isEnterprise = "false";
+    config.isCloud = "false";
+  });
+
+  afterEach(() => {
+    delete window.__O2_ASSISTANT_V2__;
+    resetAssistantV2ForTests();
+  });
+
+  it("registers nothing with the flag off", () => {
+    window.__O2_ASSISTANT_V2__ = false;
+    resetAssistantV2ForTests();
+    expect(findChild()).toBeUndefined();
+  });
+
+  it("registers the tab route with the flag on, its tab passed as a prop", () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    resetAssistantV2ForTests();
+    const route = findChild();
+    expect(route.path).toBe("assistant/:tab?");
+    expect(route.props).toBe(true);
+    expect(enMessage(route.meta.titleKey)).toBe("Assistant");
+  });
+
+  it("sends an OSS build to the enterprise-locked page", () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    resetAssistantV2ForTests();
+    const next = vi.fn();
+    findChild().beforeEnter({ fullPath: "/settings/assistant/status", query: {} }, {}, next);
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "enterpriseFeatureLocked",
+        query: expect.objectContaining({ feature: "aiAssistant" }),
+      }),
+    );
+  });
+
+  it("keeps the legacy toolsets page with the flag off", () => {
+    window.__O2_ASSISTANT_V2__ = false;
+    resetAssistantV2ForTests();
+    const legacy = useManagementRoutes()[0].children.find((r: any) => r.name === "aiToolsets");
+    expect(legacy.component).toBeTypeOf("function");
+    expect(legacy.redirect).toBeUndefined();
+  });
+
+  it("redirects the legacy toolsets page to the tab, keeping its query", () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    resetAssistantV2ForTests();
+    const legacy = useManagementRoutes()[0].children.find((r: any) => r.name === "aiToolsets");
+    expect(legacy.component).toBeUndefined();
+    expect(
+      legacy.redirect({ query: { action: "edit", id: "pagerduty", org_identifier: "acme" } }),
+    ).toEqual({
+      name: "assistantSettings",
+      params: { tab: "toolsets" },
+      query: { action: "edit", id: "pagerduty", org_identifier: "acme" },
+    });
+  });
+
+  it("lets an enterprise build through to the route guard", () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    resetAssistantV2ForTests();
+    config.isEnterprise = "true";
+    const next = vi.fn();
+    findChild().beforeEnter({ fullPath: "/settings/assistant/status", query: {} }, {}, next);
+    expect(routeGuard).toHaveBeenCalled();
   });
 });

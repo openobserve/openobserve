@@ -58,6 +58,31 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 const awsConfig = vi.hoisted(() => ({ isEnterprise: "false", isCloud: "false" }));
 vi.mock("@/aws-exports", () => ({ default: awsConfig }));
+const assistant = vi.hoisted(() => ({ v2: false, gate: { value: "available" } }));
+vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => assistant.v2 }));
+vi.mock("@/composables/assistant", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/assistant")>()),
+  useAssistantCapability: () => ({ gate: assistant.gate }),
+}));
+const built = vi.hoisted(() => ({ last: null as unknown }));
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      props: { dataTest: String, label: String, build: Function },
+      setup: (props) => () =>
+        h(
+          "button",
+          {
+            "data-test": props.dataTest,
+            onClick: async () => (built.last = await props.build?.()),
+          },
+          props.label,
+        ),
+    }),
+  };
+});
 
 const NOW = Date.UTC(2026, 9, 7, 10, 0, 0);
 const routes = ["logs", "metrics", "traces", "profiles", "recommended", "curl"].map((name) => ({
@@ -128,6 +153,9 @@ beforeEach(() => {
   fake.targetExists.value = true;
   fake.deciding.value = false;
   awsConfig.isEnterprise = "false";
+  assistant.v2 = false;
+  assistant.gate = { value: "available" };
+  built.last = null;
 });
 
 afterEach(() => {
@@ -824,5 +852,50 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     expect(q("first-event-status").attributes("data-display")).toBeUndefined();
     expect(q("first-event-status-troubleshoot-btn").exists()).toBe(true);
     expect(q("first-event-status").text()).not.toContain("Waiting for your first logs");
+  });
+});
+
+describe("FirstEventStatus — assistant door (WP-07)", () => {
+  // The gate and then the door component both load through dynamic imports.
+  const settle = async () => {
+    for (let i = 0; i < 3; i++) {
+      await vi.dynamicImportSettled();
+      await flushPromises();
+    }
+  };
+  beforeEach(() => {
+    assistant.v2 = true;
+    vi.useRealTimers();
+  });
+
+  it("sends the English builder's prompt, never the localised guide text (F7)", async () => {
+    mountBar();
+    fake.diagnosis.value = { form: "no-requests", trigger: "auto", rejections: [] };
+    fake.state.value = "no-requests";
+    await settle();
+    const door = q("ai-entry-ingestion-troubleshoot");
+    expect(door.text()).toBe("Help me set up ingestion");
+    await door.trigger("click");
+    await settle();
+    const payload = built.last as { text: string; chips: unknown[] };
+    expect(payload.text).toContain("nothing has arrived and no request was refused");
+    expect(payload.text).not.toContain("secret-token-value");
+    expect(payload.chips).toEqual([]);
+  });
+
+  it("drops the Still stuck step when the gate hides the door and there is no doc URL (U14)", async () => {
+    assistant.gate = { value: "not_entitled" };
+    mountBar();
+    fake.diagnosis.value = { form: "no-requests", trigger: "auto", rejections: [] };
+    fake.state.value = "no-requests";
+    await settle();
+    expect(q("first-event-diagnosis-still-stuck").exists()).toBe(false);
+  });
+
+  it("offers the door in the empty-page pill once the watch stops (G8)", async () => {
+    mountBar({ display: "pill" });
+    fake.state.value = "stopped";
+    await settle();
+    expect(q("ai-entry-ingestion-troubleshoot").exists()).toBe(true);
   });
 });

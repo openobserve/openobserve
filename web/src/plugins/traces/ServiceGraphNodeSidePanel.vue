@@ -42,6 +42,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag type="serviceStatus" :value="serviceHealth.status" data-test="service-health-badge">{{
           serviceHealth.text
         }}</OTag>
+        <AiEntryButton
+          v-if="assistantV2"
+          v-bind="serviceDoor"
+          :appearance="mdUp ? 'button' : 'toolbar-icon'"
+        />
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -82,6 +87,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="panel-content bg-surface-base dark:bg-graph-panel-scrim flex-1 overflow-x-hidden overflow-y-auto py-2.5"
     >
+      <ul
+        v-if="dependencies.length > 0"
+        class="px-page-edge border-border-default mb-2 flex flex-col gap-1 border-b pb-2"
+        :aria-label="t('assistant.entry.dependencies')"
+        data-test="service-graph-node-panel-dependencies"
+      >
+        <li
+          v-for="dep in dependencies"
+          :key="dep.key"
+          class="text-text-body flex items-center gap-2 text-sm"
+        >
+          <OTruncatedText class="min-w-0 flex-1">{{ dep.name }}</OTruncatedText>
+          <AiEntryButton v-bind="dependencyDoor(dep)" appearance="toolbar-icon" />
+        </li>
+      </ul>
       <!-- RED Charts Section -->
       <div
         v-if="streamFilter !== 'all' && dashboardData"
@@ -593,12 +613,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -896,6 +920,7 @@ export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
     OTag,
+    OTruncatedText,
     OSeparator,
     OSkeleton,
     OEmptyState,
@@ -916,6 +941,9 @@ export default defineComponent({
     ServiceCatalogBarCell,
     AgentNodeBehaviorTab,
     OAgentBadges,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
   },
   props: {
     selectedNode: {
@@ -947,6 +975,93 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
+
+    // The selection card's door: the service with its inbound and outbound calls over the window.
+    const assistantV2 = isAssistantV2();
+    const loadedOrg = assistantV2
+      ? useLoadedOrg(
+          () => props.graphData,
+          () => store.state.selectedOrganization?.identifier ?? "",
+        )
+      : null;
+    const { mdUp } = useBreakpoint();
+    const serviceDoor = computed(() => {
+      const node = props.selectedNode ?? {};
+      const id = node.id;
+      const sum = (edges: any[]) => edges.reduce((n, e) => n + (e.total_requests || 0), 0);
+      const inbound = sum(props.graphData.edges.filter((e: any) => e.to === id));
+      const outbound = sum(props.graphData.edges.filter((e: any) => e.from === id));
+      return {
+        verb: "explain" as const,
+        entryKind: "object_verb" as const,
+        boundOrg: loadedOrg?.value,
+        objectKind: "service_edge" as const,
+        label: t("assistant.entry.explainService"),
+        tooltip: t("assistant.entry.tooltip.explainService"),
+        dataTest: "ai-entry-service-edge-explain" as const,
+        build: async () =>
+          (await import("@/utils/assistant/prompts")).buildServiceEdgePrompt({
+            org: store.state.selectedOrganization?.identifier ?? "",
+            source: String(node.name || node.label || id || ""),
+            inbound,
+            outbound,
+            range: {
+              from: Math.round(props.timeRange.startTime / 1000),
+              to: Math.round(props.timeRange.endTime / 1000),
+            },
+            timeZone: store.state.timezone || "UTC",
+          }),
+      };
+    });
+    // Each edge touching the selected node, so every dependency has its own named door.
+    const dependencies = computed(() => {
+      const id = props.selectedNode?.id;
+      if (!assistantV2 || id === undefined) return [];
+      const nameOf = (nodeId: unknown) => {
+        const node = props.graphData.nodes?.find((n: any) => n.id === nodeId);
+        return String(node?.name || node?.label || nodeId || "");
+      };
+      return (props.graphData.edges ?? [])
+        .filter((e: any) => e.from != null && (e.from === id || e.to === id) && e.from !== e.to)
+        .map((e: any) => {
+          const source = nameOf(e.from);
+          const target = nameOf(e.to);
+          return {
+            key: `${e.from}->${e.to}`,
+            name: `${source} → ${target}`,
+            source,
+            target,
+            edge: e,
+          };
+        });
+    });
+    const dependencyDoor = (dep: { name: string; source: string; target: string; edge: any }) => ({
+      verb: "explain" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg?.value,
+      objectKind: "service_edge" as const,
+      label: t("assistant.entry.explainDependencyNamed", { name: dep.name }),
+      tooltip: t("assistant.entry.tooltip.explainEdge"),
+      dataTest: "ai-entry-service-edge-explain" as const,
+      build: async () => {
+        const requests = Number(dep.edge.total_requests) || 0;
+        const failed = Number(dep.edge.failed_requests) || 0;
+        const p95 = Number(dep.edge.p95_latency_ns) || 0;
+        return (await import("@/utils/assistant/prompts")).buildServiceEdgePrompt({
+          org: store.state.selectedOrganization?.identifier ?? "",
+          source: dep.source,
+          target: dep.target,
+          requests,
+          ...(requests > 0 && { errorRate: failed / requests }),
+          ...(p95 > 0 && { p95Ms: p95 / 1e6 }),
+          range: {
+            from: Math.round(props.timeRange.startTime / 1000),
+            to: Math.round(props.timeRange.endTime / 1000),
+          },
+          timeZone: store.state.timezone || "UTC",
+        });
+      },
+    });
     const router = useRouter();
     const { getStream } = useStreams(t);
 
@@ -2566,6 +2681,11 @@ export default defineComponent({
     }
 
     return {
+      assistantV2,
+      serviceDoor,
+      mdUp,
+      dependencies,
+      dependencyDoor,
       raw,
       t,
       serviceMetrics,

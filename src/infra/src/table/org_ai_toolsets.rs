@@ -20,8 +20,8 @@
 //! org's per-org DEK via [`cipher::get_dek`].
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
-    SqlErr,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, Order, QueryFilter,
+    QueryOrder, QuerySelect, Set, SqlErr, sea_query::Expr,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -31,6 +31,9 @@ use crate::{
     errors,
     table::cipher,
 };
+
+pub const STATE_OK: &str = "ok";
+pub const STATE_FAILING: &str = "failing";
 
 /// Filter options for [`list`].
 #[derive(Debug, Default)]
@@ -57,6 +60,21 @@ pub struct OrgToolset {
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
+    /// A disabled toolset is never pushed to the assistant.
+    pub enabled: bool,
+    /// `ok` | `failing`; `None` until the toolset was used or tested.
+    pub status_state: Option<String>,
+    pub status_since: Option<i64>,
+    /// A fixed server sentence, never upstream text.
+    pub last_error: Option<String>,
+    pub last_used_at: Option<i64>,
+}
+
+/// One use or test of a toolset, as [`record_health`] stores it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HealthOutcome<'a> {
+    Ok,
+    Failing(&'a str),
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +113,29 @@ fn model_to_toolset(model: Model, dek: &[u8]) -> Result<OrgToolset, errors::Erro
         created_by: model.created_by,
         created_at: model.created_at,
         updated_at: model.updated_at,
+        enabled: model.enabled,
+        status_state: model.status_state,
+        status_since: model.status_since,
+        last_error: model.last_error,
+        last_used_at: model.last_used_at,
     })
+}
+
+/// The columns a config save writes, keyed by id.
+fn config_columns(entry: OrgToolset, encrypted_data: Option<String>) -> ActiveModel {
+    ActiveModel {
+        id: Set(entry.id),
+        org: Set(entry.org),
+        name: Set(entry.name),
+        kind: Set(entry.kind),
+        description: Set(entry.description),
+        data: Set(encrypted_data),
+        created_by: Set(entry.created_by),
+        created_at: Set(entry.created_at),
+        updated_at: Set(entry.updated_at),
+        // Left unset so a stale save never undoes `set_enabled` or `record_health`.
+        ..Default::default()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +168,11 @@ pub async fn add(mut entry: OrgToolset) -> Result<(), errors::Error> {
         created_by: Set(entry.created_by),
         created_at: Set(entry.created_at),
         updated_at: Set(entry.updated_at),
+        enabled: Set(entry.enabled),
+        status_state: Set(None),
+        status_since: Set(None),
+        last_error: Set(None),
+        last_used_at: Set(None),
     };
 
     let client = get_orm_client_rw().await;
@@ -222,6 +267,28 @@ pub async fn list(
         .collect()
 }
 
+/// `(id, name, enabled)` of every toolset of `org`, newest first; `data` is never decrypted.
+pub async fn list_names(org: &str) -> Result<Vec<(String, String, bool)>, errors::Error> {
+    list_names_with(get_orm_client_ro().await, org).await
+}
+
+pub async fn list_names_with<C: ConnectionTrait>(
+    client: &C,
+    org: &str,
+) -> Result<Vec<(String, String, bool)>, errors::Error> {
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::Name)
+        .column(Column::Enabled)
+        .filter(Column::Org.eq(org))
+        .order_by(Column::CreatedAt, Order::Desc)
+        .into_tuple::<(String, String, bool)>()
+        .all(client)
+        .await?;
+    Ok(names)
+}
+
 /// Update an existing toolset. The caller supplies plaintext `data`; this
 /// function re-encrypts it with the org's DEK before persisting.
 pub async fn update(entry: OrgToolset) -> Result<(), errors::Error> {
@@ -232,20 +299,79 @@ pub async fn update(entry: OrgToolset) -> Result<(), errors::Error> {
         None
     };
 
-    let record = ActiveModel {
-        id: Set(entry.id),
-        org: Set(entry.org),
-        name: Set(entry.name),
-        kind: Set(entry.kind),
-        description: Set(entry.description),
-        data: Set(encrypted_data),
-        created_by: Set(entry.created_by),
-        created_at: Set(entry.created_at),
-        updated_at: Set(entry.updated_at),
-    };
-
     let client = get_orm_client_rw().await;
-    record.update(client).await?;
+    config_columns(entry, encrypted_data).update(client).await?;
+    Ok(())
+}
+
+/// Turn a toolset on or off; `false` when no such toolset exists.
+pub async fn set_enabled(
+    org: &str,
+    id: &str,
+    enabled: bool,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    set_enabled_with(get_orm_client_rw().await, org, id, enabled, now).await
+}
+
+pub async fn set_enabled_with<C: ConnectionTrait>(
+    client: &C,
+    org: &str,
+    id: &str,
+    enabled: bool,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::Enabled, Expr::value(enabled))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::Org.eq(org))
+        .filter(Column::Id.eq(id))
+        .exec(client)
+        .await?;
+    Ok(result.rows_affected > 0)
+}
+
+/// Store one use or test: `status_since` moves only when the state changes.
+pub async fn record_health(
+    org: &str,
+    id: &str,
+    outcome: HealthOutcome<'_>,
+    now: i64,
+) -> Result<(), errors::Error> {
+    record_health_with(get_orm_client_rw().await, org, id, outcome, now).await
+}
+
+pub async fn record_health_with<C: ConnectionTrait>(
+    client: &C,
+    org: &str,
+    id: &str,
+    outcome: HealthOutcome<'_>,
+    now: i64,
+) -> Result<(), errors::Error> {
+    let (state, error) = match outcome {
+        HealthOutcome::Ok => (STATE_OK, None),
+        HealthOutcome::Failing(error) => (STATE_FAILING, Some(error.to_string())),
+    };
+    // The guarded update keeps the earlier `status_since` while the state stays the same.
+    Entity::update_many()
+        .col_expr(Column::StatusSince, Expr::value(now))
+        .filter(Column::Org.eq(org))
+        .filter(Column::Id.eq(id))
+        .filter(
+            Condition::any()
+                .add(Column::StatusState.is_null())
+                .add(Column::StatusState.ne(state)),
+        )
+        .exec(client)
+        .await?;
+    Entity::update_many()
+        .col_expr(Column::StatusState, Expr::value(state))
+        .col_expr(Column::LastError, Expr::value(error))
+        .col_expr(Column::LastUsedAt, Expr::value(now))
+        .filter(Column::Org.eq(org))
+        .filter(Column::Id.eq(id))
+        .exec(client)
+        .await?;
     Ok(())
 }
 
@@ -353,5 +479,109 @@ mod tests {
         let encrypted = encrypt_data(&dek, "").unwrap();
         let decrypted = decrypt_data(&dek, &encrypted).unwrap();
         assert_eq!(decrypted, "");
+    }
+
+    #[tokio::test]
+    async fn names_are_listed_without_reading_any_data() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        for (id, org, name, at) in [
+            ("a", "o", "GitHub", 1),
+            ("b", "o", "Kube", 2),
+            ("c", "x", "Other", 3),
+        ] {
+            ActiveModel {
+                id: Set(id.to_string()),
+                org: Set(org.to_string()),
+                name: Set(name.to_string()),
+                kind: Set("mcp".to_string()),
+                description: Set(None),
+                // Not ciphertext: a read that decrypted would fail on it.
+                data: Set(Some("not-encrypted".to_string())),
+                created_by: Set("u".to_string()),
+                created_at: Set(at),
+                updated_at: Set(at),
+                enabled: Set(id != "a"),
+                status_state: Set(None),
+                status_since: Set(None),
+                last_error: Set(None),
+                last_used_at: Set(None),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+        let names = list_names_with(&db, "o").await.unwrap();
+        assert_eq!(
+            names,
+            vec![
+                ("b".to_string(), "Kube".to_string(), true),
+                ("a".to_string(), "GitHub".to_string(), false)
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn health_keeps_its_since_until_the_state_changes_and_enable_toggles() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        ActiveModel {
+            id: Set("t".to_string()),
+            org: Set("o".to_string()),
+            name: Set("GitHub".to_string()),
+            kind: Set("mcp".to_string()),
+            description: Set(None),
+            data: Set(None),
+            created_by: Set("u".to_string()),
+            created_at: Set(1),
+            updated_at: Set(1),
+            enabled: Set(true),
+            status_state: Set(None),
+            status_since: Set(None),
+            last_error: Set(None),
+            last_used_at: Set(None),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        let read = || async { Entity::find_by_id("t").one(&db).await.unwrap().unwrap() };
+        record_health_with(&db, "o", "t", HealthOutcome::Ok, 10)
+            .await
+            .unwrap();
+        record_health_with(&db, "o", "t", HealthOutcome::Ok, 20)
+            .await
+            .unwrap();
+        let row = read().await;
+        assert_eq!(row.status_state.as_deref(), Some(STATE_OK));
+        assert_eq!((row.status_since, row.last_used_at), (Some(10), Some(20)));
+        record_health_with(&db, "o", "t", HealthOutcome::Failing("down"), 30)
+            .await
+            .unwrap();
+        let row = read().await;
+        assert_eq!(row.status_state.as_deref(), Some(STATE_FAILING));
+        assert_eq!(row.status_since, Some(30));
+        assert_eq!(row.last_error.as_deref(), Some("down"));
+        record_health_with(&db, "o", "t", HealthOutcome::Ok, 40)
+            .await
+            .unwrap();
+        assert!(read().await.last_error.is_none());
+        assert!(set_enabled_with(&db, "o", "t", false, 50).await.unwrap());
+        assert!(!read().await.enabled);
+        assert!(!set_enabled_with(&db, "x", "t", true, 60).await.unwrap());
+        let mut stale = model_to_toolset(read().await, &[0; 32]).unwrap();
+        stale.enabled = true;
+        stale.updated_at = 70;
+        config_columns(stale, None).update(&db).await.unwrap();
+        let row = read().await;
+        assert_eq!((row.enabled, row.updated_at), (false, 70));
+        assert_eq!(row.status_state.as_deref(), Some(STATE_OK));
     }
 }

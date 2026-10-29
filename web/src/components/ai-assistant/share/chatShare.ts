@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { parseAttachmentBlocks, type ShareSummary, type Tri } from "@/composables/assistant/pure";
 import type {
   CreateShareRequest,
   ShareMode,
   ShareView,
   ShareVisibility,
 } from "@/services/ai_chat_share";
+import type { ChatMessage } from "@/ts/interfaces/chat";
 import type { I18nKey } from "@/types/i18n";
 import { getPath } from "@/utils/queryUtils";
 
@@ -29,6 +31,28 @@ export interface ShareForm {
   expiresInSecs: number;
   /** Viewers see tool names only, not tool inputs or outputs. */
   redactTools: boolean;
+  /** Only sent where the server can strip attachments. */
+  hideAttachments?: boolean;
+}
+
+/** What Share does, in the order of the gate table: the first match wins. */
+export type ShareButtonState =
+  | { kind: "absent" }
+  | { kind: "blocked"; reason: I18nKey }
+  | { kind: "quick" | "review" | "manage"; tooltip: I18nKey };
+
+export interface ShareButtonInput {
+  persistence: boolean;
+  canShare: Tri;
+  /** The server refused a create this page session. */
+  denied: boolean;
+  hasTurn: boolean;
+  running: boolean;
+  notSaved: boolean;
+  historyUnavailable: boolean;
+  shared: boolean;
+  hasAttachments: boolean;
+  redactAttachments: boolean;
 }
 
 export interface ExpiryPreset {
@@ -50,6 +74,10 @@ export const EXPIRY_PRESETS: readonly ExpiryPreset[] = [
 ];
 
 export const DEFAULT_PUBLIC_MAX_EXPIRY_DAYS = 90;
+
+export const QUICK_SHARE_EXPIRY_SECS = 90 * DAY;
+
+export const WARM_EXPIRY_MS = DAY * 1000;
 
 const PREFERRED_PUBLIC_EXPIRY = 30 * DAY;
 
@@ -99,6 +127,41 @@ export const applyVisibility = (
   }
 };
 
+/** The one-click link: an org snapshot with tool data hidden that expires in 90 days. */
+export const quickShareForm = (): ShareForm => ({
+  mode: "snapshot",
+  visibility: "org",
+  expiresInSecs: QUICK_SHARE_EXPIRY_SECS,
+  redactTools: true,
+  hideAttachments: true,
+});
+
+/** `CreateShareRequest` denies unknown fields, so `hide_attachments` waits for the server to advertise it. */
+export const canRedactAttachments = (zoConfig: any): boolean =>
+  zoConfig?.ai_share_redact_attachments === true;
+
+/** Switch visibility keeping the redaction the owner chose, and a public expiry within the server's bound. */
+export const switchVisibility = (
+  form: ShareForm,
+  visibility: ShareVisibility,
+  maxPublicSecs: number,
+): void => {
+  form.visibility = visibility;
+  if (visibility === "public" && !validPublicExpiry(form.expiresInSecs, maxPublicSecs)) {
+    form.expiresInSecs = Math.min(QUICK_SHARE_EXPIRY_SECS, maxPublicSecs);
+  }
+};
+
+/** The preset a link was created with, or `null` when its lifetime matches none. */
+export const presetOf = (share: Pick<ShareView, "expires_at" | "created_at">): number | null => {
+  if (share.expires_at === null) return 0;
+  const secs = Math.round((share.expires_at - share.created_at) / 1_000_000);
+  return (
+    EXPIRY_PRESETS.find((preset) => preset.value > 0 && Math.abs(preset.value - secs) <= 60)
+      ?.value ?? null
+  );
+};
+
 export const isChatPersistenceEnabled = (zoConfig: any): boolean =>
   !!zoConfig?.ai_enabled && !!zoConfig?.ai_chat_persistence_enabled;
 
@@ -139,6 +202,7 @@ export const buildCreateRequest = (
   form: ShareForm,
   publicEnabled: boolean,
   maxPublicSecs: number = DEFAULT_PUBLIC_MAX_EXPIRY_DAYS * DAY,
+  redactAttachments = false,
 ): CreateShareRequest => {
   const visibility = form.visibility === "public" && publicEnabled ? "public" : "org";
   const request: CreateShareRequest = {
@@ -146,6 +210,7 @@ export const buildCreateRequest = (
     visibility,
     redact_tools: form.redactTools,
   };
+  if (redactAttachments) request.hide_attachments = form.hideAttachments ?? true;
   if (visibility === "public") {
     request.expires_in_secs = validPublicExpiry(form.expiresInSecs, maxPublicSecs)
       ? form.expiresInSecs
@@ -163,6 +228,62 @@ export const canShareChat = (chat: {
   hasMessages: boolean;
   isStreaming?: boolean;
 }): boolean => chat.persistenceEnabled && !!chat.sessionId && chat.hasMessages && !chat.isStreaming;
+
+/** What the thread's chip shows for a chat's links; `null` when the chat is private. */
+export const summarizeShares = (
+  shares: readonly ShareView[] | undefined,
+  lastSeq: number | null,
+): ShareSummary | null => {
+  const first = shares?.[0];
+  if (!first) return null;
+  return {
+    id: first.id,
+    visibility: first.visibility,
+    mode: first.mode,
+    expiresAt: first.expires_at === null ? null : Math.floor(first.expires_at / 1000),
+    outOfDate: isOutOfDate(first, lastSeq),
+    count: shares.length,
+  };
+};
+
+/** A snapshot stops at `snapshot_seq`; anything the chat stored after it is missing from the link. */
+export const isOutOfDate = (
+  share: Pick<ShareView, "mode" | "snapshot_seq">,
+  lastSeq: number | null,
+): boolean =>
+  share.mode === "snapshot" &&
+  share.snapshot_seq !== null &&
+  lastSeq !== null &&
+  lastSeq > share.snapshot_seq;
+
+export const shareButtonState = (input: ShareButtonInput): ShareButtonState => {
+  if (!input.persistence) return { kind: "absent" };
+  if (input.canShare === "no" || input.denied) {
+    return { kind: "blocked", reason: "assistant.gate.noShare.tooltip" };
+  }
+  if (!input.hasTurn) return { kind: "blocked", reason: "assistant.share.nothingToShare" };
+  if (input.running) return { kind: "blocked", reason: "assistant.share.waitForAnswer" };
+  if (input.notSaved) return { kind: "blocked", reason: "assistant.share.notSavedBlocked" };
+  if (input.historyUnavailable) {
+    return { kind: "blocked", reason: "assistant.share.historyUnavailable" };
+  }
+  if (input.shared) return { kind: "manage", tooltip: "assistant.share.manage" };
+  // Without server-side attachment redaction a one-click link would carry attached rows and images.
+  if (input.hasAttachments && !input.redactAttachments) {
+    return { kind: "review", tooltip: "assistant.share.reviewTooltip" };
+  }
+  return { kind: "quick", tooltip: "assistant.share.tooltip" };
+};
+
+/** A chat holds an attachment when a prompt carried a chip, an image or an attachment block. */
+export const hasAttachments = (messages: readonly ChatMessage[]): boolean =>
+  messages.some(
+    (message) =>
+      message.role === "user" &&
+      (!!message.images?.length ||
+        !!message.chips?.length ||
+        parseAttachmentBlocks(String(message.content ?? "")).blocks.length > 0),
+  );
 
 export const otherMode = (mode: ShareMode): ShareMode => (mode === "live" ? "snapshot" : "live");
 

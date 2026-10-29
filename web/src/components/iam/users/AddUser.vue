@@ -286,6 +286,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import PasswordRequirementList from "@/components/common/PasswordRequirementList.vue";
 import { durationFormatter } from "@/utils/formatters";
 import { reuseRejection } from "@/utils/passwordComplexity";
+import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -769,7 +770,9 @@ export default defineComponent({
     };
   },
   methods: {
-    signout() {
+    async signout() {
+      // The changed password ends this session either way, so the assistant asks nothing and still cancels and purges.
+      await assistantSignOut({ forced: true });
       // The user's own password changed, so the old session is over whatever an open editor answers.
       void signOutThroughLeaveGuards(this.$router, this.store, { forced: true });
     },

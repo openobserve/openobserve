@@ -9,8 +9,8 @@
   Shares ODropdown's overlay coordination so descendant overlays (OSelect /
   OCombobox / nested dropdowns) opening INSIDE the popover never dismiss it.
 
-  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass | collisionPadding
-  Slots: trigger | default
+  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass | collisionPadding | autoFocus | privacy
+  Slots: trigger | anchor (positions without a trigger) | default
   Emits: update:open | open-auto-focus
 -->
 <script lang="ts">
@@ -40,7 +40,7 @@ if (typeof document !== "undefined" && !(globalThis as any)[_oPopKey]) {
 </script>
 
 <script setup lang="ts">
-import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
+import { PopoverAnchor, PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
 import { inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -69,6 +69,10 @@ const props = withDefaults(
     contentClass?: string;
     /** Overrides the default (0 desktop / 8 tablet-down) collision inset, e.g. to clear a fixed header on a flipped side. */
     collisionPadding?: number | Partial<Record<"top" | "right" | "bottom" | "left", number>>;
+    /** `false` keeps focus where it is on open and close: a listbox driven from a textbox. */
+    autoFocus?: boolean;
+    /** Session replay masks the portalled content, which sits outside any masked ancestor. */
+    privacy?: "mask";
   }>(),
   {
     modal: false,
@@ -77,6 +81,7 @@ const props = withDefaults(
     sideOffset: 4,
     hideWhenDetached: true,
     zIndex: 6000,
+    autoFocus: true,
   },
 );
 
@@ -85,6 +90,71 @@ const emit = defineEmits<{
   /** Forwards reka's initial-focus event so a consumer can redirect it (call `preventDefault()` to opt out of the default first-tabbable focus). */
   "open-auto-focus": [Event];
 }>();
+
+const slots = defineSlots<{
+  trigger?: () => unknown;
+  anchor?: () => unknown;
+  default?: () => unknown;
+}>();
+
+const FOCUSABLE =
+  "button:not([disabled]), [href], input, textarea, select, [tabindex]:not([tabindex='-1'])";
+
+const anchorRef = ref<{ $el?: Element } | null>(null);
+let closedFromOutside = false;
+let invoker: HTMLElement | null = null;
+
+// An anchor can hold several controls; the one the user last pressed or focused is the one focus returns to.
+function rememberInvoker(event: Event) {
+  const el = event.target instanceof Element ? event.target.closest<HTMLElement>(FOCUSABLE) : null;
+  if (el) invoker = el;
+}
+
+watch(
+  () => anchorRef.value?.$el,
+  (el, _was, onCleanup) => {
+    if (!(el instanceof HTMLElement)) return;
+    el.addEventListener("focusin", rememberInvoker);
+    el.addEventListener("pointerdown", rememberInvoker, true);
+    onCleanup(() => {
+      el.removeEventListener("focusin", rememberInvoker);
+      el.removeEventListener("pointerdown", rememberInvoker, true);
+    });
+  },
+  { flush: "post" },
+);
+
+function onOpenAutoFocus(event: Event) {
+  closedFromOutside = false;
+  emit("open-auto-focus", event);
+  if (!props.autoFocus) event.preventDefault();
+}
+
+// Reka returns focus only to a trigger, so an anchored popover hands it back to its anchor unless the user clicked away.
+function onCloseAutoFocus(event: Event) {
+  if (!props.autoFocus) return event.preventDefault();
+  const anchor = anchorRef.value?.$el;
+  if (!slots.anchor || !(anchor instanceof HTMLElement) || closedFromOutside) return;
+  event.preventDefault();
+  // The exit animation delays this past the caller's own focus move (Tab out, the open chord); never undo it.
+  const active = document.activeElement;
+  const content = event.target;
+  if (
+    active &&
+    active !== document.body &&
+    !(content instanceof Element && content.contains(active))
+  )
+    return;
+  const pressed = invoker?.isConnected && anchor.contains(invoker) ? invoker : null;
+  const target =
+    pressed ?? (anchor.matches(FOCUSABLE) ? anchor : anchor.querySelector<HTMLElement>(FOCUSABLE));
+  target?.focus();
+}
+
+// An IME candidate list owns its Escape: cancelling it never closes the popover.
+function onEscapeKeyDown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) event.preventDefault();
+}
 
 // Vue boolean-casts an absent `open` prop to `false`, which would lock
 // PopoverRoot into controlled-closed mode. Manage state ourselves so it stays
@@ -174,12 +244,16 @@ onBeforeUnmount(() => {
 function handlePointerDownOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
+    return;
   }
+  closedFromOutside = true;
 }
 function handleFocusOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
+    return;
   }
+  closedFromOutside = true;
 }
 
 // Close on ancestor scroll so the portal never floats detached from its trigger.
@@ -222,13 +296,17 @@ onBeforeUnmount(() => {
 
 <template>
   <PopoverRoot :open="internalOpen" :modal="modal" @update:open="handleOpenChange">
-    <PopoverTrigger ref="triggerRef" as-child>
+    <PopoverAnchor v-if="slots.anchor" ref="anchorRef" as-child>
+      <slot name="anchor" />
+    </PopoverAnchor>
+    <PopoverTrigger v-if="slots.trigger" ref="triggerRef" as-child>
       <slot name="trigger" />
     </PopoverTrigger>
 
     <PopoverPortal>
       <PopoverContent
         data-o-popover-content
+        :data-dd-privacy="privacy"
         :side="side"
         :align="align"
         :side-offset="sideOffset"
@@ -238,7 +316,9 @@ onBeforeUnmount(() => {
         :style="{ zIndex }"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
-        @open-auto-focus="(e) => emit('open-auto-focus', e)"
+        @open-auto-focus="onOpenAutoFocus"
+        @close-auto-focus="onCloseAutoFocus"
+        @escape-key-down="onEscapeKeyDown"
         :class="[
           'outline-none max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',

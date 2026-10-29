@@ -9166,6 +9166,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "يحلل...",
+        "thinking": "أفكر...",
+        "processing": "قيد المعالجة...",
+        "examiningData": "فحص البيانات...",
+        "reviewingContext": "مراجعة السياق...",
+        "formulatingResponse": "صياغة الرد...",
+        "checkingDetails": "التحقق من التفاصيل...",
+        "gatheringInsights": "جمع الرؤى...",
+        "evaluatingOptions": "تقييم الخيارات...",
+        "synthesizingInformation": "تركيب المعلومات...",
+        "workingOnIt": "أعمل على ذلك...",
+        "almostThere": "اقتربنا...",
+        "divingDeeper": "الغوص أعمق...",
+        "connectingTheDots": "ربط النقاط...",
+        "crunchingNumbers": "تحليل الأرقام...",
+        "exploringPossibilities": "استكشاف الإمكانيات...",
+        "refiningAnswer": "إجابة مصقولة...",
+        "stillThinking": "ما زلت أفكر...",
+        "makingProgress": "أحرز تقدما...",
+        "piecingTogether": "تجميع..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "فترة التجربة",
@@ -20789,7 +20815,10 @@
     "pagination": {
       "pagination": "تقسيم الصفحات",
       "previousPage": "الصفحة السابقة",
-      "nextPage": "الصفحة التالية"
+      "nextPage": "الصفحة التالية",
+      "firstPage": "الصفحة الأولى",
+      "lastPage": "الصفحة الأخيرة",
+      "recordsPerPage": "السجلات لكل صفحة"
     },
     "select": {
       "more": "المزيد",

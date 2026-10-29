@@ -57,29 +57,28 @@ function resetToDefault(): void {
 <template>
   <ODropdown align="end" side="bottom" :side-offset="4">
     <template #trigger>
-      <div class="relative inline-flex">
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          :aria-label="
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        class="relative"
+        :aria-label="
+          hiddenCount > 0
+            ? t('common.manageColumnsHidden', { count: hiddenCount })
+            : t('common.manageColumns')
+        "
+        data-test="o2-table-column-toggle-btn"
+      >
+        <template #icon-left>
+          <OIcon name="view-column" size="sm" />
+        </template>
+        <OTooltip
+          :content="
             hiddenCount > 0
-              ? t('common.manageColumnsHidden', { count: hiddenCount })
-              : t('common.manageColumns')
+              ? t('common.columnsHidden', { count: hiddenCount })
+              : t('common.columns')
           "
-          data-test="o2-table-column-toggle-btn"
-        >
-          <template #icon-left>
-            <OIcon name="view-column" size="sm" />
-          </template>
-          <OTooltip
-            :content="
-              hiddenCount > 0
-                ? t('common.columnsHidden', { count: hiddenCount })
-                : t('common.columns')
-            "
-            side="bottom"
-          />
-        </OButton>
+          side="bottom"
+        />
         <span
           v-if="hiddenCount > 0"
           class="bg-count-badge-bg text-3xs pointer-events-none absolute -top-1 -right-1 inline-flex h-4 w-4 items-center justify-center rounded-full leading-none font-medium text-white"
@@ -87,7 +86,7 @@ function resetToDefault(): void {
         >
           {{ hiddenCount }}
         </span>
-      </div>
+      </OButton>
     </template>
 
     <!-- Column list panel -->

@@ -126,7 +126,12 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 126: add held_action to slack_link_requests.
 // 127: add group_label_set to alert_states.
 // 128: widen alert_dedup_state.fingerprint to varchar(256).
-pub const DB_SCHEMA_VERSION: u64 = 128;
+// 129: add first_event_at to ai_chat_turns.
+// 130: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
+// 131: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
+// 132: create paid_overage_attribution.
+// 133: create ai_approvals.
+pub const DB_SCHEMA_VERSION: u64 = 133;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2914,6 +2919,12 @@ pub struct Limit {
         help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
+    #[env_config(
+        name = "ZO_AI_ACTIONS_RETENTION_DAYS",
+        default = 90,
+        help = "How long rows of the assistant's action ledger (Activity) are kept, in days. Their before/after snapshots are always cleared once the 24 h undo window passes. 0 or less keeps every row."
+    )]
+    pub ai_actions_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

@@ -17,7 +17,7 @@
 
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    QueryTrait, Set, SqlErr, sea_query::Expr,
+    QueryTrait, Set, SqlErr, TransactionTrait, sea_query::Expr,
 };
 
 pub use super::entity::ai_chat_turns::Model;
@@ -32,6 +32,12 @@ pub const TURN_COMPLETED: &str = "completed";
 pub const TURN_CANCELLED: &str = "cancelled";
 pub const TURN_FAILED: &str = "failed";
 pub const TURN_INTERRUPTED: &str = "interrupted";
+
+/// Decisions kept per turn; a turn asks a handful, so the cap only bounds a misbehaving client.
+pub const MAX_DECISIONS: usize = 64;
+
+// SQLite has no row locks, so this node's appends also queue here.
+static DECISION_WRITES: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Outcome of [`admit`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,6 +91,9 @@ pub async fn admit_with<C: ConnectionTrait>(
         end_seq: Set(None),
         started_at: Set(now),
         ended_at: Set(None),
+        first_event_at: Set(None),
+        version_of: Set(None),
+        decisions: Set(None),
     };
     let admission = match Entity::insert(record).exec(conn).await {
         Ok(_) => Admission::Admitted,
@@ -103,6 +112,86 @@ pub async fn admit_with<C: ConnectionTrait>(
         interrupt_others_with(conn, org_id, session_id, turn_id, now).await?;
     }
     Ok(admission)
+}
+
+/// Marks `turn_id` as a new version of `version_of`; `false` when the turn is unknown.
+pub async fn set_version_of(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+    version_of: &str,
+) -> Result<bool, errors::Error> {
+    set_version_of_with(
+        get_orm_client_rw().await,
+        (org_id, session_id, turn_id),
+        version_of,
+    )
+    .await
+}
+
+pub async fn set_version_of_with<C: ConnectionTrait>(
+    conn: &C,
+    (org_id, session_id, turn_id): (&str, &str, &str),
+    version_of: &str,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::VersionOf, Expr::value(version_of.to_string()))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TurnId.eq(turn_id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected == 1)
+}
+
+/// Appends an answered approval to the session's newest turn; `false` when it has no turn.
+pub async fn add_decision(
+    org_id: &str,
+    session_id: &str,
+    decision: serde_json::Value,
+) -> Result<bool, errors::Error> {
+    let _queued = DECISION_WRITES.lock().await;
+    add_decision_with(get_orm_client_rw().await, org_id, session_id, decision).await
+}
+
+/// Appends under a row lock, so two confirms of one turn both keep their decision.
+pub async fn add_decision_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    decision: serde_json::Value,
+) -> Result<bool, errors::Error> {
+    let txn = conn.begin().await.map_err(db_err)?;
+    let newest = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .order_by_desc(Column::StartedAt)
+        .lock_exclusive()
+        .one(&txn)
+        .await
+        .map_err(db_err)?;
+    let Some(newest) = newest else {
+        return Ok(false);
+    };
+    let mut decisions = decisions_of(&newest);
+    if decisions.len() >= MAX_DECISIONS {
+        return Ok(true);
+    }
+    decisions.push(decision);
+    Entity::update_many()
+        .col_expr(
+            Column::Decisions,
+            Expr::value(serde_json::Value::Array(decisions).to_string()),
+        )
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TurnId.eq(newest.turn_id.as_str()))
+        .exec(&txn)
+        .await
+        .map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(true)
 }
 
 /// Records how a running turn ended (`false` if not running); `None` start keeps admission's.
@@ -165,6 +254,35 @@ pub async fn finish_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
+/// Stamps the turn's first forwarded o2-ai event once; `false` if it already had one.
+pub async fn set_first_event_at(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+    at: i64,
+) -> Result<bool, errors::Error> {
+    set_first_event_at_with(get_orm_client_rw().await, org_id, session_id, turn_id, at).await
+}
+
+pub async fn set_first_event_at_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+    at: i64,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::FirstEventAt, Expr::value(Some(at)))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TurnId.eq(turn_id))
+        .filter(Column::FirstEventAt.is_null())
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected == 1)
+}
+
 /// Every turn record of a chat, oldest first.
 pub async fn list_for_session(org_id: &str, session_id: &str) -> Result<Vec<Model>, errors::Error> {
     list_for_session_with(get_orm_client_ro().await, org_id, session_id).await
@@ -183,6 +301,91 @@ pub async fn list_for_session_with<C: ConnectionTrait>(
         .all(conn)
         .await
         .map_err(db_err)
+}
+
+/// The turns of `session_ids` marked running and started at or after `stale_before`, one query.
+pub async fn running_for_sessions(
+    org_id: &str,
+    session_ids: &[String],
+    stale_before: i64,
+) -> Result<Vec<Model>, errors::Error> {
+    running_for_sessions_with(get_orm_client_ro().await, org_id, session_ids, stale_before).await
+}
+
+pub async fn running_for_sessions_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_ids: &[String],
+    stale_before: i64,
+) -> Result<Vec<Model>, errors::Error> {
+    if session_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.is_in(session_ids.iter().cloned()))
+        .filter(Column::Status.eq(TURN_RUNNING))
+        .filter(Column::StartedAt.gte(stale_before))
+        .order_by_asc(Column::StartedAt)
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// The records of these `(session_id, turn_id)` pairs of one org, one query.
+pub async fn get_many(
+    org_id: &str,
+    keys: &[(String, String)],
+) -> Result<Vec<Model>, errors::Error> {
+    get_many_with(get_orm_client_ro().await, org_id, keys).await
+}
+
+pub async fn get_many_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    keys: &[(String, String)],
+) -> Result<Vec<Model>, errors::Error> {
+    if keys.is_empty() {
+        return Ok(Vec::new());
+    }
+    let records = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.is_in(keys.iter().map(|(sid, _)| sid.clone())))
+        .filter(Column::TurnId.is_in(keys.iter().map(|(_, tid)| tid.clone())))
+        .all(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(records
+        .into_iter()
+        .filter(|r| {
+            keys.iter()
+                .any(|(sid, tid)| *sid == r.session_id && *tid == r.turn_id)
+        })
+        .collect())
+}
+
+pub async fn get(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+) -> Result<Option<Model>, errors::Error> {
+    get_with(get_orm_client_ro().await, org_id, session_id, turn_id).await
+}
+
+pub async fn get_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+) -> Result<Option<Model>, errors::Error> {
+    Entity::find_by_id((
+        org_id.to_string(),
+        session_id.to_string(),
+        turn_id.to_string(),
+    ))
+    .one(conn)
+    .await
+    .map_err(db_err)
 }
 
 /// Remove the turn records of chats whose index row is gone (retention).
@@ -225,6 +428,14 @@ pub async fn delete_by_org_with<C: ConnectionTrait>(
     Ok(result.rows_affected)
 }
 
+/// The decisions recorded on a turn, oldest first.
+pub fn decisions_of(record: &Model) -> Vec<serde_json::Value> {
+    match record.decisions.as_deref().map(serde_json::from_str) {
+        Some(Ok(serde_json::Value::Array(decisions))) => decisions,
+        _ => Vec::new(),
+    }
+}
+
 /// Marked running and started after `stale_before` (older ones died without finishing).
 pub fn is_running(record: &Model, stale_before: i64) -> bool {
     record.status == TURN_RUNNING && record.started_at >= stale_before
@@ -245,6 +456,7 @@ async fn retry_failed_with<C: ConnectionTrait>(
         .col_expr(Column::StartSeq, Expr::value(Some(start_seq)))
         .col_expr(Column::StartedAt, Expr::value(now))
         .col_expr(Column::EndedAt, Expr::value(Option::<i64>::None))
+        .col_expr(Column::FirstEventAt, Expr::value(Option::<i64>::None))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
         .filter(Column::TurnId.eq(turn_id))
@@ -522,6 +734,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_first_event_is_stamped_once_and_cleared_by_a_retry() {
+        let db = db().await;
+        admit_with(&db, ORG, SID, "t", 0, 10).await.unwrap();
+        assert_eq!(record(&db, "t").await.first_event_at, None);
+        assert!(
+            set_first_event_at_with(&db, ORG, SID, "t", 11)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !set_first_event_at_with(&db, ORG, SID, "t", 12)
+                .await
+                .unwrap()
+        );
+        assert_eq!(record(&db, "t").await.first_event_at, Some(11));
+        finish_with(&db, ORG, SID, "t", TURN_FAILED, Some("x"), None, None, 13)
+            .await
+            .unwrap();
+        assert_eq!(
+            admit_with(&db, ORG, SID, "t", 0, 20).await.unwrap(),
+            Admission::Retried
+        );
+        assert_eq!(record(&db, "t").await.first_event_at, None);
+    }
+
+    #[tokio::test]
     async fn turns_of_purged_chats_are_removed() {
         let db = db().await;
         crate::table::ai_chat_sessions::get_or_create_with(&db, ORG, SID, "u", "a@x", "o2-ai", 1)
@@ -565,5 +803,110 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn running_turns_of_many_chats_are_read_at_once() {
+        let db = db().await;
+        let other = "11111111-89ab-7def-8123-456789abcdef";
+        admit_with(&db, ORG, SID, "done", 0, 10).await.unwrap();
+        finish_with(
+            &db,
+            ORG,
+            SID,
+            "done",
+            TURN_COMPLETED,
+            None,
+            None,
+            Some(3),
+            11,
+        )
+        .await
+        .unwrap();
+        admit_with(&db, ORG, SID, "live", 4, 20).await.unwrap();
+        admit_with(&db, ORG, other, "stale", 0, 5).await.unwrap();
+        admit_with(&db, ORG, "not-listed", "elsewhere", 0, 20)
+            .await
+            .unwrap();
+        let sessions = vec![SID.to_string(), other.to_string()];
+        let running = running_for_sessions_with(&db, ORG, &sessions, 10)
+            .await
+            .unwrap();
+        let ids: Vec<&str> = running.iter().map(|r| r.turn_id.as_str()).collect();
+        assert_eq!(ids, vec!["live"], "stale and unlisted turns are left out");
+        assert!(
+            running_for_sessions_with(&db, ORG, &[], 0)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            get_with(&db, ORG, SID, "done")
+                .await
+                .unwrap()
+                .unwrap()
+                .end_seq,
+            Some(3)
+        );
+        assert!(get_with(&db, ORG, SID, "nope").await.unwrap().is_none());
+        let keys = vec![
+            (SID.to_string(), "done".to_string()),
+            (other.to_string(), "live".to_string()),
+            (other.to_string(), "stale".to_string()),
+        ];
+        let mut found: Vec<String> = get_many_with(&db, ORG, &keys)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.turn_id)
+            .collect();
+        found.sort();
+        assert_eq!(found, vec!["done", "stale"], "only the exact pairs");
+    }
+
+    #[tokio::test]
+    async fn versions_and_decisions_land_on_their_turns() {
+        let db = db().await;
+        admit_with(&db, ORG, SID, "t1", 0, 10).await.unwrap();
+        admit_with(&db, ORG, SID, "t2", 5, 20).await.unwrap();
+        assert!(
+            set_version_of_with(&db, (ORG, SID, "t2"), "t1")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !set_version_of_with(&db, (ORG, SID, "nope"), "t1")
+                .await
+                .unwrap()
+        );
+        assert_eq!(record(&db, "t2").await.version_of.as_deref(), Some("t1"));
+        assert_eq!(record(&db, "t1").await.version_of, None);
+
+        let decision = serde_json::json!({"id": "apr_1", "approved": true, "by": "a@x", "at": 1});
+        assert!(
+            add_decision_with(&db, ORG, SID, decision.clone())
+                .await
+                .unwrap()
+        );
+        assert!(
+            !add_decision_with(&db, ORG, "other", decision.clone())
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            decisions_of(&record(&db, "t2").await),
+            vec![decision.clone()]
+        );
+        assert!(decisions_of(&record(&db, "t1").await).is_empty());
+        let second = serde_json::json!({"id": "apr_2", "approved": false});
+        let third = serde_json::json!({"id": "apr_3", "approved": true});
+        let (a, b) = tokio::join!(
+            add_decision_with(&db, ORG, SID, second.clone()),
+            add_decision_with(&db, ORG, SID, third.clone()),
+        );
+        assert!(a.unwrap() && b.unwrap());
+        let kept = decisions_of(&record(&db, "t2").await);
+        assert_eq!(kept.len(), 3, "{kept:?}");
+        assert!(kept.contains(&second) && kept.contains(&third));
     }
 }

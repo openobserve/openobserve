@@ -256,6 +256,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-actions="{ row }">
               <div class="flex items-center justify-end gap-1">
+                <template v-if="assistantV2">
+                  <AiEntryButton v-bind="seriesDoor(row, 'explain')" appearance="toolbar-icon" />
+                  <AiEntryButton
+                    v-bind="seriesDoor(row, 'add_to_chat')"
+                    appearance="toolbar-icon"
+                  />
+                </template>
                 <OButton
                   variant="ghost"
                   size="icon-xs"
@@ -382,6 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
   onBeforeUnmount,
   ref,
@@ -392,6 +400,8 @@ import {
 import { getInstanceByDom, type ECharts } from "echarts/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import MetricChartTile, {
   type TileCompare,
   type TileForecast,
@@ -538,6 +548,9 @@ export default defineComponent({
     OSkeleton,
     OTooltip,
     OTable,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
@@ -579,6 +592,56 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
+
+    // Each breakdown row is one series: the metric with the active label set to that value.
+    const assistantV2 = isAssistantV2();
+    const loadedOrg = assistantV2
+      ? useLoadedOrg(
+          () => [props.card, props.timeRange],
+          () => store.state.selectedOrganization?.identifier ?? "",
+        )
+      : null;
+    const seriesDoor = (
+      row: { value: string; latest?: string | null },
+      verb: "explain" | "add_to_chat",
+    ) => ({
+      verb,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg?.value,
+      objectKind: "metric_series" as const,
+      label: t(verb === "explain" ? "assistant.entry.explainSeries" : "assistant.entry.addSeries"),
+      tooltip: t(
+        verb === "explain"
+          ? "assistant.entry.tooltip.explainSeries"
+          : "assistant.entry.tooltip.add",
+      ),
+      dataTest:
+        verb === "explain"
+          ? ("ai-entry-metric-series-explain" as const)
+          : ("ai-entry-metric-series-add" as const),
+      objectKey: `${props.card.name}:${activeLabel.value ?? ""}=${row.value}`,
+      build: async () => {
+        const label = activeLabel.value;
+        const labels: Record<string, string> = Object.fromEntries(
+          props.filters
+            .filter((f) => f.operator === "=" || f.operator === undefined)
+            .map((f) => [String(f.label), String(f.value)]),
+        );
+        if (label) labels[label] = row.value;
+        const expr = props.variant?.queries[0]?.expr;
+        return (await import("@/utils/assistant/prompts")).buildMetricSeriesPrompt({
+          org: store.state.selectedOrganization?.identifier ?? "",
+          metric: props.card.name,
+          labels,
+          ...(expr && { query: expr, language: "PromQL" as const }),
+          range: {
+            from: Math.round(props.timeRange.start_time / 1000),
+            to: Math.round(props.timeRange.end_time / 1000),
+          },
+          timeZone: store.state.timezone || "UTC",
+        });
+      },
+    });
 
     /** The stream the card's default query reads — `_count` for the exp fallback. */
     const valuesStream = computed(() => operandStreamsOf(props.card)[0]);
@@ -1144,6 +1207,8 @@ export default defineComponent({
     });
 
     return {
+      assistantV2,
+      seriesDoor,
       t,
       raw,
       titleOf,

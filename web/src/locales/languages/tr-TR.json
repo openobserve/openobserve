@@ -9166,6 +9166,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "Analiz ediliyor...",
+        "thinking": "Düşünülüyor...",
+        "processing": "İşleniyor...",
+        "examiningData": "Veriler inceleniyor...",
+        "reviewingContext": "Bağlam gözden geçiriliyor...",
+        "formulatingResponse": "Yanıt oluşturuluyor...",
+        "checkingDetails": "Ayrıntılar kontrol ediliyor...",
+        "gatheringInsights": "İçgörüler toplanıyor...",
+        "evaluatingOptions": "Seçenekler değerlendiriliyor...",
+        "synthesizingInformation": "Bilgiler derleniyor...",
+        "workingOnIt": "Üzerinde çalışılıyor...",
+        "almostThere": "Neredeyse tamam...",
+        "divingDeeper": "Daha derine iniliyor...",
+        "connectingTheDots": "Bağlantılar kuruluyor...",
+        "crunchingNumbers": "Sayılar hesaplanıyor...",
+        "exploringPossibilities": "Olasılıklar araştırılıyor...",
+        "refiningAnswer": "Yanıt iyileştiriliyor...",
+        "stillThinking": "Hâlâ düşünülüyor...",
+        "makingProgress": "İlerleme kaydediliyor...",
+        "piecingTogether": "Parçalar birleştiriliyor..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "Deneme süresi",
@@ -20789,7 +20815,10 @@
     "pagination": {
       "pagination": "Sayfalama",
       "previousPage": "Önceki sayfa",
-      "nextPage": "Sonraki sayfa"
+      "nextPage": "Sonraki sayfa",
+      "firstPage": "İlk sayfa",
+      "lastPage": "Son sayfa",
+      "recordsPerPage": "Sayfa başına kayıtlar"
     },
     "select": {
       "more": "daha fazla",

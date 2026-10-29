@@ -9166,6 +9166,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "Analizuję...",
+        "thinking": "Myślę...",
+        "processing": "Przetwarzam...",
+        "examiningData": "Badam dane...",
+        "reviewingContext": "Przeglądam kontekst...",
+        "formulatingResponse": "Formułuję odpowiedź...",
+        "checkingDetails": "Sprawdzam szczegóły...",
+        "gatheringInsights": "Zbieram wnioski...",
+        "evaluatingOptions": "Oceniam opcje...",
+        "synthesizingInformation": "Syntetyzuję informacje...",
+        "workingOnIt": "Pracuję nad tym...",
+        "almostThere": "Już prawie...",
+        "divingDeeper": "Zagłębiam się...",
+        "connectingTheDots": "Łączę fakty...",
+        "crunchingNumbers": "Obliczam...",
+        "exploringPossibilities": "Rozważam możliwości...",
+        "refiningAnswer": "Doprecyzowuję odpowiedź...",
+        "stillThinking": "Wciąż myślę...",
+        "makingProgress": "Robię postępy...",
+        "piecingTogether": "Składam w całość..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "Okres próbny",
@@ -20789,7 +20815,10 @@
     "pagination": {
       "pagination": "Paginacja",
       "previousPage": "Poprzednia strona",
-      "nextPage": "Następna strona"
+      "nextPage": "Następna strona",
+      "firstPage": "Pierwsza strona",
+      "lastPage": "Ostatnia strona",
+      "recordsPerPage": "Rekordy na stronę"
     },
     "select": {
       "more": "więcej",

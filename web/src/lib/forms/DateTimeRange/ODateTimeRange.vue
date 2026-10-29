@@ -10,7 +10,7 @@ import type {
   RelativeUnit,
   DateTimeMode,
 } from "./ODateTimeRange.types";
-import { computed, ref, useAttrs, watch, type Ref } from "vue";
+import { computed, inject, onBeforeUnmount, ref, useAttrs, watch, type Ref } from "vue";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -33,6 +33,10 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import {
+  O_DROPDOWN_NESTED_KEY,
+  type DropdownNestedRegistry,
+} from "@/lib/overlay/Dropdown/ODropdown.context";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -75,6 +79,23 @@ const popoverOpen = computed({
     if (!props.disabled) _popoverOpen.value = val;
   },
 });
+
+// The trigger is a `div role="button"` and reka binds only click, so Enter and Space open it here (CT-01 AC 11).
+function toggleFromKeyboard() {
+  popoverOpen.value = !popoverOpen.value;
+}
+
+// Inside an OPopover the picker's own popup is a nested overlay, so a click in the calendar never dismisses the parent.
+const parentOverlay = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
+let closeNested: (() => void) | null = null;
+watch(_popoverOpen, (open) => {
+  if (open && parentOverlay && !closeNested) closeNested = parentOverlay.open();
+  else if (!open && closeNested) {
+    closeNested();
+    closeNested = null;
+  }
+});
+onBeforeUnmount(() => closeNested?.());
 
 // ── Staged state ───────────────────────────────────────────────
 const activeTab = ref<DateTimeMode>(props.disableRelative ? "absolute" : props.mode);
@@ -331,6 +352,8 @@ const triggerClasses = computed(() => [
           :aria-disabled="disabled || undefined"
           :tabindex="inputTabindex"
           data-test="datetimerange-trigger"
+          @keydown.enter.prevent="toggleFromKeyboard"
+          @keydown.space.prevent="toggleFromKeyboard"
         >
           <!-- Clock icon -->
           <svg

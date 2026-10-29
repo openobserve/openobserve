@@ -54,6 +54,16 @@ describe("OPopover", () => {
     expect(wrapper.find('[data-testid="content"]').exists()).toBe(true);
   });
 
+  it("masks its content for session replay only when privacy is mask", () => {
+    const plain = mount(OPopover, { props: { open: true }, slots: { default: "<p>x</p>" } });
+    expect(plain.find("[data-o-popover-content]").attributes("data-dd-privacy")).toBeUndefined();
+    const masked = mount(OPopover, {
+      props: { open: true, privacy: "mask" },
+      slots: { default: "<p>x</p>" },
+    });
+    expect(masked.find("[data-o-popover-content]").attributes("data-dd-privacy")).toBe("mask");
+  });
+
   it("follows the open prop back to closed", async () => {
     const wrapper = mount(OPopover, {
       props: { open: true },
@@ -152,5 +162,69 @@ describe("OPopover", () => {
     const event = new Event("focus");
     content.vm.$emit("open-auto-focus", event);
     expect(wrapper.emitted("open-auto-focus")?.[0]).toEqual([event]);
+  });
+
+  it("positions by an anchor with no trigger", async () => {
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    const wrapper = mount(OPopover, {
+      props: { open: true, autoFocus: false },
+      slots: {
+        anchor: '<span data-testid="anchor"></span>',
+        default: '<button data-testid="inside">Inside</button>',
+      },
+      attachTo: document.body,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(wrapper.find('[data-testid="anchor"]').exists()).toBe(true);
+    expect(wrapper.find("[aria-haspopup]").exists()).toBe(false);
+    wrapper.unmount();
+    input.remove();
+  });
+
+  it("returns focus on close to the anchor control that opened it, not the first one", async () => {
+    const wrapper = mount(OPopover, {
+      props: { open: false },
+      slots: {
+        anchor:
+          '<p data-testid="anchor"><button data-testid="one">One</button><button data-testid="two">Two</button></p>',
+        default: '<button data-testid="inside">Inside</button>',
+      },
+      attachTo: document.body,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const two = wrapper.get('[data-testid="two"]').element as HTMLButtonElement;
+    two.focus();
+    await wrapper.setProps({ open: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    (document.body.querySelector('[data-testid="inside"]') as HTMLElement).focus();
+    await wrapper.setProps({ open: false });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.activeElement).toBe(two);
+    wrapper.unmount();
+  });
+
+  it("leaves focus where the caller already put it when the popover closes (V1)", async () => {
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    const wrapper = mount(OPopover, {
+      props: { open: false },
+      slots: {
+        anchor: '<p><button data-testid="one">One</button></p>',
+        default: '<button data-testid="inside">Inside</button>',
+      },
+      attachTo: document.body,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    (wrapper.get('[data-testid="one"]').element as HTMLElement).focus();
+    await wrapper.setProps({ open: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    outside.focus();
+    await wrapper.setProps({ open: false });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.activeElement).toBe(outside);
+    wrapper.unmount();
+    outside.remove();
   });
 });

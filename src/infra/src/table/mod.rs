@@ -21,9 +21,16 @@ use sea_orm_migration::{MigratorTrait, SchemaManager};
 
 use crate::{db::get_orm_client_ddl, dist_lock};
 
+pub mod ai_access_requests;
+pub mod ai_actions;
+pub mod ai_approvals;
+pub mod ai_chat_feedback;
+pub mod ai_chat_imports;
 pub mod ai_chat_sessions;
 pub mod ai_chat_shares;
 pub mod ai_chat_turns;
+pub mod ai_grants;
+pub mod ai_turn_marks;
 pub mod alert_acks;
 pub mod alert_calibration;
 pub mod alert_composites;
@@ -87,6 +94,8 @@ pub mod org_storage_providers;
 pub mod org_telephony;
 pub mod org_users;
 pub mod organizations;
+#[cfg(feature = "cloud")]
+pub mod paid_overage_attribution;
 pub mod providers;
 pub mod public_dashboards;
 pub mod query_history;
@@ -271,6 +280,11 @@ where
         .collect()
 }
 
+/// `value` cut to `max_chars` characters, so a row never fails a Postgres/MySQL column width.
+pub(crate) fn fit(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
+}
+
 #[macro_export]
 macro_rules! orm_err {
     ($e:expr) => {
@@ -285,6 +299,12 @@ mod tests {
     use sea_orm::{ConnectionTrait, Database, Statement};
 
     use super::*;
+
+    #[test]
+    fn fit_cuts_on_characters_not_bytes() {
+        assert_eq!(fit("héllo", 2), "hé");
+        assert_eq!(fit("ok", 64), "ok");
+    }
 
     #[tokio::test]
     async fn test_check_migration_history_allows_a_fresh_database() {

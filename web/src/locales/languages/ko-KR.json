@@ -9166,6 +9166,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "분석 중...",
+        "thinking": "생각 중...",
+        "processing": "처리 중...",
+        "examiningData": "데이터 검토 중...",
+        "reviewingContext": "컨텍스트 검토 중...",
+        "formulatingResponse": "응답 작성 중...",
+        "checkingDetails": "세부 정보 확인 중...",
+        "gatheringInsights": "인사이트 수집 중...",
+        "evaluatingOptions": "옵션 평가 중...",
+        "synthesizingInformation": "정보 종합 중...",
+        "workingOnIt": "작업 중...",
+        "almostThere": "거의 다 됐어요...",
+        "divingDeeper": "더 깊이 탐색 중...",
+        "connectingTheDots": "점들을 연결하는 중...",
+        "crunchingNumbers": "숫자 계산 중...",
+        "exploringPossibilities": "가능성 탐색 중...",
+        "refiningAnswer": "답변 다듬는 중...",
+        "stillThinking": "아직 생각 중...",
+        "makingProgress": "진행 중...",
+        "piecingTogether": "조각 맞추는 중..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "체험 기간",
@@ -20789,7 +20815,10 @@
     "pagination": {
       "pagination": "페이지네이션",
       "previousPage": "이전 페이지",
-      "nextPage": "다음 페이지"
+      "nextPage": "다음 페이지",
+      "firstPage": "첫 페이지",
+      "lastPage": "마지막 페이지",
+      "recordsPerPage": "페이지당 레코드"
     },
     "select": {
       "more": "더보기",

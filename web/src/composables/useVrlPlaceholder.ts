@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { computed } from "vue";
+
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useI18nTyped } from "@/types/i18n";
 
 // The prompts are built per call, not at module scope: a module-level array would
@@ -34,17 +37,21 @@ const JS_EXAMPLES = [
   "row.count = parseInt(row.count) + 1;",
 ];
 
-/** Typewriter placeholder for VRL function editors. */
+/** The VRL editor placeholder: static on the v2 path, typed out on the legacy one. */
 export function useVrlPlaceholder() {
   const { t } = useI18nTyped();
+  if (isAssistantV2())
+    return { placeholder: computed<string>(() => t("assistant.helper.editorPlaceholder.vrl")) };
   return useTypewriterPlaceholder(
     VRL_EXAMPLES.map((example) => t("functions.vrlFunctionPlaceholder", { example })),
   );
 }
 
-/** Typewriter placeholder for JavaScript function editors. */
+/** The JavaScript editor placeholder: static on the v2 path, typed out on the legacy one. */
 export function useJsPlaceholder() {
   const { t } = useI18nTyped();
+  if (isAssistantV2())
+    return { placeholder: computed<string>(() => t("assistant.helper.editorPlaceholder.js")) };
   return useTypewriterPlaceholder(
     JS_EXAMPLES.map((example) => t("functions.jsFunctionPlaceholder", { example })),
   );
