@@ -2620,6 +2620,7 @@ export default defineComponent({
       chartPanelRef,
       chartRendererRef,
       data,
+      filteredData,
       loading,
       searchRequestTraceIds,
       errorDetail,
