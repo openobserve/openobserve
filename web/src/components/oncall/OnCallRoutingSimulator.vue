@@ -203,12 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="flex flex-col" data-test="oncall-simulator-responder">
           <OUserCell :value="responder.user_email" />
           <!-- Channels that would carry it, or the server's reason none can. -->
-          <span
-            :class="
-              responder.would_a_page_land ? 'text-status-success-text' : 'text-status-error-text'
-            "
-            class="text-xs"
-          >
+          <span :class="responderTone" class="text-xs" data-test="oncall-simulator-responder-note">
             {{ responderNote }}
           </span>
         </span>
@@ -263,7 +258,12 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { AlsoMatchedRule, RoutingPreview, TeamRungSummary } from "@/ts/interfaces/oncall";
+import type {
+  AlsoMatchedRule,
+  Channel,
+  RoutingPreview,
+  TeamRungSummary,
+} from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -423,14 +423,29 @@ const ladderNote = computed<I18nText>(() => {
 
 const responder = computed(() => props.preview?.current_responder ?? null);
 
+/// What they can receive narrowed to what the chosen priority sends; with no priority there is nothing to narrow by.
+const sentChannels = computed<Channel[]>(() => {
+  const person = responder.value;
+  if (!person) return [];
+  const entry = ladderEntry.value;
+  if (!entry) return person.deliverable_channels;
+  return person.deliverable_channels.filter((channel) => entry.channels.includes(channel));
+});
+
 const responderNote = computed<I18nText>(() => {
   const person = responder.value;
   if (!person) return raw("");
   if (!person.would_a_page_land) return raw(person.why_not) || t("oncall.contactNoChannel");
-  const channels = person.deliverable_channels
+  if (!sentChannels.value.length) return t("oncall.simulatorSendsNothing");
+  const channels = sentChannels.value
     .map((channel) => String(t(`oncall.channel_${channel}`)))
     .join(", ");
   return t("oncall.simulatorReachableNow", { channels: raw(channels) });
+});
+
+const responderTone = computed(() => {
+  if (!responder.value?.would_a_page_land) return "text-status-error-text";
+  return sentChannels.value.length ? "text-status-success-text" : "text-status-warning-text";
 });
 
 /// A losing rule that points at the same team changes nothing; one pointing

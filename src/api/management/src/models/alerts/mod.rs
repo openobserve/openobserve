@@ -230,7 +230,8 @@ pub struct Alert {
     #[schema(example = 10)]
     pub pending_period_sec: i64,
 
-    /// Send one notification when this alert recovers.
+    /// Send one notification when this alert recovers; a multi-alert sends one per recovered
+    /// group.
     #[serde(default)]
     pub notify_on_recovery: bool,
 
