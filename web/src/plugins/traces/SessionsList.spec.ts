@@ -226,6 +226,7 @@ import AgentScopeCascade from "@/enterprise/components/AIObservability/AgentScop
 import config from "@/aws-exports";
 import { queryClient } from "@/composables/query/queryClient";
 import { SCOPE_MODE_CHOICE_LS_KEY } from "@/enterprise/composables/useAgentScope";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 
 const defaultProps = {
   streamName: "test-stream",
@@ -466,6 +467,22 @@ describe("SessionsList — sessions table", () => {
 
     expect((wrapper.vm as any).filterMode).toBe("stream");
     expect(mockListAgents).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetches explicit Stream sessions while the agents request is still pending", async () => {
+    mockRouteQuery = { type: "stream" };
+    const agentsResult = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    mockListAgents.mockReturnValue(agentsResult.promise);
+    const wrapper = await mountComponent();
+    // Vue Test Utils omits the script-setup method from its public-instance type.
+    const vm = wrapper.vm as unknown as {
+      refresh: (start?: number, end?: number, force?: boolean) => Promise<void>;
+    };
+    const pending = vm.refresh(undefined, undefined, false);
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
+    agentsResult.resolve({ agents: [] });
+    await pending;
   });
 
   it("opens in Stream mode with the no-agent-identity banner when the window has no agents", async () => {

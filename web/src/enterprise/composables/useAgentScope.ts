@@ -535,8 +535,9 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   // flight join it, so the several callers on page entry (date replay, mode
   // resolution) cost one request. A forced refresh waits for any request for
   // the same key, then invalidates and fetches again rather than reusing it.
-  // Joiners wait for the latest request for their key, so a forced refresh
-  // started after they joined settles before they resume.
+  // Every caller, including the one that started a request, resolves only once
+  // the latest request for its key settles, so a forced refresh started
+  // meanwhile lands before the caller decides anything from the list.
   let inFlight: { key: string; promise: Promise<void> } | null = null;
   let requestSequence = 0;
   async function joinLatest(key: string): Promise<void> {
@@ -597,7 +598,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
       if (inFlight?.promise === promise) inFlight = null;
     });
     inFlight = { key, promise };
-    return promise;
+    return promise.then(() => joinLatest(key));
   }
 
   return {
