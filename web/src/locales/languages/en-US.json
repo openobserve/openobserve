@@ -28371,11 +28371,8 @@
     },
     "health": {
       "title": "Data health",
-      "errors": "{n} error | {n} errors",
-      "warnings": "{n} warning | {n} warnings",
       "passing": "{n} passing",
       "checkedAgo": "checked {ago}",
-      "review": "Review checks",
       "drawerTitle": "AI data health",
       "drawerSubtitle": "{stream} · current window",
       "rerun": "Re-run checks",
