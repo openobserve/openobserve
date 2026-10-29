@@ -610,6 +610,7 @@ import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { isSlackAppDestination } from "@/utils/slackAppDestination";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
@@ -1110,7 +1111,11 @@ function openMembers() {
 async function fetchDestinations() {
   try {
     const list = await queryClient.fetchQuery(destinationsQuery(orgId.value, "alert"));
-    availableDestinations.value = list.map((d: { name: string }) => d.name).filter(Boolean);
+    // A Slack app destination cannot carry a page; the team's room is a webhook (7.1).
+    availableDestinations.value = list
+      .filter((d: { type?: string }) => !isSlackAppDestination(d))
+      .map((d: { name: string }) => d.name)
+      .filter(Boolean);
   } catch {
     availableDestinations.value = [];
   }

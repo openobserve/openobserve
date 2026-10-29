@@ -145,6 +145,35 @@ describe("SlackWorkspaceCard (A3)", () => {
     ).toBe(false);
   });
 
+  it("shows the outbound queue line once the server reports it, and no last-send line (MK-6b)", () => {
+    const health = installationView().health;
+    const w = mountCard(
+      installationView({ health: { ...health, outbound_depth: 3, outbound_oldest_age_secs: 4 } }),
+    );
+    expect(w.find('[data-test="slack-workspace-outbound"]').text()).toBe(
+      "Alert messages: 3 queued, oldest 4 s",
+    );
+    expect(w.text()).not.toMatch(/last send/i);
+    expect(mountCard().find('[data-test="slack-workspace-outbound"]').exists()).toBe(false);
+    const empty = mountCard(
+      installationView({ health: { ...health, outbound_depth: 0, outbound_oldest_age_secs: 0 } }),
+    ).find('[data-test="slack-workspace-outbound"]');
+    expect(empty.text()).toBe("No alert messages queued");
+    expect(empty.attributes("data-state")).toBe("ok");
+  });
+
+  it("flags the queue once its oldest message waits past 10 minutes", () => {
+    const health = installationView().health;
+    const w = mountCard(
+      installationView({
+        health: { ...health, outbound_depth: 40, outbound_oldest_age_secs: 900 },
+      }),
+    );
+    const line = w.find('[data-test="slack-workspace-outbound"]');
+    expect(line.text()).toBe("Alert messages: 40 queued, oldest 15 min");
+    expect(line.attributes("data-state")).toBe("warning");
+  });
+
   it("AC-12.1 credentials unreadable: says so and opens Update credentials", async () => {
     const w = mountCard(installationView({ credentials_readable: false }));
     const banner = w.find('[data-test="slack-credentials-unreadable"]');

@@ -31,6 +31,8 @@ export const oncallKeys = {
   /** Every team's list and per-team entry — the scope a team write drops. */
   teamsAll: (org: string) => orgKey(org, "oncall", "teams"),
   teams: (org: string) => orgKey(org, "oncall", "teams", "list"),
+  /** Every team's room destinations, read together for the Slack app's on-call room check. */
+  teamRooms: (org: string) => orgKey(org, "oncall", "teams", "rooms"),
   /** One team's whole prefix: detail, roster, schedule, policy and everything derived from them. */
   team: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId),
   teamOverview: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "overview"),

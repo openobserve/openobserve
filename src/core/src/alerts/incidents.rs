@@ -3048,6 +3048,32 @@ async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::Transa
     Ok(())
 }
 
+/// An incident ack made anywhere but an alert's own ack acks every firing row of its alerts (§5.6).
+async fn ack_incident_alerts(org_id: &str, incident_id: &str, user_id: &str) {
+    if crate::alerts::ack::propagating() {
+        return;
+    }
+    let alerts = match infra::table::alert_incidents::get_incident_alerts(incident_id).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[incidents] could not list the alerts of {incident_id} to ack them: {e}");
+            return;
+        }
+    };
+    let mut ids: Vec<String> = alerts.into_iter().map(|a| a.alert_id).collect();
+    ids.sort();
+    ids.dedup();
+    for alert_id in ids {
+        crate::alerts::ack::ack_from_elsewhere(
+            org_id,
+            &alert_id,
+            user_id,
+            config::meta::alerts::ack::AckSource::Incident,
+        )
+        .await;
+    }
+}
+
 /// Update incident status
 pub async fn update_status(
     org_id: &str,
@@ -3086,6 +3112,9 @@ pub async fn update_status_as(
     } else {
         infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
     };
+    if status == "acknowledged" && updated.acknowledged_by.as_deref() == Some(user_id) {
+        ack_incident_alerts(org_id, incident_id, user_id).await;
+    }
 
     let muted = status_change_is_muted(
         quiet || muted_before,

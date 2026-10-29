@@ -13,15 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::destinations::{
-    Destination, DestinationType, Endpoint, HTTPOutputFormat, HTTPType, Module,
+use config::meta::{
+    alerts::auto_investigate::GateSettings,
+    destinations::{Destination, DestinationType, Endpoint, HTTPOutputFormat, HTTPType, Module},
 };
 use hashbrown::HashMap;
 use o2_enterprise::enterprise::{
     common::auditor::AuditMessage,
     slack::{
         self,
-        hooks::{BoxFut, ChartSeries, CreatedDestination, SlackHooks, WebhookDestination},
+        hooks::{
+            AlertRcaRefusal, AlertRcaRequest, AlertRcaStart, AlertRcaVerdict, AlertViewKey, BoxFut,
+            ChartSeries, CreatedDestination, DestinationRefusal, GateFacts, SlackAppDestination,
+            SlackHooks, WebhookDestination,
+        },
     },
 };
 use openobserve_core::alerts::notifications::chart::{
@@ -38,9 +43,16 @@ pub fn hooks() -> SlackHooks {
         domain_mappings_for_org,
         is_org_blocked: db::org_status::is_blocked,
         create_webhook_destination,
+        create_slack_app_destination,
+        alert_message_view,
         render_chart_png,
         shorten_url,
         audit,
+        auto_investigate_facts,
+        auto_investigate_settings,
+        start_alert_rca,
+        running_rca_verdict,
+        publish_auto_investigate_decision: usage_reporting::publish_auto_investigate_decision,
     }
 }
 
@@ -95,6 +107,104 @@ fn create_webhook_destination(d: WebhookDestination) -> BoxFut<anyhow::Result<Cr
             id: saved.id.map(|id| id.to_string()).unwrap_or_default(),
             name: saved.name,
         })
+    })
+}
+
+fn create_slack_app_destination(
+    d: SlackAppDestination,
+) -> BoxFut<anyhow::Result<CreatedDestination>> {
+    Box::pin(async move {
+        let by = d.created_by.clone();
+        let destination = Destination {
+            id: None,
+            org_id: d.org_id,
+            name: d.name,
+            module: Module::Alert {
+                template: None,
+                destination_type: DestinationType::SlackApp(d.target),
+            },
+        };
+        let saved = openobserve_core::alerts::destinations::save_by("", destination, true, &by)
+            .await
+            .map_err(refusal_or_error)?;
+        Ok(CreatedDestination {
+            id: saved.id.map(|id| id.to_string()).unwrap_or_default(),
+            name: saved.name,
+        })
+    })
+}
+
+/// A coded refusal crosses the hook typed, so the setup path can hand the confirm to the form.
+fn refusal_or_error(e: db::alerts::destinations::DestinationError) -> anyhow::Error {
+    match e {
+        db::alerts::destinations::DestinationError::SlackApp(r) => {
+            anyhow::Error::new(DestinationRefusal {
+                status: r.status,
+                code: r.code.to_string(),
+                message: r.message,
+                team: r.team,
+                destination: r.destination,
+            })
+        }
+        e => anyhow::Error::new(e),
+    }
+}
+
+fn alert_message_view(
+    key: AlertViewKey,
+) -> BoxFut<anyhow::Result<Option<config::meta::slack::AlertMessageView>>> {
+    Box::pin(async move {
+        openobserve_core::alerts::slack_view::alert_message_view(
+            &key.org_id,
+            &key.alert_id,
+            &key.group_key,
+            key.firing_started_at,
+        )
+        .await
+    })
+}
+
+fn auto_investigate_facts(key: AlertViewKey, now: i64) -> BoxFut<anyhow::Result<GateFacts>> {
+    Box::pin(async move {
+        let f = openobserve_core::alerts::slack_investigate::gate_facts(
+            &key.org_id,
+            &key.alert_id,
+            &key.group_key,
+            key.firing_started_at,
+            now,
+        )
+        .await?;
+        Ok(GateFacts {
+            onsets_7d: f.stats.onsets,
+            evaluations_7d: f.stats.evaluations,
+            fire_share_7d: f.stats.fire_share,
+            rca_running: f.rca_running,
+            settings: f.settings,
+            settings_version: f.settings_version,
+        })
+    })
+}
+
+fn auto_investigate_settings(org_id: String) -> BoxFut<GateSettings> {
+    Box::pin(async move {
+        openobserve_core::alerts::slack_investigate::gate_settings(&org_id)
+            .await
+            .0
+    })
+}
+
+fn start_alert_rca(req: AlertRcaRequest) -> BoxFut<Result<AlertRcaStart, AlertRcaRefusal>> {
+    Box::pin(openobserve_core::alerts::slack_investigate::start_alert_rca(req))
+}
+
+fn running_rca_verdict(key: AlertViewKey) -> BoxFut<Option<AlertRcaVerdict>> {
+    Box::pin(async move {
+        openobserve_core::alerts::slack_investigate::running_rca_verdict(
+            &key.org_id,
+            &key.alert_id,
+            key.firing_started_at,
+        )
+        .await
     })
 }
 
