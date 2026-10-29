@@ -9684,6 +9684,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThan,
                 value: json::json!(0),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: true,
