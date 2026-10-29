@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @extractPatterns="extractPatternsForCurrentQuery"
               @buildModeToggle="onBuildModeToggle"
               @sendToAiChat="sendToAiChat"
+              @filter-builder-growth="filterBuilderGrowth = $event"
             />
           </div>
         </template>
@@ -2984,21 +2985,38 @@ export default defineComponent({
       },
     );
 
-    // Auto-expand the splitter when either editor has >2 lines; never overrides a larger user-set value.
+    // Pixels the filter builder has grown past one line; null while the text editor is shown.
+    const filterBuilderGrowth = ref<number | null>(null);
+    let autoSplitterHeight = 0;
+
+    // Auto-expand the splitter when either editor has >2 lines or the filter builder wraps; never overrides a larger user-set value.
     watch(
-      [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent, isMobile],
-      ([queryValue, fnValue, mobile]) => {
+      [
+        () => searchObj.data.editorValue,
+        () => searchObj.data.tempFunctionContent,
+        isMobile,
+        filterBuilderGrowth,
+      ],
+      ([queryValue, fnValue, mobile, growth]) => {
         const queryLines = (queryValue || "").split("\n").length;
         const fnLines = (fnValue || "").split("\n").length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
         const baseHeight = mobile ? 165 : 83;
         const expandedHeight = mobile ? 205 : 130;
+        const target =
+          growth === null
+            ? hasMoreThanTwoLines
+              ? expandedHeight
+              : baseHeight
+            : baseHeight + growth;
 
-        if (hasMoreThanTwoLines && splitterModel.value < expandedHeight) {
-          splitterModel.value = expandedHeight;
-        } else if (!hasMoreThanTwoLines && splitterModel.value <= expandedHeight) {
-          splitterModel.value = baseHeight;
+        if (
+          splitterModel.value < target ||
+          splitterModel.value <= Math.max(expandedHeight, autoSplitterHeight)
+        ) {
+          splitterModel.value = target;
         }
+        autoSplitterHeight = target;
       },
       { immediate: true },
     );
@@ -4049,6 +4067,7 @@ export default defineComponent({
       searchObj,
       searchBarRef,
       splitterModel,
+      filterBuilderGrowth,
       isMobile,
       mobileFieldsOpen,
       // loadPageData,

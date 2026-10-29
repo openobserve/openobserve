@@ -526,6 +526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <div v-if="showFilterBuilder" class="h-full overflow-y-auto py-0.75 ps-1.5 pe-10">
           <SqlFilterBuilder
+            ref="filterBuilderRef"
             :query="searchObj.data.editorValue"
             :fields="filterBuilderFields"
             :load-values="loadFilterBuilderValues"
@@ -660,6 +661,7 @@ import { toCsv } from "@/utils/csv";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
+import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -699,6 +701,7 @@ export default defineComponent({
   },
   emits: [
     "searchdata",
+    "filterBuilderGrowth",
     "cancel-query",
     "update:searchMode",
     "error-only-toggled",
@@ -780,6 +783,12 @@ export default defineComponent({
 
     const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
       useFilterBuilderPreference("o2.traces.queryInput");
+    const filterBuilderRef = ref(null);
+    // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
+    const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
+    watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
+      immediate: true,
+    });
     const showFilterBuilder = computed(() => filterBuilderOn.value && !searchObj.meta.sqlMode);
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
@@ -1396,6 +1405,7 @@ export default defineComponent({
       toggleFilterBuilder,
       showFilterBuilder,
       filterBuilderFields,
+      filterBuilderRef,
       loadFilterBuilderValues,
       onFilterBuilderQuery,
       effectiveSuggestions,

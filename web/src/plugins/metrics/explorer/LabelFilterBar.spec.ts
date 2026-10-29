@@ -90,6 +90,13 @@ describe("LabelFilterBar", () => {
     expect(chips[1].text()).toContain("!=");
   });
 
+  it("sits flush in its row like the Logs bar, with no input frame of its own", () => {
+    createWrapper({ filters: [filter("job", "api")] });
+    const field = wrapper!.find('[data-test="metrics-explorer-label-field"]');
+    expect(field.classes()).not.toContain("border");
+    expect(field.classes()).not.toContain("bg-input-bg");
+  });
+
   it("defaults a filter without an operator to =", () => {
     createWrapper({ filters: [filter("job", "api")] });
     expect(wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').text()).toContain("=");
@@ -134,12 +141,12 @@ describe("LabelFilterBar", () => {
     expect(wrapper!.emitted("add")![0][0]).toEqual({ label: "job", operator: symbol, value: "x" });
   });
 
-  it("shows a plain alternation as is any of, and keeps a real pattern as a regex", () => {
+  it("shows a plain alternation as IN, and keeps a real pattern as a regex", () => {
     createWrapper({
       filters: [filter("job", "a\\.b|c", "=~"), filter("pod", "api-.*", "=~")],
     });
     const job = wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').text();
-    expect(job).toContain("is any of");
+    expect(job).toContain("IN");
     expect(job).toContain("a.b, c");
     expect(wrapper!.find('[data-test="metrics-explorer-label-chip-pod-operator"]').text()).toBe(
       "=~",

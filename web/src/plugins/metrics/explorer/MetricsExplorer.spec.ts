@@ -706,6 +706,11 @@ describe("MetricsExplorer wiring", () => {
       expect(filterRow(wrapper).exists()).toBe(true);
     });
 
+    it("pads the row like the Logs query row, which holds its flush filter bar the same way", () => {
+      const wrapper = mountExplorer();
+      expect(filterRow(wrapper).classes()).toEqual(expect.arrayContaining(["px-1.5", "py-0.75"]));
+    });
+
     it("is hidden in Visualize, where the PromQL query carries its own matchers", async () => {
       const wrapper = mountExplorer();
       expect(filterRow(wrapper).exists()).toBe(true);

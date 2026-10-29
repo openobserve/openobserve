@@ -119,7 +119,10 @@ const toLabelFilter = (condition: FilterCondition): LabelFilter | null => {
 };
 
 const conditionsOf = (items: FilterNode[]): FilterCondition[] =>
-  items.flatMap((item) => (item.kind === "condition" ? [item] : conditionsOf(item.items)));
+  items.flatMap((item) => {
+    if (item.kind === "condition") return [item];
+    return item.kind === "group" ? conditionsOf(item.items) : [];
+  });
 
 function onChange(next: FilterGroup) {
   const nextFilters = conditionsOf(next.items)
@@ -159,6 +162,7 @@ function onFocus() {
       :fields-loading="labelNamesLoading || schemaLoading"
       :placeholder="raw(filterHint)"
       size="sm"
+      appearance="plain"
       data-test="metrics-explorer-label"
       @update:model-value="onChange"
       @focus="onFocus"

@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <div
       v-if="isGridMode"
-      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b px-1.5 py-0.75"
       data-test="metrics-explorer-filter-row"
     >
       <!-- No "Filters" caption: the chips already read `action = accept_challenge`

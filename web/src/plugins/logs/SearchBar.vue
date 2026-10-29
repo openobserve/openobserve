@@ -1329,6 +1329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <div v-if="showFilterBuilder" class="h-full overflow-y-auto py-0.75 ps-1.5 pe-18">
                 <SqlFilterBuilder
+                  ref="filterBuilderRef"
                   :query="searchObj.data.query"
                   :fields="filterBuilderFields"
                   :load-values="loadFilterBuilderValues"
@@ -1790,6 +1791,7 @@ const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/Query
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
+import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { json2csv } from "json-2-csv";
@@ -1983,6 +1985,7 @@ export default defineComponent({
   },
   emits: [
     "searchdata",
+    "filterBuilderGrowth",
     "onChangeInterval",
     "onChangeTimezone",
     "handleQuickModeChange",
@@ -2253,6 +2256,12 @@ export default defineComponent({
 
     const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
       useFilterBuilderPreference("o2.logs.queryInput");
+    const filterBuilderRef = ref(null);
+    // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
+    const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
+    watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
+      immediate: true,
+    });
     // SQL mode and the visualize/build views keep the editor: the builder writes filter-mode WHERE text only.
     const showFilterBuilder = computed(
       () =>
@@ -5086,6 +5095,7 @@ export default defineComponent({
       showFilterBuilder,
       filterBuilderToggleRight,
       filterBuilderFields,
+      filterBuilderRef,
       loadFilterBuilderValues,
       onFilterBuilderQuery,
       onRefreshIntervalUpdate,

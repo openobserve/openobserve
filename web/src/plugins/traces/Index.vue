@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @apply-saved-view="onApplySavedView"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
+              @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
             />
           </div>
@@ -441,6 +442,18 @@ watch(
   },
   { immediate: true },
 );
+// Pixels the filter builder has grown past one line; null while the text editor is shown.
+const filterBuilderGrowth = ref<number | null>(null);
+let autoSplitterHeight = 0;
+// The query pane grows with the builder and shrinks back, but never overrides a larger user-set height.
+watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
+  const base = mobile ? 150 : 90;
+  const target = base + (growth ?? 0);
+  if (splitterModel.value < target || splitterModel.value <= Math.max(base, autoSplitterHeight)) {
+    splitterModel.value = target;
+  }
+  autoSplitterHeight = target;
+});
 // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
 let preTabletSplitter: number | null = null;
 watch(
