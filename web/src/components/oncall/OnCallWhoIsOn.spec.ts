@@ -54,6 +54,15 @@ function render(props: Record<string, unknown> = {}) {
 }
 
 describe("OnCallWhoIsOn", () => {
+  /// A deleted team has no rotation to add, so the setup prompt would be a dead end.
+  it("points a deleted team's page at a handoff, not at team setup", () => {
+    const text = render({ teamDeleted: true }).find('[data-test="oncall-who-is-on-nobody"]').text();
+
+    expect(text).toBe(
+      "Nobody is on call: the team was deleted. Hand this page off to another team.",
+    );
+  });
+
   /// A team with nothing resolving is the failure this card exists to surface,
   /// not an empty card.
   it("says plainly when the schedule resolves to nobody", () => {

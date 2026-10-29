@@ -78,9 +78,15 @@ import templateService from "@/services/alert_templates";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 import slack from "@/services/slack";
 import { queryClient } from "@/composables/query/queryClient";
 import { installationView } from "@/test/unit/helpers/slack";
+import { clickIn } from "@/test/unit/helpers/draftDom";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
@@ -116,6 +122,7 @@ const OTableStub = {
       <slot name="actions" />
       <slot name="selection-actions" />
       <template v-for="row in data" :key="row.name">
+        <slot name="cell-name" :row="row" />
         <div :data-test="'destination-url-' + row.name">
           <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>
         </div>
@@ -155,13 +162,14 @@ const makeTemplate = (idx: number) => ({
 
 // ── mount helper ─────────────────────────────────────────────────────────────
 
-function mountComponent() {
+function mountComponent({ realConfirm = false } = {}) {
   return mount(AlertsDestinationList, {
+    attachTo: realConfirm ? document.body : undefined,
     global: {
       plugins: [i18n, store, router],
       stubs: {
         OTable: OTableStub,
-        ConfirmDialog: ConfirmDialogStub,
+        ConfirmDialog: realConfirm ? false : ConfirmDialogStub,
         AddDestination: { template: '<div data-test="add-destination-stub" />' },
         ImportDestination: { template: '<div data-test="import-destination-stub" />' },
         NoData: { template: '<div data-test="no-data-stub" />' },
@@ -472,6 +480,99 @@ describe("AlertsDestinationList", () => {
 
       expect((wrapper.vm as any).confirmDelete.visible).toBe(false);
       expect((wrapper.vm as any).confirmDelete.data).toBeNull();
+    });
+  });
+
+  describe("drafts", () => {
+    interface BulkDeleteVm {
+      handleSelectedIdsUpdate: (ids: string[]) => void;
+      bulkDeleteDestinations: () => Promise<void>;
+    }
+    const scope = (entityId: string | null): EditorDraftScope => ({
+      kind: "alert_destination",
+      org: "default",
+      entityId,
+      userEmail: "example@gmail.com",
+    });
+
+    beforeEach(() => {
+      localStorage.clear();
+      writeEditorDraft(scope(null), { data: {} });
+      writeEditorDraft(scope("destination-2"), { data: {} });
+    });
+
+    afterEach(() => localStorage.clear());
+
+    it("marks the Add button and the drafted row only", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const add = wrapper.get('[data-test="alert-destination-list-add-alert-btn"]');
+      expect(add.find('[data-test="alert-destination-list-add-draft-dot"]').exists()).toBe(true);
+      expect(add.attributes("aria-label")).toContain("unsaved draft");
+      expect(
+        wrapper.find('[data-test="alert-destination-list-destination-2-draft-dot"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="alert-destination-list-destination-1-draft-dot"]').exists(),
+      ).toBe(false);
+    });
+
+    const deleteFromRow = async (name: string) => {
+      await wrapper!
+        .get(`[data-test="alert-destination-list-${name}-delete-destination"]`)
+        .trigger("click");
+      await flushPromises();
+      clickIn("confirm-dialog", "o-dialog-primary-btn");
+      await flushPromises();
+    };
+
+    it("drops a deleted destination's draft and keeps it when the delete fails", async () => {
+      wrapper = mountComponent({ realConfirm: true });
+      await flushPromises();
+
+      vi.mocked(destinationService.delete).mockRejectedValueOnce({ response: { status: 500 } });
+      await deleteFromRow("destination-2");
+      expect(destinationService.delete).toHaveBeenCalledTimes(1);
+      expect(readEditorDraft(scope("destination-2"))).not.toBeNull();
+
+      await deleteFromRow("destination-2");
+      expect(destinationService.delete).toHaveBeenCalledTimes(2);
+      expect(readEditorDraft(scope("destination-2"))).toBeNull();
+      expect(readEditorDraft(scope(null))).not.toBeNull();
+    });
+
+    it("drops drafts of bulk-deleted names the refetch no longer lists, on an unrecognised response", async () => {
+      writeEditorDraft(scope("destination-1"), { data: {} });
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as unknown as BulkDeleteVm;
+      vm.handleSelectedIdsUpdate(["destination-1", "destination-2"]);
+
+      vi.mocked(destinationService.bulkDelete).mockResolvedValueOnce({ data: {} } as never);
+      vi.mocked(destinationService.list).mockResolvedValue({
+        data: [makeDestination(1), makeDestination(3)],
+      } as never);
+      await vm.bulkDeleteDestinations();
+      await flushPromises();
+
+      expect(readEditorDraft(scope("destination-2"))).toBeNull();
+      expect(readEditorDraft(scope("destination-1"))).not.toBeNull();
+      expect(readEditorDraft(scope(null))).not.toBeNull();
+    });
+
+    it("keeps every bulk-delete draft when the fallback refetch fails", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as unknown as BulkDeleteVm;
+      vm.handleSelectedIdsUpdate(["destination-2"]);
+
+      vi.mocked(destinationService.bulkDelete).mockResolvedValueOnce({ data: {} } as never);
+      vi.mocked(destinationService.list).mockRejectedValue({ response: { status: 500 } });
+      await vm.bulkDeleteDestinations();
+      await flushPromises();
+
+      expect(readEditorDraft(scope("destination-2"))).not.toBeNull();
     });
   });
 

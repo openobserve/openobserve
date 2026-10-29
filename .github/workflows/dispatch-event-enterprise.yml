@@ -41,9 +41,15 @@ jobs:
           APPROVED=false
           if [ "$DECISION" = "APPROVED" ]; then APPROVED=true; fi
           # A second approval or an unrelated label must not rebuild a commit the enterprise build already passed.
-          STATE=$(gh api "repos/$GH_REPO/commits/$SHA/status" --jq '.statuses[] | select(.context == "ent-build-status-check") | .state')
+          STATUS=$(gh api "repos/$GH_REPO/commits/$SHA/status" --jq '.statuses[] | select(.context == "ent-build-status-check") | "\(.state) \(now - (.updated_at | fromdateiso8601) | floor)"')
+          read -r STATE AGE <<< "$STATUS"
           if [ "$APPROVED" = "true" ] && [ "$STATE" = "success" ]; then
             echo "ent-build-status-check already passed on $SHA."
+            APPROVED=false
+          fi
+          # o2-enterprise cancels the older run for a branch, so re-dispatching a SHA still building would restart it; past an hour it is presumed lost.
+          if [ "$APPROVED" = "true" ] && [ "$STATE" = "pending" ] && [ "${AGE:-3600}" -lt 3600 ]; then
+            echo "ent-build-status-check has been pending on $SHA for ${AGE}s; not re-dispatching."
             APPROVED=false
           fi
           echo "approved=$APPROVED" >> "$GITHUB_OUTPUT"
@@ -98,7 +104,19 @@ jobs:
         if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
         run: echo ${{ env.SHORT_COMMIT_ID }}
 
+      # Posted before the dispatch so it can never overwrite the enterprise result; the approval guard reads it.
+      - name: Report dispatched
+        id: pending
+        if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_HEAD_SHA" \
+            -f state=pending -f context=ent-build-status-check -f description="dispatched to o2-enterprise; waiting for its build"
+
       - name: Repository Dispatch
+        id: dispatch
         if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         env:
@@ -109,3 +127,11 @@ jobs:
           repository: openobserve/o2-enterprise
           event-type: initiate-enterprise-build
           client-payload: '{"o2_enterprise_repo": "${{ env.BRANCH_NAME }}", "o2_opensource_repo": "${{ env.BRANCH_NAME }}" ,"o2_commit_id": "${{ env.SHORT_COMMIT_ID }}", "o2_full_commit":"${{env.COMMIT_ID}}", "o2_target_branch": "${{ github.event.pull_request.base.ref }}"}'
+      # A pending left by a dispatch that never went out would make the approval guard skip the next one for an hour.
+      - name: Report dispatch failed
+        if: ${{ (failure() || cancelled()) && steps.pending.outcome == 'success' && steps.dispatch.outcome != 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_HEAD_SHA" \
+            -f state=error -f context=ent-build-status-check -f description="dispatch to o2-enterprise failed; push or re-approve the PR to retry"

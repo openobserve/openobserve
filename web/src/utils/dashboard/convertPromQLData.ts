@@ -33,8 +33,10 @@ import { ANNOTATION_MARK_AREA_Z } from "@/utils/dashboard/constants";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
+  chartAxisLine,
   chartColor,
   chartNumber,
+  chartTextColor,
   dataZoomBrushStyle,
   CHART_SELECTION_FILL,
 } from "@/utils/chartTheme";
@@ -388,7 +390,6 @@ export const convertPromQLData = async (
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
     panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true;
-  // Subtle dashed grid lines so they recede behind the data
   const gridLineStyle = getGridLineStyle(store.state.theme);
 
   await importMoment();
@@ -852,13 +853,16 @@ export const convertPromQLData = async (
       axisLine: {
         show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
           ? true
-          : (panelSchema.config?.axis_border_show ?? false),
+          : (panelSchema.config?.axis_border_show ?? true),
+        lineStyle: { color: chartAxisLine() },
       },
       splitLine: {
-        show: showGridlines,
+        show: false,
         lineStyle: gridLineStyle,
       },
       axisLabel: {
+        color: chartTextColor(),
+        fontSize: 12,
         // hide axis label if overlaps
         hideOverlap: true,
         // For time-based x-axis (type: "time"), rotation and truncation are not applicable
@@ -873,6 +877,8 @@ export const convertPromQLData = async (
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       axisLabel: {
+        color: chartTextColor(),
+        fontSize: 12,
         // hide colliding tick labels instead of drawing them on top of each
         // other (short panels fit fewer labels than ECharts offers)
         hideOverlap: true,
@@ -962,8 +968,8 @@ export const convertPromQLData = async (
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
       (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
-        // if (!axis.splitLine) axis.splitLine = {};
-        axis.splitLine.show = showGridlines;
+        // Gridlines are horizontal only: the time axis draws none.
+        axis.splitLine.show = false;
         axis.splitLine.lineStyle = gridLineStyle;
       },
     );

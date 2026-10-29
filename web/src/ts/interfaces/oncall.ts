@@ -529,7 +529,8 @@ export interface OnCallResponse {
   id: string;
   org_id: string;
   subject: SubjectRef;
-  team_id: string;
+  /** `null` for a page nothing routed to a team (04-responses R6.1). */
+  team_id: string | null;
   priority: number;
   state: ResponseState;
   opened_at: number;
@@ -543,6 +544,8 @@ export interface OnCallResponse {
   /** Quiet until this instant (micros). Not an acknowledgement. */
   snoozed_until?: number | null;
   ladder_anchor?: number | null;
+  /** When the ladder ran out with nobody answering; the state stays triggered. */
+  exhausted_at?: number | null;
   /** Which run of the ladder this record is on. Absent means the first run. */
   ladder_run?: number | null;
   /** Always on the wire — the server defaults it to `owner`. */
@@ -957,6 +960,10 @@ export interface FiredRung {
   /** Absolute instant it fired. */
   at: number;
   targets: string[];
+  /** The people it actually reached, from the delivery ledger. */
+  reached?: string[];
+  /** The step fired and the ledger has nobody for it: an unstaffed rotation, say. */
+  reached_nobody?: boolean;
 }
 
 /// Where the ladder has got to. The question mid-incident is "when does this
@@ -968,6 +975,8 @@ export interface EscalationProgress {
   exhausted: boolean;
   /** Set when the ladder is not climbing: acknowledged, snoozed, resolved. */
   stopped_because?: string | null;
+  /** While the first page is held for AI triage, when the hold ends (micros). */
+  held_until_micros?: number | null;
 }
 
 export interface OnCallResponseEvent {
