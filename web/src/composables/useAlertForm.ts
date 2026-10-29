@@ -96,6 +96,7 @@ import {
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { isNotFoundError } from "@/utils/alerts/alertEditorDraft";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
@@ -745,6 +746,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isLoadingPrefill = ref(false);
   /** Lossy transforms the source adapter performed, surfaced in the form. */
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
+  /** Outcome of the anomaly edit fetch: "missing" when the server has no such config. */
+  const anomalyLoadStatus = ref<"idle" | "loaded" | "missing" | "failed">("idle");
+  // Late async seeding (timezone from the stored offset) that must land before the form counts as loaded.
+  let pendingSeeding: Promise<unknown> = Promise.resolve();
+  let resolveFormReady: () => void = () => {};
+  /** Resolves once the mounted form holds the item it opened with (edit, prefill or anomaly load). */
+  const formReady = new Promise<void>((resolve) => {
+    resolveFormReady = resolve;
+  });
 
   const folderQuery = router.currentRoute.value.query.folder;
   // Prefer the folder the caller (AlertList) hands us over the URL query: the
@@ -2723,7 +2733,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     // Resolve the timezone from the stored offset (edit prefill) after the reset.
     if (pendingTimezoneOffset != null) {
-      getTimezonesByOffset(pendingTimezoneOffset).then((res: any) => {
+      pendingSeeding = getTimezonesByOffset(pendingTimezoneOffset).then((res: any) => {
         if (res.length > 1) showTimezoneWarning.value = true;
         setF("trigger_condition.timezone", res[0]);
       });
@@ -3043,16 +3053,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     await getAllFunctions();
   });
 
-  onMounted(async () => {
-    // Initialize form data (replaces created() hook)
-    await initializeFormData();
-
-    // Pre-set anomaly mode
-    if (router.currentRoute.value.name === "addAnomalyDetection") {
-      setF("is_real_time", "anomaly");
-    }
-
-    // Load anomaly detection config when editing
+  // Load anomaly detection config when editing
+  const loadAnomalyForEdit = async () => {
     const routeAnomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
     if (routeAnomalyId) {
       try {
@@ -3122,13 +3124,34 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         // returned early — leaving the stream select with no options and the
         // stream's columns unloaded. The form value was set, yet nothing was
         // selectable and every field picker downstream was empty.
+        anomalyLoadStatus.value = "loaded";
         if (data.stream_type) await updateStreams(false);
-      } catch {
+      } catch (error: unknown) {
+        if (anomalyLoadStatus.value === "idle") {
+          anomalyLoadStatus.value = isNotFoundError(error) ? "missing" : "failed";
+        }
         toast({
           variant: "error",
           message: t("alerts.messages.anomalyConfigLoadFailed"),
         });
       }
+    }
+  };
+
+  onMounted(async () => {
+    try {
+      // Initialize form data (replaces created() hook)
+      await initializeFormData();
+
+      // Pre-set anomaly mode
+      if (router.currentRoute.value.name === "addAnomalyDetection") {
+        setF("is_real_time", "anomaly");
+      }
+
+      await loadAnomalyForEdit();
+      await pendingSeeding.catch(() => undefined);
+    } finally {
+      resolveFormReady();
     }
 
     // Set up alerts context provider
@@ -3250,6 +3273,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     validationErrors,
     isLoadingPrefill,
     prefillWarnings,
+    anomalyLoadStatus,
+    formReady,
     activeFolderId,
     alertType,
 

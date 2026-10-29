@@ -643,6 +643,19 @@ impl Response {
         self.exhausted_at.is_some() && !self.state.is_terminal()
     }
 
+    /// The timeline line a joining alert leaves, in the run it belongs to. [pure] [no-fail]
+    pub fn new_alert_note(&self, repaged: bool, actor: &str, now: i64) -> ResponseEvent {
+        let (body, run) = if repaged {
+            (
+                "A new alert joined after nobody answered; paging again.",
+                next_ladder_run(self.ladder_run),
+            )
+        } else {
+            ("A new alert joined this page.", self.current_run())
+        };
+        ResponseEvent::new(ResponseEventKind::Sys, now, actor, body).in_run(run)
+    }
+
     /// What a new alert joining this page's incident does to it at `now`. [pure] [no-fail]
     pub fn on_new_alert(&self, now: i64) -> NewAlertEffect {
         if !self.is_exhausted() {
@@ -1034,7 +1047,22 @@ mod tests {
         ResponseEventKind::Flapped,
     ];
 
-    /// B2: a new alert re-pages an exhausted page only if unowned and its run is 30 minutes old.
+    /// The note sits in the run it belongs to: the new run when it re-paged, else the current.
+    #[test]
+    fn test_a_new_alert_note_is_tagged_with_its_run() {
+        let page = Response {
+            ladder_run: Some(3),
+            ..sample(None, None)
+        };
+        let repaged = page.new_alert_note(true, "o2-engine", 5);
+        let noted = page.new_alert_note(false, "o2-engine", 5);
+        assert_eq!(repaged.ladder_run, Some(4));
+        assert!(repaged.body.contains("paging again"));
+        assert_eq!(noted.ladder_run, Some(3));
+        assert_eq!(noted.body, "A new alert joined this page.");
+    }
+
+    /// A new alert re-pages an exhausted page only if unowned and its run is 30 minutes old.
     #[test]
     fn test_a_new_alert_pages_again_only_after_the_cooldown() {
         let opened = 1_700_000_000_000_000;

@@ -110,7 +110,7 @@ function weekly(members: string[], level: EscalationLevel = "primary"): Rotation
   };
 }
 
-// #3149: shifts count in the TEAM's zone, so these equal the Rust side whatever zone the browser is in.
+// Shifts count in the TEAM's zone, so these equal the Rust side whatever zone the browser is in.
 describe("shift maths matches the server (shift_parity.json)", () => {
   it.each(shiftParity.map((c) => [c.case, c] as const))("%s", (_name, c) => {
     const rule = {
@@ -1165,7 +1165,7 @@ describe("parseRoutingReason", () => {
     expect(parsed?.dimensions).toEqual({ "k8s-cluster": "introspection", service: "search" });
   });
 
-  // F4: the server now names the team, and a name may hold spaces.
+  // The server now names the team, and a name may hold spaces.
   it.each([
     ["routed to Platform SRE by ownership rule service=search", "ownership"],
     ["routed to Platform SRE by the alert's own setting", "explicit"],
@@ -1730,7 +1730,7 @@ describe("rotation drawer, part B", () => {
     expect(rotateMembersTo(members, person, index)).toEqual(expected);
   });
 
-  // B1: the draft keeps the holder and the handovers, the same rule as `ShiftRule::with_roster`.
+  // The draft keeps the holder and the handovers, the same rule as `ShiftRule::with_roster`.
   it.each([
     [
       "add before the first handover",
@@ -1789,7 +1789,7 @@ describe("rotation drawer, part B", () => {
     },
   );
 
-  // F8: shifts are counted in the team's wall time, so a DST change between anchor and now moves no turn.
+  // Shifts are counted in the team's wall time, so a DST change between anchor and now moves no turn.
   it("withRoster counts shifts in the team's zone across a DST change", () => {
     // Monday 2026-03-02 09:00 New York (EST); the clocks spring forward on 2026-03-08.
     const anchor = Date.UTC(2026, 2, 2, 14, 0) * 1000;

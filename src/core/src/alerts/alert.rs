@@ -337,10 +337,6 @@ pub enum AlertError {
         platform: String,
     },
     #[error(
-        "notification grouping batches several alerts into one message, which cannot carry this alert's correlation key — turn off one of grouping or notify_on_recovery"
-    )]
-    RecoveryWithNotificationGrouping,
-    #[error(
         "destination '{destination}' is {platform}, which is resolved by updating the alert the firing opened. That needs the firing payload to be a JSON object, and template '{template}' does not render one"
     )]
     RecoveryNeedsJsonPayload {
@@ -457,22 +453,7 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
         &alert.trigger_condition,
         alert.creates_incident,
     )
-    .map_err(AlertError::InvalidMultiAlert)?;
-
-    // Checked here, not in `validate_multi_alert`, because the grouping
-    // config is a sibling of the query condition rather than part of it.
-    // Same shape as MN-11's incidents rule.
-    let notification_grouping = alert
-        .deduplication
-        .as_ref()
-        .and_then(|d| d.grouping.as_ref())
-        .is_some_and(|g| g.enabled);
-    if alert.query_condition.multi_alert_enabled() && notification_grouping {
-        return Err(AlertError::InvalidMultiAlert(
-            config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported,
-        ));
-    }
-    Ok(())
+    .map_err(AlertError::InvalidMultiAlert)
 }
 
 /// Refuses, at save time, a custom-aggregation `group_by` entry that is not a column of the stream.
@@ -532,16 +513,6 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
                 platform: format!("{platform:?}"),
             });
         }
-    }
-
-    // A batch carries no single alert's correlation key, so its recovery could close nothing.
-    if alert
-        .deduplication
-        .as_ref()
-        .and_then(|d| d.grouping.as_ref())
-        .is_some_and(|g| g.enabled)
-    {
-        return Err(AlertError::RecoveryWithNotificationGrouping);
     }
 
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
@@ -4952,37 +4923,14 @@ mod threshold_validation_tests {
         assert!(validate_rules(&alert).is_ok());
     }
 
-    /// §5.5: alert-level notification grouping would collapse per-group pages
-    /// back into one batch — rejected at save time, never silently rerouted.
     #[test]
-    fn test_multi_alert_rejects_notification_grouping() {
-        let mut alert = multi_alert_fixture();
-        alert.deduplication = Some(config::meta::alerts::deduplication::DeduplicationConfig {
-            enabled: true,
-            grouping: Some(config::meta::alerts::deduplication::GroupingConfig {
-                enabled: true,
-                ..serde_json::from_str("{}").expect("GroupingConfig defaults")
-            }),
-            ..Default::default()
+    fn test_multi_alert_with_a_stored_grouping_object_loads_and_validates() {
+        let mut stored = serde_json::to_value(multi_alert_fixture()).unwrap();
+        stored["deduplication"] = json!({
+            "enabled": true,
+            "grouping": {"enabled": true, "max_group_size": 10, "group_wait_seconds": 30}
         });
-
-        let err = validate_rules(&alert).unwrap_err();
-        assert!(matches!(
-            err,
-            AlertError::InvalidMultiAlert(
-                config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported
-            )
-        ));
-
-        // Grouping configured but DISABLED must stay valid.
-        alert
-            .deduplication
-            .as_mut()
-            .unwrap()
-            .grouping
-            .as_mut()
-            .unwrap()
-            .enabled = false;
+        let alert: Alert = serde_json::from_value(stored).expect("legacy grouping must still load");
         assert!(validate_rules(&alert).is_ok());
     }
 
@@ -5475,24 +5423,12 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn a_multi_alert_with_recovery_saves_but_not_with_notification_grouping() {
+    async fn a_multi_alert_with_recovery_saves() {
         let mut alert = Alert::default();
         alert.notify_on_recovery = true;
         alert.query_condition.query_type = QueryType::PromQL;
         alert.query_condition.promql_multi_alert = true;
         assert!(validate_recovery_templates("default", &alert).await.is_ok());
-
-        alert.deduplication = Some(config::meta::alerts::deduplication::DeduplicationConfig {
-            grouping: Some(config::meta::alerts::deduplication::GroupingConfig {
-                enabled: true,
-                ..Default::default()
-            }),
-            ..Default::default()
-        });
-        assert!(matches!(
-            validate_recovery_templates("default", &alert).await,
-            Err(AlertError::RecoveryWithNotificationGrouping)
-        ));
     }
 
     #[test]

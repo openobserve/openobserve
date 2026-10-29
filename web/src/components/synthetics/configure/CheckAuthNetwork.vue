@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -24,7 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
-const props = defineProps<{ check: BrowserCheck }>();
+const props = defineProps<{ check: BrowserCheck; validationErrors?: Record<string, string> }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
 const { t } = useI18nTyped();
@@ -155,6 +155,8 @@ function removeCookie(index: number) {
               v-model="authPassword"
               type="password"
               :placeholder="t('synthetics.authNetwork.passwordPlaceholder')"
+              :error="!!validationErrors?.['auth.password']"
+              :error-message="raw(validationErrors?.['auth.password'])"
               data-test="synthetics-check-auth-network-password-input"
             />
           </div>

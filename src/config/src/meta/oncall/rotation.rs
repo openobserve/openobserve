@@ -3616,7 +3616,7 @@ mod tests {
 
     // ── The offset composed with an absence ─────────────────────────────────
 
-    /// B1: editing a roster never moves who holds it now, and every handover stays where it was.
+    /// Editing a roster never moves who holds it now, and every handover stays where it was.
     #[test]
     fn test_with_roster_keeps_the_holder_and_the_handover_grid() {
         let before_first = ANCHOR - MICROS_PER_DAY;

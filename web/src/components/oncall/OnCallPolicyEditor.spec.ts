@@ -44,7 +44,11 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
 }));
 
 const push = vi.fn();
-vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
+}));
 
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
@@ -123,6 +127,8 @@ function render() {
 
 describe("OnCallPolicyEditor", () => {
   beforeEach(() => {
+    // A draft one test leaves behind would open the restore dialog on the next open.
+    localStorage.clear();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: ["slack-eng"], source: "policy" },
     } as any);
