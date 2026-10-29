@@ -4,11 +4,8 @@
  * Plan: docs/test_generator/features/oncall-test-plan.md (§11.1, plus the list
  * CRUD the rest of the suite depends on being able to reach).
  *
- * ENTERPRISE-GATED. On-call answers 404 (feature off) or 403 "Not Supported"
- * (OSS build) on every route, and the product treats both as the same calm
- * fact. `isOnCallAvailable()` turns that into one boolean, so an OSS runner
- * SKIPS with a reason instead of failing thirty seconds into a table timeout.
- * Tagged @enterprise, never @all.
+ * ENTERPRISE-GATED (@enterprise, never @all). `isOnCallAvailable()` skips on an
+ * OSS build and fails an enterprise build that has on-call switched off.
  *
  * Self-cleaning: every team is named `e2e_oncall_teams_w<worker>_*` and swept
  * by that prefix in afterAll. `afterAll` runs once PER WORKER in parallel mode,
@@ -43,8 +40,10 @@ const {
   waitForStreamSearchable,
   seedNotificationDestination,
   createPagingAlert,
-  triggerAlertOrLetSchedulerFire,
   waitForPages,
+  listResponses,
+  getDeliveries,
+  getEscalationProgress,
   orgId,
   uniqueName,
   deleteOnCallFixturesByPrefix,
@@ -53,6 +52,9 @@ const {
   createOrgUsers,
   getResponseRecord,
   getResponseHistory,
+  eventsOfKind,
+  resolveResponse,
+  shortenPolicyForSpeed,
   deleteTeamExpectingStatus,
 } = require('../utils/oncall-seed-ext.js');
 
@@ -248,12 +250,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
 
   // -------------------------------------------------------------- P2 edge cases
 
-  /**
-   * `oncall-teams-policies-btn` NAVIGATES to /oncall/policies. It reads like a
-   * filter on this screen and is not one — a spec that treated it as one would
-   * pass on an empty list forever.
-   */
-  test.fixme('the policies button leaves the teams list for the policies screen — not wired: the button was deleted in f6ad43986f (#14502) and nothing replaced it; the oncall/policies route still registers and renders but no component links to it, so the screen is reachable only by typing the URL. o2-enterprise#2481', {
+  test.fixme('the policies button leaves the teams list for the policies screen — nothing links to /oncall/policies since #14502. o2-enterprise#2628', {
     tag: ['@P2'],
   }, async ({ page }) => {
     await pm.oncallTeamsPage.goto(ORG);
@@ -396,90 +393,50 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     ).toContainText(after, { timeout: 30000 });
   });
 
-  /**
-   * The other half of TS-03.04: restriction windows re-evaluated in the new zone.
-   *
-   * PARKED — and it is a real split-brain, not a missing feature.
-   *
-   * The engine evaluates a rotation's restriction windows in the SCHEDULE's
-   * stored `timezone`. `PUT /oncall/teams/{id}` changes the TEAM's timezone and
-   * leaves the schedule's alone — verified against :5090: after moving a team
-   * from UTC to Asia/Kolkata, `GET .../schedule` still answered
-   * `"timezone": "UTC"` and a 09:00-17:00 weekday restriction still fired on
-   * UTC hours (Wed 06:00 UTC = 11:30 IST resolved to NOBODY on call).
-   *
-   * Meanwhile the UI renders the whole schedule in the team's NEW zone:
-   * OnCallTeamDetail.vue passes `:timezone="team?.timezone"` into every
-   * schedule component, and OnCallScheduleEditor.vue only writes that zone onto
-   * the schedule when somebody SAVES the schedule. So between a timezone change
-   * and the next schedule save, the screen shows the roster in one zone and the
-   * pager fires in another — on the one question the screen exists to answer.
-   *
-   * Left as a failing expectation on purpose: it goes green the day the team
-   * write propagates the zone (or the UI stops claiming it has).
-   */
-  test.fixme('TS-03.04b changing a team\'s timezone re-evaluates its restriction windows in the new zone — not wired: PUT /oncall/teams/{id} changes the team zone but leaves the schedule at its own stored zone, so the engine keeps evaluating restrictions in the old one while the UI renders the new one, verified 16 Sep on :5090. o2-enterprise#2481.', {
+  test('TS-03.04b changing a team\'s timezone re-evaluates its restriction windows in the new zone', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     const name = uniqueName(`${workerPrefix(testInfo)}_tz`);
+    const [member] = await createOrgUsers(page, name, 1);
     const team = await createTeam(page, { name, timezone: 'UTC' });
+    // Weekdays and weekends alike, so the instants below need no day-of-week arithmetic.
+    const officeHours = { days: [0, 1, 2, 3, 4, 5, 6], start_minute: 9 * 60, end_minute: 17 * 60 };
+    await setTeamSchedule(page, team.id, {
+      timezone: 'UTC',
+      rotations: [rotation({ id: 'Primary', members: [member], restrictions: [officeHours] })],
+    });
+    await addTeamMembers(page, team.id, [member]);
+
+    // Tomorrow 01:00 UTC is 10:00 in Tokyo; tomorrow 10:00 UTC is 19:00 in Tokyo.
+    const tomorrow = new Date();
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const at = (hourUtc) => Date.UTC(
+      tomorrow.getUTCFullYear(), tomorrow.getUTCMonth(), tomorrow.getUTCDate(), hourUtc,
+    ) * 1000;
+    const onCallAt = async (micros) => (await whoIsOnCall(page, team.id, micros)).map((slot) => slot.user_email);
+
+    expect(await onCallAt(at(1)), 'before the move, 01:00 UTC is outside UTC office hours').not.toContain(member);
+    expect(await onCallAt(at(10)), 'before the move, 10:00 UTC is inside UTC office hours').toContain(member);
 
     await pm.oncallTeamsPage.goto(ORG);
     await pm.oncallTeamsPage.openEditDrawer(team.id, { name });
-    // The zone the picker can actually offer — see the note in TS-03.04. The
-    // split-brain below is about the schedule not following the team, not about
-    // which zone was chosen, and Kolkata is not in this runtime's ICU list.
     await pm.oncallTeamsPage.selectTimezone('Asia/Tokyo');
     await pm.oncallTeamsPage.saveDrawer();
+    await expect(pm.oncallTeamsPage.getFormDrawer()).toBeHidden({ timeout: 30000 });
 
     await expect
-      .poll(async () => (await getTeamSchedule(page, team.id))?.timezone, { timeout: 20000 })
+      .poll(async () => (await getTeamSchedule(page, team.id))?.timezone, {
+        timeout: 20000, message: 'the schedule must move with the team it belongs to',
+      })
       .toBe('Asia/Tokyo');
+    expect(await onCallAt(at(1)), '01:00 UTC is 10:00 in Tokyo, inside the moved office hours').toContain(member);
+    expect(await onCallAt(at(10)), '10:00 UTC is 19:00 in Tokyo, outside the moved office hours')
+      .not.toContain(member);
   });
 
-  /**
-   * TS-03.05 — deleting a team must never leave a live page pointing at nothing.
-   *
-   * Either answer is acceptable and the case accepts both: refuse the delete
-   * and list what is still open, or close the records with an explicit timeline
-   * entry saying the team was deleted. What is not acceptable is the third
-   * outcome — the team vanishes and the open record keeps a `team_id` that
-   * resolves to nothing, so the record can never be routed, escalated or
-   * handed off again and nothing on screen says why.
-   */
-  /**
-   * TS-03.05 — PARKED. A real product gap, not a test that asks too much.
-   *
-   * `delete_team` (o2-enterprise .../oncall/service.rs:183) refuses ONLY when the
-   * team is the org's nominated default. Past that it deletes ownership rules,
-   * overrides, schedules and policies — and never queries `oncall_responses` at
-   * all. Its own doc comment states the intent: "Response records are kept: they
-   * are history, and history has to survive a reorg."
-   *
-   * That reasoning holds for a RESOLVED record. It does not hold for an OPEN one:
-   * the delete succeeds (200), the page stays `triggered` against a `team_id`
-   * that no longer resolves, and nothing escalates it any further — the ladder,
-   * the schedule and the policy it would have climbed were all just deleted. The
-   * record is not history; it is a live page nobody will ever be woken for, and
-   * no timeline entry says why.
-   *
-   * The asymmetry is the argument that this is an oversight rather than a
-   * decision: taking ONE MEMBER off a team already does the check. The same file
-   * carries `open_records_acknowledged_by` (service.rs:1038), which calls
-   * `oncall_responses::list_open` for the team and reports the open records that
-   * person can no longer close. Deleting the entire team — which strands every
-   * open record, not one person's — skips it.
-   *
-   * The test accepts EITHER honest answer — refuse and name what is still open,
-   * or allow and close the record with a timeline entry. The product does
-   * neither, verified 16 Sep on :5090. The body is left intact so it goes green
-   * the day one of the two is implemented.
-   */
-  test.fixme('TS-03.05 a team with a live page cannot be deleted into a dangling reference — not wired: delete_team (o2-enterprise oncall/service.rs:183) refuses only for the org default team and never queries oncall_responses, so DELETE /oncall/teams/{id} returns 200 while an open page stays triggered against a team, schedule and policy that no longer exist, with no timeline entry, verified 16 Sep on :5090. o2-enterprise#2481.', {
+  test('TS-03.05 deleting a team with a live page stops its ladder and leaves the page open for a new owner', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    // A real firing has to clear ingestion, the scheduler and the ladder; the
-    // 3-minute default is for screens, not for this.
     test.setTimeout(600_000);
     const name = uniqueName(`${workerPrefix(testInfo)}_live`);
     const users = await createOrgUsers(page, name, 2);
@@ -489,6 +446,8 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
       rotations: [rotation({ id: 'Primary', members: users })],
     });
     await addTeamMembers(page, team.id, users);
+    // A second rung 45s out, so "nothing was delivered after the delete" covers a rung that was really due.
+    await shortenPolicyForSpeed(page, team.id, 2, [0, 45]);
 
     const stream = `${name}_stream`;
     await seedOnCallStream(page, stream);
@@ -498,36 +457,48 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
       name: `${name}_alert`, stream, teamId: team.id, priority: 2,
       destinations: [destination],
     });
-    await triggerAlertOrLetSchedulerFire(page, alert.id);
-    const pages = await waitForPages(page, { alertId: alert.id, expected: 1 });
-    expect(pages.length, 'the fixture needs a genuinely open page on this team')
-      .toBeGreaterThan(0);
-    const openRecord = pages[0];
+    const [openRecord] = await waitForPages(page, { alertId: alert.id, expected: 1, expectTeamId: team.id });
 
+    await expect.poll(async () => (await getDeliveries(page, openRecord.id))?.total ?? 0, {
+      timeout: 60000, intervals: [1000], message: 'the first rung must have paged before the team goes',
+    }).toBeGreaterThan(0);
+    const ledgerAtDelete = await getDeliveries(page, openRecord.id);
+    expect(ledgerAtDelete.deliveries.map((row) => row.rung_micros),
+      'the second rung must still be pending when the team is deleted').toEqual(
+      ledgerAtDelete.deliveries.map(() => 0),
+    );
+
+    const deletedAtMicros = Date.now() * 1000;
     const deleted = await deleteTeamExpectingStatus(page, team.id);
+    expect(deleted.status, `deleting a non-default team is allowed: ${deleted.text}`).toBe(200);
 
-    if (deleted.status >= 400) {
-      // Answer one: refused. The refusal has to name what is still open,
-      // or it is a wall rather than an explanation.
-      expect(String(deleted.body?.message ?? deleted.text ?? ''),
-        'a refusal must say what is still open, not just "cannot delete"')
-        .toMatch(/page|open|response|firing/i);
-      return;
-    }
-
-    // Answer two: allowed — then the record must have been closed, and the
-    // timeline must say why, rather than left triggered against a gone team.
     const record = await getResponseRecord(page, openRecord.id);
-    expect(record, 'the record must still be readable after its team is deleted').toBeTruthy();
-    expect(record.state,
-      'deleting the team must close the page it left open rather than strand it')
-      .toBe('resolved');
+    testLogger.info('TS-03.05 record after the team delete', record);
+    expect(record.state, 'the page stays open: somebody still has to own it').toBe('triggered');
+    expect(record.exhausted_at, 'the ladder is stopped, and the record says when').toBeTruthy();
+    expect(record.team_id, 'the record keeps naming the team it was lost from').toBe(team.id);
 
-    const events = await getResponseHistory(page, openRecord.id);
-    const text = JSON.stringify(events);
-    expect(text,
-      'and the timeline must carry an explicit entry saying the team was deleted')
-      .toMatch(/team.*(delete|removed|gone)/i);
+    const exhausted = eventsOfKind(await getResponseHistory(page, openRecord.id), 'exhausted');
+    expect(exhausted.length, 'the timeline must say once why the ladder stopped').toBe(1);
+    expect(exhausted[0].actor, 'the engine stopped it, not a person').toBe('o2-engine');
+    expect(exhausted[0].body, 'and say it was the team delete').toMatch(/owning team was deleted/);
+
+    const progress = await getEscalationProgress(page, openRecord.id);
+    expect(progress.stopped_because, 'the escalation view names the same reason')
+      .toMatch(/owning team was deleted/);
+    expect(progress.next_at ?? null, 'and schedules nothing further').toBeNull();
+
+    await page.waitForTimeout(60_000);
+    const ledgerAfter = await getDeliveries(page, openRecord.id);
+    expect(ledgerAfter.deliveries.filter((row) => row.at > deletedAtMicros),
+      'the pending rung must not fire once its team is gone').toEqual([]);
+
+    const open = await listResponses(page, { subjectType: 'alert', sourceId: alert.id });
+    expect(open.map((r) => r.id), 'the page stays on the open list until somebody closes it')
+      .toContain(openRecord.id);
+    const resolved = await resolveResponse(page, openRecord.id, { cause: 'noisy_threshold' });
+    expect(resolved.status, `a page whose team is gone can still be closed: ${resolved.text}`).toBe(200);
+    expect((await getResponseRecord(page, openRecord.id)).state).toBe('resolved');
   });
 
 });
