@@ -75,8 +75,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.expectStep1Visible();
     await pm.alertDestinationsPage.expectDestinationSelectorVisible();
-    await pm.alertDestinationsPage.expectDestinationCardsVisible(8); // 7 prebuilt + 1 custom
-    testLogger.info('✓ Step 1 displays correctly with 8 destination type cards');
+    await pm.alertDestinationsPage.expectDestinationCardsVisible(9); // 8 prebuilt + 1 custom
+    testLogger.info('✓ Step 1 displays correctly with 9 destination type cards');
 
     // ----- PART 3: Verify type selection shows indicator -----
     testLogger.info('Part 3: Testing selected destination indicator');

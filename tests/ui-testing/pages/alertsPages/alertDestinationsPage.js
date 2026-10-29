@@ -94,6 +94,20 @@ export class AlertDestinationsPage {
         this.servicenowInstanceUrlInputField = '[data-test="servicenow-instance-url-input-field"]';
         this.servicenowUsernameInputField = '[data-test="servicenow-username-input-field"]';
         this.servicenowPasswordInputField = '[data-test="servicenow-password-input-field"]';
+        // Jira: connect first, then the project and issue type lists load from Jira
+        this.jiraDeploymentCloud = '[data-test="jira-deployment-cloud"]';
+        this.jiraDeploymentDataCenter = '[data-test="jira-deployment-data-center"]';
+        this.jiraUrlInputField = '[data-test="jira-url-input-field"]';
+        this.jiraEmailInputField = '[data-test="jira-email-input-field"]';
+        this.jiraTokenInputField = '[data-test="jira-token-input-field"]';
+        this.jiraConnectButton = '[data-test="jira-connect-button"]';
+        this.jiraConnectedAs = '[data-test="jira-connected-as"]';
+        this.jiraSetupError = '[data-test="jira-setup-error"]';
+        this.jiraProjectSelect = '[data-test="jira-project-select"]';
+        this.jiraIssueTypeSelect = '[data-test="jira-issue-type-select"]';
+        this.jiraPrioritySelect = '[data-test="jira-priority-select"]';
+        this.jiraLabelsMissing = '[data-test="jira-labels-missing"]';
+        this.testSuccessIssueLink = '[data-test="test-success-issue-link"]';
         this.severitySelect = '[data-test="pagerduty-severity-select"]';
         this.severitySelectPopover = '[data-test="pagerduty-severity-select-popover"]';
         this.prioritySelect = '[data-test="opsgenie-priority-select"]';
@@ -393,7 +407,7 @@ export class AlertDestinationsPage {
     // FACTORY HELPERS
     // ============================================================================
 
-    /** @param {string} type Type id (slack/discord/msteams/email/pagerduty/opsgenie/servicenow/custom) */
+    /** @param {string} type Type id (slack/discord/msteams/email/pagerduty/opsgenie/servicenow/jira/custom) */
     getDestinationTypeCard(type) {
         return this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
     }
@@ -1372,7 +1386,7 @@ export class AlertDestinationsPage {
 
     /**
      * Select a prebuilt destination type
-     * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, custom)
+     * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, jira, custom)
      */
     async selectDestinationType(type) {
         // Wait for the TYPE-SPECIFIC credential field (proof the type's form rendered) plus the
@@ -1385,6 +1399,7 @@ export class AlertDestinationsPage {
             pagerduty: '[data-test="pagerduty-integration-key-input-field"]',
             opsgenie: '[data-test="opsgenie-api-key-input-field"]',
             servicenow: '[data-test="servicenow-instance-url-input-field"]',
+            jira: '[data-test="jira-url-input-field"]',
             email: this.recipientsSelectTrigger,
             custom: this.urlInput,
         }[type] || this.destinationNameInput;
