@@ -22,4 +22,4 @@ function inventory(file) {
 const baseline = inventory(baselinePath), candidate = inventory(candidatePath);
 const result = { declarations: baseline.tests.length, expectCalls: baseline.assertions.length, identicalBodies: JSON.stringify(baseline.tests) === JSON.stringify(candidate.tests), identicalAssertions: JSON.stringify(baseline.assertions) === JSON.stringify(candidate.assertions) };
 console.log(JSON.stringify(result, null, 2));
-if (!result.identicalBodies || !result.identicalAssertions || result.declarations !== 104) process.exitCode = 1;
+if (!result.identicalBodies || !result.identicalAssertions || result.declarations !== 115 || result.expectCalls !== 237) process.exitCode = 1;

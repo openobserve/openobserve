@@ -13,9 +13,9 @@ import tempfile
 import time
 
 DEADLINE = None
-BASE = '81fb3444137218f373c2ca1a6c9ff63c9b050c64'
+BASE = '3960df0f12760f4e8628a5a9104fef65048ff369'
 TARGET = 'src/components/alerts/AlertList.spec.ts'
-EXPECTED = {'baseline': '937ea8ea19eb4a8916c8ebf7676d53368ba823a6816100d80aeb7191431bde87', 'candidate': '742f8342b9df4127083edeb7fe0a899716f5f77bc5d51d907a1896e4ac4a3afe'}
+EXPECTED = {'baseline': '82bfaec613aae3405ad9ea3575c7672be224c2aef47e6fb33ad5342ca774ae63', 'candidate': 'dcf2857d8fa0b23f7d3c7d6351cc5bc5b828f779328e1dcd6f95c62a53b36284'}
 
 
 def digest(data):
@@ -120,7 +120,7 @@ def compare(output, left, right):
                 covered_differences[path] = differences
         save(output / (right + '-covered-location-differences.json'), covered_differences)
         result['coveredLocationsEqual'] = not covered_differences
-        result['equivalent'] = scope_valid and ca == cb and len(ca) == 106 and not a['errors'] and not b['errors'] and not summary_differences and not covered_differences
+        result['equivalent'] = scope_valid and ca == cb and len(ca) == 117 and not a['errors'] and not b['errors'] and not summary_differences and not covered_differences
         result['allTestsPassed'] = all(x[-1] == 'passed' for x in ca + cb)
         result['comparisonVerified'] = result['equivalent'] and result['allTestsPassed']
     except (OSError, KeyError, ValueError) as error:
@@ -161,7 +161,7 @@ def main():
     assert original == inputs['baseline'], 'Probe checkout must start with exact baseline spec'
     assert subprocess.check_output(['git', 'show', BASE + ':web/' + TARGET], cwd=web) == original
     assert not capture(['git', 'diff', BASE, '--', ':(top)web'], web, env), 'Probe web tree differs from pinned baseline'
-    assert capture(['git', 'rev-parse', 'HEAD:web'], web, env) == '944b1dd026a96157debb48a1beab071f08a72b2a', 'Unexpected tracked web tree'
+    assert capture(['git', 'rev-parse', 'HEAD:web'], web, env) == 'd51379f81d6f4521be4ae1bfe69fc6c5dba4a17d', 'Unexpected tracked web tree'
     before = inventory(web)
     save(output / 'source-inventory.json', before)
     save(output / 'environment.json', {'baseline': BASE, 'probeHead': capture(['git', 'rev-parse', 'HEAD'], web, env), 'node': capture([str(node), '-p', 'process.version'], web, env), 'nodeExecutable': str(node), 'nodeExecutableSha256': digest(node.read_bytes()), 'npm': capture(['npm', '--version'], web, env), 'platform': sys.platform, 'cpuCount': os.cpu_count(), 'uname': list(os.uname()), 'inputs': EXPECTED, 'seed': args.seed, 'overallTimeoutSeconds': args.overall_timeout, 'cleanupReserveSeconds': 15})

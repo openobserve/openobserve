@@ -38,7 +38,7 @@ jobs:
           printf 'PROOF_EVIDENCE=%s\nPROOF_ARTIFACT=%s\n' "$PROOF_EVIDENCE" "$RUNNER_TEMP/alertlist-artifact" >> "$GITHUB_ENV"
           printf 'PROOF_JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
           mkdir -p "$PROOF_EVIDENCE"
-          test "$(git rev-parse HEAD:web)" = 944b1dd026a96157debb48a1beab071f08a72b2a
+          test "$(git rev-parse HEAD:web)" = d51379f81d6f4521be4ae1bfe69fc6c5dba4a17d
           test -z "$(git status --porcelain -- web)"
           {
             git rev-parse HEAD

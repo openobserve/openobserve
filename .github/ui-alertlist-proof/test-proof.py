@@ -19,7 +19,7 @@ class ComparisonTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.output = Path(self.temp.name)
         self.report = {"errors": [], "records": [{"file": proof.TARGET, "tests": [
-            {"name": f"case {n}", "mode": "run", "state": "passed"} for n in range(106)
+            {"name": f"case {n}", "mode": "run", "state": "passed"} for n in range(117)
         ]}]}
         self.summary = {"total": {"lines": {"total": 2, "covered": 1}}, "/src/AlertList.vue": {"lines": {"total": 2, "covered": 1}}}
         self.coverage = {"/src/AlertList.vue": {

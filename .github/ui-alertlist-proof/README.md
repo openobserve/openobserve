@@ -2,18 +2,18 @@
 
 This scratch branch validates a frozen test-fixture optimization. It does not change production tests or establish the full UI suite's 180-second target. The only workflow trigger is a push to `bench/ui-alertlist-proof-20261028` that changes this directory or its workflow. There is no PR or manual trigger, no paid runner, and no automatic retry.
 
-The job uses one public `ubuntu-latest` runner, read-only repository permission, Node `24.22.0`, npm `11.19.1`, and one `npm ci`. Checkout credentials are not persisted. The pinned baseline is commit `81fb3444137218f373c2ca1a6c9ff63c9b050c64`, with web tree `944b1dd026a96157debb48a1beab071f08a72b2a`. Both source guards and a complete tracked-web SHA256 inventory protect the common source/configuration snapshot.
+The job uses one public `ubuntu-latest` runner, read-only repository permission, Node `24.22.0`, npm `11.19.1`, and one `npm ci`. Checkout credentials are not persisted. The pinned baseline is commit `3960df0f12760f4e8628a5a9104fef65048ff369`, with web tree `d51379f81d6f4521be4ae1bfe69fc6c5dba4a17d`. Both source guards and a complete tracked-web SHA256 inventory protect the common source/configuration snapshot.
 
 Frozen input SHA256 values:
 
-- `AlertList.baseline.spec.ts`: `937ea8ea19eb4a8916c8ebf7676d53368ba823a6816100d80aeb7191431bde87`
-- `AlertList.candidate.spec.ts`: `742f8342b9df4127083edeb7fe0a899716f5f77bc5d51d907a1896e4ac4a3afe`
+- `AlertList.baseline.spec.ts`: `82bfaec613aae3405ad9ea3575c7672be224c2aef47e6fb33ad5342ca774ae63`
+- `AlertList.candidate.spec.ts`: `dcf2857d8fa0b23f7d3c7d6351cc5bc5b828f779328e1dcd6f95c62a53b36284`
 
-The runner first verifies TypeScript AST equivalence of all 104 declarations and 211 `expect` calls. It applies the candidate for full `npm run format:check` and targeted ESLint, then restores the baseline before the four sequential trials: baseline normal, candidate normal, baseline seed 1729, candidate seed 1729. Only `web/src/components/alerts/AlertList.spec.ts` is swapped. A `finally` block restores its original bytes and verifies the inventory even when a trial fails or receives a termination signal.
+The runner first verifies TypeScript AST equivalence of all 115 declarations and 237 `expect` calls. It applies the candidate for full `npm run format:check` and targeted ESLint, then restores the baseline before the four sequential trials: baseline normal, candidate normal, baseline seed 1729, candidate seed 1729. Only `web/src/components/alerts/AlertList.spec.ts` is swapped. A `finally` block restores its original bytes and verifies the inventory even when a trial fails or receives a termination signal.
 
 Each trial uses isolated forks with one worker, real covered shard blob output, and a real Vitest coverage merge. It inherits production coverage include/exclude, jsdom setup, and dependency optimization. Only the focused proof's temporary config disables threshold enforcement so one test file can produce full-source coverage reports; the production config and both CI threshold gates are untouched. The optimizer cache is cleared only inside the runner-owned temporary directory before every trial, making the pairing cold on both sides. The npm download-cache result and pretrial optimizer-cache state are recorded separately.
 
-Admission requires 106 matching case identities/dispositions, all passing, zero unhandled errors, exact per-source summary objects and covered statement/function/branch locations, successful commands, and restored source. Matching baseline/candidate failures are diagnostic evidence only; they cannot pass the job. Missing reports, source drift, timeout, format/lint failure, and coverage differences fail explicitly. Artifact upload does not override that failure.
+Admission requires 117 matching case identities/dispositions, all passing, zero unhandled errors, exact per-source summary objects and covered statement/function/branch locations, successful commands, and restored source. Matching baseline/candidate failures are diagnostic evidence only; they cannot pass the job. Missing reports, source drift, timeout, format/lint failure, and coverage differences fail explicitly. Artifact upload does not override that failure.
 
 The job has a 30-minute cap. The proof receives at most 22 minutes, including format/lint, and less if setup/install consumed the reserved evidence-collection window. It reserves 15 seconds internally for cleanup. Individual caps are format 180 seconds, ESLint 60 seconds, tests 240 seconds, and merge 90 seconds; these are upper limits, not guaranteed allocations. Expired budgets prevent new subprocesses. Timeout cleanup targets only runner-owned process groups, excluding already terminated zombies, and reaps their leader. There are no retries.
 
