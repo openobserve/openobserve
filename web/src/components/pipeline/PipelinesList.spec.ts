@@ -25,6 +25,11 @@ import jstransform from "@/services/jstransform";
 import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { createStore } from "vuex";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 // Mock services
 const mockDownloadFile = vi.fn();
@@ -40,6 +45,7 @@ vi.mock("@/services/pipelines", async (importOriginal) => {
       getPipelines: vi.fn(),
       toggleState: vi.fn(),
       bulkToggleState: vi.fn(),
+      bulkDelete: vi.fn(),
       createPipeline: vi.fn(),
       deletePipeline: vi.fn(),
     },
@@ -1253,6 +1259,95 @@ describe("PipelinesList", () => {
       const saved: any = useListViewState("pipelines", {});
       expect(saved.filterQuery).toBe("abc");
       expect(saved.pageSize).toBe(100);
+    });
+  });
+
+  describe("Editor drafts", () => {
+    const draftScope = (entityId: string, userEmail = "me@x.io"): EditorDraftScope => ({
+      kind: "pipeline",
+      org: "test-org",
+      entityId,
+      userEmail,
+    });
+    const seed = (scope: EditorDraftScope) => writeEditorDraft(scope, { data: {} });
+
+    const mountRows = async () => {
+      store.state.userInfo = { email: "me@x.io" };
+      const rows = mount(PipelinesList, {
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ODialog: ODialogStub,
+            ODrawer: ODrawerStub,
+            PipelineView: true,
+            StreamSelection: true,
+            ResumePipelineDialog: true,
+            CreateBackfillJobDialog: true,
+          },
+        },
+      });
+      // OTable holds its skeleton for MIN_SKELETON_MS before rows render.
+      await vi.waitFor(() =>
+        expect(rows.find('[data-test="pipeline-list-name-cell-Test Pipeline 1"]').exists()).toBe(
+          true,
+        ),
+      );
+      return rows;
+    };
+
+    beforeEach(() => localStorage.clear());
+
+    it("dots the rows that have this user's draft", async () => {
+      seed(draftScope("pipeline1"));
+      seed(draftScope("pipeline2", "other@x.io"));
+      const rows = await mountRows();
+
+      const dot = rows.get('[data-test="pipeline-list-Test Pipeline 1-draft-dot"]');
+      expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
+      expect(rows.find('[data-test="pipeline-list-Test Pipeline 2-draft-dot"]').exists()).toBe(
+        false,
+      );
+      rows.unmount();
+    });
+
+    it("drops every user's draft of a deleted pipeline", async () => {
+      seed(draftScope("pipeline1"));
+      seed(draftScope("pipeline1", "other@x.io"));
+      seed(draftScope("pipeline2"));
+      wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
+      await wrapper.vm.deletePipeline();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("pipeline1"))).toBeNull();
+      expect(readEditorDraft(draftScope("pipeline1", "other@x.io"))).toBeNull();
+      expect(readEditorDraft(draftScope("pipeline2"))).not.toBeNull();
+    });
+
+    it("keeps the draft when the delete fails", async () => {
+      vi.mocked(pipelineService.deletePipeline).mockRejectedValue({
+        response: { status: 500, data: {} },
+      });
+      seed(draftScope("pipeline1"));
+      wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
+      await wrapper.vm.deletePipeline();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("pipeline1"))).not.toBeNull();
+    });
+
+    it("drops drafts only of the pipelines a bulk delete removed", async () => {
+      vi.mocked(pipelineService.bulkDelete).mockResolvedValue({
+        data: { successful: ["pipeline1"], unsuccessful: ["pipeline2"] },
+      });
+      seed(draftScope("pipeline1"));
+      seed(draftScope("pipeline2"));
+      wrapper.vm.selectedPipelineIds = ["pipeline1", "pipeline2"];
+      await nextTick();
+      await wrapper.vm.bulkDeletePipelines();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("pipeline1"))).toBeNull();
+      expect(readEditorDraft(draftScope("pipeline2"))).not.toBeNull();
     });
   });
 });

@@ -53,7 +53,7 @@ test.describe('Prebuilt destination form reuse (#13243)', () => {
     // a form instance that has already been used, not a fresh page.
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('discord');
-    await page.locator('[data-test="add-destination-cancel-btn"]').click();
+    await pm.alertDestinationsPage.clickCancel();
     await page.locator('[data-test="prebuilt-destination-selector"]').waitFor({
       state: 'hidden',
       timeout: 15000,
@@ -102,7 +102,7 @@ test.describe('Prebuilt destination form reuse (#13243)', () => {
           `reuse_${type}`,
         );
 
-        await page.locator('[data-test="add-destination-cancel-btn"]').click();
+        await pm.alertDestinationsPage.clickCancel();
         await page.locator('[data-test="prebuilt-destination-selector"]').waitFor({
           state: 'hidden',
           timeout: 15000,
