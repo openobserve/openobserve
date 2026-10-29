@@ -42,6 +42,8 @@ pub struct ConfigRow {
     pub updated_at: i64,
     pub updated_by: String,
     pub live_version: Option<i64>,
+    pub draft_by: Option<String>,
+    pub draft_at: Option<i64>,
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -73,6 +75,8 @@ pub async fn list_with<C: ConnectionTrait>(
             Column::UpdatedAt,
             Column::UpdatedBy,
             Column::LiveVersion,
+            Column::DraftBy,
+            Column::DraftAt,
         ])
         .filter(Column::OrgId.eq(org_id))
         .order_by_asc(Column::Id)
@@ -409,6 +413,40 @@ mod tests {
         insert_with(&db, config("o2", "alpha"))
             .await
             .expect("another org");
+    }
+
+    #[tokio::test]
+    async fn list_reports_the_draft_author_and_time_until_a_publish_clears_them() {
+        let db = db().await;
+        let mut clean = config("o1", "clean");
+        (clean.draft_yaml, clean.draft_by, clean.draft_at) = (None, None, None);
+        seed(&db, &[clean, config("o1", "drafted")], &[]).await;
+        let draft = |rows: &[ConfigRow], id: &str| {
+            let r = rows.iter().find(|r| r.id == id).unwrap();
+            (r.draft_by.clone(), r.draft_at)
+        };
+        let rows = list_with(&db, "o1").await.unwrap();
+        assert_eq!(draft(&rows, "clean"), (None, None));
+        assert_eq!(
+            draft(&rows, "drafted"),
+            (Some("a@example.com".to_string()), Some(NOW))
+        );
+
+        save_draft_with(&db, "o1", "clean", "x: 1\n", "b@example.com", NOW + 3)
+            .await
+            .unwrap();
+        let rows = list_with(&db, "o1").await.unwrap();
+        assert_eq!(
+            draft(&rows, "clean"),
+            (Some("b@example.com".to_string()), Some(NOW + 3))
+        );
+
+        bump_latest_with(&db, "o1", "clean", 0, "p@example.com", NOW + 4)
+            .await
+            .unwrap();
+        let rows = list_with(&db, "o1").await.unwrap();
+        assert_eq!(draft(&rows, "clean"), (None, None));
+        assert_eq!(draft(&rows, "drafted").1, Some(NOW));
     }
 
     #[tokio::test]

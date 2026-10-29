@@ -312,6 +312,12 @@ pub struct FleetConfig {
     pub fleets_hidden: usize,
     pub updated_at: i64,
     pub updated_by: String,
+    /// Author of the unpublished server draft; absent when there is none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub draft_by: Option<String>,
+    /// Epoch milliseconds of the unpublished server draft; absent when there is none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub draft_at: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -1171,6 +1177,8 @@ mod tests {
                 fleets_hidden: 1,
                 updated_at: 1,
                 updated_by: "u".to_string(),
+                draft_by: None,
+                draft_at: None,
             },
             draft: None,
             versions: vec![],
@@ -1179,8 +1187,55 @@ mod tests {
         assert_eq!(json["id"], "edge");
         assert_eq!(json["fleets_hidden"], 1);
         assert!(json.get("config").is_none());
+        assert!(json.get("draft_by").is_none() && json.get("draft_at").is_none());
         let publish: PublishRequest = serde_json::from_str(r#"{"yaml":"a: 1"}"#).unwrap();
         assert_eq!(publish.message, "");
+    }
+
+    #[test]
+    fn config_detail_with_a_draft_keeps_flat_draft_fields_beside_the_nested_draft() {
+        let detail = FleetConfigDetail {
+            config: FleetConfig {
+                id: "edge".to_string(),
+                description: String::new(),
+                latest_version: 1,
+                live_version: Some(1),
+                collectors: 0,
+                fleets: vec![],
+                fleets_hidden: 0,
+                updated_at: 1,
+                updated_by: "u".to_string(),
+                draft_by: Some("d@example.com".to_string()),
+                draft_at: Some(7),
+            },
+            draft: Some(ConfigDraft {
+                yaml: "a: 1\n".to_string(),
+                by: "d@example.com".to_string(),
+                at: 7,
+            }),
+            versions: vec![],
+        };
+        let json = serde_json::to_value(&detail).unwrap();
+        assert_eq!(json["draft_by"], "d@example.com");
+        assert_eq!(json["draft_at"], 7);
+        assert_eq!(json["draft"]["yaml"], "a: 1\n");
+        assert!(json.get("draft_yaml").is_none());
+        let back: FleetConfigDetail = serde_json::from_value(json).unwrap();
+        assert_eq!(back, detail);
+
+        let old: FleetConfig = serde_json::from_value(serde_json::json!({
+            "id": "edge", "description": "", "latest_version": 0, "live_version": null,
+            "collectors": 0, "fleets": [], "updated_at": 1, "updated_by": "u"
+        }))
+        .unwrap();
+        assert_eq!((old.draft_by, old.draft_at), (None, None));
+
+        let schema =
+            serde_json::to_value(<FleetConfig as utoipa::PartialSchema>::schema()).unwrap();
+        for key in ["draft_by", "draft_at"] {
+            assert!(schema["properties"].get(key).is_some(), "{key}");
+            assert!(!schema["required"].as_array().unwrap().contains(&key.into()));
+        }
     }
 
     #[test]
