@@ -24,6 +24,7 @@ import { responseProgressQuery } from "@/services/oncall.queries";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import store from "@/test/unit/helpers/store";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
+import { formatOnCallInstant } from "@/utils/oncall";
 import OnCallResponseDetail from "@/views/OnCall/OnCallResponseDetail.vue";
 
 vi.mock("@/services/oncall", () => ({
@@ -531,6 +532,7 @@ describe("OnCallResponseDetail", () => {
     const banner = active.find('[data-test="oncall-response-snoozed-banner"]');
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain("unassigned");
+    expect(banner.text()).toContain(formatOnCallInstant(future, Date.now() * 1000, "UTC"));
 
     // A second mount of the same id is served from cache, so the lapsed record
     // only reaches the page on a fresh load.
@@ -1738,6 +1740,19 @@ describe("OnCallResponseDetail — responding", () => {
       gone.vm.$emit("action");
 
       expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
+    });
+
+    it("says a linked page is gone instead of keeping the page it came from", async () => {
+      const { reactive } = await import("vue");
+      const wrapper = await renderWith({ id: "resp_1", title: "First page" });
+      service.getResponse.mockRejectedValue({ response: { status: 404, data: {} } });
+
+      reactive(routeState).params.responseId = "resp_gone";
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-response-detail-not-found"]').exists()).toBe(true);
+      reactive(routeState).params.responseId = "resp_1";
+      await flushPromises();
     });
   });
 

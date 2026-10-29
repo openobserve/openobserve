@@ -1258,7 +1258,7 @@ const handoffTarget = computed(() =>
 const snoozedUntilLabel = computed(() => {
   const r = response.value;
   if (!r || !isSnoozed(r)) return "";
-  return new Date((r.snoozed_until as number) / 1000).toLocaleString();
+  return formatOnCallInstant(r.snoozed_until as number, nowMicros.value, store.state.timezone);
 });
 
 const timeToAck = computed(() => {
@@ -1790,5 +1790,13 @@ watch(
 // param, so Vue Router reuses this instance instead of remounting it — the
 // fetch has to key off responseId directly rather than firing once on mount.
 // Wrapped: a watcher hands the callback the new id, which `force` would read as a yes.
-watch(responseId, () => fetchResponse(), { immediate: true });
+// A linked page reuses this view, so the one left must not stay on screen if the new id fails.
+watch(
+  responseId,
+  () => {
+    response.value = null;
+    fetchResponse();
+  },
+  { immediate: true },
+);
 </script>
