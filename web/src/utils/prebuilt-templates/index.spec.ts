@@ -61,9 +61,10 @@ describe("Prebuilt Templates Index", () => {
         "servicenow",
         "email",
         "opsgenie",
+        "jira",
       ];
 
-      expect(PREBUILT_DESTINATION_TYPES).toHaveLength(7);
+      expect(PREBUILT_DESTINATION_TYPES).toHaveLength(8);
 
       const actualTypes = PREBUILT_DESTINATION_TYPES.map((type) => type.id);
       expectedTypes.forEach((expectedType) => {

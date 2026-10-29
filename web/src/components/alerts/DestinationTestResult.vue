@@ -25,8 +25,26 @@ limitations under the License. -->
       </div>
       <div class="min-w-0 flex-1">
         <div data-test="test-success-message" class="text-compact mb-1 leading-[1.4] font-medium">
-          {{ t("alerts.testSuccessMessage") }}
+          {{
+            result.issue
+              ? t("alerts.prebuiltDestinations.jiraTestCreated", { key: result.issue.key })
+              : t("alerts.testSuccessMessage")
+          }}
         </div>
+        <OButton
+          v-if="result.issue && /^https?:\/\//i.test(result.issue.url)"
+          data-test="test-success-issue-link"
+          as="a"
+          :href="result.issue.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          variant="ghost-primary"
+          size="xs"
+          icon-right="open-in-new"
+          class="mb-1"
+        >
+          {{ t("alerts.prebuiltDestinations.jiraOpenIssue") }}
+        </OButton>
         <div
           data-test="test-success-timestamp"
           class="text-2xs text-text-secondary flex flex-wrap items-center gap-2"

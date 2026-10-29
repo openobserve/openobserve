@@ -28,6 +28,7 @@ export { pagerdutyTemplate, pagerdutyConfig, pagerdutyDestinationType } from "./
 export { servicenowTemplate, servicenowConfig, servicenowDestinationType } from "./servicenow";
 export { emailTemplate, emailConfig, emailDestinationType } from "./email";
 export { opsgenieTemplate, opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
+export { jiraTemplate, jiraConfig, jiraDestinationType } from "./jira";
 
 import { slackAppDestinationTile, slackConfig, slackDestinationType } from "./slack";
 import { discordConfig, discordDestinationType } from "./discord";
@@ -37,6 +38,13 @@ import { servicenowConfig, servicenowDestinationType } from "./servicenow";
 import { emailConfig, emailDestinationType } from "./email";
 import { opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
 import { gt } from "@/types/i18n";
+import {
+  jiraAuthorization,
+  jiraBaseUrl,
+  jiraConfig,
+  jiraDestinationType,
+  jiraMetadata,
+} from "./jira";
 import { DestinationTile, PrebuiltConfig, PrebuiltType, PrebuiltTypeId } from "./types";
 
 /**
@@ -52,6 +60,7 @@ export const PREBUILT_DESTINATION_TYPES: PrebuiltType[] = [
   pagerdutyDestinationType,
   opsgenieDestinationType,
   servicenowDestinationType,
+  jiraDestinationType,
 ];
 
 /** Unavailable Slack apps remain discoverable beside the selectable webhook. */
@@ -81,6 +90,7 @@ export const PREBUILT_CONFIGS: Record<string, PrebuiltConfig> = {
   servicenow: servicenowConfig,
   email: emailConfig,
   opsgenie: opsgenieConfig,
+  jira: jiraConfig,
 };
 
 /**
@@ -144,6 +154,8 @@ export function generateDestinationUrl(type: string, credentials: Record<string,
       return credentials.webhookUrl || "";
     case "servicenow":
       return credentials.instanceUrl || "";
+    case "jira":
+      return jiraBaseUrl(credentials.url);
     case "pagerduty":
       return "https://events.pagerduty.com/v2/enqueue";
     case "opsgenie":
@@ -180,6 +192,11 @@ export function generateDestinationHeaders(
     case "opsgenie":
       if (credentials.apiKey) {
         headers["Authorization"] = `GenieKey ${credentials.apiKey}`;
+      }
+      break;
+    case "jira":
+      if (String(credentials.token ?? "").trim()) {
+        headers["Authorization"] = jiraAuthorization(credentials);
       }
       break;
     case "servicenow":
@@ -219,6 +236,8 @@ export function generatePrebuiltMetadata(
       // PagerDuty requires a non-empty `source` in the payload.
       metadata["source"] = "openobserve";
       break;
+    case "jira":
+      return jiraMetadata(credentials);
   }
 
   return metadata;

@@ -280,6 +280,7 @@ function getIconName(icon: string): string {
     pagerduty: "warning",
     opsgenie: "notifications_active",
     servicenow: "support_agent",
+    jira: "assignment",
     custom: "settings",
   };
 

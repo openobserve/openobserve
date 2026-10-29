@@ -72,6 +72,7 @@ const {
   mockDestUpdate,
   mockDestTest,
   mockDestGetByName,
+  mockJiraSetup,
 } = vi.hoisted(() => ({
   mockGetSystemTemplates: vi.fn(),
   mockGetByName: vi.fn(),
@@ -80,6 +81,7 @@ const {
   mockDestUpdate: vi.fn(),
   mockDestTest: vi.fn(),
   mockDestGetByName: vi.fn(),
+  mockJiraSetup: vi.fn(),
 }));
 
 vi.mock("@/services/alert_templates", async (importOriginal) => {
@@ -101,6 +103,7 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
       update: mockDestUpdate,
       test: mockDestTest,
       get_by_name: mockDestGetByName,
+      jiraSetup: mockJiraSetup,
     },
   });
 });
@@ -113,13 +116,17 @@ vi.mock("@/utils/prebuilt-templates", async (importOriginal) => {
   return {
     ...actual,
     generateDestinationUrl: vi.fn((type: string, credentials: Record<string, unknown>) =>
-      type === "servicenow"
-        ? String(credentials.instanceUrl ?? "")
-        : String(credentials.webhookUrl ?? "https://generated.example.com"),
+      type === "jira"
+        ? actual.generateDestinationUrl(type, credentials)
+        : type === "servicenow"
+          ? String(credentials.instanceUrl ?? "")
+          : String(credentials.webhookUrl ?? "https://generated.example.com"),
     ),
-    generateDestinationHeaders: vi.fn(() => ({
-      "Content-Type": "application/json",
-    })),
+    generateDestinationHeaders: vi.fn((type: string, credentials: Record<string, unknown>) =>
+      type === "jira"
+        ? actual.generateDestinationHeaders(type, credentials)
+        : { "Content-Type": "application/json" },
+    ),
   };
 });
 
@@ -817,6 +824,129 @@ describe("usePrebuiltDestinations", () => {
       expect(data.metadata.credential_username).toBe("OpenObserve");
       expect(data.metadata).not.toHaveProperty("credential_webhookUrl");
       expect(JSON.stringify(data.metadata)).not.toContain(secret);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Jira (spec section 1: stored destination; section 2: test_issue)
+  // -------------------------------------------------------------------------
+  describe("jira", () => {
+    const jiraCloud = {
+      deployment: "cloud",
+      url: "https://acme.atlassian.net/",
+      email: "alerts-bot@example.com",
+      token: "secret-token",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+      priorityId: "",
+      fields: '{"customfield_10020":{"id":"10101"}}',
+    };
+    const jiraHeaders = (authorization: string) => ({
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: authorization,
+    });
+    const jiraMetadata = {
+      prebuilt_type: "jira",
+      jira_deployment: "cloud",
+      jira_email: "alerts-bot@example.com",
+      jira_project_key: "OPS",
+      jira_issue_type_id: "10004",
+      jira_priority_id: "",
+      jira_fields: '{"customfield_10020":{"id":"10101"}}',
+    };
+
+    it("creates an Http destination with the Jira URL, headers and metadata", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+      const { createDestination } = usePrebuiltDestinations();
+      await createDestination("jira", "jira-ops", jiraCloud);
+
+      const { data } = mockDestCreate.mock.calls[0][0];
+      expect(data).toMatchObject({
+        name: "jira-ops",
+        type: "http",
+        url: "https://acme.atlassian.net",
+        method: "post",
+        template: "prebuilt_jira",
+        destination_type_name: "jira",
+      });
+      expect(data.headers).toEqual(
+        jiraHeaders(`Basic ${btoa("alerts-bot@example.com:secret-token")}`),
+      );
+      expect(data.metadata).toEqual(jiraMetadata);
+    });
+
+    it("updates with a Bearer token for Data Center and keeps custom headers", async () => {
+      mockDestUpdate.mockResolvedValue({ data: {} });
+      const { updateDestination } = usePrebuiltDestinations();
+      await updateDestination(
+        "jira",
+        "jira-ops",
+        "jira-ops-dc",
+        { ...jiraCloud, deployment: "data_center", email: "", priorityId: "3" },
+        { "X-Team": "sre" },
+      );
+
+      const call = mockDestUpdate.mock.calls[0][0];
+      expect(call.destination_name).toBe("jira-ops");
+      expect(call.data.headers).toEqual({
+        ...jiraHeaders("Bearer secret-token"),
+        "X-Team": "sre",
+      });
+      expect(call.data.metadata).toEqual({
+        ...jiraMetadata,
+        jira_deployment: "data_center",
+        jira_email: "",
+        jira_priority_id: "3",
+      });
+    });
+
+    it("sends no Authorization header on edit when the token is empty", async () => {
+      mockDestUpdate.mockResolvedValue({ data: {} });
+      const { updateDestination } = usePrebuiltDestinations();
+      await updateDestination("jira", "jira-ops", "jira-ops", { ...jiraCloud, token: "" }, {});
+
+      const { headers } = mockDestUpdate.mock.calls[0][0].data;
+      expect(headers).not.toHaveProperty("Authorization");
+    });
+
+    it("tests through the setup route and returns the created issue", async () => {
+      mockJiraSetup.mockResolvedValue({
+        data: { key: "OPS-141", url: "https://acme.atlassian.net/browse/OPS-141" },
+      });
+      const { testDestination, lastTestResult } = usePrebuiltDestinations();
+      const result = await testDestination("jira", jiraCloud);
+
+      expect(mockJiraSetup).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          action: "test_issue",
+          url: "https://acme.atlassian.net",
+          project_key: "OPS",
+          issue_type_id: "10004",
+          fields: { customfield_10020: { id: "10101" } },
+        }),
+      );
+      expect(mockDestTest).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        success: true,
+        issue: { key: "OPS-141", url: "https://acme.atlassian.net/browse/OPS-141" },
+      });
+      expect(lastTestResult.value).toEqual(result);
+    });
+
+    it("shows the setup route's error message when the test fails", async () => {
+      mockJiraSetup.mockRejectedValue({
+        message: "Request failed with status code 400",
+        response: { status: 400, data: { message: "Jira: Field 'Team' is required." } },
+      });
+      const { testDestination } = usePrebuiltDestinations();
+      const result = await testDestination("jira", jiraCloud);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: "Jira: Field 'Team' is required.",
+      });
     });
   });
 
