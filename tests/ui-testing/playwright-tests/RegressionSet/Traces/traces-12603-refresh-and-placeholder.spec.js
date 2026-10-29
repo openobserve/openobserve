@@ -9,29 +9,31 @@ const SERVICE_NAME = `r12603-gateway-${Date.now()}`;
 const UNPARSABLE_FILTER = 'service_name = ';
 const NESTED_IN_FILTER = `service_name IN ('${SERVICE_NAME}', 'r12603-absent') AND duration > 0`;
 
+let traceId;
+let spanId;
+let ingestedAtMs;
+
+// File-level so each describe, and each worker running it, has the fixture in the stream.
+test.beforeAll(async ({ browser }) => {
+  const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+  const page = await context.newPage();
+  try {
+    const trace = generateBasicTrace({ clientService: SERVICE_NAME });
+    const result = await ingestTrace(page, trace);
+    expect(result.status, 'trace ingestion must succeed').toBe(200);
+    traceId = trace.metadata.traceId;
+    spanId = trace.payload.resourceSpans[1].scopeSpans[0].spans[0].spanId;
+    ingestedAtMs = Date.now();
+    testLogger.info('Ingested #12603 fixture trace', { traceId, spanId });
+  } finally {
+    await page.close();
+    await context.close();
+  }
+});
+
 test.describe('Traces hard refresh', () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
-  let traceId;
-  let spanId;
-  let ingestedAtMs;
-
-  test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    try {
-      const trace = generateBasicTrace({ clientService: SERVICE_NAME });
-      const result = await ingestTrace(page, trace);
-      expect(result.status, 'trace ingestion must succeed').toBe(200);
-      traceId = trace.metadata.traceId;
-      spanId = trace.payload.resourceSpans[1].scopeSpans[0].spans[0].spanId;
-      ingestedAtMs = Date.now();
-      testLogger.info('Ingested #12603 fixture trace', { traceId, spanId });
-    } finally {
-      await page.close();
-      await context.close();
-    }
-  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
