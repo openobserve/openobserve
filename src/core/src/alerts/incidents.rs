@@ -3112,6 +3112,10 @@ pub async fn update_status_as(
     } else {
         infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
     };
+    // The ack guard left a resolved row alone: record and replicate nothing.
+    if status == "acknowledged" && updated.status != "acknowledged" {
+        return model_to_incident(updated).await;
+    }
     if status == "acknowledged" && updated.acknowledged_by.as_deref() == Some(user_id) {
         ack_incident_alerts(org_id, incident_id, user_id).await;
     }

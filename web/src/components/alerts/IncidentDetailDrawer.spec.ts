@@ -487,6 +487,49 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
     });
 
+    it.each([
+      ["resolveIncident", "Resolve incident?"],
+      ["reopenIncident", "Reopen incident?"],
+    ])("%s asks first and changes nothing when cancelled", async (action, title) => {
+      mockConfirm.mockResolvedValueOnce(false);
+
+      await wrapper.vm[action]();
+
+      expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["resolved", "Resolve incident?"],
+      ["open", "Reopen incident?"],
+    ])(
+      "the Manage chip for %s asks first and changes nothing when cancelled",
+      async (status, title) => {
+        mockConfirm.mockResolvedValueOnce(false);
+
+        await wrapper.vm.handleStatusChange(status);
+
+        expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
+        expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+      },
+    );
+
+    it("a reopen from the Manage chip drops the cleared resolve and acknowledgement", async () => {
+      wrapper.vm.incidentDetails.status = "resolved";
+      wrapper.vm.incidentDetails.resolved_at = 1700000000000000;
+      wrapper.vm.incidentDetails.acknowledged_by = "ana@example.com";
+      vi.mocked(incidentsService.updateStatus).mockResolvedValueOnce({
+        data: { status: "open", resolved_at: null, acknowledged_by: null, acknowledged_at: null },
+      } as never);
+
+      await wrapper.vm.handleStatusChange("open");
+
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
+      expect(wrapper.vm.incidentDetails.status).toBe("open");
+      expect(wrapper.vm.incidentDetails.resolved_at).toBeUndefined();
+      expect(wrapper.vm.incidentDetails.acknowledged_by).toBeNull();
+    });
+
     it("should set updating state during status update", async () => {
       // acknowledgeIncident awaits the confirm dialog before it ever touches
       // `updating`, so a fixed number of microtask hops can't be assumed here —

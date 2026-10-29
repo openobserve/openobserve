@@ -153,8 +153,9 @@ pub struct Alert {
     #[serde(default)]
     pub pending_period_sec: i64,
 
-    /// Send one notification when this alert stops firing. Off by default: an existing template
-    /// that never mentions `{alert_status}` would otherwise render the firing wording twice.
+    /// Send one notification when this alert, or each group of a multi-alert, stops firing. Off by
+    /// default: an existing template that never mentions `{alert_status}` would otherwise render
+    /// the firing wording twice.
     #[serde(default)]
     pub notify_on_recovery: bool,
 
