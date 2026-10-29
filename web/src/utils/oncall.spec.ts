@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import type {
   EscalationLevel,
   EscalationTarget,
+  OnCallResponseEvent,
   Rotation,
   ShiftRule,
   TimeWindow,
@@ -87,6 +88,8 @@ import {
   dayRows,
   stopChoices,
   stopConsequence,
+  offsetAnchor,
+  rungStillRetrying,
   stateTagVariant,
   upcomingShifts,
   windowContains,
@@ -128,6 +131,7 @@ describe("shift maths matches the server (shift_parity.json)", () => {
       member: c.holder,
     });
     expect(second).toMatchObject({ startMicros: c.next_handover, member: c.next_holder });
+    expect(offsetAnchor(rule, 1, c.timezone)).toBe(c.secondary_anchor);
   });
 });
 
@@ -1477,6 +1481,35 @@ describe("isOnCallUnavailable", () => {
   });
 });
 
+/// A rung the engine gave up on is settled, so its lost page must not still promise a retry.
+describe("rungStillRetrying", () => {
+  const event = (over: Partial<OnCallResponseEvent>): OnCallResponseEvent => ({
+    kind: "page",
+    at: 1,
+    actor: "engine",
+    body: "paged ana@o2.ai",
+    rung_micros: 0,
+    ladder_run: 2,
+    ...over,
+  });
+  const lost = event({ delivered: false });
+  const gaveUp = (over: Partial<OnCallResponseEvent> = {}) =>
+    event({
+      kind: "sys",
+      body: "nothing could be delivered to this rung in 3 attempts; the ladder carries on",
+      ...over,
+    });
+  it.each([
+    ["a lost page with no give-up", lost, [lost], true],
+    ["a lost page the engine gave up on", lost, [lost, gaveUp()], false],
+    ["a give-up for another rung", lost, [lost, gaveUp({ rung_micros: 60 })], true],
+    ["a give-up from an earlier run", lost, [lost, gaveUp({ ladder_run: 1 })], true],
+    ["a page that reached somebody", event({}), [event({})], false],
+  ] as const)("%s", (_name, page, events, expected) => {
+    expect(rungStillRetrying(page, [...events])).toBe(expected);
+  });
+});
+
 /// A finished sentence is a paragraph on a rail. The badge is four words and
 /// the sentence stays on hover — but only where the cause is one we know.
 describe("shortReachReason", () => {
@@ -1489,6 +1522,12 @@ describe("shortReachReason", () => {
         t,
       ),
     ).toBe("oncall.reachShortNoSmtp");
+    expect(
+      shortReachReason(
+        "`ZO_SMTP_FROM_EMAIL` is missing or invalid, so no email page can be sent",
+        t,
+      ),
+    ).toBe("oncall.reachShortNoFromAddress");
     expect(shortReachReason("`ana@o2.ai` is not a user of this organization", t)).toBe(
       "oncall.reachShortNoAddress",
     );

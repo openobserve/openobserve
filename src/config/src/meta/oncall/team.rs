@@ -626,7 +626,11 @@ fn week_mask(r: &ShiftRule) -> WeekMask {
 }
 
 /// The rule `rule` runs exactly one shift behind: same people in the same order, same turn length.
-fn pair_leader<'a>(rule: &ShiftRule, rules: &[&'a ShiftRule]) -> Option<&'a ShiftRule> {
+fn pair_leader<'a>(
+    rule: &ShiftRule,
+    rules: &[&'a ShiftRule],
+    tz: chrono_tz::Tz,
+) -> Option<&'a ShiftRule> {
     let people = |r: &ShiftRule| -> Vec<String> {
         r.members
             .iter()
@@ -634,9 +638,10 @@ fn pair_leader<'a>(rule: &ShiftRule, rules: &[&'a ShiftRule]) -> Option<&'a Shif
             .collect()
     };
     rules.iter().copied().find(|leader| {
-        leader.shift_micros == rule.shift_micros
-            && leader.anchor_micros.checked_sub(rule.shift_micros) == Some(rule.anchor_micros)
-            && people(leader) == people(rule)
+        // Secondaries stored before the local-clock offset sit one fixed shift back.
+        let behind = ShiftRule::offset_from(leader, 1, tz).anchor_micros == rule.anchor_micros
+            || leader.anchor_micros.checked_sub(rule.shift_micros) == Some(rule.anchor_micros);
+        leader.shift_micros == rule.shift_micros && behind && people(leader) == people(rule)
     })
 }
 
@@ -651,7 +656,7 @@ fn with_roster_paired(
     let mut leader = None;
     // Bounded by the rule count, so a chain of rotations one shift apart leads from its first.
     for _ in 0..rules.len() {
-        match pair_leader(leader.unwrap_or(rule), rules) {
+        match pair_leader(leader.unwrap_or(rule), rules, tz) {
             Some(next) => leader = Some(next),
             None => break,
         }
@@ -911,6 +916,24 @@ mod tests {
                 super::super::rotation::ShiftRuleError::NoMembers
             )))
         );
+    }
+
+    /// A day past Sunday matches no local day, so the rule would save and never apply.
+    #[test]
+    fn test_validate_refuses_a_restriction_day_outside_the_week() {
+        for (days, refused) in [(vec![200], true), (vec![7], true), (vec![0, 6], false)] {
+            let mut rotation = weekly("Primary", &["ana@o2.ai"]);
+            rotation.shift_rules[0].restrictions = vec![TimeWindow {
+                days: days.clone(),
+                start_minute: 0,
+                end_minute: MINUTES_PER_DAY,
+            }];
+            let verdict = schedule(vec![rotation]).validate();
+            assert_eq!(verdict.is_err(), refused, "{days:?}: {verdict:?}");
+            if let Err(e) = verdict {
+                assert!(e.to_string().contains("0 (Monday) and 6 (Sunday)"), "{e}");
+            }
+        }
     }
 
     #[test]
@@ -1251,6 +1274,38 @@ mod tests {
                     "{case}: week {week}"
                 );
             }
+        }
+    }
+
+    /// A London Secondary one local shift back, or one fixed week back (stored), is a pair.
+    #[test]
+    fn test_a_pair_across_a_clock_change_is_still_a_pair() {
+        // Monday 26 Oct 2026 09:00 GMT, the day after the clocks went back.
+        let primary_anchor = 1_793_005_200_000_000;
+        let people = ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"];
+        // (case, Secondary anchor): 19 Oct 09:00 BST, and the old 19 Oct 10:00 BST.
+        let cases = [
+            ("local one shift earlier", 1_792_396_800_000_000),
+            ("fixed week earlier", primary_anchor - MICROS_PER_WEEK),
+        ];
+        for (case, secondary_anchor) in cases {
+            let mut primary = weekly("Primary", &people);
+            primary.shift_rules[0].anchor_micros = primary_anchor;
+            let mut secondary = weekly("Secondary", &people);
+            secondary.shift_rules[0].anchor_micros = secondary_anchor;
+            let s = Schedule {
+                timezone: "Europe/London".into(),
+                ..schedule(vec![primary, secondary])
+            };
+            let now = primary_anchor + 4 * MICROS_PER_WEEK;
+            let added = match place_member(&s.rotations, "dan@o2.ai", now, s.tz()) {
+                MemberPlacement::Appended { rotations, .. } => rotations,
+                other => panic!("{case}: a default pair takes the newcomer, got {other:?}"),
+            };
+            assert_eq!(
+                added[1].shift_rules[0].members, added[0].shift_rules[0].members,
+                "{case}"
+            );
         }
     }
 

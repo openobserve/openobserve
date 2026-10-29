@@ -422,6 +422,8 @@ export function shortReachReason(
   // Matched on the distinctive noun, not the whole sentence: the engine has
   // reworded these before, and a near-miss must degrade to the sentence rather
   // than to silence.
+  // Before "smtp": the From sentence names `ZO_SMTP_FROM_EMAIL`, which contains it.
+  if (said.includes("zo_smtp_from_email")) return t("oncall.reachShortNoFromAddress");
   if (said.includes("smtp")) return t("oncall.reachShortNoSmtp");
   if (said.includes("not a user of this organization")) return t("oncall.reachShortNoAddress");
   if (said.includes("login, not a mailbox")) return t("oncall.reachShortNotMailbox");
@@ -945,6 +947,11 @@ function fromLocalMicros(local: number, timezone: string): number | null {
 export function shiftBoundary(rule: ShiftRule, index: number, timezone: string): number | null {
   const localAnchor = rule.anchor_micros + offsetMicrosAt(rule.anchor_micros, timezone);
   return fromLocalMicros(localAnchor + index * rule.shift_micros, timezone);
+}
+
+/** `rule`'s anchor `shifts` handovers earlier on `timezone`'s clock; mirrors `ShiftRule::offset_from`. [pure] */
+export function offsetAnchor(rule: ShiftRule, shifts: number, timezone: string): number {
+  return shiftBoundary(rule, -shifts, timezone) ?? rule.anchor_micros - shifts * rule.shift_micros;
 }
 
 /** Whether `rule` has people and a positive turn length, so its shifts can be counted. [pure] */
@@ -1954,6 +1961,25 @@ export const DEFAULT_ACTIVITY_KINDS: ResponseEventKind[] = [
   "severity_promoted",
   "flapped",
 ];
+
+/** How the engine's give-up line opens; twin of escalation.rs `GAVE_UP_MARKER`. */
+const GAVE_UP_MARKER = "nothing could be delivered to this rung";
+
+/** Whether a page that reached nobody is still retried: not once the engine gave up on its run and rung. [pure] */
+export function rungStillRetrying(
+  page: OnCallResponseEvent,
+  events: OnCallResponseEvent[],
+): boolean {
+  if (page.kind !== "page" || page.delivered !== false) return false;
+  const run = page.ladder_run ?? 1;
+  return !events.some(
+    (e) =>
+      e.kind === "sys" &&
+      (e.ladder_run ?? 1) === run &&
+      (e.rung_micros ?? null) === (page.rung_micros ?? null) &&
+      e.body.startsWith(GAVE_UP_MARKER),
+  );
+}
 
 /** What the Phone card shows; `empty` is also the form that Change reopens. */
 export type PhoneCardState = "empty" | "codeSent" | "verified" | "noProvider" | "changed";

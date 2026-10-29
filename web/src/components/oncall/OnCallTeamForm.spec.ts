@@ -215,6 +215,40 @@ describe("OnCallTeamForm", () => {
     expect(rotations[1].shift_rules[0].anchor_micros).toBe(anchor - MICROS_PER_WEEK);
   });
 
+  /// A Secondary is one shift earlier on the team's clock: a clock change moves the instant, not the wall time.
+  it.each([
+    ["written by the form", null],
+    [
+      "staffed by the server",
+      {
+        timezone: "UTC",
+        rotations: ["rot_primary", "rot_secondary"].map((id) => ({
+          id,
+          name: id,
+          shift_rules: [{ name: "Base", members: [], shift_micros: 1, anchor_micros: 1 }],
+        })),
+      },
+    ],
+  ])("anchors the Secondary across a clock change in the team's zone (%s)", async (_, data) => {
+    oncall.getSchedule.mockResolvedValue({ data } as any);
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      name: "Payments",
+      timezone: "Europe/London",
+      members: ["ana@o2.ai", "bob@o2.ai"],
+      first_handover_date: "2026-10-26",
+      first_handover_time: "09:00",
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
+    // Monday 26 Oct 09:00 GMT, and the Monday before at 09:00 BST: the clocks went back in between.
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 9, 26, 9, 0) * 1000);
+    expect(rotations[1].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 9, 19, 8, 0) * 1000);
+  });
+
   /// The checkbox has to be able to say no. The backend staffs a second
   /// rotation by default, so leaving it in place when the box is clear would
   /// make the control read as a choice the form quietly overrules.

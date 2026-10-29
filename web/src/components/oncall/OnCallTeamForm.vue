@@ -191,7 +191,12 @@ import {
   SECONDARY_ROTATION_NAME,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { fromZonedInputValue, resolvableTimezones, SHIFT_PRESETS } from "@/utils/oncall";
+import {
+  fromZonedInputValue,
+  offsetAnchor,
+  resolvableTimezones,
+  SHIFT_PRESETS,
+} from "@/utils/oncall";
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
 
 import { makeOnCallTeamSchema, type OnCallTeamFormValues } from "./OnCallTeamForm.schema";
@@ -397,6 +402,7 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
           emails,
           shift,
           anchor,
+          values.timezone,
           values.create_secondary !== false,
         ),
       },
@@ -436,6 +442,7 @@ async function amendStaffedRotations(
   emails: string[],
   shift: number,
   anchorMicros: number,
+  timezone: string,
   wantSecondary: boolean,
 ): Promise<Rotation[]> {
   // The rule takes the BASE name, never the rotation's: a rotation is a
@@ -458,7 +465,7 @@ async function amendStaffedRotations(
           {
             id: mintRotationId(),
             name: SECONDARY_ROTATION_NAME,
-            shift_rules: [rule(anchorMicros - shift)],
+            shift_rules: [rule(offsetAnchor(rule(anchorMicros), 1, timezone))],
           },
         ]
       : []),
@@ -479,7 +486,7 @@ async function amendStaffedRotations(
       shift_rules: (rotation.shift_rules ?? []).map((r) => ({
         ...r,
         shift_micros: shift,
-        anchor_micros: anchorMicros - index * shift,
+        anchor_micros: offsetAnchor(rule(anchorMicros), index, timezone),
       })),
       // A human has now chosen the timezone, the handover and the cadence, so
       // this is no longer the rotation nobody chose. The marker is the
