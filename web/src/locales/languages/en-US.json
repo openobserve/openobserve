@@ -13042,7 +13042,6 @@
     "statReady": "Ready to use",
     "statNeedsData": "Not ingested",
     "statAll": "All",
-    "notIngested": "Not ingested: {stream}",
     "notIngestedHint": "This organization is not receiving {stream}, so this alert would never fire. Add it anyway and it will start working once the data arrives.",
     "alertCount": "{count} alert | {count} alerts",
     "noCollectorTitle": "Nothing here matches your data yet",
@@ -13070,7 +13069,7 @@
     "enterprise": "Enterprise",
     "enterpriseHint": "Anomaly detection alerts need OpenObserve Enterprise.",
     "card": {
-      "customize": "Customize"
+      "customizeTooltip": "Opens the alert editor prefilled"
     },
     "drawer": {
       "dataAvailable": "Data available",

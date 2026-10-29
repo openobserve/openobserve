@@ -13039,7 +13039,6 @@
     "statReady": "Готово к использованию",
     "statNeedsData": "Не поступает",
     "statAll": "Все",
-    "notIngested": "Не поступает: {stream}",
     "notIngestedHint": "Эта организация не получает {stream}, поэтому это оповещение никогда не сработает. Всё равно добавьте его, и оно заработает, когда данные поступят.",
     "alertCount": "Оповещения: {count} | Оповещения: {count}",
     "noCollectorTitle": "Пока ничего здесь не соответствует вашим данным.",
@@ -13067,7 +13066,7 @@
     "enterprise": "Enterprise",
     "enterpriseHint": "Оповещения об аномалиях требуют OpenObserve Enterprise.",
     "card": {
-      "customize": "Настроить"
+      "customizeTooltip": "Открывает редактор оповещений с заполненными полями"
     },
     "drawer": {
       "dataAvailable": "Данные доступны",

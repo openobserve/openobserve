@@ -13039,7 +13039,6 @@
     "statReady": "Sẵn sàng sử dụng",
     "statNeedsData": "Chưa được thu thập",
     "statAll": "Tất cả",
-    "notIngested": "Chưa được thu thập: {stream}",
     "notIngestedHint": "Tổ chức này không đang tiếp nhận {stream}, nên cảnh báo này sẽ không bao giờ kích hoạt. Bạn vẫn có thể thêm và nó sẽ bắt đầu hoạt động khi dữ liệu đến.",
     "alertCount": "{count} cảnh báo | {count} cảnh báo",
     "noCollectorTitle": "Chưa có gì ở đây khớp với dữ liệu của bạn",
@@ -13067,7 +13066,7 @@
     "enterprise": "Enterprise",
     "enterpriseHint": "Cảnh báo phát hiện bất thường cần OpenObserve Enterprise.",
     "card": {
-      "customize": "Tùy chỉnh"
+      "customizeTooltip": "Mở trình chỉnh sửa cảnh báo đã điền sẵn"
     },
     "drawer": {
       "dataAvailable": "Có dữ liệu",

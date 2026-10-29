@@ -13039,7 +13039,6 @@
     "statReady": "사용 준비 완료",
     "statNeedsData": "수집되지 않음",
     "statAll": "모두",
-    "notIngested": "수집되지 않음: {stream}",
     "notIngestedHint": "이 조직은 {stream}을(를) 수신하지 않으므로 이 알림은 절대 트리거되지 않습니다. 그래도 추가하면 데이터가 도착하는 즉시 작동합니다.",
     "alertCount": "{count}개 알림 | {count}개 알림",
     "noCollectorTitle": "아직 여기에 데이터와 일치하는 것이 없습니다",
@@ -13067,7 +13066,7 @@
     "enterprise": "Enterprise",
     "enterpriseHint": "이상 탐지 알림에는 OpenObserve Enterprise가 필요합니다.",
     "card": {
-      "customize": "사용자 지정"
+      "customizeTooltip": "미리 채워진 알림 편집기를 엽니다"
     },
     "drawer": {
       "dataAvailable": "데이터 사용 가능",
