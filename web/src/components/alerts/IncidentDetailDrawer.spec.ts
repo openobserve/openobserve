@@ -843,6 +843,40 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
+  describe("Utility Functions - Trigger Durations", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper();
+    });
+
+    it("reads the period as minutes", () => {
+      expect(wrapper.vm.formatPeriod(10)).toBe("10 min");
+      expect(wrapper.vm.formatPeriod(90)).toBe("90 min");
+    });
+
+    it("reads the frequency as seconds", () => {
+      expect(wrapper.vm.formatFrequency({ frequency: 3600, frequency_type: "minutes" })).toBe(
+        "60 min",
+      );
+      expect(wrapper.vm.formatFrequency({ frequency: 90, frequency_type: "minutes" })).toBe(
+        "1 min 30 sec",
+      );
+      expect(wrapper.vm.formatFrequency({ frequency: 30, frequency_type: "minutes" })).toBe(
+        "30 sec",
+      );
+    });
+
+    it("shows the cron expression for a cron frequency", () => {
+      expect(
+        wrapper.vm.formatFrequency({ frequency: 0, frequency_type: "cron", cron: "0 */5 * * * *" }),
+      ).toBe("0 */5 * * * *");
+    });
+
+    it("shows N/A when the value is missing", () => {
+      expect(wrapper.vm.formatPeriod(undefined)).toBe("N/A");
+      expect(wrapper.vm.formatFrequency(undefined)).toBe("N/A");
+    });
+  });
+
   describe("Theme Support", () => {
     it("should detect dark mode", async () => {
       store.state.theme = "dark";

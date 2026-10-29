@@ -1420,4 +1420,13 @@ describe("SearchResult Component", () => {
       expect(wrapper.find('[data-test="logs-result-scan-chip"]').exists()).toBe(true);
     });
   });
+
+  describe("results bar layout", () => {
+    it("lets the header bar grow when its chips wrap instead of clipping them", () => {
+      const bar = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]').element
+        .parentElement as HTMLElement;
+      expect(bar.classList.contains("min-h-9")).toBe(true);
+      expect(bar.classList.contains("h-9")).toBe(false);
+    });
+  });
 });

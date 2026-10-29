@@ -560,6 +560,9 @@ const pagination = useTablePagination(
     get data() {
       return props.data;
     },
+    get rowModelWindowed() {
+      return rowModelWindowed.value;
+    },
   },
   emit,
 );

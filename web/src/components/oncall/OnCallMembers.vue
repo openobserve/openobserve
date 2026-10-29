@@ -31,6 +31,7 @@
               multiple
               searchable
               :placeholder="t('oncall.memberPickPlaceholder')"
+              :aria-label="t('oncall.membersPickerLabel')"
               :options="userOptions"
               :loading="loadingUsers"
               data-test="oncall-members-user-select"
@@ -40,6 +41,7 @@
               ref="memberPickerRef"
               v-model="fallbackEmails"
               :placeholder="t('oncall.memberEmailPlaceholder')"
+              :aria-label="t('oncall.membersPickerLabel')"
               :help-text="t('oncall.memberEmailFallbackHint')"
               data-test="oncall-members-email-input"
             />
