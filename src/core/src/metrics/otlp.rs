@@ -193,7 +193,10 @@ pub async fn otlp_json(org_id: &str, body: Bytes, user: IngestUser) -> HttpRespo
     };
     super::otlp_json_compat::normalize(&mut body_json);
     let request = match serde_json::from_value::<ExportMetricsServiceRequest>(body_json) {
-        Ok(req) => req,
+        Ok(mut req) => {
+            crate::ingestion::otlp_json::restore_metrics_empty_slots(&mut req);
+            req
+        }
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: org_id: {org_id}, error: {e}");
             return otlp_error_response(

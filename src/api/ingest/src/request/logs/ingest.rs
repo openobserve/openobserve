@@ -31,9 +31,9 @@ use ingestion_common::{
     KinesisFHIngestionResponse, KinesisFHRequest,
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::ingestion::check_ingestion_allowed;
+use openobserve_core::{auth::UserEmail, ingestion::otlp_json};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
@@ -524,6 +524,7 @@ pub async fn otlp_logs_write(
         Some(OtlpRequestType::HttpJson) => {
             match config::utils::json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(
                 body.as_ref(),
+                otlp_json::restore_logs_empty_slots,
             ) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
                 Err(e) => {

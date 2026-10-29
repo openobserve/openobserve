@@ -684,7 +684,10 @@ pub async fn otlp_json(
     in_stream_name: Option<&str>,
     user: IngestUser,
 ) -> Result<HttpResponse, Error> {
-    let request = match json::from_slice_lenient_otlp::<ExportTraceServiceRequest>(body.as_ref()) {
+    let request = match json::from_slice_lenient_otlp::<ExportTraceServiceRequest>(
+        body.as_ref(),
+        crate::ingestion::otlp_json::restore_traces_empty_slots,
+    ) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid json: org_id: {org_id}, error: {e}");
@@ -2044,8 +2047,11 @@ mod tests {
         let body = br#"{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"repro"}},{"key":"geo.locality.region","value":{}}]},"scopeSpans":[{"scope":{"name":"s","attributes":[{"key":"scope.empty","value":{}}]},"spans":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"0123456789abcdef","name":"repro","kind":1,"startTimeUnixNano":"1793184000000000000","endTimeUnixNano":"1793184000000000001","attributes":[{"key":"probe","value":{}},{"key":"list","value":{"arrayValue":{}}},{"key":"map","value":{"kvlistValue":{}}}],"events":[{"timeUnixNano":"1793184000000000000","name":"e","attributes":[{"key":"b","value":{}}]}],"links":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"0123456789abcdee","attributes":[{"key":"c","value":{}}]}]}]}]}]}"#;
         assert!(config::utils::json::from_slice::<ExportTraceServiceRequest>(body).is_err());
 
-        let request: ExportTraceServiceRequest =
-            config::utils::json::from_slice_lenient_otlp(body).unwrap();
+        let request: ExportTraceServiceRequest = config::utils::json::from_slice_lenient_otlp(
+            body,
+            crate::ingestion::otlp_json::restore_traces_empty_slots,
+        )
+        .unwrap();
         let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
         let resource_spans = &request.resource_spans[0];
         let resource = resource_spans.resource.as_ref().unwrap();
@@ -2083,8 +2089,11 @@ mod tests {
         let body = br#"{"resourceSpans":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":0.10}}]},"scopeSpans":[{"scope":{"name":"s"},"spans":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"eee19b7ec3c1b174","name":"op","kind":2,"startTimeUnixNano":"1789000000000000001","endTimeUnixNano":"1789000000000000002","attributes":[{"key":"a","value":{"doubleValue":1e0}}],"events":[{"timeUnixNano":"1789000000000000001","name":"e","attributes":[{"key":"b","value":{"doubleValue":1.50}}]}],"links":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"eee19b7ec3c1b175","attributes":[{"key":"c","value":{"doubleValue":-2.5E-3}}]}]}]}]}]}"#;
         assert!(config::utils::json::from_slice::<ExportTraceServiceRequest>(body).is_err());
 
-        let request: ExportTraceServiceRequest =
-            config::utils::json::from_slice_lenient_otlp(body).unwrap();
+        let request: ExportTraceServiceRequest = config::utils::json::from_slice_lenient_otlp(
+            body,
+            crate::ingestion::otlp_json::restore_traces_empty_slots,
+        )
+        .unwrap();
         let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
         let resource_spans = &request.resource_spans[0];
         let resource = resource_spans.resource.as_ref().unwrap();
