@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
-      <p>{{ t("user.deleteUsersMsg", { count: selectedUsers.length }) }}</p>
+      <p>{{ t("user.deleteUsersMsg", { count: bulkDeleteCount }) }}</p>
       <p v-if="bulkBlockCount > 0" class="mt-2">
         {{ t("user.deleteUsersBlockNote", { count: bulkBlockCount }) }}
       </p>
