@@ -835,7 +835,7 @@ function onChildMouseenter(event: MouseEvent) {
         role="menu"
         :aria-label="title"
         :aria-describedby="showTrialNote ? trialNoteId : undefined"
-        class="nav-group-flyout rounded-default border-dropdown-border bg-dropdown-bg min-w-52 border p-1 shadow-md"
+        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 border border-transparent p-1"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"

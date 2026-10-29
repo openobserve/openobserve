@@ -33,9 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm"
           data-test="downtime-list-add-btn"
+          :aria-label="
+            downtimeDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('alerts.downtimes.newDowntime') })
+              : undefined
+          "
           @click="createDowntime"
         >
           {{ t("alerts.downtimes.newDowntime") }}
+          <EditorDraftDot
+            v-if="downtimeDrafts.hasNew"
+            :saved-at="downtimeDrafts.savedAt(null)"
+            corner
+            data-test="downtime-list-add-draft-dot"
+          />
         </OButton>
       </template>
 
@@ -211,6 +222,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                   <span class="truncate">{{ row.name }}</span>
+                  <EditorDraftDot
+                    v-if="downtimeDrafts.ids.has(row.id)"
+                    :saved-at="downtimeDrafts.savedAt(row.id)"
+                    :data-test="`downtime-list-${row.id}-draft-dot`"
+                  />
                   <span v-if="row.show_banner" class="inline-flex shrink-0">
                     <OIcon name="campaign" size="xs" class="text-text-secondary" />
                     <OTooltip :content="t('alerts.downtimes.bannerOn')" />
@@ -366,9 +382,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-sm"
                       icon-left="content-copy"
                       :data-test="`downtime-list-${row.id}-duplicate`"
+                      :aria-label="
+                        downtimeDrafts.hasNewVariant(`clone:${row.id}`)
+                          ? t('common.editorDraft.newDot', {
+                              label: t('alerts.downtimes.actions.duplicate'),
+                            })
+                          : undefined
+                      "
                       @click.stop="duplicateDowntime(row)"
                     >
-                      <OTooltip side="bottom" :content="t('alerts.downtimes.actions.duplicate')" />
+                      <OTooltip
+                        side="bottom"
+                        :content="
+                          downtimeDrafts.hasNewVariant(`clone:${row.id}`)
+                            ? draftLabel(
+                                t('alerts.downtimes.actions.duplicate'),
+                                downtimeDrafts.savedAtVariant(`clone:${row.id}`),
+                              )
+                            : t('alerts.downtimes.actions.duplicate')
+                        "
+                      />
+                      <EditorDraftDot
+                        v-if="downtimeDrafts.hasNewVariant(`clone:${row.id}`)"
+                        corner
+                        :tooltip="false"
+                        :data-test="`downtime-list-${row.id}-duplicate-draft-dot`"
+                      />
                     </OButton>
                   </span>
                   <ODropdown align="end">
@@ -377,10 +416,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="ghost"
                         size="icon-sm"
                         icon-left="more-vert"
-                        :aria-label="t('alerts.downtimes.actions.more')"
+                        :aria-label="moreActionsLabel(row)"
                         :data-test="`downtime-list-${row.id}-more`"
                         @click.stop
-                      />
+                      >
+                        <EditorDraftDot
+                          v-if="downtimeDrafts.hasNewVariant(`clone:${row.id}`)"
+                          corner
+                          class="md:hidden"
+                          :data-test="`downtime-list-${row.id}-more-draft-dot`"
+                        />
+                      </OButton>
                     </template>
                     <MuteMenuItems
                       v-if="isExtendable(row)"
@@ -424,6 +470,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @select="duplicateDowntime(row)"
                     >
                       {{ t("alerts.downtimes.actions.duplicate") }}
+                      <EditorDraftDot
+                        v-if="downtimeDrafts.hasNewVariant(`clone:${row.id}`)"
+                        :saved-at="downtimeDrafts.savedAtVariant(`clone:${row.id}`)"
+                        :data-test="`downtime-list-${row.id}-duplicate-menu-draft-dot`"
+                      />
                     </ODropdownItem>
                     <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
@@ -615,6 +666,11 @@ import { DEFAULT_DOWNTIME_FOLDER } from "@/utils/downtimes/folderDefault";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import useBreakpoint from "@/composables/useBreakpoint";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import ExtendDowntimeDialog from "./ExtendDowntimeDialog.vue";
 import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
 import MuteMenuItems from "./MuteMenuItems.vue";
@@ -640,11 +696,22 @@ const RAIL_COLORS: Record<DowntimeListItem["status"], string> = {
 
 const { t } = useI18nTyped();
 const store = useStore();
+const draftLabel = useDraftLabel();
 const viewerZone = useViewerTimezone();
 const route = useRoute();
 const router = useRouter();
 const orgId = useOrgId();
 const { toast } = useToast();
+const downtimeDrafts = useEditorDraftIds("downtime");
+const { isMobile } = useBreakpoint();
+// Only below md does the menu hold Duplicate and show the dot, so only there may its name claim the draft.
+const moreActionsLabel = (row: DowntimeListItem): I18nText => {
+  const label = t("alerts.downtimes.actions.more");
+  const variant = `clone:${row.id}`;
+  return isMobile.value && downtimeDrafts.hasNewVariant(variant)
+    ? draftLabel(label, downtimeDrafts.savedAtVariant(variant))
+    : label;
+};
 
 const listQuery = useQuery(() =>
   Object.assign(downtimesListQuery(orgId.value), { enabled: !!orgId.value }),
@@ -1127,10 +1194,14 @@ const askDelete = (row: DowntimeListItem) => {
 
 const confirmDelete = async () => {
   deleteOpen.value = false;
+  const id = pendingDelete.value;
   try {
-    await deleteMutation.mutateAsync({
-      id: pendingDelete.value,
-      folder: folderOf(pendingDelete.value),
+    await deleteMutation.mutateAsync({ id, folder: folderOf(id) });
+    deleteEditorDraftsFor({
+      kind: "downtime",
+      org: orgId.value,
+      entityId: id,
+      variant: `clone:${id}`,
     });
     toast({ variant: "success", message: t("toastMessages.downtimes.deleted") });
   } catch {

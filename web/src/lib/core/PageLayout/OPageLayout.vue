@@ -213,7 +213,8 @@ import { PAGE_LAYOUT_SIDEBAR_KEY } from "./pageLayoutSidebar";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
-  label: I18nText;
+  /** Optional, as on OPageHeader: without it the button reads plain "Back". */
+  label?: I18nText;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;

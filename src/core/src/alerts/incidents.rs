@@ -885,6 +885,15 @@ pub async fn correlate_alert_to_incident(
         }
     }
 
+    // A new alert is new evidence, so a page whose ladder ran out may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && downtime.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(&alert.org_id, incident_id).await;
+    }
+
     // Starts after routing decides L0; an un-mute keeps an already stored off decision.
     #[cfg(feature = "enterprise")]
     if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome
@@ -1032,6 +1041,14 @@ pub async fn correlate_external_event(
         None,
     )
     .await?;
+
+    // A new external alert is new evidence too, so an unanswered page may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(org_id, incident_id).await;
+    }
 
     // No on-call routing on this path, so nothing decides L0 and the run starts.
     #[cfg(feature = "enterprise")]
@@ -2613,6 +2630,71 @@ async fn start_unmuted_incident_rca(
     }
 }
 
+/// Tells each of the incident's pages that a new alert joined, re-running a ladder that ran out.
+#[cfg(feature = "enterprise")]
+async fn page_again_after_new_alert(org_id: &str, incident_id: &str) {
+    use config::meta::oncall::NewAlertEffect;
+    use o2_enterprise::enterprise::oncall::{escalation::ENGINE_ACTOR, replicate};
+
+    let now = config::utils::time::now_micros();
+    let pages = match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await {
+        Ok(pages) => pages,
+        Err(e) => {
+            log::error!("[incidents] on-call pages of {org_id}/{incident_id}: {e}");
+            return;
+        }
+    };
+    for page in pages {
+        let repaged = match page.on_new_alert(now) {
+            NewAlertEffect::Nothing => continue,
+            NewAlertEffect::NoteOnly => false,
+            // Ok(false): acked, snoozed or re-run since the read, so this alert only gets the note.
+            NewAlertEffect::PageAgain => match restart_exhausted_ladder(org_id, &page, now).await {
+                Ok(repaged) => repaged,
+                Err(e) => {
+                    log::error!("[incidents] could not page {org_id}/{} again: {e}", page.id);
+                    continue;
+                }
+            },
+        };
+        let event = page.new_alert_note(repaged, ENGINE_ACTOR, now);
+        if let Err(e) = replicate::add_event(org_id, &page.id, &event).await {
+            log::error!("[incidents] timeline of {org_id}/{}: {e}", page.id);
+        }
+    }
+}
+
+/// Re-runs an exhausted page's ladder if nobody touched it since `seen`, then re-arms its timer.
+#[cfg(feature = "enterprise")]
+async fn restart_exhausted_ladder(
+    org_id: &str,
+    seen: &config::meta::oncall::Response,
+    now: i64,
+) -> Result<bool, anyhow::Error> {
+    use config::meta::triggers::{Trigger, TriggerModule};
+    use o2_enterprise::enterprise::oncall::replicate;
+
+    let Some(updated) =
+        infra::table::oncall_responses::restart_exhausted(org_id, seen, now).await?
+    else {
+        return Ok(false);
+    };
+    // Upsert keeps the row's data; a racing tick may delete it, and the reconcile sweep re-arms it.
+    infra::scheduler::arm_with(
+        infra::db::get_orm_client_rw().await,
+        &Trigger {
+            org: org_id.to_string(),
+            module: TriggerModule::OncallEscalation,
+            module_key: updated.id.clone(),
+            next_run_at: now,
+            ..Default::default()
+        },
+    )
+    .await?;
+    replicate::response(&updated).await;
+    Ok(true)
+}
+
 /// A manual run does not decide L0, so only a stored off reason skips the un-mute decision.
 #[cfg(feature = "enterprise")]
 fn l0_undecided(incident: &infra::table::entity::alert_incidents::Model) -> bool {
@@ -3134,6 +3216,10 @@ pub async fn update_status_as(
     } else {
         infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
     };
+    // The ack guard left a resolved row alone: record and replicate nothing.
+    if status == "acknowledged" && updated.status != "acknowledged" {
+        return model_to_incident(updated).await;
+    }
     if status == "acknowledged" && updated.acknowledged_by.as_deref() == Some(user_id) {
         ack_incident_alerts(org_id, incident_id, user_id).await;
     }

@@ -589,13 +589,7 @@
     </OPageLayout>
   </OForm>
 
-  <ConfirmDialog
-    v-model="leaveDialog.show"
-    :title="t('aiObservability.experiments.form.leaveTitle')"
-    :message="t('aiObservability.experiments.form.leaveMessage')"
-    @update:ok="leaveDialog.onConfirm"
-    @update:cancel="leaveDialog.show = false"
-  />
+  <EditorDraftDialogs :draft="experimentDraft" />
   <ConfirmDialog
     v-model="costDialog.show"
     :title="t('aiObservability.experiments.form.costConfirmTitle')"
@@ -606,10 +600,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { debounce } from "lodash-es";
 import { useStore } from "vuex";
-import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -619,6 +613,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, {
   commonInputFields,
@@ -693,7 +689,6 @@ const previewRequests = createPreviewRequestGate();
 let previewedFor = "";
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 const idempotencyKey = ref(nextIdempotencyKey());
-const leaveDialog = reactive({ show: false, onConfirm: () => {} });
 // The body awaiting the user's OK to go over the cost warning threshold. Cancel
 // just closes the dialog: the form keeps its state and nothing is resent.
 const costDialog = reactive({
@@ -704,7 +699,10 @@ const costDialog = reactive({
 // True while a confirmed create runs: it starts from the dialog, outside the
 // form's own submit, so isSubmitting does not cover it.
 const sendingConfirmed = ref(false);
-let allowLeave = false;
+// Set while the leave dialog's Save runs, so a successful create stays on the page.
+let leaveSave: { saved: boolean } | null = null;
+// A continued prompt_ref draft keeps its own model and temperature over the resolved prompt's.
+let draftOverrides: { model: string; temperature: number } | null = null;
 
 /** A query value only when it is really there — an absent key must fall through
  *  to the form default, not overwrite it with "". */
@@ -746,6 +744,7 @@ const userPrompt = form.useStore((s: any) => s.values.userPrompt as string);
 const systemPrompt = form.useStore((s: any) => s.values.systemPrompt as string);
 const sources = form.useStore((s: any) => (s.values.sources ?? []) as string[]);
 const isDirty = form.useStore((s: any) => s.isDirty as boolean);
+const formValues = form.useStore((state) => state.values);
 
 const datasetSelected = computed(() => !!datasetId.value);
 const providerSelected = computed(() => !!providerId.value);
@@ -853,8 +852,16 @@ async function resolvePromptSelection() {
     });
     if (request !== promptResolveRequest) return;
     resolvedPrompt.value = resolved;
+    // A new version re-runs this resolve, so the draft's overrides wait for that one too.
+    const settled = promptVersion.value === String(resolved.version.version);
     form.setFieldValue("promptId", resolved.prompt.entityId);
     form.setFieldValue("promptVersion", String(resolved.version.version));
+    if (draftOverrides) {
+      form.setFieldValue("model", draftOverrides.model);
+      form.setFieldValue("temperature", draftOverrides.temperature);
+      if (settled) draftOverrides = null;
+      return;
+    }
     if (!model.value) form.setFieldValue("model", resolved.version.config.model ?? "");
     const baseTemperature = resolved.version.config.params?.temperature;
     if (typeof baseTemperature === "number") {
@@ -1177,13 +1184,17 @@ async function send(body: ExperimentCreatePayload) {
       ? await submitClone(body)
       : (await createExperimentWrite.mutateAsync(body)).experiment.id;
     idempotencyKey.value = nextIdempotencyKey();
-    allowLeave = true;
     toast({
       variant: "success",
       message: cloning.value
         ? t("aiObservability.experiments.cloneSuccess")
         : t("aiObservability.experiments.createSuccess"),
     });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    experimentDraft.markSaved();
     router.push(aiExperimentsRoute(orgId.value, { selectedId: createdId }));
   } catch (error: any) {
     // 412 = over the cost warning threshold. Nothing was stored, so the
@@ -1254,24 +1265,53 @@ onBeforeUnmount(() => runPreviewAfterTyping.cancel());
 watch(datasetId, loadDatasetRows, { immediate: true });
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
-// A locked page cannot be edited, and its locked confirm button would trap the user.
+// A locked page cannot be edited, and its locked Save in the leave dialog would trap the user.
 const { locked: pageLocked } = useFeatureLock();
 
-onBeforeRouteLeave((to, _from, next) => {
-  if (allowLeave || pageLocked.value || !isDirty.value) {
-    next();
-    return;
-  }
-  // Cancel and ask in a dialog — browsers suppress confirm() during navigation.
-  next(false);
-  const destination = to.fullPath;
-  leaveDialog.onConfirm = () => {
-    leaveDialog.show = false;
-    allowLeave = true;
-    router.push(destination);
-  };
-  leaveDialog.show = true;
+const experimentDraft = useEditorDraft<ExperimentForm>({
+  kind: "experiment",
+  entityLabel: () => t("common.editorDraft.entities.experiment"),
+  // A clone draft is keyed by its source run, so its dot lands on that run's Clone action.
+  entityId: () => cloneOfId.value || null,
+  snapshot: () => ({ ...formValues.value }),
+  apply: async (data) => {
+    draftOverrides =
+      data.taskType === "prompt_ref" ? { model: data.model, temperature: data.temperature } : null;
+    for (const [field, value] of Object.entries(data)) {
+      form.setFieldValue(field as keyof ExperimentForm, value as never);
+    }
+    await nextTick();
+    if (!resolvingPrompt.value) draftOverrides = null;
+  },
+  base: () => (cloning.value ? cloneDefinition(cloneSource.value) : undefined),
+  hasChanges: () => !pageLocked.value && isDirty.value,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
 });
+
+// Only what a clone copies is hashed; status and progress change while the source runs.
+function cloneDefinition(source: LlmExperiment | null) {
+  if (!source) return null;
+  return {
+    id: source.id,
+    name: source.name,
+    description: source.description,
+    datasetId: source.datasetId,
+    datasetVersion: source.datasetVersion,
+    datasetFilter: source.datasetFilter,
+    task: source.task,
+    scorers: source.scorers,
+    trialCount: source.trialCount,
+  };
+}
 
 onMounted(async () => {
   if (!orgId.value) return;
@@ -1288,15 +1328,16 @@ onMounted(async () => {
   // Registry reads are best-effort until their task type is selected.
   await Promise.all([loadRemoteTasks(), loadPrompts()]);
   providers.value = chatProviders(providers.value);
-  if (cloning.value) await loadCloneSource();
+  if (cloning.value && !(await loadCloneSource())) return;
   const preselected = providers.value.find((p) => p.isDefault ?? p.is_default);
   if (preselected && !providerId.value) form.setFieldValue("providerId", preselected.id);
   if (previewReady.value) runPreview();
+  await experimentDraft.start();
 });
 
 // Seeded field by field rather than through defaultValues: the source is only
 // in hand after a request, and the form is already mounted by then.
-async function loadCloneSource() {
+async function loadCloneSource(): Promise<boolean> {
   let source: LlmExperiment;
   try {
     // Smallest sample the server accepts, not none: only the definition is read
@@ -1308,7 +1349,7 @@ async function loadCloneSource() {
       message:
         raw(error?.response?.data?.message) || t("aiObservability.experiments.cloneLoadError"),
     });
-    return;
+    return false;
   }
   cloneSource.value = source;
   const values = experimentFormFromExperiment(
@@ -1318,5 +1359,6 @@ async function loadCloneSource() {
   for (const [field, value] of Object.entries(values)) {
     form.setFieldValue(field as keyof ExperimentForm, value as never);
   }
+  return true;
 }
 </script>

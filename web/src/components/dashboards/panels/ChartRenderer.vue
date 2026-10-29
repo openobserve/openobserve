@@ -614,7 +614,7 @@ export default defineComponent({
         followOverlayLeave(overlay);
         return;
       }
-      if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
+      hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
     };
 
     // The overlays are teleported out of the chart, so leaving one for anywhere but the chart is leaving the chart.

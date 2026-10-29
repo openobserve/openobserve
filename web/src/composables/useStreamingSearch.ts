@@ -18,7 +18,8 @@ import { gt } from "@/types/i18n";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
-import { getUUID, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
+import { getUUID } from "@/utils/zincutils";
+import { expireSession } from "@/utils/sessionServices";
 import { attemptTokenRefresh } from "@/services/http";
 import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 
@@ -464,11 +465,7 @@ const useHttpStreaming = () => {
         // A refresh was already attempted in Path 1 (initial fetch 401 handler).
         // Reaching here means the refresh didn't help or json() parsing failed
         // on a 401 response — fall back to logout.
-        store.dispatch("logout");
-        useLocalCurrentUser("", true);
-        useLocalUserInfo("", true);
-        sessionStorage.clear();
-        window.location.reload();
+        expireSession(store);
       } else {
         onError(traceId, withErrorFields(error));
       }

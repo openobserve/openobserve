@@ -54,12 +54,6 @@ export interface Alert {
     enabled: boolean;
     fingerprint_fields: string[];
     time_window_minutes?: number;
-    grouping?: {
-      enabled: boolean;
-      max_group_size: number;
-      send_strategy: "first_with_count" | "summary" | "all";
-      group_wait_seconds: number;
-    };
   };
   creates_incident?: boolean;
   /** Send one notification to the firing's destinations when the alert recovers. */

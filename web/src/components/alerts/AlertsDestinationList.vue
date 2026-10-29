@@ -36,9 +36,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm"
           :disabled="!templates.length"
+          :aria-label="
+            destinationDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('alert_destinations.add') })
+              : undefined
+          "
           @click="editDestination(null)"
-          >{{ t(`alert_destinations.add`) }}</OButton
-        >
+          >{{ t(`alert_destinations.add`) }}
+          <EditorDraftDot
+            v-if="destinationDrafts.hasNew"
+            :saved-at="destinationDrafts.savedAt(null)"
+            corner
+            data-test="alert-destination-list-add-draft-dot"
+        /></OButton>
       </template>
       <template #actions-overflow>
         <OButton
@@ -168,6 +178,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : templates.length && editDestination(null)
               "
             />
+          </template>
+
+          <template #cell-name="{ row }">
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="destinationDrafts.ids.has(row.name)"
+                :saved-at="destinationDrafts.savedAt(row.name)"
+                :data-test="`alert-destination-list-${row.name}-draft-dot`"
+              />
+            </div>
           </template>
 
           <template #cell-template="{ row }">
@@ -448,6 +469,9 @@ import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { slackInstallationsQuery } from "@/services/slack.queries";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import { useOncallRoomNames, useSlackAppSwitch } from "@/composables/slack/useSlackAppSwitch";
@@ -484,6 +508,7 @@ export default defineComponent({
     OPageLayout,
     AlertSectionTabs,
     DependencyUsageCell,
+    EditorDraftDot,
   },
   setup() {
     const store = useStore();
@@ -491,6 +516,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
     const { track } = useReo();
+    const destinationDrafts = useEditorDraftIds("alert_destination");
 
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
 
@@ -694,6 +720,8 @@ export default defineComponent({
       // Anything that failed to delete stays selected, so a bulk retry is one click.
       selectedDestinations.value = selectedDestinations.value.filter((d: any) => !gone.has(d.name));
       const org = store.state.selectedOrganization.identifier;
+      for (const name of gone)
+        deleteEditorDraftsFor({ kind: "alert_destination", org, entityId: name });
       // The rows above are a render of the cached list, not the cache itself —
       // splice the names out of every cached module list too, or the row returns
       // on the next visit inside staleTime.
@@ -706,6 +734,14 @@ export default defineComponent({
           depNodeId("destination", name),
           depGraph.value,
         );
+    };
+
+    const dropDraftsOfMissing = (names: string[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      const present = new Set(destinations.value.map((d) => d.name));
+      for (const name of names)
+        if (!present.has(name))
+          deleteEditorDraftsFor({ kind: "alert_destination", org, entityId: name });
     };
 
     // Deleting an alert in the impact dialog leaves this list's rows untouched, so
@@ -791,6 +827,7 @@ export default defineComponent({
           // "Used by" counts still follow every write.
           if (force) invalidateDependencyGraphCache();
           loadDepGraph(org, force ? ["alerts", "templates"] : []);
+          return true;
         })
         .catch((err: any) => {
           forbidden.value = forbiddenState(err);
@@ -801,6 +838,7 @@ export default defineComponent({
             });
           }
           dismiss();
+          return false;
         })
         .finally(() => {
           dismiss();
@@ -1099,7 +1137,7 @@ export default defineComponent({
           selectedDestinations.value = [];
           // Forced: this branch exists to hear it from the server, and an unforced
           // read inside staleTime answers from cache without asking.
-          getDestinations(true);
+          if (await getDestinations(true)) dropDraftsOfMissing(payload.ids);
         }
       } catch (error: any) {
         dismiss();
@@ -1145,6 +1183,7 @@ export default defineComponent({
       t,
       lastUpdatedAt,
       depGraph,
+      destinationDrafts,
       showDestinationEditor,
       destinations,
       columns,

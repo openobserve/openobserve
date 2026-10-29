@@ -2,6 +2,8 @@
  * Utility functions for dashboard panel configuration conditions
  */
 
+import { isRowTimeline } from "./chartTypeGroups";
+
 interface PanelQueriesState {
   data: { queries?: Array<{ config?: { query_type?: string } } | null> };
   layout?: { hiddenQueries?: number[] };
@@ -384,5 +386,5 @@ export const shouldShowTimeShift = (
 
 /** Whether the PromQL range/instant selector applies; a state timeline always runs a range query. */
 export const shouldShowPromQLQueryType = (dashboardPanelData: any): boolean => {
-  return dashboardPanelData.data.type !== "state-timeline";
+  return !isRowTimeline(dashboardPanelData.data.type);
 };

@@ -257,6 +257,47 @@ describe("OTable", () => {
     });
   });
 
+  describe("pagination: client with filters", () => {
+    const INFO = '[data-test="o2-table-pagination-info"]';
+    const filterableColumns = (): OTableColumnDef<TestRow>[] =>
+      makeColumns().map((c) => (c.id === "status" ? { ...c, filterable: true } : c));
+    const rowsWithFourPending = (): TestRow[] =>
+      makeRows(16).map((r, i) => (i < 4 ? { ...r, status: "Pending" } : r));
+    const footerText = () => wrapper.find(INFO).text().replace(/\s+/g, " ");
+
+    it("counts only rows matching the global filter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: rowsWithFourPending(),
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 10,
+          globalFilter: "Pending",
+        },
+      });
+      await nextTick();
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+    });
+
+    it("counts only rows matching a column filter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: rowsWithFourPending(),
+          columns: filterableColumns(),
+          pagination: "client",
+          pageSize: 10,
+        },
+      });
+      expect(footerText()).toMatch(/1 - 10 \S+ 16$/);
+
+      (wrapper.vm as any).table.getColumn("status").setFilterValue(["Pending"]);
+      await nextTick();
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+    });
+  });
+
   // ── Server-Side Pagination ──────────────────────────────────
 
   describe("pagination: server", () => {
@@ -900,6 +941,29 @@ describe("OTable", () => {
 
       expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(0);
       expect(localStorage.getItem("o2-tables-column-state-v1")).toBe(stored);
+    });
+  });
+
+  describe("persisted columns", () => {
+    beforeEach(() => localStorage.clear());
+
+    /// A column removed from a table must not break a layout saved while it existed.
+    it("ignores saved state for a column the table no longer has", () => {
+      localStorage.setItem(
+        "o2-tables-column-state-v1",
+        JSON.stringify({ "gone-column": { visibility: { state: true }, sizes: { state: 160 } } }),
+      );
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          tableId: "gone-column",
+          persistColumns: true,
+        },
+      });
+
+      expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(2);
+      expect(wrapper.find('[data-test="o2-table-cell-state"]').exists()).toBe(false);
     });
   });
 
@@ -1952,6 +2016,25 @@ describe("OTable", () => {
     it("still builds every row for an expandable table that does not opt in", () => {
       wrapper = mountWindowed({});
       expect(rowModelSize(wrapper)).toBe(300);
+    });
+
+    it("counts every row in the footer while the row model is windowed", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2000),
+          columns: makeColumns(),
+          virtualScroll: true,
+          windowRowModel: true,
+          pagination: "none",
+          sorting: "server",
+        },
+        slots: {
+          "pagination-bar": `<template #pagination-bar="s"><span data-test="total-rows">{{ s.totalRows }}</span></template>`,
+        },
+      });
+      await nextTick();
+      expect(rowModelSize(wrapper)).toBeLessThan(2000);
+      expect(wrapper.find('[data-test="total-rows"]').text()).toBe("2000");
     });
 
     it("never windows a tree", () => {

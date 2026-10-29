@@ -26,6 +26,11 @@ import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
 import OnCallTeamDetail from "@/views/OnCall/OnCallTeamDetail.vue";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -69,6 +74,7 @@ vi.mock("vue-router", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
+import shiftParity from "../../../../src/config/src/meta/oncall/shift_parity.json";
 
 const service = vi.mocked(oncallService);
 const toasted = vi.mocked(toast);
@@ -113,6 +119,7 @@ const rotation = (id: string, name: string) => ({
 
 describe("OnCallTeamDetail", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.clearAllMocks();
     delete routeParams.tab;
     service.getTeam.mockResolvedValue({
@@ -442,6 +449,45 @@ describe("OnCallTeamDetail", () => {
       expect(service.listOverrides.mock.calls.length).toBeGreaterThan(before);
     });
 
+    // Swap covers are stored at the handovers the server counts in the team's zone.
+    it("offers swap shifts at the team-zone handovers the server uses", async () => {
+      const c = shiftParity[0];
+      const now = vi.spyOn(Date, "now").mockReturnValue(c.at_micros / 1000);
+      service.getTeam.mockResolvedValue({
+        data: { id: "team_1", name: "Platform", timezone: c.timezone },
+      } as any);
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: c.timezone,
+          rotations: [
+            {
+              id: "rot_1",
+              name: "Primary",
+              shift_rules: [
+                {
+                  name: "Base",
+                  members: c.members,
+                  shift_micros: c.shift_micros,
+                  anchor_micros: c.anchor_micros,
+                },
+              ],
+            },
+          ],
+        },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      const [first] = wrapper.findComponent({ name: "OnCallCoverForm" }).props("shifts") as any[];
+      now.mockRestore();
+      expect(first).toMatchObject({
+        startMicros: c.shift_start,
+        endMicros: c.next_handover,
+        member: c.holder,
+      });
+    });
+
     /// A swap is two covers written back to back, so it invalidates exactly
     /// what one cover invalidates.
     it("re-reads the Covers panel after a swap too", async () => {
@@ -758,6 +804,92 @@ describe("OnCallTeamDetail", () => {
       expect(sent.data.rotations.map((r: any) => r.name)).not.toContain("Primary");
     });
 
+    it("drops the deleted rotation's draft and keeps another rotation's", async () => {
+      const scopeFor = (rotationId: string): EditorDraftScope => ({
+        kind: "oncall_schedule",
+        org: store.state.selectedOrganization.identifier,
+        entityId: `team_1/${rotationId}`,
+        userEmail: store.state.userInfo.email,
+      });
+      service.setSchedule.mockResolvedValue({ data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
+        },
+      } as never);
+      writeEditorDraft(scopeFor("rot_primary"), { data: {} });
+      writeEditorDraft(scopeFor("rot_backup"), { data: {} });
+      // A teammate's duplicate of the deleted rotation in this browser goes with it.
+      const othersCopy: EditorDraftScope = {
+        ...scopeFor("rot_primary"),
+        entityId: null,
+        variant: "team_1/clone:rot_primary",
+        userEmail: "teammate@x.io",
+      };
+      writeEditorDraft(othersCopy, { data: {} });
+      const wrapper = await openSchedule();
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
+      await flushPromises();
+      deleteConfirm(wrapper)!.vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(readEditorDraft(scopeFor("rot_primary"))).toBeNull();
+      expect(readEditorDraft(othersCopy)).toBeNull();
+      expect(readEditorDraft(scopeFor("rot_backup"))).not.toBeNull();
+    });
+
+    it("opening the editor drops drafts of rotations deleted elsewhere, and keeps the rest", async () => {
+      const base = {
+        kind: "oncall_schedule" as const,
+        org: store.state.selectedOrganization.identifier,
+        userEmail: store.state.userInfo.email,
+      };
+      const gone: EditorDraftScope = { ...base, entityId: "team_1/rot_gone" };
+      const live: EditorDraftScope = { ...base, entityId: "team_1/rot_primary" };
+      const goneClone: EditorDraftScope = {
+        ...base,
+        entityId: null,
+        variant: "team_1/clone:rot_gone",
+      };
+      const fresh: EditorDraftScope = { ...base, entityId: null, variant: "team_1/new" };
+      for (const scope of [gone, live, goneClone, fresh]) writeEditorDraft(scope, { data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as never);
+      const wrapper = await openSchedule();
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("edit", "rot_primary");
+      await flushPromises();
+
+      expect(readEditorDraft(gone)).toBeNull();
+      expect(readEditorDraft(goneClone)).toBeNull();
+      expect(readEditorDraft(live)).not.toBeNull();
+      expect(readEditorDraft(fresh)).not.toBeNull();
+    });
+
+    it("dots the Schedule and Escalation tabs while their drafts exist", async () => {
+      const scope = (kind: "oncall_schedule" | "oncall_policy"): EditorDraftScope => ({
+        kind,
+        org: store.state.selectedOrganization.identifier,
+        entityId: "team_1",
+        userEmail: store.state.userInfo.email,
+      });
+      writeEditorDraft(
+        { ...scope("oncall_schedule"), entityId: "team_1/rot_primary" },
+        { data: {} },
+      );
+      const wrapper = await openSchedule();
+
+      expect(wrapper.find('[data-test="oncall-team-tab-schedule-draft-dot"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-team-tab-policy-draft-dot"]').exists()).toBe(false);
+
+      writeEditorDraft(scope("oncall_policy"), { data: {} });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-team-tab-policy-draft-dot"]').exists()).toBe(true);
+    });
+
     /// Nothing is sent until the reader confirms — the dialog is the guard, not
     /// a receipt for a delete that already happened.
     it("leaves the schedule alone when the delete is cancelled", async () => {
@@ -1065,6 +1197,26 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-team-detail-not-available"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(false);
+  });
+
+  /// There is no team to edit on "Team not found", including one deleted while the page was open.
+  it("offers Edit team only while the team is loaded", async () => {
+    service.getTeam.mockRejectedValueOnce({ response: { status: 404 } });
+    const missing = render();
+    await flushPromises();
+    expect(missing.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(false);
+    missing.unmount();
+
+    queryClient.clear();
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(true);
+
+    service.getTeam.mockRejectedValueOnce({ response: { status: 404 } });
+    await wrapper.find('[data-test="oncall-team-refresh"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(false);
   });
 
   /// The org-level team list is the one fetch every on-call build serves

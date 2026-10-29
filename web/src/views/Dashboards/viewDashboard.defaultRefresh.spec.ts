@@ -34,6 +34,7 @@ vi.mock("vue-router", () => ({
     replace: routerReplace,
     back: vi.fn(),
     options: { history: { state: { back: null } } },
+    afterEach: vi.fn(() => vi.fn()),
   }),
   onBeforeRouteLeave: vi.fn(),
   onBeforeRouteUpdate: vi.fn(),
