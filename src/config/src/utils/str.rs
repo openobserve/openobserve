@@ -121,6 +121,17 @@ pub fn redact_dsn(s: &str) -> String {
     }
 }
 
+/// A URL cut to its origin, as a webhook's userinfo, path or query can carry its secret.
+pub fn url_origin(raw: &str) -> String {
+    let Ok(mut url) = url::Url::parse(raw) else {
+        return String::new();
+    };
+    if !url.has_host() || url.set_username("").is_err() || url.set_password(None).is_err() {
+        return String::new();
+    }
+    url[..url::Position::BeforePath].to_string()
+}
+
 /// Render a license key as `abc*****xyz`; anything shorter than 7 characters is masked whole.
 pub fn mask_license_key(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
@@ -189,6 +200,17 @@ mod tests {
             "postgres://..."
         );
         assert_eq!(redact_dsn("mongodb"), "mongodb");
+    }
+
+    #[test]
+    fn test_url_origin_drops_userinfo_path_and_query() {
+        assert_eq!(
+            url_origin("https://u:p@hooks.example.com:8443/services/T1/B1/x?token=t#f"),
+            "https://hooks.example.com:8443"
+        );
+        for raw in ["", "not a url", "mailto:a@b.c", "{{webhook}}"] {
+            assert_eq!(url_origin(raw), "", "{raw}");
+        }
     }
 
     #[test]

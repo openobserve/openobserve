@@ -434,9 +434,18 @@ pub async fn update_destination(
         ("x-o2-mcp" = json!({"description": "Get destination details", "category": "alerts"}))
     )
 )]
-pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Response {
+pub async fn get_destination(
+    Path((org_id, name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match destinations::get(&org_id, &name).await {
-        Ok(data) => MetaHttpResponse::json(Destination::from(data)),
+        Ok(data) => {
+            let mut dest = Destination::from(data);
+            if !can_write_destination(&org_id, &user_email.user_id, &name).await {
+                dest.redact_secrets();
+            }
+            MetaHttpResponse::json(dest)
+        }
         Err(e) => MetaHttpResponse::not_found(e),
     }
 }
@@ -477,7 +486,7 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
 pub async fn list_destinations(
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let module = query.get("module").map(|s| s.as_str());
     // Opt-in, mirroring ListAlerts' `include_dependencies`: off the hot list path by default.
@@ -509,6 +518,17 @@ pub async fn list_destinations(
     match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => {
             let mut items: Vec<Destination> = data.into_iter().map(Destination::from).collect();
+            let writable = futures::future::join_all(
+                items
+                    .iter()
+                    .map(|d| can_write_destination(&org_id, &user_email.user_id, &d.name)),
+            )
+            .await;
+            for (item, writable) in items.iter_mut().zip(writable) {
+                if !writable {
+                    item.redact_secrets();
+                }
+            }
             if include_usage {
                 // Same all_usage() the delete guard uses, attached only to this response's rows.
                 match destinations::all_usage(&org_id).await {
@@ -822,6 +842,30 @@ pub async fn test_send(
             message,
         }),
         Err(e) => MetaHttpResponse::bad_request(e.to_string()),
+    }
+}
+
+/// The URL and headers can post as the org, so only a destination writer reads them whole.
+async fn can_write_destination(org_id: &str, user_id: &str, name: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            name,
+            org_id,
+            user_id,
+            "destinations",
+            "PUT",
+            None,
+            false,
+            false,
+            false,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id, name);
+        true
     }
 }
 
