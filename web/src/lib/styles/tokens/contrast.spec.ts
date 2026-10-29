@@ -64,7 +64,7 @@ const LARGE_TEXT_MIN = 3;
 const NON_TEXT_MIN = 3;
 
 /** Ratchets. Both only ever go down; see the module docstring. */
-const MAX_PENDING = 93;
+const MAX_PENDING = 88;
 const MAX_EXEMPT = 37;
 /** Manifest entries on a bare alias, which are never judged. Only goes down. */
 const MAX_UNJUDGED = 7;

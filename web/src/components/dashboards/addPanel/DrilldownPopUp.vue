@@ -273,6 +273,7 @@ import { makeDrilldownPopUpSchema, type DrilldownPopUpForm } from "./DrilldownPo
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { folderIconOption } from "@/components/common/sidebar/folderIconOption";
 import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
+import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { hostmapLabelNames } from "@/utils/dashboard/convertHostmapData";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -614,7 +615,7 @@ export default defineComponent({
             value: "${" + variable.name + "}",
           })) ?? [];
 
-      if (dashboardPanelData.data.type === "sankey") {
+      if (isFlowChart(dashboardPanelData.data.type)) {
         selectedValues = [
           { label: t("dashboard.edgeSource"), value: "${edge.__source}" },
           { label: t("dashboard.edgeTarget"), value: "${edge.__target}" },
@@ -647,7 +648,7 @@ export default defineComponent({
           { label: t("dashboard.seriesValue"), value: "${series.__value}" },
           ...variableListName,
         ];
-      } else if (dashboardPanelData.data.type === "state-timeline") {
+      } else if (isRowTimeline(dashboardPanelData.data.type)) {
         selectedValues = [
           { label: t("dashboard.seriesName"), value: "${series.__name}" },
           { label: t("dashboard.seriesValue"), value: "${series.__value}" },

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
+import { formatAxisTickValue } from "../../axisTickFormat";
 import {
   calculateWidthText,
   calculateDynamicNameGap,
@@ -30,7 +31,7 @@ import {
   calculateChartDimensions,
   calculatePieChartRadius,
 } from "../../legendConfiguration";
-import { chartColor, dataZoomBrushStyle } from "@/utils/chartTheme";
+import { chartAxisLine, chartColor, chartTextColor, dataZoomBrushStyle } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
 import { processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
@@ -74,7 +75,6 @@ export function buildSQLContext(
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
     panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true;
-  // Subtle dashed grid lines so they recede behind the data
   const gridLineStyle = getGridLineStyle(store.state.theme);
   const extras: any = {};
 
@@ -663,6 +663,8 @@ export function buildSQLContext(
           fontSize: 14,
         },
         axisLabel: {
+          color: chartTextColor(),
+          fontSize: 12,
           interval:
             panelSchema.type == "h-stacked"
               ? "auto"
@@ -679,13 +681,14 @@ export function buildSQLContext(
           rotate: labelRotation,
         },
         splitLine: {
-          show: showGridlines,
+          show: false,
           lineStyle: gridLineStyle,
         },
         axisLine: {
           show: searchQueryData?.every((it: any) => it.length == 0)
             ? true
-            : (panelSchema.config?.axis_border_show ?? false),
+            : (panelSchema.config?.axis_border_show ?? true),
+          lineStyle: { color: chartAxisLine() },
         },
         axisTick: {
           show: xAxisKeys.length + breakDownKeys.length == 1 ? false : true,
@@ -720,16 +723,16 @@ export function buildSQLContext(
         ellipsis: "..",
       },
       axisLabel: {
+        color: chartTextColor(),
+        fontSize: 12,
         hideOverlap: true,
         formatter: function (value: any) {
           try {
-            return formatUnitValue(
-              getUnitValue(
-                value,
-                panelSchema?.config?.unit,
-                panelSchema?.config?.unit_custom,
-                yAxisTickDecimals,
-              ),
+            return formatAxisTickValue(
+              value,
+              panelSchema?.config?.unit,
+              panelSchema?.config?.unit_custom,
+              yAxisTickDecimals,
             );
           } catch (error) {
             return "";
@@ -775,7 +778,8 @@ export function buildSQLContext(
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
       (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
-        axis.splitLine.show = showGridlines;
+        // Gridlines run along the value axis only; the category axis draws none.
+        axis.splitLine.show = false;
         axis.splitLine.lineStyle = gridLineStyle;
       },
     );
