@@ -1045,6 +1045,59 @@ export const serializeWorkflow = (opts?: { onlyNodeId?: string }) => {
   };
 };
 
+const BRANCH_PROBE_SEP = "::path::";
+
+// The server records a Branch's output only for a handle with an edge, so a lone Run Step would drop every record; each wired handle gets a pass-through condition probe instead.
+const withBranchProbes = (workflow: any, nodeId: string) => {
+  const node = (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === nodeId);
+  const wired = new Set(
+    (workflowObj.currentSelectedWorkflow?.edges || [])
+      .filter((e: any) => e.source === nodeId)
+      .map((e: any) => e.source_handle ?? e.sourceHandle),
+  );
+  const handles = branchHandles(node).filter((h) => wired.has(h));
+  const probeId = (handle: string) => `${nodeId}${BRANCH_PROBE_SEP}${handle}`;
+  const probes = handles.map((handle) =>
+    serializeNode({
+      id: probeId(handle),
+      io_type: "default",
+      position: { x: 0, y: 0 },
+      is_disabled: false,
+      data: { node_type: "condition", conditions: null },
+    }),
+  );
+  const edges = handles.map((handle) => ({
+    id: `${probeId(handle)}-edge`,
+    source: nodeId,
+    target: probeId(handle),
+    source_handle: handle,
+  }));
+  return {
+    workflow: { ...workflow, nodes: [...workflow.nodes, ...probes], edges },
+    handles,
+    probeId,
+  };
+};
+
+/** Folds the probes' inputs into the Branch's per-handle output map and drops the probes from the result. */
+export const foldBranchProbes = (
+  nodeId: string,
+  handles: string[],
+  maps: { inputs: Record<string, any>; outputs: Record<string, any>; errors: Record<string, any> },
+) => {
+  const isProbe = (key: string) => key.startsWith(`${nodeId}${BRANCH_PROBE_SEP}`);
+  const perHandle = Object.fromEntries(
+    handles.map((h) => [h, maps.inputs[`${nodeId}${BRANCH_PROBE_SEP}${h}`] ?? []]),
+  );
+  const strip = (m: Record<string, any>) =>
+    Object.fromEntries(Object.entries(m).filter(([key]) => !isProbe(key)));
+  return {
+    inputs: strip(maps.inputs),
+    outputs: { ...strip(maps.outputs), [nodeId]: perHandle },
+    errors: strip(maps.errors),
+  };
+};
+
 // Stamp the current graph as the stored version. Called on load and after every
 // successful write, so the no-op comparison always names the newest saved state.
 export const captureStoredSnapshot = () => {
@@ -1083,9 +1136,15 @@ export const executeTestRun = async (opts: {
     // single-node run is inherently a partial graph (one node, no trigger/edges),
     // so it's ALWAYS a draft, even when the parent workflow is published.
     const draft = !!(single || wf.isDraft || workflowObj.dirtyFlag || !wf.id);
+    const sent = serializeWorkflow(single ? { onlyNodeId: single } : undefined);
+    const singleNodeData = single
+      ? (wf.nodes || []).find((n: any) => n.id === single)?.data
+      : undefined;
+    const probed =
+      singleNodeData?.node_type === "branch" ? withBranchProbes(sent, single) : undefined;
     const res = await workflowService.testWorkflow({
       org_identifier: opts.orgId,
-      workflow: serializeWorkflow(single ? { onlyNodeId: single } : undefined),
+      workflow: probed?.workflow ?? sent,
       inputs: opts.inputs,
       from_node: opts.fromNode || undefined,
       draft,
@@ -1095,14 +1154,21 @@ export const executeTestRun = async (opts: {
     if (wf.id) {
       void queryClient.invalidateQueries({ queryKey: workflowKeys.runsOf(opts.orgId, wf.id) });
     }
-    const errors = res.data?.errors || {};
+    let errors = res.data?.errors || {};
     // Per-node INPUT map: node_id -> the records that node received.
-    const inputs = res.data?.inputs || {};
+    let inputs = res.data?.inputs || {};
     // Per-node OUTPUT map: node_id -> the records that node emitted. The backend
     // now sends this directly (alongside `inputs`), so a node's Output is read
     // straight from here (see nodeTestOutput) rather than derived from downstream
     // inputs. Errors are still delivered the old way, via `errors`.
-    const outputs = res.data?.outputs || {};
+    let outputs = res.data?.outputs || {};
+    if (probed) {
+      ({ inputs, outputs, errors } = foldBranchProbes(single, probed.handles, {
+        inputs,
+        outputs,
+        errors,
+      }));
+    }
 
     if (single) {
       // Single-node Run Step: REPLACE just this node's input/output/error in the

@@ -429,6 +429,47 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(res.ranNodeIds).toEqual(["f"]);
   });
 
+  it("Run Step on a Branch probes each wired path and reports what each one routed", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        {
+          id: "b",
+          data: {
+            node_type: "branch",
+            cases: [{ handle: "case-0" }, { handle: "case-1" }],
+            else_handle: "else",
+          },
+        },
+        { id: "d0", data: { node_type: "destination" } },
+        { id: "d1", data: { node_type: "destination" } },
+      ],
+      edges: [
+        { source: "b", sourceHandle: "case-0", target: "d0" },
+        { source: "b", sourceHandle: "case-1", target: "d1" },
+      ],
+    } as any;
+    mockTest.mockResolvedValue({
+      data: {
+        inputs: { b: [{ a: 1 }, { a: 2 }], "b::path::case-0": [{ a: 1 }] },
+        outputs: { b: [{ a: 1 }], "b::path::case-0": [{ a: 1 }] },
+      },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "b", singleNode: true });
+    const arg = mockTest.mock.calls[0][0];
+    // The server drops records on a handle without an edge, so every wired path needs a target.
+    expect(arg.workflow.nodes.map((n: any) => n.id)).toEqual([
+      "b",
+      "b::path::case-0",
+      "b::path::case-1",
+    ]);
+    expect(arg.workflow.edges.map((e: any) => e.source_handle)).toEqual(["case-0", "case-1"]);
+    const res: any = workflowObj.testRun.result;
+    expect(res.inputs).toEqual({ b: [{ a: 1 }, { a: 2 }] });
+    expect(res.outputs).toEqual({ b: { "case-0": [{ a: 1 }], "case-1": [] } });
+  });
+
   it("Run Step accumulates: a second node's run keeps the first node's result", async () => {
     // Run Step on "f", then on "d" — d's run must NOT wipe f's input/output.
     mockTest.mockResolvedValue({ data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ o: 1 }] } } });

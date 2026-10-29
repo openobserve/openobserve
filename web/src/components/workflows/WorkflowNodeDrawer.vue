@@ -1257,6 +1257,7 @@ const branchPaths = computed(() =>
         runEdges(),
         workflowObj.testRun.result?.inputs,
         t,
+        workflowObj.testRun.result?.outputs,
       )
     : [],
 );

@@ -110,6 +110,12 @@ describe("branchPathCounts", () => {
     expect(paths[0].count).toBe(0);
   });
 
+  it("prefers a Run Step's per-handle outputs map over the children's inputs", () => {
+    const outputs = { br: { "case-0": recs(1), else: [] } };
+    const paths = branchPathCounts(branchNode, branchEdges, { destA: recs(5) } as any, t, outputs);
+    expect(paths.map((p) => p.count)).toEqual([1, 0]);
+  });
+
   it("returns [] for a non-branch node", () => {
     expect(branchPathCounts(conditionNode, [], {} as any, t)).toEqual([]);
   });
