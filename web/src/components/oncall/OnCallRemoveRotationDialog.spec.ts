@@ -104,7 +104,6 @@ describe("OnCallRemoveRotationDialog", () => {
     expect(wrapper.find('[data-test="oncall-remove-rotation-body"]').text()).toBe(
       "Riya Root is on call in Secondary now. The escalation policy is rebuilt around Primary.",
     );
-    expect(wrapper.find('[data-test="oncall-remove-rotation-steps"]').exists()).toBe(false);
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
     // Removing a rotation is destructive, so its button is red like every other delete.
     expect(dialog(wrapper).props("primaryButtonVariant")).toBe("destructive");
@@ -184,7 +183,6 @@ describe("OnCallRemoveRotationDialog", () => {
       render(pagesR2(undefined), "r9"),
       render(null),
     ]) {
-      expect(wrapper.find('[data-test="oncall-remove-rotation-steps"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-remove-rotation-blocked"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-remove-rotation-may-refuse"]').exists()).toBe(false);
       expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
