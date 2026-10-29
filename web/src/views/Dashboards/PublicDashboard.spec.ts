@@ -908,30 +908,6 @@ describe("PublicDashboard viewer", () => {
     ).toBe(true);
   });
 
-  it("opens in the OS theme under its own key, leaving the app's saved theme alone", async () => {
-    vi.spyOn(window, "matchMedia").mockImplementation(
-      (query: string) => ({ matches: query === "(prefers-color-scheme: dark)" }) as MediaQueryList,
-    );
-    localStorage.setItem("theme", "light");
-    localStorage.removeItem("publicDashboardTheme");
-    vi.mocked(service.getConfig).mockReturnValue(new Promise(() => {}));
-    const before = store.state.theme;
-    store.state.theme = "light";
-    try {
-      buildWrapper();
-      expect(store.state.theme).toBe("dark");
-      expect(localStorage.getItem("theme")).toBe("light");
-
-      localStorage.setItem("publicDashboardTheme", "light");
-      buildWrapper();
-      expect(store.state.theme).toBe("light");
-    } finally {
-      localStorage.removeItem("theme");
-      localStorage.removeItem("publicDashboardTheme");
-      store.state.theme = before;
-    }
-  });
-
   it("falls back to the default range when the author removes the viewer's range", async () => {
     vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
     vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);

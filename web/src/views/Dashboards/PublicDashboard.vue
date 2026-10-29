@@ -138,7 +138,7 @@
               </div>
             </div>
           </OPopover>
-          <ThemeSwitcher bordered :storage-key="PUBLIC_THEME_KEY" follow-system />
+          <ThemeSwitcher bordered />
         </template>
       </OPageHeader>
 
@@ -239,7 +239,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
-import { savedThemeMode } from "@/utils/theme";
 import { CUSTOM_VALUE } from "@/utils/dashboard/constants";
 import publicDashboardsService from "@/services/public_dashboards";
 import { formatInTimeZone } from "date-fns-tz";
@@ -318,11 +317,6 @@ const router = useRouter();
 const store = useStore();
 const { t } = useI18nTyped();
 const slug = String(route.params.slug || "");
-
-// Its own key, so a viewer's choice here never flips the signed-in app's theme.
-const PUBLIC_THEME_KEY = "publicDashboardTheme";
-// Applied before the header mounts, so the loading and error screens open in it too.
-store.dispatch("appTheme", savedThemeMode(PUBLIC_THEME_KEY, true));
 
 // A shared or reloaded link reopens on its range and tab; an unknown value falls back once the config loads.
 const queryParam = (name: string): string | null => {
