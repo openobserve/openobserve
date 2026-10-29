@@ -649,6 +649,26 @@ fn summary(ctx: &NotificationContext) -> String {
     cut(&text, SUMMARY_MAX_CHARS)
 }
 
+/// The `(operator, threshold)` the evaluation compared; `alert_threshold` is only the group-count
+/// gate for aggregate alerts.
+fn evaluated_threshold(ctx: &NotificationContext) -> (&str, &str) {
+    let level_value = match ctx.alert_level.as_str() {
+        "warning" => &ctx.alert_threshold_warn,
+        _ => &ctx.alert_threshold_crit,
+    };
+    // PromQL rule alerts leave every threshold empty, so they still print none.
+    let threshold = [level_value, &ctx.alert_threshold_crit, &ctx.alert_threshold]
+        .into_iter()
+        .find(|v| !v.is_empty())
+        .map_or("", |v| v.as_str());
+    let operator = if ctx.alert_threshold_operator.is_empty() || ctx.alert_threshold.is_empty() {
+        &ctx.alert_operator
+    } else {
+        &ctx.alert_threshold_operator
+    };
+    (operator, threshold)
+}
+
 fn description(ctx: &NotificationContext) -> String {
     let line = |label: &str, value: &str| (!value.is_empty()).then(|| format!("{label}: {value}"));
     let stream = match ctx.stream_type.as_str() {
@@ -656,10 +676,11 @@ fn description(ctx: &NotificationContext) -> String {
         "" => ctx.stream_name.clone(),
         stream_type => format!("{} ({stream_type})", ctx.stream_name),
     };
-    let condition = if ctx.alert_threshold.is_empty() {
+    let (operator, threshold) = evaluated_threshold(ctx);
+    let condition = if threshold.is_empty() {
         String::new()
     } else {
-        format!("{} {}", ctx.alert_operator, ctx.alert_threshold)
+        format!("{operator} {threshold}")
     };
     let started = utc(ctx
         .alert_start_time_millis
@@ -744,14 +765,12 @@ fn comment(ctx: &NotificationContext) -> String {
             link("View in OpenObserve")
         );
     }
-    let (value, threshold) = (&ctx.alert_agg_value, &ctx.alert_threshold);
+    let value = &ctx.alert_agg_value;
+    let (operator, threshold) = evaluated_threshold(ctx);
     let measure = match (value.is_empty(), threshold.is_empty()) {
-        (false, false) => format!(
-            " Value {value}, threshold {} {threshold}.",
-            ctx.alert_operator
-        ),
+        (false, false) => format!(" Value {value}, threshold {operator} {threshold}."),
         (false, true) => format!(" Value {value}."),
-        (true, false) => format!(" Threshold {} {threshold}.", ctx.alert_operator),
+        (true, false) => format!(" Threshold {operator} {threshold}."),
         (true, true) => String::new(),
     };
     format!(
@@ -875,6 +894,39 @@ mod tests {
              Alert description: 5xx responses from checkout.\n\
              View in OpenObserve: https://o2.example.com/s/abc"
         );
+    }
+
+    #[test]
+    fn aggregate_alert_shows_the_evaluated_threshold_not_the_group_gate() {
+        let mut ctx = alert_ctx();
+        ctx.alert_operator = ">=".into();
+        ctx.alert_threshold = "1".into();
+        ctx.alert_threshold_crit = "500".into();
+        ctx.alert_threshold_warn = "300".into();
+        ctx.alert_threshold_operator = ">".into();
+        assert!(description(&ctx).contains("Condition: > 500\n"));
+        assert!(comment(&ctx).contains("Value 812, threshold > 500."));
+        ctx.alert_level = "warning".into();
+        assert!(description(&ctx).contains("Condition: > 300\n"));
+        assert!(comment(&ctx).contains("Value 812, threshold > 300."));
+    }
+
+    #[test]
+    fn plain_alert_keeps_its_count_threshold() {
+        let mut ctx = alert_ctx();
+        ctx.alert_threshold_crit = "500".into();
+        ctx.alert_threshold_operator = ">".into();
+        assert!(description(&ctx).contains("Condition: > 500\n"));
+        assert!(comment(&ctx).contains("threshold > 500."));
+    }
+
+    #[test]
+    fn promql_rule_alert_prints_no_condition() {
+        let mut ctx = alert_ctx();
+        ctx.alert_threshold.clear();
+        ctx.promql_operator = Some(">".into());
+        assert!(!description(&ctx).contains("Condition"));
+        assert!(comment(&ctx).contains("Value 812."));
     }
 
     #[test]

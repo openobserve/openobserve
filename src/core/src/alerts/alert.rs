@@ -4243,6 +4243,13 @@ async fn build_notification_context(
             alert.trigger_condition.warning_threshold.map(|w| w as f64),
         )
     };
+    let family_operator = if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        agg.having.operator.to_string()
+    } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+        pc.operator.to_string()
+    } else {
+        alert.trigger_condition.operator.to_string()
+    };
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -4461,6 +4468,7 @@ async fn build_notification_context(
             fmt_observed(family_crit)
         },
         alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
+        alert_threshold_operator: family_operator,
         alert_start_time: alert_start_time_str,
         alert_end_time: alert_end_time_str,
         alert_start_time_millis: epoch_millis_or_na(alert_start_time),
