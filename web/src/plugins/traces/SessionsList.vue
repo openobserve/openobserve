@@ -761,7 +761,10 @@ async function loadSessions(
   resolvingScope++;
   try {
     if (genAiAgentMappingAccess.allowed && availableStreams.value.length > 0) {
-      await loadAgents(start, end, forceAgents);
+      const agentsLoad = loadAgents(start, end, forceAgents);
+      // Explicit Stream queries need no agent identity. Counts and the
+      // instrumentation banner can settle after the sessions start loading.
+      if (!modeExplicit.value || filterMode.value === "agent") await agentsLoad;
     }
   } finally {
     resolvingScope--;

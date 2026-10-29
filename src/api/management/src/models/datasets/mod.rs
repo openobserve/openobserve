@@ -120,9 +120,10 @@ impl From<ListDatasetItemsQuery> for ListDatasetItems {
 pub struct DatasetSnapshotRowsQuery {
     /// Row-level Snapshot/pin key. Defaults to the Dataset's current row version.
     pub version: Option<i64>,
-    /// Displayed write version to pin. Resolves to the highest row version at
-    /// or below it; cannot be combined with `version`. Use the returned
-    /// `snapshotVersion` as the Experiment's `datasetVersion`.
+    /// Displayed write version W to pin. Resolves to the highest row version
+    /// among rows whose write version is at or below W (labels and row versions
+    /// are separate counters); cannot be combined with `version`. Use the
+    /// returned `snapshotVersion` as the Experiment's `datasetVersion`.
     pub write_version: Option<i64>,
     /// Zero-based result offset. Defaults to 0.
     pub from: Option<usize>,
