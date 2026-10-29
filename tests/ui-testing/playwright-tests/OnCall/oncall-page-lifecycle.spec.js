@@ -70,6 +70,7 @@ const {
   getCauseAnalytics,
   eventsOfKind,
   getResponseHistory,
+  requireMailSink,
   waitForMail,
   waitForResponseState,
   RESOLUTION_CAUSES,
@@ -81,6 +82,10 @@ const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
 
 /** The cause used wherever the case needs one but is not about which one. */
 const A_CAUSE = 'noisy_threshold';
+
+/** A 404 on this record's agent report is the designed "no agent ran" answer (request/oncall/mod.rs get_response_report). */
+const isNoReportYet = (url, org, responseId) =>
+  new URL(url).pathname === `/api/${org}/oncall/responses/${responseId}/report`;
 
 const gate = { checked: false, available: false, reason: '' };
 
@@ -150,13 +155,14 @@ test.describe('On-call page lifecycle', {
   test('the golden path: fire, page the right person, ack, resolve with a cause', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
+    await requireMailSink(test);
     const f = await seedRoutedAlert(page, testInfo, 'golden');
     // Two later rungs inside a minute, so "the ack stopped the ladder" is a
     // claim about rungs that would otherwise have fired during the test.
     await shortenPolicyForSpeed(page, f.team.id, 2, [0, 45, 90]);
 
     const since = Date.now() - 2000;
-    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
     const record = pages[0];
     testLogger.info('TS-15.01 record opened', { id: record.id, team: record.team_id, priority: record.priority });
     expect(record.team_id, 'the ownership rule must put the page on the team that claims the service')
@@ -247,94 +253,61 @@ test.describe('On-call page lifecycle', {
 
   // ------------------------------------------------------------------ TS-15.03
 
-  /**
-   * UNWIRED, and kept as a fixme with its real assertions intact.
-   *
-   * Verified on this build, 15 Sep: an alert on a one-minute evaluation window
-   * over a stream nothing is still writing to DOES notice it went healthy — the
-   * record's timeline collects `recovery: the alert stopped firing`, once per
-   * evaluation — and the record nevertheless stays `state: "triggered"` with no
-   * `closed_at` eight minutes and seven recovery events later. The engine sees
-   * the recovery and does not act on it.
-   *
-   * That is the worst shape this can take: the Pages list keeps showing a page
-   * that needs somebody for a condition that has already cleared, so the screen
-   * that exists to say "what still needs a human" fills up with things that do
-   * not. The body asserts the correct behaviour — the record closes itself, no
-   * acknowledgement is forged, and nothing is delivered afterwards — so it goes
-   * green the moment the recovery is acted on.
-   */
-  test.fixme('a recovery closes the record without a human, and says nobody answered — not wired: the record collects repeated `recovery` events and stays triggered, verified 15 Sep on :5090. o2-enterprise#2481.', {
+  test('a recovery closes the record without a human, and says nobody answered', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
-    test.setTimeout(15 * 60 * 1000);
-    // A one-minute evaluation window over a stream nothing is still writing to:
-    // the window drains on its own, which is what "the condition went healthy"
-    // looks like from the engine's side.
+    test.setTimeout(10 * 60 * 1000);
+    // A one-minute window over rows ingested once drains within about two minutes: that is the recovery.
     const f = await seedRoutedAlert(page, testInfo, 'recover', {
       periodMinutes: 1, frequencyMinutes: 1,
     });
-    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
     const record = pages[0];
     testLogger.info('TS-15.03 record opened', { id: record.id });
 
-    // Nobody acks. The close must happen anyway.
-    const closed = await waitForResponseState(page, record.id, ['resolved', 'recovered', 'closed'], {
-      timeout: 10 * 60 * 1000, pollMs: 10000,
+    const closed = await waitForResponseState(page, record.id, ['resolved'], {
+      timeout: 6 * 60 * 1000, pollMs: 5000,
     });
-    testLogger.info('TS-15.03 record after recovery', {
-      state: closed.state, closedAt: closed.closed_at, ackedBy: closed.acked_by,
-    });
-    expect(closed.state, 'an alert that stops firing must close its own record — nobody is coming')
-      .not.toBe('triggered');
-
-    // "Nobody ever answered this" has to stay countable: an un-acked recovery
-    // is a different fact from one a person handled, and MTTA depends on it.
-    expect(closed.acked_by ?? null, 'a recovery must not forge an acknowledgement nobody made').toBeNull();
-
-    // The timeline says WHY it closed, so a reader is not left guessing.
     const detail = await getResponseDetail(page, record.id);
-    const closing = detail.events.filter((e) => /recover|resolv|clos/i.test(String(e.body ?? '')));
-    testLogger.info('TS-15.03 closing events', { closing });
-    expect(closing.length, 'a record that closes itself must say so on its own timeline').toBeGreaterThan(0);
-    expect(closing[closing.length - 1].actor, 'an automatic close is the engine\'s act, not a person\'s')
-      .not.toBe(closed.acked_by ?? 'never');
+    testLogger.info('TS-15.03 record after recovery', {
+      state: closed.state, closedAt: closed.closed_at, ackedBy: closed.acked_by, cause: closed.cause,
+      events: detail.events.map((e) => [e.kind, e.actor, e.body]),
+    });
+    expect(closed.closed_at, 'a record that closed itself must carry its close time').toBeTruthy();
+    expect(closed.acked_by ?? null, 'a recovery must not forge an acknowledgement nobody made').toBeNull();
+    expect(eventsOfKind(detail.events, 'ack'), 'nobody answered, and the timeline must not say otherwise')
+      .toEqual([]);
+    expect(closed.cause ?? null, 'the engine knows the signal stopped, not why, so it must not invent a cause')
+      .toBeNull();
 
-    // And the escalation stops with it: no delivery after the close.
+    const recoveries = eventsOfKind(detail.events, 'recovery');
+    expect(recoveries.length, 'the timeline must say the signal recovered — once, not once per evaluation')
+      .toBe(1);
+    expect(recoveries[0].actor, 'an automatic close is the engine\'s act, not a person\'s').toBe('o2-engine');
+    const closes = eventsOfKind(detail.events, 'state').filter((e) => /^resolved/.test(String(e.body)));
+    expect(closes.length, 'the record closed once').toBe(1);
+    expect(closes[0].actor, 'the engine closed it').toBe('o2-engine');
+    expect(closes[0].body, 'and the timeline says it recovered rather than that someone fixed it')
+      .toMatch(/recovered automatically/);
+    const humanActors = detail.events.filter((e) => e.actor !== 'o2-engine');
+    expect(humanActors, 'nobody but the engine may have acted on a page nobody answered').toEqual([]);
+
     const ledger = await getDeliveries(page, record.id);
     const afterClose = ledger.deliveries.filter((row) => row.at > closed.closed_at);
     expect(afterClose, 'nothing may be delivered for a record that has already closed').toEqual([]);
   });
 
-  /**
-   * The header half of TS-15.01, UNWIRED, kept as a fixme with its real
-   * assertions intact.
-   *
-   * Verified on this build, 15 Sep: on an open record whose
-   * `oncall-response-detail-page` root, `oncall-response-stats` and
-   * `oncall-response-elapsed` all render, the ENTIRE subtitle slot is absent —
-   * `oncall-response-subtitle`, `oncall-response-team-link` and
-   * `oncall-response-firing` each have a DOM count of 0. The component draws
-   * them under `v-if="response"` inside the page header's `#subtitle` slot, and
-   * that slot is not reaching the page.
-   *
-   * What it costs a responder: the record never says which team it belongs to,
-   * never links to that team's rotation — `OnCallResponseDetail.vue` calls that
-   * link "the next click a responder makes" in its own comment — and never
-   * shows the firing count that distinguishes "again" from "first time". The
-   * rest of the golden path works, which is why it is asserted green above and
-   * this is a separate fixme rather than a failure hung on the whole case.
-   */
-  test.fixme('the record header names the team the page belongs to and links to it — not wired: the whole subtitle slot renders zero elements, verified 15 Sep on :5090. o2-enterprise#2481.', {
+  test('the record header names the team the page belongs to and links to it', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const f = await seedRoutedAlert(page, testInfo, 'header');
-    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
 
     await pm.oncallResponseDetailPage.goto(ORG, pages[0].id);
     await pm.oncallResponseDetailPage.expectDetailVisible();
-    await pm.oncallResponseDetailPage.expectTeamLinkNames(f.team.name);
     await pm.oncallResponseDetailPage.expectSubtitleContains(f.team.name);
+    await pm.oncallResponseDetailPage.expectTeamLinkNames(f.team.name);
+    await pm.oncallResponseDetailPage.expectTeamLinkTargets(f.team.id);
   });
 
   // ------------------------------------------------------------------ TS-15.04
@@ -346,11 +319,14 @@ test.describe('On-call page lifecycle', {
     const f = await seedRoutedAlert(page, testInfo, 'flap');
     // Deliberately NOT shortened: the point is that nothing new fires, so the
     // default P2 ladder's five-minute second rung stays out of the window.
-    const { alert, pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const { alert, pages } = await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
     const record = pages[0];
+    // The record opens before its first rung's delivery rows are written.
+    await expect.poll(
+      async () => (await getDeliveries(page, record.id))?.total ?? 0,
+      { timeout: 90000, intervals: [2000], message: 'the first rung has to have fired for "once" to mean anything' },
+    ).toBeGreaterThan(0);
     const firstLedger = await getDeliveries(page, record.id);
-    expect(firstLedger.total, 'the first rung has to have fired for "once" to mean anything')
-      .toBeGreaterThan(0);
 
     // The alert re-evaluates every minute over a window that still holds rows,
     // so it keeps firing for the whole of this wait.
@@ -380,7 +356,7 @@ test.describe('On-call page lifecycle', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const f = await seedRoutedAlert(page, testInfo, 'cause');
-    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
     const record = pages[0];
 
     await pm.oncallResponseDetailPage.goto(ORG, record.id);
@@ -421,7 +397,7 @@ test.describe('On-call page lifecycle', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const f = await seedRoutedAlert(page, testInfo, 'hygiene');
-    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
     const record = pages[0];
 
     const consoleErrors = [];
@@ -442,10 +418,15 @@ test.describe('On-call page lifecycle', {
     const sharedShellAsset = (message) =>
       /Failed to load resource/.test(message.text())
       && (message.location()?.url ?? '').includes('/web/src/assets/');
+    const missingReport = (message) =>
+      /Failed to load resource: .* 404/.test(message.text())
+      && Boolean(message.location()?.url) && isNoReportYet(message.location().url, ORG, record.id);
 
     page.on('console', (message) => {
       const text = message.text();
-      if (message.type() === 'error' && !sharedShellAsset(message)) consoleErrors.push(text);
+      if (message.type() === 'error' && !sharedShellAsset(message) && !missingReport(message)) {
+        consoleErrors.push(text);
+      }
       if (/\[Vue warn\]/.test(text)) vueWarnings.push(text);
     });
     page.on('pageerror', (error) => consoleErrors.push(`uncaught: ${error.message}`));
@@ -454,7 +435,9 @@ test.describe('On-call page lifecycle', {
       const url = response.url();
       if (!/\/api\/.*\/oncall\//.test(url)) return;
       apiCallsHere += 1;
-      if (response.status() === 404) notFound.push(`${response.status()} ${url}`);
+      if (response.status() === 404 && !isNoReportYet(url, ORG, record.id)) {
+        notFound.push(`${response.status()} ${url}`);
+      }
       // G24: the Pages list once called a count endpoint that does not exist,
       // 404ing on every single load without anybody noticing.
       if (/\/oncall\/responses\/count/.test(url)) countCalls.push(url);
@@ -517,7 +500,7 @@ test.describe('On-call page lifecycle', {
     // 3-minute default is for screens, not for this.
     test.setTimeout(600_000);
     const f = await seedRoutedAlert(page, testInfo, 'deep');
-    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
     const id = pages[0].id;
 
     // A genuinely cold context: no history, no warmed store, no prior route —
@@ -537,7 +520,9 @@ test.describe('On-call page lifecycle', {
     const failures = [];
     cold.on('response', (res) => {
       const url = res.url();
-      if (url.includes('/oncall/') && res.status() >= 400) failures.push(`${res.status()} ${url}`);
+      if (!url.includes('/oncall/') || res.status() < 400) return;
+      if (res.status() === 404 && isNoReportYet(url, ORG, id)) return;
+      failures.push(`${res.status()} ${url}`);
     });
 
     await coldPm.oncallResponseDetailPage.goto(ORG, id);
@@ -596,7 +581,7 @@ test.describe('On-call page lifecycle', {
     // 3-minute default is for screens, not for this.
     test.setTimeout(600_000);
     const f = await seedRoutedAlert(page, testInfo, 'ledger');
-    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
     const id = pages[0].id;
 
     await expect.poll(async () => (await getDeliveries(page, id))?.total, { timeout: 120000 })
@@ -654,7 +639,7 @@ test.describe('On-call page lifecycle', {
     // 3-minute default is for screens, not for this.
     test.setTimeout(600_000);
     const f = await seedRoutedAlert(page, testInfo, 'g24');
-    await firePageAndWait(page, { alertOptions: f.alertOptions });
+    await firePageAndWait(page, { alertOptions: f.alertOptions, expectTeamId: f.team.id });
 
     // Scoped to on-call's OWN endpoints. G24 was an on-call count request that
     // did not exist; widening this to every `/api/` call on the screen would

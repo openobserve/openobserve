@@ -527,6 +527,16 @@ export class OnCallTeamDetailPage {
     await this.getQuickStartApply().click();
   }
 
+  /** Accept the "replace the shift rules of …" confirm and return the preset write it issues. */
+  async confirmQuickStartReplace() {
+    const write = this.page.waitForResponse(
+      (res) => /\/oncall\/teams\/[^/]+\/schedule\/from-preset/.test(res.url()) && res.request().method() === 'POST',
+      { timeout: 30000 },
+    );
+    await this.page.locator(this.locators.confirmOk).click();
+    return await write;
+  }
+
   /**
    * §11.2: Save with regions unnamed and unstaffed must not be a silent no-op.
    *

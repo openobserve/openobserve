@@ -12,11 +12,12 @@ the behaviour under test.
 
 **Enterprise-gated.** Every route here exists only when `O2_ONCALL_ENABLED` is
 on in an enterprise build; the router does not even register them otherwise, so
-an OSS instance answers 404 rather than 403. `oncall_enabled()` probes
-`GET {org}/oncall/teams` and skips on a 404. It does NOT read a `/config` flag:
-a current enterprise build does not publish `config.oncall_enabled` at all, and
-gating on it skipped all 104 tests against a server that was serving on-call
-perfectly well. Any status other than 200/403/404 raises rather than skips.
+the probe `GET {org}/oncall/teams` answers 404 rather than 403. `oncall_enabled()`
+skips on that 404 only when the public `/config` reports `build_type:
+opensource`; on an enterprise build the 404 means the flag is off (the default
+since o2-enterprise#2748), and it raises, because skipping there hid the whole
+suite in CI. It does NOT read an on-call flag off `/config`: none is published.
+Any status other than 200/403/404 raises rather than skips.
 
 Environment the suite reads:
 
@@ -25,11 +26,15 @@ Environment the suite reads:
   * `MAILPIT_BASE_URL` (default `http://127.0.0.1:8025`) — where to read the
     paging mail. An acknowledgement token is minted per person and exists ONLY
     inside the delivered mail: no API exposes it. So without a reachable
-    mailbox the ack-token cases cannot run, and they SKIP with that reason
-    rather than passing emptily. Nothing starts Mailpit in CI today, so those
-    cases are a known, visible coverage gap rather than an enforced one; run
-    them locally with `mailpit` on its default ports and the server pointed at
-    it (`ZO_SMTP_ENABLED=true ZO_SMTP_HOST=127.0.0.1 ZO_SMTP_PORT=1025`).
+    mailbox the ack-token cases cannot run: they SKIP locally and FAIL when
+    `CI` is set (`skip_or_fail_in_ci`), because the enterprise `ent_oncall` API
+    shard starts Mailpit, so a missing mailbox there is a broken job. That
+    Mailpit accepts only `test.invalid` recipients and refuses `MAILBOX_DOMAIN`,
+    which is how §7 gets real delivery failures beside real deliveries. Locally:
+    `mailpit --smtp-allowed-recipients '(?i)@test\\.invalid$'` on its default
+    ports and the server pointed at it (`ZO_SMTP_ENABLED=true
+    ZO_SMTP_HOST=127.0.0.1 ZO_SMTP_PORT=1025 ZO_SMTP_FROM_EMAIL=<any address>`;
+    without a From address every send fails "Invalid input").
 
 Org addressing: on a multi-tenant deployment an org is addressed by its
 **identifier** (a ksuid), not by its display name. `resolve_org` maps whichever
@@ -60,8 +65,10 @@ import re
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, NoReturn
+from urllib.parse import urljoin
 
+import pytest
 import requests
 
 from support.client import OpenObserveClient
@@ -116,6 +123,9 @@ SINK_DEST = f"{PREFIX}_dest_sink"
 DEAD_DEST = f"{PREFIX}_dest_dead"
 DEAD_URL = "http://127.0.0.1:1/never-listens"
 
+# Not IANA-reserved, so reachability counts its failures; it has no MX or A record, and the ent_oncall CI Mailpit refuses it.
+MAILBOX_DOMAIN = "oncall-pt.openobserve.ai"
+
 
 def uniq(prefix: str = PREFIX) -> str:
     """A unique, human-readable name. uuid4, not a timestamp: two xdist workers
@@ -149,30 +159,47 @@ def resolve_org(client: OpenObserveClient, wanted: str) -> str:
     return wanted
 
 
+def build_type(client: OpenObserveClient) -> str:
+    """`opensource`, `enterprise` or `cloud`, read off the unauthenticated `/config`."""
+    url = urljoin(client.base_url, "config")
+    try:
+        resp = requests.get(url, timeout=client.timeout)
+        body = resp.json() if resp.status_code == 200 else None
+    except (requests.RequestException, ValueError) as exc:
+        raise AssertionError(f"cannot read build_type from {url}: {exc}") from exc
+    kind = body.get("build_type") if isinstance(body, dict) else None
+    if not kind:
+        raise AssertionError(
+            f"no build_type from {url}: HTTP {resp.status_code} — {resp.text[:200]}")
+    return kind
+
+
 def oncall_enabled(client: OpenObserveClient, org: str) -> bool:
-    """Whether this build serves the on-call routes.
+    """Whether this build serves the on-call routes; False only on an OSS build.
 
-    Probes `GET {org}/oncall/teams` rather than reading a flag off `/config`.
-    An earlier version read `config.oncall_enabled`, which is what the issue
-    report quoted — but a current enterprise build does not publish that key at
-    all, so the gate skipped all 104 tests against a server that was serving
-    on-call perfectly well.
+    Probes `GET {org}/oncall/teams`: 200 or 403 (the route answering) means
+    served. A 404 is a skip only when `/config` says `opensource`; an enterprise
+    build answering 404 has `O2_ONCALL_ENABLED` off, and skipping there is what
+    turned every enterprise CI run of this suite into a silent green skip.
 
-    A 200 (or a 403, which is still the route answering) means the feature is
-    there; a 404 means this build does not carry it. ANYTHING ELSE RAISES, and
-    deliberately so: this gate is autouse and session-scoped, so returning False
-    for a 500 would skip every on-call test and report a green run against a
-    broken server. A deployment that cannot answer is not a deployment without
-    the feature, and the two must not collapse into the same silent skip.
+    EVERYTHING ELSE RAISES: this gate is autouse and session-scoped, so returning
+    False for a 500 would report a green run against a broken server.
     """
     resp = client.get("oncall/teams", org=org)
     if resp.status_code in (200, 403):
         return True
-    if resp.status_code == 404:
+    if resp.status_code != 404:
+        raise AssertionError(
+            f"on-call probe failed: HTTP {resp.status_code} on {org}/oncall/teams — "
+            f"{resp.text[:200]}"
+        )
+    kind = build_type(client)
+    if kind == "opensource":
         return False
     raise AssertionError(
-        f"on-call probe failed: HTTP {resp.status_code} on {org}/oncall/teams — "
-        f"{resp.text[:200]}"
+        f"on-call is off on this {kind} build: {org}/oncall/teams answered 404. "
+        "Start the server with O2_ONCALL_ENABLED=true (off by default since "
+        "o2-enterprise#2748) — this suite fails rather than skips on an enterprise build."
     )
 
 
@@ -209,6 +236,13 @@ def mailpit_available() -> bool:
         return requests.get(f"{MAILPIT_BASE}/api/v1/info", timeout=5).status_code == 200
     except requests.RequestException:
         return False
+
+
+def skip_or_fail_in_ci(reason: str) -> NoReturn:
+    """Skip locally; fail when `CI` is set, where the ent_oncall shard provisions every dependency these cases need."""
+    if os.environ.get("CI"):
+        pytest.fail(f"{reason} (CI is set: the ent_oncall job provides this, so its absence is a broken job)")
+    pytest.skip(reason)
 
 
 def ack_link_for(recipient_marker: str, *, timeout_s: int = 180) -> str | None:
@@ -796,14 +830,15 @@ class OnCallClient:
 
 
 def make_user(client: OpenObserveClient, org: str, role: str,
-              password: str = "Complexpass#123") -> tuple[str, OpenObserveClient]:
+              password: str = "Complexpass#123", *,
+              domain: str = "test.invalid") -> tuple[str, OpenObserveClient]:
     """Create an org user with `role` and return (email, a client acting as them).
 
     The returned client authenticates as that user, which is the only way to
     assert what the API refuses them — asserting with root's credentials and a
     `user_email` field in the body would test nothing.
     """
-    email = f"{PREFIX}_{role}_{uuid.uuid4().hex[:8]}@test.invalid"
+    email = f"{PREFIX}_{role}_{uuid.uuid4().hex[:8]}@{domain}"
     payload = {
         "email": email, "password": password, "first_name": "OnCall",
         "last_name": role.capitalize(), "role": role, "organization": org,

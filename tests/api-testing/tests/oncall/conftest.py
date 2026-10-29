@@ -5,14 +5,13 @@ template and the two Alert Destinations already provisioned, and a teardown
 sweep of every team, alert, ownership rule and user the module registered on it.
 
 Everything here is **enterprise-gated**: `_require_oncall` skips the whole
-directory when on-call is not served, so an OSS build reports skips rather than
-a wall of 404s.
+directory on an OSS build, so it reports skips rather than a wall of 404s, and
+FAILS on an enterprise build with on-call off rather than skipping green.
 
-It decides that by PROBING `GET {org}/oncall/teams` — 200/403 served, 404 absent
-— not by reading `oncall_enabled` off `/config`. That key is what the original
-issue quoted, and a current enterprise build does not publish it on the public
-`/config`, so gating on it skipped all 104 tests against a server that was
-serving on-call perfectly well. See `oncall_helpers.oncall_enabled`.
+It decides that by PROBING `GET {org}/oncall/teams` — 200/403 served, 404 not —
+and on a 404 reading `build_type` off the public `/config`. No on-call flag is
+published there, so gating on one skipped all 104 tests against a server that
+was serving on-call perfectly well. See `oncall_helpers.oncall_enabled`.
 
 Scope is `module`, not `function`: a page only exists once the alert scheduler
 has evaluated a rule, which costs the better part of a minute, and a per-test
@@ -46,14 +45,14 @@ def oncall_available(client: OpenObserveClient, oncall_org: str) -> bool:
 
 @pytest.fixture(scope="session", autouse=True)
 def _require_oncall(oncall_available: bool) -> None:
-    """Skip cleanly rather than fail when the feature is not built or not on.
+    """Skip cleanly on an OSS build; `oncall_enabled` raises on an enterprise build with on-call off.
 
     Session-scoped on purpose: a function-scoped gate is set up AFTER the
     module-scoped fixtures it is meant to protect, so an OSS build would seed
     teams and wait on pages that can never arrive before ever reaching the skip.
     """
     if not oncall_available:
-        pytest.skip("this build does not serve the on-call routes")
+        pytest.skip("on-call is enterprise-only and this is an OSS build")
 
 
 @pytest.fixture(scope="module")

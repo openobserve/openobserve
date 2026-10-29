@@ -71,6 +71,8 @@ const {
   getEscalationPreview,
   getTeamOverview,
   mailSince,
+  requireMailSink,
+  oncallUserEmail,
 } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_health';
@@ -337,30 +339,34 @@ test.describe('On-call team health', {
     const me = process.env.ZO_ROOT_USER_EMAIL;
     test.skip(
       !me || !/@example\.(com|org|net)$/i.test(me),
-      'this case is about a reserved-domain address; the suite is running as a deliverable one',
+      'needs a reserved-domain root user (CI runs as root@example.com); this run signs in with a deliverable address',
     );
+    await requireMailSink(test);
 
+    // A deliverable member beside the reserved-domain one, so a reachability check that probed by sending would show up in the sink.
+    const { email: deliverable } = await createOrgUser(page, { email: oncallUserEmail(name, 'ok') });
     const team = await createTeam(page, { name, timezone: 'UTC' });
-    await addTeamMembers(page, team.id, [me]);
+    await addTeamMembers(page, team.id, [me, deliverable]);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
-      rotations: [rotation({ id: 'Primary', members: [me] })],
+      // Half a shift in, so the reserved-domain member is the one holding the pager now.
+      rotations: [rotation({ id: 'Primary', members: [me, deliverable], anchorMicros: Date.now() * 1000 - DAY_MICROS / 2 })],
     });
 
-    // Half one: nothing is sent. Counted across the call rather than assumed.
-    const before = await mailSince(0);
+    const since = Date.now();
     const reach = await getReachability(page, team.id);
-    const after = await mailSince(0);
-    expect(after.length,
+    // A send is asynchronous, so give one the time it takes to reach the sink before reading it.
+    await page.waitForTimeout(5000);
+    const sent = (await mailSince(since)).filter((m) => m.to.includes(deliverable) || m.to.includes(me.toLowerCase()));
+    expect(sent.map((m) => m.subject),
       'asking whether a page would land must not send one — it is a calculation, not a probe')
-      .toBe(before.length);
+      .toEqual([]);
 
     expect(reach, 'the reachability endpoint must answer').toBeTruthy();
-    expect(reach.total, 'the fixture has exactly one member').toBe(1);
-    expect(reach.reachable, 'and that member is on a reserved domain, so none are reachable')
-      .toBe(0);
+    expect(reach.total, 'the fixture has exactly two members').toBe(2);
+    expect(reach.reachable, 'only the member on a deliverable domain is reachable').toBe(1);
     expect(reach.unreachable_members, 'the unreachable member must be named, not just counted')
-      .toContain(me);
+      .toEqual([me]);
 
     const member = reach.members.find((m) => m.user_email === me);
     expect(member.would_a_page_land, 'a page to a reserved domain does not land').toBe(false);
