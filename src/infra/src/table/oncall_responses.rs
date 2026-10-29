@@ -560,6 +560,35 @@ pub async fn list_by_team(
         .collect())
 }
 
+/// Every open record in the org that `user_email` holds the acknowledgement of, on any team.
+pub async fn list_open_acknowledged_by(
+    org_id: &str,
+    user_email: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    list_open_acknowledged_by_in(get_orm_client_rw().await, org_id, user_email).await
+}
+
+async fn list_open_acknowledged_by_in<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    user_email: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    use oncall_responses::Column;
+
+    Ok(oncall_responses::Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::ClosedAt.is_null())
+        .filter(
+            Expr::expr(sea_orm::sea_query::Func::lower(Expr::col(Column::AckedBy)))
+                .eq(user_email.to_ascii_lowercase()),
+        )
+        .all(db)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
+}
+
 /// Records that the ladder ran out with nobody answering.
 ///
 /// Idempotent: the reconcile sweep and the engine can both reach exhaustion for
@@ -2282,6 +2311,48 @@ mod tests {
             );
             assert_eq!(row_in(&db).await, to_response(row).unwrap());
         }
+    }
+
+    /// A leaver's open acknowledged pages are found on every team, whatever the stored case.
+    #[tokio::test]
+    async fn test_open_pages_acknowledged_by_a_person_span_every_team() {
+        let held = |id: &str, team: &str, holder: &str| oncall_responses::Model {
+            id: id.into(),
+            team_id: Some(team.into()),
+            state: ResponseState::Acknowledged.to_i32(),
+            acked_by: Some(holder.into()),
+            acked_at: Some(5_000),
+            ..model()
+        };
+        let db = table_with(held("resp_1", "team_1", "ana@o2.ai")).await;
+        let rows = [
+            held("resp_2", "team_2", "Ana@O2.ai"),
+            held("resp_3", "team_1", "bob@o2.ai"),
+            oncall_responses::Model {
+                state: ResponseState::Resolved.to_i32(),
+                closed_at: Some(6_000),
+                ..held("resp_4", "team_1", "ana@o2.ai")
+            },
+            oncall_responses::Model {
+                org_id: "other".into(),
+                ..held("resp_5", "team_1", "ana@o2.ai")
+            },
+        ];
+        for row in rows {
+            oncall_responses::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        let mut ids: Vec<String> = list_open_acknowledged_by_in(&db, "default", "ANA@o2.ai")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        ids.sort();
+        assert_eq!(ids, ["resp_1", "resp_2"]);
     }
 
     /// The ladder clock starts once, at the first held page, and never on a closed record.

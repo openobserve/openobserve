@@ -484,11 +484,11 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     const name = uniqueName(`${workerPrefix(testInfo)}_live`);
     const users = await createOrgUsers(page, name, 2);
     const team = await createTeam(page, { name, timezone: 'UTC' });
+    await addTeamMembers(page, team.id, users);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: users })],
     });
-    await addTeamMembers(page, team.id, users);
 
     const stream = `${name}_stream`;
     await seedOnCallStream(page, stream);
