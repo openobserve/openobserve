@@ -3432,6 +3432,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <SparklineConfig />
       </div>
     </OCollapsible>
+
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelData.data.type == 'alert-list'"
+      v-show="isSectionVisible('alertList')"
+      :model-value="isExpanded('alertList')"
+      :icon="SECTION_ICONS.alertList"
+      @update:modelValue="
+        (v) => {
+          expandedSections.alertList = v;
+        }
+      "
+      :label="t('dashboard.chartSelection.alertList')"
+      class="border-card-glass-border border-t border-solid"
+    >
+      <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <AlertListPanelConfig
+          :is-option-visible="(id: string) => isConfigOptionVisible('alertList', id)"
+        />
+      </div>
+    </OCollapsible>
   </div>
 </template>
 
@@ -3534,6 +3555,7 @@ import {
 } from "@/utils/dashboard/heatmapYAxis";
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
   inject,
   nextTick,
@@ -3638,6 +3660,8 @@ import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 import { resolveTooltipSort, TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
 import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 
+const AlertListPanelConfig = defineAsyncComponent(() => import("./AlertListPanelConfig.vue"));
+
 export default defineComponent({
   components: {
     OTabs,
@@ -3662,6 +3686,7 @@ export default defineComponent({
     ColorPaletteDropDown,
     BackGroundColorConfig,
     SparklineConfig,
+    AlertListPanelConfig,
     PromQLChartConfig,
     OButton,
     OTooltip,

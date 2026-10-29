@@ -35,7 +35,7 @@ export const isRawValueChart = (type: unknown): boolean =>
 export const DISTRIBUTION_ROW_LIMIT = 10000;
 
 /** Panel types drawn as HTML by their own renderer instead of an ECharts option. */
-export const HTML_PANEL_TYPES: readonly string[] = [];
+export const HTML_PANEL_TYPES: readonly string[] = ["alert-list"];
 
 export const isHtmlPanel = (type: unknown): boolean =>
   typeof type === "string" && HTML_PANEL_TYPES.includes(type);

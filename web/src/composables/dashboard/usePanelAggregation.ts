@@ -28,7 +28,7 @@ import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/co
 import { isAdditiveSizeField, SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 
 // Types that reset their own queries on a switch, so no builder state carries into them.
-const NON_BUILDER_TYPES = ["html", "markdown", "custom_chart"];
+const NON_BUILDER_TYPES = ["html", "markdown", "custom_chart", "alert-list"];
 
 // Starter SQL seeded in this editor session, per query; saved or typed SQL is never a starter, whatever its shape.
 const seededStarters = new WeakMap<object, string>();
@@ -561,6 +561,12 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
+        break;
+      }
+      case "alert-list": {
+        // The alert list reads the alerts API, so the panel keeps one empty query.
+        resetToSingleQuery();
+        dashboardPanelData.data.queryType = "";
         break;
       }
       case "custom_chart": {

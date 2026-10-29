@@ -330,4 +330,13 @@ describe("defaultFields", () => {
       expect(seeded.y[0].functionName).toBe("count");
     });
   });
+  describe("buildDefaultBuilderFields for the alert list", () => {
+    it("seeds nothing", () => {
+      const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+      expect(buildDefaultBuilderFields("alert-list", "logs", logsSchema, "logs")).toEqual({
+        x: [],
+        y: [],
+      });
+    });
+  });
 });

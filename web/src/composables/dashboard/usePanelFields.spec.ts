@@ -712,4 +712,22 @@ describe("usePanelFields", () => {
       expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
     });
   });
+  describe("alert list slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "alert-list";
+      expect(addMany("x", 3)).toBe(0);
+      expect(addMany("y", 3)).toBe(0);
+      expect(addMany("breakdown", 3)).toBe(0);
+    });
+  });
 });
