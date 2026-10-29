@@ -35,6 +35,7 @@ export { useAssistantClient } from "./useAssistantClient";
 export { parseStream, extractFrames } from "./sseParser";
 export { toAssistantError, ASSISTANT_ERROR_CODES } from "./assistantErrors";
 export { STALL_MS, turnStatusText } from "./turnStateMachine";
+export { starterPayload, widerPeriodText } from "./starterPayload";
 export { useAssistantStarters } from "./useAssistantStarters";
 export { groupOf, originOf, useAssistantHistory } from "./useAssistantHistory";
 export type {
@@ -62,7 +63,11 @@ export {
   useAssistantOpenChord,
   useAssistantShortcuts,
 } from "./shortcuts";
-export { refreshPageContext, useAssistantContext } from "./context/useAssistantContext";
+export {
+  hostOrgName,
+  refreshPageContext,
+  useAssistantContext,
+} from "./context/useAssistantContext";
 export {
   INTERNAL_FIELDS,
   MAX_ATTACHED_BYTES,
@@ -71,11 +76,14 @@ export {
   chipSecondaryOf,
   chipStateOf,
   contextChipFor,
+  isLongPaste,
+  pastedTextChip,
   periodMs,
   shortLabelFor,
   timeChipOf,
   timeRangeShortText,
   timeRangeText,
+  timeWindowOf,
   truncateChip,
 } from "./context/contextChips";
 export {

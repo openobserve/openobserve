@@ -216,6 +216,13 @@ describe("AssistantShell states", () => {
     expect(wrapper.find('[data-test="assistant-composer"]').exists()).toBe(false);
   });
 
+  it("renders the context tray only inside the composer frame, never as a row of its own (D4 §3.1)", () => {
+    const { wrapper } = setup();
+    expect(root(wrapper).attributes("data-assistant-surface")).toBe("");
+    expect(wrapper.find('[data-test="assistant-composer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-context-tray"]').exists()).toBe(false);
+  });
+
   it("shows the welcome for an empty session and stages a starter without sending", async () => {
     const { wrapper, store } = setup();
     expect(root(wrapper).attributes("data-state")).toBe("empty");
@@ -512,6 +519,22 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     );
   });
 
+  it("hands a Home starter's provenance to the ghost, so accepting it stages it (PO A26)", async () => {
+    (STARTER as { home?: true }).home = true;
+    const { wrapper, store } = live();
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    await flushPromises();
+    delete (STARTER as { home?: true }).home;
+    await wrapper.get('[data-test="assistant-ghost"]').trigger("click");
+    await flushPromises();
+    expect(store.state.sessions[sid].composer).toMatchObject({
+      text: "Why did errors spike?",
+      homeStarter: true,
+    });
+  });
+
   it("keeps chat A's draft on New chat, says so, and moves it only on Bring it here (CT-06 AC 5, S7, V6)", async () => {
     const { wrapper, store } = live();
     const first = store.createSession({
@@ -618,10 +641,16 @@ describe("WP-06 conversation wiring", () => {
     },
   ];
 
-  it("renders the transcript in ③ and Go to answer in the strip after a finished answer (X-28)", async () => {
+  it("renders the transcript in ③ and Go to answer in the strip once the finished answer scrolls away (X-28)", async () => {
     const { wrapper } = live({ state: "done", saved: "server" }, MESSAGES);
     await flushPromises();
     expect(wrapper.find('section[role="log"]').exists()).toBe(true);
+    const transcript = wrapper.findComponent({ name: "AssistantTranscript" });
+    transcript.vm.$emit("answer-visible", true);
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-strip-go-to-answer"]').exists()).toBe(false);
+    transcript.vm.$emit("answer-visible", false);
+    await flushPromises();
     await wrapper.get('[data-test="assistant-strip-go-to-answer"]').trigger("click");
     expect(document.activeElement?.getAttribute("data-test")).toBe("assistant-answer-t1");
   });
@@ -670,7 +699,7 @@ describe("WP-06 conversation wiring", () => {
     store.announce(sid, "assistant.error.agent_unavailable.title");
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
-      "Failed. The assistant service didn't respond. Retry available.",
+      "Failed. The assistant didn't respond. Nothing was changed. Retry available.",
     );
   });
 
@@ -689,7 +718,7 @@ describe("WP-06 conversation wiring", () => {
     store.announce(sid, "assistant.error.rate_limited.titleTimed");
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
-      "Not sent. The AI provider is rate-limiting requests. Retry in 30 s.",
+      "Not sent. The AI provider is limiting requests. Your message wasn't sent. Retry in 30 s.",
     );
   });
 
@@ -812,7 +841,7 @@ describe("WP-06 conversation wiring", () => {
     store.announce(sid, "assistant.error.turn_limit.title");
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
-      "Not sent. Too many answers are running. Wait for one to finish. Retry available.",
+      "Not sent. Too many answers are running. Your message wasn't sent. Retry available.",
     );
   });
 
@@ -1082,12 +1111,14 @@ describe("AssistantShell decision cards", () => {
     expect(note()).toHaveLength(0);
   });
 
-  it("declines a card the old chat waits on when a new chat starts", async () => {
+  it("leaves the card the old chat waits on pending when a new chat starts (PO A12)", async () => {
     const { wrapper, store, sid } = await mountWithCard();
     const decide = vi.spyOn(store, "decideApproval").mockResolvedValue({} as never);
     (wrapper.vm as unknown as { $: { setupState: { newChat(): void } } }).$.setupState.newChat();
     await flushPromises();
-    expect(decide).toHaveBeenCalledWith(sid, { approved: false, reason: "new_chat" });
+    expect(decide).not.toHaveBeenCalled();
+    expect(store.state.sessions[sid].pendingApproval).not.toBeNull();
+    expect(store.state.shell.activeSid).not.toBe(sid);
   });
 });
 
@@ -1109,6 +1140,25 @@ describe("AssistantShell history states", () => {
     expect(header.find('[data-test="assistant-shell-close"]').exists()).toBe(true);
     expect(header.find('[data-test="assistant-thread-menu"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-shell-menu"]').exists()).toBe(false);
+  });
+
+  it("swaps the chat for the Chats view and back, keeping the chat mounted (D5 §3.2)", async () => {
+    const { wrapper, store } = setup();
+    open(store);
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-thread-history"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-history"]').attributes("data-mode")).toBe("panel");
+    const body = wrapper.get('[data-test="assistant-shell-body"]');
+    expect((body.element as HTMLElement).style.display).toBe("none");
+    expect(wrapper.find('[data-test="assistant-shell-lower"]').exists()).toBe(true);
+    await wrapper.get('[data-test="assistant-chats-back"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-history"]').exists()).toBe(false);
+    expect((body.element as HTMLElement).style.display).toBe("");
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="assistant-thread-history"]').element,
+    );
   });
 
   it("follows a turn another tab runs with its status line and Stop", async () => {

@@ -22,43 +22,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-header-skeleton"
   />
   <template v-else-if="view.state !== 'hidden'">
-    <OButton
-      ref="button"
-      variant="ghost"
-      size="icon-toolbar"
-      data-test="menu-link-ai-item"
-      data-entry="ai-entry-header-ask"
-      :data-state="view.state"
-      :aria-label="view.name"
-      :class="[
-        'relative max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
-        view.state === 'open' ? 'border-border-strong border' : '',
-      ]"
-      @click="onClick"
+    <OPopover
+      :open="lockedOpen && mdUp"
+      side="bottom"
+      align="end"
+      :aria-label="
+        lockedGate === 'off_for_org'
+          ? t('assistant.gate.offForOrg.title', { product })
+          : t('assistant.gate.noPermission.title', { product })
+      "
+      @update:open="onLockedOpen"
     >
-      <span class="relative inline-flex">
-        <OIcon
-          :name="assistantGlyph.assistant"
-          size="sm"
-          :class="view.state === 'off' ? 'text-text-muted' : ''"
-        />
-        <span v-if="view.signal" class="absolute -end-1 -top-1 inline-flex">
-          <AssistantStatusDot
-            :state="view.signal"
-            :count="view.count"
-            data-test="assistant-header-status-light"
-          />
-        </span>
-        <span
-          v-else-if="view.badge"
-          aria-hidden="true"
-          class="rounded-default bg-surface-base text-text-secondary absolute -end-1.5 -top-1.5 inline-flex size-3.5 items-center justify-center"
+      <template #anchor>
+        <OButton
+          ref="button"
+          variant="ghost"
+          size="icon-toolbar"
+          data-test="menu-link-ai-item"
+          data-entry="ai-entry-header-ask"
+          :data-state="view.state"
+          :aria-label="view.name"
+          :class="[
+            'relative max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
+            view.state === 'open' ? 'border-border-strong border' : '',
+          ]"
+          @click="onClick"
         >
-          <OIcon :name="assistantGlyph[view.badge]" size="xs" />
-        </span>
-      </span>
-      <OTooltip side="bottom" :content="view.tooltip" :shortcut-id="shortcutId" />
-    </OButton>
+          <span class="relative inline-flex">
+            <OIcon
+              :name="assistantGlyph.assistant"
+              size="sm"
+              :class="view.state === 'off' ? 'text-text-muted' : ''"
+            />
+            <span v-if="view.signal" class="absolute -end-1 -top-1 inline-flex">
+              <AssistantStatusDot
+                :state="view.signal"
+                :count="view.count"
+                data-test="assistant-header-status-light"
+              />
+            </span>
+            <span
+              v-else-if="view.badge"
+              aria-hidden="true"
+              class="rounded-default bg-surface-base text-text-secondary absolute -end-1.5 -top-1.5 inline-flex size-3.5 items-center justify-center"
+            >
+              <OIcon :name="assistantGlyph[view.badge]" size="xs" />
+            </span>
+          </span>
+          <OTooltip side="bottom" :content="view.tooltip" :shortcut-id="shortcutId" />
+        </OButton>
+      </template>
+      <AssistantGateState
+        v-if="lockedOpen && mdUp"
+        :reason="lockedGate"
+        size="popover"
+        :is-admin="capability.isAdmin"
+        :context="{ org }"
+        focus-on-mount
+        @action="onLockedAction"
+      />
+    </OPopover>
     <AssistantStatusRegion
       v-if="shortcutId"
       ref="region"
@@ -113,6 +136,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @action="onGateAction"
       />
     </OSheet>
+    <ODialog
+      :open="gateLearnOpen"
+      size="md"
+      :title="t('assistant.name')"
+      data-test="assistant-header-learn-dialog"
+      @update:open="(open) => !open && closeLearn()"
+    >
+      <AssistantGateState
+        v-if="gateLearnOpen"
+        reason="not_entitled"
+        size="hero"
+        learn-only
+        :is-admin="capability.isAdmin"
+        :context="{ org }"
+        @action="(cta) => cta === 'close' && closeLearn()"
+      />
+    </ODialog>
   </template>
 </template>
 
@@ -156,14 +196,16 @@ function isRunning(session: AssistantSession): boolean {
 </script>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantGateState, {
+  gateLearnOpen,
   type GateCta,
 } from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
@@ -183,12 +225,16 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSheet from "@/lib/overlay/Sheet/OSheet.vue";
 import type { SheetSnap } from "@/lib/overlay/Sheet/OSheet.types";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant, type AiEventProps } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
-import { openLockedPanel, useLockedPanel } from "./lockedPanel";
+import { useLockedPanel } from "./lockedPanel";
+
+// Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
+provideAssistantSurface();
 
 const { t } = useI18nTyped();
 const { product } = useAssistantName();
@@ -201,10 +247,11 @@ const lockedPanel = useLockedPanel();
 useAssistantOpenChord({ gate: capability.gate, assistantCanChat: capability.assistantCanChat });
 const route = useRoute();
 const vuex = useStore();
-const { lgUp } = useBreakpoint();
+const { lgUp, mdUp } = useBreakpoint();
 const button = ref<InstanceType<typeof OButton> | null>(null);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
 const dialogGate = ref<GateReason | null>(null);
+const lockedOpen = ref(false);
 const sheetSnap = ref<SheetSnap>("half");
 const toasted = new Set<string>();
 
@@ -221,6 +268,9 @@ const mine = computed(() =>
 );
 
 const view = computed<HeaderView>(() => gateView() ?? lightView());
+const lockedGate = computed<GateReason>(() =>
+  capability.gate.value === "off_for_org" ? "off_for_org" : "no_permission",
+);
 
 // A chat another tab or device lights may be known only by its history row; else no title is claimed.
 function knownTitle(sid: string | null): I18nText | null {
@@ -363,8 +413,14 @@ function onClick(): void {
     sheetSnap.value = "half";
     return;
   }
+  // A locked user gets the gate where they clicked, never an empty container (D7 decision 2).
   if (current.state === "locked") {
-    if (route.name !== "assistant") openLockedPanel(buttonEl());
+    if (route.name === "assistant") return;
+    if (mdUp.value) lockedOpen.value = true;
+    else {
+      dialogGate.value = lockedGate.value;
+      sheetSnap.value = "half";
+    }
     return;
   }
   openOnLitSession(buttonEl());
@@ -391,7 +447,26 @@ function closeDialog(): void {
 }
 
 function onGateAction(cta: GateCta): void {
-  if (cta === "close" || cta === "see_plans") closeDialog();
+  if (cta === "close" || cta === "see_plans" || cta === "open_settings") closeDialog();
+  if (cta !== "learn_more" || dialogGate.value === "not_entitled") return;
+  // Focus stays put, so the closing sheet never hands it to the button and dismisses the dialog opening after it.
+  dialogGate.value = null;
+  void nextTick(() => (gateLearnOpen.value = true));
+}
+
+function onLockedOpen(open: boolean): void {
+  lockedOpen.value = open;
+  if (!open) buttonEl()?.focus();
+}
+
+// Ask an admin opens its own popover from the gate, so only the actions that leave close it.
+function onLockedAction(cta: GateCta): void {
+  if (cta === "learn_more" || cta === "open_settings") lockedOpen.value = false;
+}
+
+function closeLearn(): void {
+  gateLearnOpen.value = false;
+  buttonEl()?.focus();
 }
 
 function lightName(): AiEventProps["ai_status_light"]["state"] {

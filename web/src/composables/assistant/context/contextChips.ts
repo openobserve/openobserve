@@ -47,6 +47,11 @@ export const MAX_ATTACHED_BYTES = 32 * 1024;
 /** The page time the tray assumes when a page has no picker (CT-01 AC 2). */
 export const DEFAULT_PERIOD = "15m";
 
+/** A paste longer than this many lines or characters becomes a Pasted text chip (D4 §3.9). */
+export const PASTE_CHIP_LINES = 20;
+
+export const PASTE_CHIP_CHARS = 2_000;
+
 /** Row fields shown greyed and dropped from the wire while "Hide internal fields" is on (CT-03 AC 1–2). */
 export const INTERNAL_FIELDS: ReadonlySet<string> = new Set(["_o2_id", "_original"]);
 
@@ -58,6 +63,7 @@ export const SERIALIZED_KINDS: Readonly<Partial<Record<ChipKind, string>>> = {
   span: "Span",
   query_error: "Query error",
   report: "Report",
+  pasted_text: "Pasted text",
 };
 
 /** Door chips of these kinds carry observed values the prompt text must not hold, so they are serialised too; page chips of the same kinds are not. */
@@ -402,6 +408,26 @@ export function shortLabelFor(
   return name && NAMED_KINDS.has(kind) ? raw(name) : undefined;
 }
 
+/** Whether a pasted text is long enough to ride as a chip instead of burying the question. */
+export function isLongPaste(text: string): boolean {
+  return text.length > PASTE_CHIP_CHARS || lineCount(text) > PASTE_CHIP_LINES;
+}
+
+/** The Pasted text chip of one paste; its data is the text, serialised like any attached block. */
+export function pastedTextChip(text: string, id: string, t: TranslateFn = gt): ContextChip {
+  const lines = lineCount(text);
+  return {
+    id: `paste:${id}`,
+    kind: "pasted_text",
+    label: t("assistant.context.pastedText", { count: lines }, lines),
+    secondary: raw(formatBytes(byteSize(text))),
+    data: text,
+    sizeBytes: byteSize(text),
+    provenance: "attach",
+    sent: "serialized",
+  };
+}
+
 /** The secondary line a chip shows: the honest "not read yet" and "truncated" win over provenance. */
 export function chipSecondaryOf(chip: ContextChip, t: TranslateFn = gt): I18nText | undefined {
   if (chip.sent === "not_read") return t("assistant.context.notReadYet");
@@ -418,6 +444,8 @@ export function seesRowsOf(
     window: TimeWindow;
     timezone: string;
     pageLabel?: (page: PageContext) => I18nText;
+    /** The org's display name for its identifier, which can be an opaque hash. */
+    orgName?: (id: string) => string;
     t?: TranslateFn;
   },
 ): SeesRow[] {
@@ -520,7 +548,12 @@ export function periodMs(period: string): number {
 function seenRow(
   row: ContextFieldRow,
   page: PageContext,
-  opts: { window: TimeWindow; timezone: string; pageLabel?: (page: PageContext) => I18nText },
+  opts: {
+    window: TimeWindow;
+    timezone: string;
+    pageLabel?: (page: PageContext) => I18nText;
+    orgName?: (id: string) => string;
+  },
   t: TranslateFn,
 ): SeesRow | null {
   const base = {
@@ -543,7 +576,7 @@ function seenRow(
     };
   if (field === "org_id") {
     const org = orgOf(page);
-    return org ? { ...base, value: raw(org), fields: ["org_id"] } : null;
+    return org ? { ...base, value: raw(opts.orgName?.(org) || org), fields: ["org_id"] } : null;
   }
   const value = rowValue(row, page, t);
   if (value === null) return null;

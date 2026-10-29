@@ -27,13 +27,18 @@ import AssistantAskAdminPopover, {
   type AssistantAskAdminPopoverProps,
 } from "./AssistantAskAdminPopover.vue";
 
-const { copyToClipboard, toast, phone } = vi.hoisted(() => ({
+const { copyToClipboard, toast, phone, orgNames } = vi.hoisted(() => ({
+  orgNames: new Map<string, string>(),
   phone: { value: false },
   copyToClipboard: vi.fn(async () => true),
   toast: vi.fn(),
 }));
 
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard }));
+vi.mock("@/composables/assistant", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/assistant")>()),
+  hostOrgName: (id: string) => orgNames.get(id) ?? id,
+}));
 vi.mock("@/composables/useBreakpoint", async () => {
   const { computed } = await import("vue");
   return {
@@ -139,6 +144,15 @@ describe("AssistantAskAdminPopover", () => {
     );
   });
 
+  it("names the org by its display name where the host knows it", async () => {
+    orgNames.set("a1b2c3", "Acme");
+    await openPopover({ org: "a1b2c3" });
+    expect(
+      document.body.querySelector('[data-test="assistant-ask-admin-unknown"]')?.textContent,
+    ).toContain("An admin of Acme");
+    orgNames.clear();
+  });
+
   it("includes the first line of the prompt only when ticked, and only for credits and consent", async () => {
     await openPopover({ kind: "access", promptPreview: "why did checkout fail?" });
     expect(
@@ -155,6 +169,26 @@ describe("AssistantAskAdminPopover", () => {
     await flushPromises();
     expect(message()).toContain(`"${"y".repeat(80)}"`);
     expect(message()).not.toContain("second line");
+  });
+
+  it("asks to turn the assistant on with a link to the Access tab for kind enable (D7 §3.7)", async () => {
+    const wrapper = mount(AssistantAskAdminPopover, {
+      props: { kind: "enable", org: "acme" },
+      slots: { trigger: '<button data-test="trigger">Ask an admin</button>' },
+      global: {
+        plugins: [
+          fakeRouter([
+            { path: "/settings/assistant/:tab?", name: "assistantSettings", component: {} },
+          ]),
+        ],
+      },
+      attachTo: document.body,
+    });
+    await wrapper.get('[data-test="trigger"]').trigger("click");
+    await flushPromises();
+    expect(message()).toBe(
+      `Could you turn O2 Assistant on for acme? Settings › Assistant › Access: ${window.location.origin}/settings/assistant/access?org_identifier=acme`,
+    );
   });
 
   it("copies the message and confirms with a toast", async () => {

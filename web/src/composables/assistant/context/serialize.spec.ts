@@ -31,7 +31,7 @@ import type {
 } from "../assistantStore.types";
 import type { CompleteFrame } from "../frames";
 import { parseAttachmentBlocks } from "../record";
-import { byteSize } from "./contextChips";
+import { byteSize, pastedTextChip } from "./contextChips";
 import {
   NONCE_ALPHABET,
   contextUsedOf,
@@ -537,6 +537,25 @@ describe("the request", () => {
     expect(request.attachments).toEqual([{ kind: "log_row", data: { level: "error" } }]);
   });
 
+  it("keeps a pasted text in the message body even when typed attachments are on (D4 §3.9)", () => {
+    const row = chip("log_row", { level: "error" });
+    const pasted = pastedTextChip("line 1\nline 2", "p1");
+    for (const attachments of [false, true]) {
+      const request = serialize(
+        session(),
+        snapshot({ chips: [row, pasted] }),
+        CLIENT,
+        turn(PAGE_CONTEXTS.logs, { attachments }),
+      );
+      expect(request.message.text).toMatch(
+        /--- Pasted text \[[a-z2-7]{8}\] ---\n"line 1\\nline 2"/,
+      );
+      if (attachments)
+        expect(request.attachments).toEqual([{ kind: "log_row", data: { level: "error" } }]);
+      else expect(request.attachments).toBeUndefined();
+    }
+  });
+
   it("sends the known seq with persistence and the transcript without", () => {
     const current = session();
     current.record.cachedLastSeq = 7;
@@ -551,6 +570,24 @@ describe("the request", () => {
     expect((local as { transcript?: unknown }).transcript).toEqual([
       { role: "user", content: "before" },
     ]);
+  });
+
+  it("keeps an earlier paste in a browser-only transcript, since the paste was a chip", () => {
+    const current = session();
+    current.messages.push(
+      { role: "user", content: raw("why?"), chips: [pastedTextChip("a\nb", "p1")] },
+      { role: "assistant", content: raw("because"), chips: [pastedTextChip("x", "p2")] },
+    );
+    const local = serialize(
+      current,
+      snapshot(),
+      CLIENT,
+      turn(null, { persisted: false, userIndex: 2 }),
+    ) as { transcript?: { role: string; content: string }[] };
+    expect(local.transcript?.[0].content).toMatch(
+      /^why\?\n\n--- Pasted text \[[a-z2-7]{8}\] ---\n"a\\nb"\n--- end \[[a-z2-7]{8}\] ---$/,
+    );
+    expect(local.transcript?.[1]).toEqual({ role: "assistant", content: "because" });
   });
 
   it("maps context_used for the turn meta (CT-12)", () => {

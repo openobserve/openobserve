@@ -17,6 +17,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TurnMeta, TurnState } from "@/composables/assistant/pure";
+import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
 
 import AssistantTurnStatus from "./AssistantTurnStatus.vue";
@@ -42,7 +43,7 @@ function mountStatus(
     now?: number;
     variant?: "block" | "line" | "card";
     owned?: boolean;
-    trailShown?: boolean;
+    answer?: ChatMessage | null;
   } = {},
 ) {
   return mount(AssistantTurnStatus, {
@@ -51,11 +52,23 @@ function mountStatus(
       meta: meta(over.meta),
       variant: over.variant ?? "block",
       ownedByThisTab: over.owned ?? true,
-      trailShown: over.trailShown ?? false,
+      answer: over.answer ?? null,
       now: () => over.now ?? 1_000,
     },
   });
 }
+
+const answerOf = (...states: ContentBlock["stepState"][]): ChatMessage => ({
+  role: "assistant",
+  content: raw(""),
+  contentBlocks: states.map((stepState, index) => ({
+    type: "tool_call",
+    tool: "SearchSQL",
+    call_id: `c${index + 1}`,
+    stepState,
+    context: { stream_name: "default" },
+  })),
+});
 
 const text = (wrapper: ReturnType<typeof mountStatus>) =>
   wrapper.find('[data-test="assistant-turn-status-text"]').text();
@@ -118,25 +131,51 @@ describe("AssistantTurnStatus", () => {
     expect(stalled.classes()).toContain("text-status-warning-text");
   });
 
-  it("drops a bare Running {tool} beside the trail's row, unless the turn stalls", () => {
-    const bare: TurnState = {
-      state: "running_tool",
-      tool: "o2_Custom",
-      target: null,
-      callId: "c1",
-    };
-    const quiet = mountStatus(bare, { trailShown: true, meta: { lastFrameAt: 1_000 } });
-    expect(quiet.find('[data-test="assistant-turn-status"]').exists()).toBe(false);
-    const stalled = mountStatus(bare, { trailShown: true, now: 31_000 });
-    expect(stalled.find('[data-test="assistant-turn-status-stall"]').exists()).toBe(true);
-    const named: TurnState = {
+  it("names the running step's number, the steps beside it and the results it thinks about (D3-c)", () => {
+    const running: TurnState = {
       state: "running_tool",
       tool: "SearchSQL",
       target: "default",
-      callId: "c1",
+      callId: "c2",
     };
-    expect(text(mountStatus(named, { trailShown: true, meta: { lastFrameAt: 1_000 } }))).toBe(
-      "Querying default",
+    const fresh = { lastFrameAt: 1_000 };
+    expect(text(mountStatus(running, { meta: fresh, answer: answerOf("done", "running") }))).toBe(
+      "Querying default · step 2",
+    );
+    expect(
+      text(mountStatus(running, { meta: fresh, answer: answerOf("running", "running") })),
+    ).toBe("Querying default and 1 more");
+    const thinking: TurnState = { state: "responding.thinking" };
+    expect(text(mountStatus(thinking, { meta: fresh, answer: answerOf("done", "failed") }))).toBe(
+      "Thinking about 2 results",
+    );
+    expect(text(mountStatus(thinking, { meta: fresh }))).toBe("Thinking");
+  });
+
+  it("counts time in the current state and adds the turn total past 30 s (D3-b)", () => {
+    const thinking: TurnState = { state: "responding.thinking" };
+    const line = text(
+      mountStatus(thinking, {
+        now: 40_000,
+        meta: { startedAt: 0, stateEnteredAt: 32_000, lastFrameAt: 39_000 },
+      }),
+    );
+    expect(line).toBe("Thinking · 8 s · 40 s in all");
+  });
+
+  it("stalls from the last data frame, so only a turn sending nothing but keepalives warns (R5)", () => {
+    const thinking: TurnState = { state: "responding.thinking" };
+    const alive = mountStatus(thinking, {
+      now: 80_000,
+      meta: { startedAt: 0, lastFrameAt: 0, lastByteAt: 75_000 },
+    });
+    expect(alive.find('[data-test="assistant-turn-status-stall"]').exists()).toBe(false);
+    const silent = mountStatus(thinking, {
+      now: 80_000,
+      meta: { startedAt: 0, lastFrameAt: 0, lastByteAt: 40_000 },
+    });
+    expect(silent.find('[data-test="assistant-turn-status-stall"]').text()).toBe(
+      "No response for 40 s",
     );
   });
 

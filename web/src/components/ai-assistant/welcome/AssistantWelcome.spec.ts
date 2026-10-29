@@ -34,6 +34,7 @@ vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
 
 const SCOPE: AssistantScope = {
   org: "acme",
+  orgName: "acme",
   streamCount: 12,
   timeRange: raw("last 15 min"),
   canWrite: "yes",
@@ -84,6 +85,11 @@ describe("AssistantWelcome", () => {
         .get("h2")
         .text(),
     ).toContain("can't change anything in this organization.");
+  });
+
+  it("names the org tag by its display name, never the identifier", () => {
+    const wrapper = mountWelcome({ scope: { ...SCOPE, org: "a1b2c3", orgName: "Acme" } });
+    expect(wrapper.get('[data-test="assistant-welcome-scope-org"]').text()).toBe("org Acme");
   });
 
   it("lists what it sees as neutral tags, with Beta only in the roomy variant", () => {

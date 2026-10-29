@@ -19,8 +19,9 @@ import type { ChatMessage } from "@/ts/interfaces/chat";
 
 import { isRunning } from "../../assistantStore";
 import type { AssistantSession, ComposerSnapshot } from "../../assistantStore.types";
-import { timeChipOf } from "../../context/contextChips";
+import { periodMs, timeChipOf } from "../../context/contextChips";
 import { footerOf, promptRange, stepsOf, turnAnnotationKey, windowsOf } from "../../evidence";
+import { starterPayload, WIDER_PERIOD } from "../../starterPayload";
 import { registerApplier, type Applier } from "../registry";
 import type { AssistantAction } from "../types";
 
@@ -70,6 +71,41 @@ export const rerunApplier: Applier<Extract<AssistantAction, { kind: "rerun_now" 
     images: [...(turn.prompt.images ?? [])],
     mentions: [],
     timeOverride: { from, to },
+  };
+  void store.resend(sid, snapshot, "rerun");
+  return { ok: true };
+};
+
+/** Sends the turn's question and chips again over the last hour, once, on the user's click (PO A26). */
+export const rerunWiderApplier: Applier<Extract<AssistantAction, { kind: "rerun_wider" }>> = (
+  sid,
+  action,
+  env,
+) => {
+  const store = env.store();
+  const session = store.state.sessions[sid];
+  const turn = session ? turnOf(session, action.turnId) : null;
+  if (!session || !turn?.prompt) return { ok: false, reason: "failed" };
+  // A second send while a turn runs would join that turn, not start this one.
+  if (isRunning(session.turn)) return { ok: false, reason: "gated" };
+  const to = env.now();
+  const payload = starterPayload(
+    {
+      prompt: String(turn.prompt.content ?? ""),
+      chips: (turn.prompt.chips ?? [])
+        .filter((chip) => chip.kind !== "time")
+        .map((chip) => ({ ...toRaw(chip) })),
+      period: WIDER_PERIOD,
+    },
+    session.org,
+    to,
+  );
+  const snapshot: ComposerSnapshot = {
+    text: payload.text,
+    chips: payload.chips,
+    images: [...(turn.prompt.images ?? [])],
+    mentions: [],
+    timeOverride: { from: to - periodMs(WIDER_PERIOD), to, period: WIDER_PERIOD },
   };
   void store.resend(sid, snapshot, "rerun");
   return { ok: true };
@@ -141,5 +177,6 @@ export function turnOf(
 export function registerThreadAppliers(): void {
   registerApplier("open_step", openStepApplier);
   registerApplier("rerun_now", rerunApplier);
+  registerApplier("rerun_wider", rerunWiderApplier);
   registerApplier("feedback", feedbackApplier);
 }

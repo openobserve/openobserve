@@ -41,6 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OTruncatedText class="text-text-secondary min-w-0 text-xs">{{ header }}</OTruncatedText>
     </OButton>
+    <OButton
+      v-if="!hidden && folded > 0"
+      variant="ghost"
+      size="sm"
+      :class="['ms-2 self-start', TOUCH_TARGET_CLASS]"
+      data-test="assistant-trail-earlier"
+      @click="showAll = true"
+    >
+      <OText variant="meta" as="span">
+        {{ t("assistant.steps.showEarlier", { count: folded }, folded) }}
+      </OText>
+    </OButton>
     <ul v-if="!hidden && shown.length" :id="listId" class="flex min-w-0 flex-col gap-0.5 ps-2">
       <li v-for="step in shown" :key="step.callId" class="flex min-w-0 flex-col">
         <OButton
@@ -130,13 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="secondary"
               size="sm"
               as="a"
-              :href="hrefOf(step)"
-              :target="opensElsewhere ? '_blank' : undefined"
-              :rel="opensElsewhere ? 'noopener noreferrer' : undefined"
-              :icon-right="opensElsewhere ? assistantGlyph.newTab : undefined"
+              :href="actions.hrefOf(step)"
+              :target="actions.opensElsewhere.value ? '_blank' : undefined"
+              :rel="actions.opensElsewhere.value ? 'noopener noreferrer' : undefined"
+              :icon-right="actions.opensElsewhere.value ? assistantGlyph.newTab : undefined"
               :class="TOUCH_TARGET_CLASS"
               :data-test="`assistant-step-open-${step.callId}`"
-              @click="openStep(step, $event)"
+              @click="actions.open(step, $event)"
             >
               {{
                 t("assistant.query.open", { explorer: explorerLabel(explorerOf(step.query), t) })
@@ -148,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon-left="assistantGlyph.copy"
               :class="TOUCH_TARGET_CLASS"
               :data-test="`assistant-step-copy-${step.callId}`"
-              @click="copyStep(step)"
+              @click="actions.copy(step)"
             >
               {{ t("assistant.query.copy") }}
             </OButton>
@@ -161,7 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, inject, ref, watch } from "vue";
-import { useRouter } from "vue-router";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
@@ -169,6 +180,7 @@ import AssistantQueryText from "@/components/ai-assistant/evidence/AssistantQuer
 import AssistantResultTable from "@/components/ai-assistant/evidence/AssistantResultTable.vue";
 import { explorerLabel, stepLine, stepName } from "@/components/ai-assistant/evidence/evidenceText";
 import { OPEN_STEP_EVENT } from "@/components/ai-assistant/evidence/revealStep";
+import { useStepActions } from "@/components/ai-assistant/evidence/useStepActions";
 import {
   MAX_HIT_ROWS,
   assistantEvidenceHostKey,
@@ -187,9 +199,11 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { explorerOf, explorerTarget } from "@/utils/assistant/explorerRoutes";
-import { copyToClipboard } from "@/utils/clipboard";
+import { explorerOf } from "@/utils/assistant/explorerRoutes";
 import { formatCount, formatElapsed, formatOrgTime } from "@/utils/formatters";
+
+/** While a turn runs the trail lists only its newest rows, so the live line stays in view (D3-f). */
+const LIVE_ROWS = 3;
 
 const props = withDefaults(
   defineProps<{
@@ -205,11 +219,16 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const host = props.readonly ? null : inject(assistantEvidenceHostKey, null);
-const router = useRouter();
+const actions = useStepActions(
+  () => props.turn?.sid ?? null,
+  () => props.readonly,
+  "trail",
+);
 
 // Without a live session (a shared page) the expansion is the reader's own and never stored.
 const localExpanded = ref<string[]>([]);
 const root = ref<HTMLElement | null>(null);
+const showAll = ref(false);
 
 const sid = computed(() => props.turn?.sid ?? null);
 const live = computed(() => props.turn?.outcome === "live");
@@ -239,10 +258,21 @@ const exceptions = computed(() =>
 );
 
 // The exceptions stay listed when collapsed, so colour is spent on the problem only.
-const shown = computed(() => (open.value ? steps.value : exceptions.value));
+const listed = computed(() => (open.value ? steps.value : exceptions.value));
+
+// A failed row and a row the reader opened are never folded away.
+const shown = computed(() => {
+  if (!live.value || !open.value || showAll.value) return listed.value;
+  const newest = steps.value.length - LIVE_ROWS;
+  return listed.value.filter(
+    (step, index) =>
+      index >= newest || exceptions.value.includes(step) || expanded.value.includes(step.callId),
+  );
+});
+
+const folded = computed(() => listed.value.length - shown.value.length);
 
 const openable = computed(() => props.turn?.openable !== false);
-const opensElsewhere = computed(() => !sid.value || !host || host.prefersNewTab());
 
 const duration = computed(() => {
   const footer = footerOf(props.message);
@@ -304,46 +334,6 @@ function windowLine(step: StepFacts): I18nText {
     shown: formatCount(shownRows),
     total: formatCount(total),
   });
-}
-
-function hrefOf(step: StepFacts): string | undefined {
-  if (!step.query || !router) return undefined;
-  return router.resolve(explorerTarget(step.query, explorerOf(step.query), String(Date.now())))
-    .href;
-}
-
-// A shared page follows the link itself in a new tab; a live chat opens through the applier.
-async function openStep(step: StepFacts, event: MouseEvent): Promise<void> {
-  if (!step.query) return;
-  trackAssistant("ai_evidence_action", { action: "open_step_logs", block_kind: "trail" });
-  if (!sid.value || !host) return;
-  if (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1) return;
-  event.preventDefault();
-  const result = await host.dispatch(sid.value, {
-    kind: "open_in_explorer",
-    query: step.query,
-    explorer: explorerOf(step.query),
-  });
-  if (!result.ok && result.reason === "other_org")
-    host.announce(sid.value, t("assistant.evidence.otherOrg", { org: raw(step.query.org) }));
-}
-
-async function copyStep(step: StepFacts): Promise<void> {
-  if (!step.query) return;
-  trackAssistant("ai_evidence_action", { action: "copy_step_query", block_kind: "trail" });
-  if (!sid.value || !host) {
-    await copyToClipboard(step.query.text, t, { successMessage: t("assistant.evidence.copied") });
-    return;
-  }
-  const result = await host.dispatch(sid.value, {
-    kind: "copy",
-    text: step.query.text,
-    what: "query",
-  });
-  host.announce(
-    sid.value,
-    result.ok ? t("assistant.evidence.copied") : t("assistant.client.copyManually"),
-  );
 }
 
 function onOpenStep(event: Event): void {

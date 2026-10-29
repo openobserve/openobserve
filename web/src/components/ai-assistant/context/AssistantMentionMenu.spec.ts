@@ -78,6 +78,45 @@ beforeEach(() => {
 });
 
 describe("AssistantMentionMenu", () => {
+  it("never offers internal streams and finds a name by any of its parts (BUG-015)", async () => {
+    queryClient.clear();
+    seed();
+    queryClient.setQueryData(streamKeys.nameList(ORG, "logs"), [
+      { name: "_o2_alert_calibration_digests" },
+      { name: "audit" },
+      { name: "cart_api_errors" },
+    ]);
+    const wrapper = mount(AssistantMentionMenu, {
+      props: { open: true, query: "", org: ORG, listboxId: "lb" },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const streamLabels = () =>
+      wrapper
+        .findAll('[data-test="assistant-mention-option"][data-kind="stream"]')
+        .map((option) => option.text());
+    expect(streamLabels().join(" ")).not.toMatch(/_o2_|audit/);
+    await wrapper.setProps({ query: "errors" });
+    expect(streamLabels()).toEqual([expect.stringContaining("cart_api_errors")]);
+    await wrapper.setProps({ query: "cart err" });
+    expect(streamLabels()).toEqual([expect.stringContaining("cart_api_errors")]);
+    await wrapper.setProps({ query: "digests" });
+    expect(streamLabels()).toEqual([]);
+  });
+
+  it("adds an Image row for the + menu and hands it over like an option", async () => {
+    seed();
+    const wrapper = mount(AssistantMentionMenu, {
+      props: { open: true, query: "", org: ORG, listboxId: "lb", inline: true, withImage: true },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const image = wrapper.get('[data-test="assistant-mention-image"]');
+    expect(wrapper.get('[data-test="assistant-mention-panel"]').classes()).not.toContain("border");
+    await image.trigger("click");
+    expect(wrapper.emitted("select")?.[0]?.[0]).toMatchObject({ action: "image" });
+  });
+
   it("lists the five groups as a listbox with the first option active (CT-05 AC 1, 9)", async () => {
     const { wrapper, options } = await open();
     const listbox = document.body.querySelector('[data-test="assistant-mention-menu"]')!;

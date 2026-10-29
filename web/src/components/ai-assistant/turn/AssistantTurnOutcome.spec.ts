@@ -25,8 +25,6 @@ import {
 import type { AssistantError, AssistantErrorCode } from "@/composables/assistant/pure";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
-import { ASSISTANT_SETUP_DOCS_URL } from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
-
 import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantTurnOutcome, { type AssistantTurnOutcomeProps } from "./AssistantTurnOutcome.vue";
 
@@ -63,6 +61,8 @@ const title = (w: ReturnType<typeof mountOutcome>) =>
 const buttons = (w: ReturnType<typeof mountOutcome>) =>
   w.findAll('[data-test="assistant-turn-outcome-action"]');
 const label = (w: ReturnType<typeof mountOutcome>) => buttons(w)[0]?.text();
+const bodies = (w: ReturnType<typeof mountOutcome>) =>
+  w.findAll('[data-test="assistant-turn-outcome-body"]').map((line) => line.text());
 
 // `80` §1.3: code → kind, title, admin action label, member action label (null = no button).
 const LEDGER: [AssistantErrorCode, "failed" | "refused", string, string | null, string | null][] = [
@@ -78,21 +78,21 @@ const LEDGER: [AssistantErrorCode, "failed" | "refused", string, string | null, 
   [
     "permission_denied",
     "refused",
-    "O2 Assistant isn't available to your role.",
+    "Your role can no longer use O2 Assistant. Your message wasn't sent.",
     "Open IAM roles",
     "Ask an admin",
   ],
   [
     "not_enabled",
     "refused",
-    "O2 Assistant is off for this organization.",
-    "Read the setup guide (opens in a new tab)",
+    "O2 Assistant is turned off for acme. Your message wasn't sent.",
+    "Open access settings",
     "Ask an admin",
   ],
   [
     "credits_exhausted",
     "refused",
-    "AI credits are used up for acme.",
+    "AI credits are used up for acme. Your message wasn't sent.",
     "Manage paid usage",
     "Ask an admin",
   ],
@@ -120,21 +120,21 @@ const LEDGER: [AssistantErrorCode, "failed" | "refused", string, string | null, 
   [
     "turn_limit",
     "refused",
-    "Too many answers are running. Wait for one to finish.",
+    "Too many answers are running. Your message wasn't sent.",
     "Retry",
     "Retry",
   ],
   [
     "rate_limited",
     "refused",
-    "The AI provider is rate-limiting requests. Try again in about a minute.",
+    "The AI provider is limiting requests. Your message wasn't sent.",
     "Retry",
     "Retry",
   ],
   [
     "turn_busy",
     "refused",
-    "Another answer is still running in this chat. Your message wasn't sent.",
+    "This chat is still answering. Your message wasn't sent.",
     "Stop it",
     "Stop it",
   ],
@@ -145,8 +145,14 @@ const LEDGER: [AssistantErrorCode, "failed" | "refused", string, string | null, 
     "Reload chat",
     "Reload chat",
   ],
-  ["agent_unavailable", "failed", "The assistant service didn't respond.", "Retry", "Retry"],
-  ["provider_error", "failed", "The AI provider failed.", "Retry", "Retry"],
+  [
+    "agent_unavailable",
+    "failed",
+    "The assistant didn't respond. Nothing was changed.",
+    "Retry",
+    "Retry",
+  ],
+  ["provider_error", "failed", "The AI provider failed, so the answer stopped.", "Retry", "Retry"],
   [
     "stream_dropped",
     "failed",
@@ -231,14 +237,17 @@ describe("AssistantTurnOutcome", () => {
 
   it("names the action by the title and says the findings line only when findings exist", () => {
     const bare = mountOutcome({ error: error("provider_error", { reason: "overloaded" }) });
-    expect(title(bare)).toBe("The AI provider failed: overloaded.");
-    expect(bare.find('[data-test="assistant-turn-outcome-body"]').exists()).toBe(false);
+    expect(title(bare)).toBe("The AI provider is overloaded, so the answer stopped.");
+    expect(bodies(bare)).toEqual(["Nothing was changed."]);
     const titleId = bare.get('[data-test="assistant-turn-outcome-title"]').attributes("id");
     expect(buttons(bare)[0].attributes("aria-describedby")).toBe(titleId);
     const partial = mountOutcome({ error: error("provider_error"), partial: true });
-    expect(partial.get('[data-test="assistant-turn-outcome-body"]').text()).toBe(
+    expect(bodies(partial)).toEqual(["Nothing was changed.", "Findings so far are kept above."]);
+    const dropped = mountOutcome({ error: error("stream_dropped"), partial: true, elapsedMs: 1 });
+    expect(bodies(dropped)).toEqual([
       "Findings so far are kept above.",
-    );
+      "The text above is incomplete.",
+    ]);
   });
 
   it("reads Ask again with the undo line after a mutating tool, Edit and resend for an unrecoverable failure", () => {
@@ -248,6 +257,33 @@ describe("AssistantTurnOutcome", () => {
     expect(label(mountOutcome({ error: error("provider_error", { action: "edit_resend" }) }))).toBe(
       "Edit and resend",
     );
+  });
+
+  it("never says nothing changed after an approved change ran; it warns instead (D7 §3.2)", () => {
+    const afterChange = (code: AssistantErrorCode) =>
+      mountOutcome({ error: error(code, { action: "ask_again" }), elapsedMs: 40_000 });
+    const provider = afterChange("provider_error");
+    expect(title(provider)).toBe("The AI provider failed, so the answer stopped.");
+    expect(bodies(provider)).toEqual(["Retrying won't undo anything already changed."]);
+    expect(label(provider)).toBe("Ask again");
+    expect(title(afterChange("agent_unavailable"))).toBe("The assistant didn't respond.");
+    expect(title(afterChange("stream_dropped"))).toBe("Connection lost after 40 s.");
+    for (const code of [
+      "provider_error",
+      "agent_unavailable",
+      "stream_dropped",
+      "stream_oversized",
+    ] as const)
+      expect(afterChange(code).text()).not.toContain("Nothing was changed");
+    expect(bodies(mountOutcome({ error: error("provider_error") }))).toEqual([
+      "Nothing was changed.",
+    ]);
+    const unrecoverable = mountOutcome({
+      error: error("provider_error", { action: "edit_resend", afterChange: true }),
+    });
+    expect(label(unrecoverable)).toBe("Edit and resend");
+    expect(bodies(unrecoverable)).toEqual(["Retrying won't undo anything already changed."]);
+    expect(unrecoverable.text()).not.toContain("Nothing was changed");
   });
 
   it("disables Retry with a reason while offline and once the snapshot is gone (HT-02 AC 7, HT-03 AC 5)", async () => {
@@ -340,21 +376,60 @@ describe("AssistantTurnOutcome", () => {
   it("puts the action before Details in reading and tab order (`30` §4.4, HT-10 AC 5)", () => {
     const wrapper = mountOutcome({ error: error("agent_unavailable") });
     const action = buttons(wrapper)[0].element;
-    const details = wrapper.get('[data-test="assistant-error-details"]').element;
+    const details = wrapper.get('[data-test="assistant-error-details-trigger"]').element;
     expect(action.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("leads settings actions to the setup guide as a labelled new-tab link (HT-02 AC 6)", () => {
-    for (const code of ["not_enabled", "data_level_blocked", "permission_denied_tool"] as const) {
-      const wrapper = mountOutcome({ kind: "refused", error: error(code) });
+  it("keeps the action in the title row and the hint, manual route and Details in one meta row (D7 §3.1)", () => {
+    const manualRoute = { language: "sql" as const, text: "SELECT 1", stream: "default", org: "o" };
+    const wrapper = mountOutcome({ kind: "refused", error: error("offline"), manualRoute });
+    const titleRow = wrapper.get('[data-test="assistant-turn-outcome-title"]').element
+      .parentElement!.parentElement!;
+    expect(titleRow.contains(buttons(wrapper)[0].element)).toBe(true);
+    const meta = wrapper.findAll('[data-test="assistant-turn-outcome-meta"]');
+    expect(meta).toHaveLength(1);
+    expect(meta[0].get('[data-test="assistant-turn-outcome-hint"]').text()).toBe(
+      "Retry turns on when you're back online.",
+    );
+    expect(meta[0].find('[data-test="assistant-error-details-trigger"]').exists()).toBe(true);
+    const failed = mountOutcome({ error: error("provider_error"), manualRoute });
+    const row = failed.get('[data-test="assistant-turn-outcome-meta"]');
+    expect(row.find('[data-test="assistant-turn-outcome-manual"]').exists()).toBe(true);
+    expect(row.find('[data-test="assistant-turn-outcome-hint"]').exists()).toBe(false);
+  });
+
+  it("opens the settings tab a settings action names in a new tab (D7 §3.2)", () => {
+    const settings = [
+      { path: "/settings/assistant/:tab?", name: "assistantSettings", component: {} },
+    ];
+    const cases = [
+      ["not_enabled", "/settings/assistant/access?org_identifier=acme", "Open access settings"],
+      ["data_level_blocked", "/settings/assistant/data?org_identifier=acme", "Change level"],
+      [
+        "permission_denied_tool",
+        "/settings/assistant/permissions?org_identifier=acme",
+        "Open assistant permissions",
+      ],
+    ] as const;
+    for (const [code, href, text] of cases) {
+      const wrapper = mount(AssistantTurnOutcome, {
+        props: {
+          kind: "refused",
+          role: "admin",
+          retrySnapshotAvailable: true,
+          org: "acme",
+          error: error(code),
+        },
+        global: { plugins: [fakeRouter(settings)] },
+      });
       const link = buttons(wrapper)[0];
       expect(link.element.tagName).toBe("A");
       expect(link.attributes()).toMatchObject({
-        href: ASSISTANT_SETUP_DOCS_URL,
+        href,
         target: "_blank",
         rel: "noopener noreferrer",
       });
-      expect(link.text()).toBe("Read the setup guide (opens in a new tab)");
+      expect(link.text()).toBe(`${text} (opens in a new tab)`);
     }
   });
 
@@ -368,7 +443,7 @@ describe("AssistantTurnOutcome", () => {
       kind: "refused",
       error: error("rate_limited", { retryAfterMs: 30_000 }),
     });
-    expect(title(timed)).toBe("The AI provider is rate-limiting requests.");
+    expect(title(timed)).toBe("The AI provider is limiting requests. Your message wasn't sent.");
     expect(label(timed)).toBe("Retry in 30 s");
   });
 
@@ -414,7 +489,7 @@ describe("AssistantTurnOutcome", () => {
     expect(contract.text()).toContain("Contact your account manager to add credits.");
     const payer = withRouter({ canManage: false, payer: "acme-billing" });
     expect(payer.get('[data-test="assistant-turn-outcome-title"]').text()).toBe(
-      "AI credits are used up for acme, billed to acme-billing.",
+      "AI credits are used up for acme, billed to acme-billing. Your message wasn't sent.",
     );
     expect(payer.text()).toContain("An admin of acme-billing can allow paid usage.");
   });
@@ -427,7 +502,7 @@ describe("AssistantTurnOutcome", () => {
 
   it("is one line with no button and no Details when readonly (HT-02 AC 11)", () => {
     const wrapper = mountOutcome({ error: error("agent_unavailable"), readonly: true });
-    expect(wrapper.text()).toBe("Failed: The assistant service didn't respond.");
+    expect(wrapper.text()).toBe("Failed: The assistant didn't respond. Nothing was changed.");
     expect(wrapper.find("button").exists()).toBe(false);
   });
 

@@ -22,6 +22,8 @@ import { streamKeys } from "@/services/stream.querykeys";
 import { raw } from "@/types/i18n";
 
 import { createAssistantStore, inertAssistantDeps } from "./assistantStore";
+import { wireContextOf } from "./context/serialize";
+import { starterPayload } from "./starterPayload";
 import type { AssistantCapability, AssistantHostAdapter } from "./assistantStore.types";
 import type { PageContext } from "./context/types";
 import { useAssistantStarters } from "./useAssistantStarters";
@@ -179,22 +181,92 @@ describe("useAssistantStarters", () => {
     dashboard.page$.value = "metrics";
     await flushPromises();
     expect(labels(dashboard.starters)[0]).toBe("Write PromQL for p95 latency of `http_latency`");
+    expect(dashboard.starters.value.some((starter) => starter.home)).toBe(false);
     dashboard.page$.value = "home";
     await flushPromises();
-    expect(labels(dashboard.starters).slice(0, 2)).toEqual([
+    expect(labels(dashboard.starters)).toEqual([
       "What needs attention in `default` right now?",
-      "Which alerts fired since yesterday?",
+      "What can you do here?",
     ]);
+    expect(dashboard.starters.value.every((starter) => starter.home === true)).toBe(true);
   });
 
-  it("always offers three distinct starters off the page table", async () => {
+  it("offers learn and org health off the page table, never the removed alerts starter", async () => {
     const { starters } = setup("assistant", { currentPage: "assistant" });
     await flushPromises();
     expect(labels(starters)).toEqual([
       "What can you do here?",
-      "Which alerts fired since yesterday?",
       "What needs attention in `default` right now?",
     ]);
+  });
+
+  it("grounds Home on streams the org has, skips internal ones and stages the hour it names", async () => {
+    seedStreams("logs", ["_o2_internal", "k8s"]);
+    seedStreams("traces", ["_o2_spans", "checkout"]);
+    const { starters } = setup("home", null);
+    await flushPromises();
+    expect(labels(starters)).toEqual([
+      "What needs attention in `default` right now?",
+      "Summarise errors in `k8s` over the last hour",
+      "Which services had the slowest spans in the last hour?",
+    ]);
+    expect(starters.value[1].period).toBe("1h");
+    expect(starters.value[1].chips[0].ref).toMatchObject({ stream: "k8s", streamType: "logs" });
+    expect(starters.value[2].chips[0].ref).toMatchObject({
+      stream: "checkout",
+      streamType: "traces",
+    });
+    expect(labels(starters).join(" ")).not.toContain("_o2_");
+  });
+
+  it("stages Home starter streams so they reach the tray and the request from the full view", async () => {
+    seedStreams("logs", ["k8s"]);
+    seedStreams("traces", ["checkout"]);
+    const { starters, store } = setup("home", null);
+    await flushPromises();
+    const sid = store.createSession({
+      origin: { entryKind: "home_launcher", objectKind: "none", container: "full_view" },
+    });
+    const wire = (index: number) => {
+      store.state.sessions[sid].composer.chips = [];
+      store.stage(sid, { ...starterPayload(starters.value[index], "default"), mode: "replace" });
+      const composer = store.state.sessions[sid].composer;
+      expect(composer.chips.some((chip) => chip.provenance === "page")).toBe(false);
+      expect(composer.timeOverride).not.toBeNull();
+      return wireContextOf(null, composer, { org: "default" });
+    };
+    expect(wire(1)).toMatchObject({ selectedStreams: ["k8s"], streamType: "logs" });
+    expect(wire(2)).toMatchObject({ selectedStreams: ["checkout"], streamType: "traces" });
+  });
+
+  it("keeps a Logs starter's stream a page copy that never re-adds the page's own field", async () => {
+    seedStreams("logs", ["default"]);
+    const { starters } = setup("logs");
+    await flushPromises();
+    const stream = starters.value[0].chips.find((chip) => chip.kind === "stream");
+    expect(stream?.provenance).toBe("page");
+  });
+
+  it("never offers a Continue starter on Home, where Your chats lists them", async () => {
+    const { starters, store } = setup("home", null);
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
+    store.setActive(null);
+    await flushPromises();
+    expect(starters.value.some((s) => s.kind === "recent")).toBe(false);
+  });
+
+  it("names the org by its display name, not its identifier", async () => {
+    setup("home", null);
+    runtime.current.context = shallowRef({
+      getOrg: () => ({ identifier: "a1b2c3", name: "Acme" }),
+    });
+    const acme = effectScope().run(() => useAssistantStarters({ page: "home" }))!;
+    await flushPromises();
+    expect(labels(acme.starters)[0]).toBe("What needs attention in `Acme` right now?");
+    expect(acme.scope.value).toMatchObject({ org: "a1b2c3", orgName: "Acme" });
   });
 
   it("uses the editor starters for a docked host", async () => {

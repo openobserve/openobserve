@@ -341,6 +341,20 @@ export function queryCount(steps: StepFacts[]): number {
   return steps.filter((step) => QUERY_KINDS.has(step.kind) && step.state === "done").length;
 }
 
+/** Every query of the answer ran and reported zero rows; a policy-denied call or an unknown count is never empty (PO A26). */
+export function answerQueriesAllEmpty(
+  message: ChatMessage | null | undefined,
+  org: string,
+): boolean {
+  // The trail drops policy-denied calls, so they are looked for on the raw blocks.
+  const denied = (message?.contentBlocks ?? []).some(
+    (block) => block.type === "tool_call" && POLICY_CODES.has(block.errorType ?? ""),
+  );
+  if (denied) return false;
+  const queries = stepsOf(message, org).filter((step) => QUERY_KINDS.has(step.kind));
+  return queries.length > 0 && queries.every((step) => step.state === "done" && step.rows === 0);
+}
+
 /** Claim numbers by distinct `call_id` in order of first citation. */
 export function claimNumbers(claims: string[]): Map<string, number> {
   const numbers = new Map<string, number>();

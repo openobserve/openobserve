@@ -17,10 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="root"
-    :class="[
-      '@container flex min-h-0 min-w-0 flex-col gap-2',
-      mode === 'popover' ? 'max-h-[70vh] p-2' : 'h-full p-2',
-    ]"
+    class="@container flex h-full min-h-0 min-w-0 flex-col gap-2 p-2"
+    :role="mode === 'panel' ? 'region' : undefined"
+    :aria-label="mode === 'panel' ? t('assistant.history.view.title') : undefined"
     :data-mode="mode"
     :data-readonly="readonly ? '' : undefined"
     data-dd-privacy="mask"
@@ -39,27 +38,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="(q) => history.setFilter({ q })"
         @keydown="onSearchKey"
       />
-      <template v-if="!readonly">
-        <OButton
-          v-if="mode === 'rail'"
-          variant="outline"
-          size="sm"
-          :icon-left="assistantGlyph.newChat"
-          class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-history-new"
-          @click="emit('new')"
-        >
-          {{ t("assistant.history.new") }}
-        </OButton>
-        <AssistantIconButton
-          v-else
-          variant="outline"
-          :label="t('assistant.history.new')"
-          :icon="assistantGlyph.newChat"
-          data-test="assistant-history-new"
-          @click="emit('new')"
-        />
-      </template>
+      <OButton
+        v-if="!readonly && mode === 'rail'"
+        variant="outline"
+        size="sm"
+        :icon-left="assistantGlyph.newChat"
+        class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
+        data-test="assistant-history-new"
+        @click="emit('new')"
+      >
+        {{ t("assistant.history.new") }}
+      </OButton>
     </div>
 
     <div ref="scroller" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
@@ -230,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-group="item.id"
                 data-test="assistant-history-group"
               >
-                <h3 :class="GROUP_HEADING_CLASS">{{ t(`assistant.history.group.${item.id}`) }}</h3>
+                <h3 :class="GROUP_HEADING_CLASS">{{ groupLabel(item.id) }}</h3>
               </div>
               <AssistantHistoryRow
                 v-else
@@ -263,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="assistant-history-group"
             >
               <h3 :id="`${listId}-${group.id}`" :class="GROUP_HEADING_CLASS">
-                {{ t(`assistant.history.group.${group.id}`) }}
+                {{ groupLabel(group.id) }}
               </h3>
               <ul class="flex flex-col">
                 <AssistantHistoryRow
@@ -338,7 +327,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { Container, HistoryFilter, HistoryRow, Sid } from "@/composables/assistant";
 
 export interface AssistantHistoryListProps {
-  mode: "popover" | "rail" | "drawer";
+  /** `panel` replaces a container's chat (D5 §3.2); `rail` sits beside the full view's chat. */
+  mode: "panel" | "rail";
   currentSid: Sid | null;
   /** Where a row opens: the rail routes to the full view, the others open in their container. */
   container: Container;
@@ -349,7 +339,15 @@ export const SEARCH_DEBOUNCE_MS = 300;
 /** From this many rows the list mounts only what is on screen. */
 export const VIRTUAL_FROM = 150;
 
-const GROUP_ORDER = ["pinned", "today", "yesterday", "week", "older", "browser"] as const;
+const GROUP_ORDER = [
+  "running",
+  "pinned",
+  "today",
+  "yesterday",
+  "week",
+  "older",
+  "browser",
+] as const;
 
 const ROW_ESTIMATE_PX = 40;
 
@@ -367,7 +365,6 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AssistantErrorDetails from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
-import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import {
   groupOf,
@@ -398,11 +395,12 @@ import AssistantHistoryFooter from "./AssistantHistoryFooter.vue";
 import AssistantHistoryRow from "./AssistantHistoryRow.vue";
 import AssistantImportCard from "./AssistantImportCard.vue";
 import AssistantLocalOnlyHeader from "./AssistantLocalOnlyHeader.vue";
+import { chatStatusOf, isInProgress, type ChatStatus } from "./chatStatus";
 import { useAssistantHistoryKeys } from "./useAssistantHistoryKeys";
 
 const props = defineProps<AssistantHistoryListProps>();
 
-const emit = defineEmits<{ opened: [sid: Sid]; new: [] }>();
+const emit = defineEmits<{ opened: [sid: Sid]; new: []; close: [] }>();
 
 defineSlots<{ shares?: () => unknown }>();
 
@@ -487,7 +485,10 @@ const groups = computed(() => {
   const zone = timezone.value;
   const buckets = new Map<GroupId, HistoryRow[]>();
   for (const row of history.visible.value) {
-    const id = groupOf(row, now.value, (ts, at) => orgDayDistance(ts, at, zone), server);
+    // A chat that answers or waits leaves its date group until it settles (D5 decision 2).
+    const id = isInProgress(statusOf(row))
+      ? "running"
+      : groupOf(row, now.value, (ts, at) => orgDayDistance(ts, at, zone), server);
     const bucket = buckets.get(id);
     if (bucket) bucket.push(row);
     else buckets.set(id, [row]);
@@ -522,12 +523,14 @@ onMounted(() => {
       priority: 2,
       run: focusSearch,
     });
+  if (props.mode === "panel") root.value?.addEventListener("keydown", onRootKey);
   history.ensureLoaded();
   trackAssistant("ai_history_open", { placement: props.mode });
   clock = setInterval(() => (now.value = Date.now()), 60_000);
   if (props.mode !== "rail") void nextTick(() => focusSearch());
 });
 onBeforeUnmount(() => {
+  root.value?.removeEventListener("keydown", onRootKey);
   if (clock) clearInterval(clock);
   unregisterHistory?.();
 });
@@ -535,6 +538,7 @@ onBeforeUnmount(() => {
 function rowProps(row: HistoryRow) {
   return {
     row,
+    status: statusOf(row),
     current: row.sid === props.currentSid,
     mode: props.mode,
     pending: history.pending[row.sid] ?? null,
@@ -544,6 +548,24 @@ function rowProps(row: HistoryRow) {
     serverPins: history.serverPins.value,
     timezone: timezone.value,
   };
+}
+
+function statusOf(row: HistoryRow): ChatStatus | null {
+  return chatStatusOf(row, store.state.sessions[row.sid]?.turn.state);
+}
+
+function groupLabel(id: GroupId): string {
+  if (id !== "running") return t(`assistant.history.group.${id}`);
+  const count = groups.value.find((group) => group.id === "running")?.rows.length ?? 0;
+  return t("assistant.history.group.running", { count });
+}
+
+// Escape that nothing inside used (search clearing, a menu) returns the panel to its chat.
+function onRootKey(event: KeyboardEvent): void {
+  if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+  event.preventDefault();
+  event.stopPropagation();
+  emit("close");
 }
 
 // A virtual row may be off screen: bring it in first, then focus it.

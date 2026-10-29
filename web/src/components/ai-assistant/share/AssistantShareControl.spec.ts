@@ -23,6 +23,7 @@ import type { ShareView } from "@/services/ai_chat_share";
 
 import { fakeAssistant } from "../__tests__/fakeAssistant";
 import AssistantShareControl from "./AssistantShareControl.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 import AssistantShareSettings from "./AssistantShareSettings.vue";
@@ -76,7 +77,7 @@ const share = (over: Partial<ShareView> = {}): ShareView => ({
 
 function vuex(zoConfig: Record<string, unknown> = {}) {
   return createStore({
-    state: { selectedOrganization: { identifier: "default", name: "Acme" }, zoConfig },
+    state: { selectedOrganization: { identifier: "default", label: "Acme" }, zoConfig },
   });
 }
 
@@ -137,13 +138,13 @@ async function setupMenu(
   fake.current = fakeAssistant("available", {});
   api.listForChat.mockResolvedValue({ data: { shares: [] } });
   const sid = opts.row ? "0190a1b2-c3d4-7e5f-8a9b-00000000r0w1" : chat(opts);
-  const onManage = vi.fn();
+  const onSettings = vi.fn();
   const wrapper = mount(ODropdown, {
     props: { open: true },
     slots: {
       trigger: "<button>Open</button>",
       default: {
-        render: () => h(AssistantShareControl, { sid, variant: "menu-item", onManage }),
+        render: () => h(AssistantShareControl, { sid, variant: "menu-item", onSettings }),
       },
     },
     global: { plugins: [vuex(opts.zoConfig)] },
@@ -152,36 +153,41 @@ async function setupMenu(
   await flushPromises();
   const item = () =>
     document.querySelector<HTMLElement>('[data-test="assistant-thread-menu-share"]');
-  return { wrapper, onManage, item };
+  return { wrapper, onSettings, item };
 }
 
 describe("AssistantShareControl menu item", () => {
-  it("sends a chat with attachments to the review instead of posting", async () => {
-    const { onManage, item } = await setupMenu({ chips: true });
+  it.each([
+    ["a chat with attachments", { chips: true }],
+    ["a history row whose chat isn't loaded", { row: true }],
+    ["a plain chat", {}],
+  ])("asks the shell for the Share surface on %s and never posts", async (_label, opts) => {
+    const { onSettings, item } = await setupMenu(opts);
+    expect(item()?.textContent?.trim()).toBe("Share…");
     item()?.click();
     await flushPromises();
     expect(api.create).not.toHaveBeenCalled();
-    expect(onManage).toHaveBeenCalledTimes(1);
+    expect(onSettings).toHaveBeenCalledTimes(1);
   });
+});
 
-  it("never one-clicks a row whose chat isn't loaded when the server can't hide attachments", async () => {
-    const { onManage, item } = await setupMenu({ row: true });
-    item()?.click();
-    await flushPromises();
-    expect(api.create).not.toHaveBeenCalled();
-    expect(onManage).toHaveBeenCalledTimes(1);
-  });
-
-  it("one-clicks a row when the server hides attachments, with no dead Change settings", async () => {
-    const { item } = await setupMenu({
-      row: true,
-      zoConfig: { ai_share_redact_attachments: true },
+describe("AssistantShareControl drawer", () => {
+  it("opens the same Share chat form through its model, and creates only on confirm", async () => {
+    fake.current = fakeAssistant("available", {});
+    api.listForChat.mockResolvedValue({ data: { shares: [] } });
+    const sid = chat();
+    const wrapper = mount(AssistantShareControl, {
+      props: { sid, variant: "drawer", open: true },
+      global: { plugins: [vuex()] },
+      attachTo: document.body,
     });
-    item()?.click();
+    await flushPromises();
+    expect(document.querySelector('[data-test="assistant-share-settings"]')).not.toBeNull();
+    expect(api.create).not.toHaveBeenCalled();
+    (document.querySelector('[data-test="assistant-share-create"]') as HTMLElement).click();
     await flushPromises();
     expect(api.create).toHaveBeenCalledTimes(1);
-    expect(api.create.mock.calls[0][2]).toMatchObject({ hide_attachments: true });
-    expect(toast.mock.calls[0][0].action).toBeUndefined();
+    wrapper.unmount();
   });
 });
 
@@ -199,18 +205,95 @@ describe("AssistantShareControl", () => {
     expect(api.create).not.toHaveBeenCalled();
   });
 
-  it.each([
-    [{ turns: false }, "Send a message first"],
-    [{ running: true }, "Wait for the answer to finish to share a snapshot."],
-  ])("is unavailable while %o", async (opts, reason) => {
-    const { button } = await setup({}, opts);
+  it("is unavailable before the chat has an answer", async () => {
+    const { button } = await setup({}, { turns: false });
     expect(button().attributes("aria-disabled")).toBe("true");
-    expect(button().text()).toContain(reason);
+    expect(button().text()).toContain("Send a message first");
   });
 
-  it("shares in one click when the chat has no links, without a dialog", async () => {
+  it("opens while an answer runs with only Live available, and creates a live link", async () => {
+    const { button } = await setup({}, { running: true });
+    expect(button().attributes("aria-disabled")).toBeUndefined();
+    await button().trigger("click");
+    await flushPromises();
+    const snapshot = document.querySelector('[data-test="assistant-share-mode-snapshot"]');
+    expect(
+      snapshot?.hasAttribute("disabled") || snapshot?.getAttribute("data-disabled") === "",
+    ).toBe(true);
+    expect(document.querySelector('[data-test="assistant-share-settings"]')?.textContent).toContain(
+      "Available when the answer finishes",
+    );
+    const create = document.querySelector('[data-test="assistant-share-create"]') as HTMLElement;
+    expect(create.textContent?.trim()).toBe("Create live link and copy");
+    create.click();
+    await flushPromises();
+    expect(api.create.mock.calls[0][2]).toMatchObject({ mode: "live" });
+  });
+
+  it("keeps an existing link's Copy and Revoke reachable while an answer runs", async () => {
+    const { button } = await setup({}, { running: true, shares: [share()] });
+    expect(button().attributes("aria-disabled")).toBeUndefined();
+    await button().trigger("click");
+    await flushPromises();
+    expect(document.querySelector('[data-test="assistant-share-copy"]')).not.toBeNull();
+    expect(document.querySelector('[data-test="assistant-share-revoke"]')).not.toBeNull();
+    expect(
+      document
+        .querySelector('[data-test="assistant-share-update-snapshot"]')
+        ?.getAttribute("aria-disabled"),
+    ).toBe("true");
+  });
+
+  it("creates a second link for another audience beside an existing one, without revoking", async () => {
+    api.create.mockResolvedValue({ data: share({ id: "s2", visibility: "public" }) });
+    const { button } = await setup(
+      { publicLinks: true, publicMaxExpiryDays: 30 },
+      { shares: [share()] },
+    );
+    await button().trigger("click");
+    await flushPromises();
+    (document.querySelector('[data-test="assistant-share-new-link"]') as HTMLElement).click();
+    await flushPromises();
+    expect(document.querySelector('[data-test="assistant-share-copy"]')).toBeNull();
+    expect(document.querySelector('[data-test="assistant-share-new-cancel"]')).not.toBeNull();
+    (
+      document.querySelector('[data-test="assistant-share-visibility-public"]') as HTMLElement
+    ).click();
+    await flushPromises();
+    (document.querySelector('[data-test="assistant-share-create"]') as HTMLElement).click();
+    await flushPromises();
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(api.create.mock.calls[0][2]).toMatchObject({ visibility: "public" });
+    expect(api.revoke).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-test="assistant-share-copy"]')).not.toBeNull();
+    expect(button().attributes("aria-label")).toBe("Shared with anyone who has the link");
+  });
+
+  it("goes back to the existing link from Create another link's Cancel", async () => {
+    const { button } = await setup({}, { shares: [share()] });
+    await button().trigger("click");
+    await flushPromises();
+    (document.querySelector('[data-test="assistant-share-new-link"]') as HTMLElement).click();
+    await flushPromises();
+    (document.querySelector('[data-test="assistant-share-new-cancel"]') as HTMLElement).click();
+    await flushPromises();
+    expect(document.querySelector('[data-test="assistant-share-copy"]')).not.toBeNull();
+    expect(api.create).not.toHaveBeenCalled();
+  });
+
+  it("opens Share chat with the defaults visible and creates nothing until Create and copy link", async () => {
     const { button } = await setup();
     await button().trigger("click");
+    await flushPromises();
+    expect(api.create).not.toHaveBeenCalled();
+    const form = document.querySelector('[data-test="assistant-share-settings"]');
+    expect(form).not.toBeNull();
+    expect(form?.textContent).toContain("People in Acme with shared-chat access can read it.");
+    expect(form?.textContent).toContain("Continuing it in their own chats also needs AI access.");
+    expect(form?.textContent).toContain("Snapshot of the chat as it is now");
+    const create = document.querySelector('[data-test="assistant-share-create"]') as HTMLElement;
+    expect(create.textContent?.trim()).toBe("Create and copy link");
+    create.click();
     await flushPromises();
     expect(api.create).toHaveBeenCalledTimes(1);
     expect(api.create.mock.calls[0][2]).toEqual({
@@ -219,20 +302,29 @@ describe("AssistantShareControl", () => {
       redact_tools: true,
       expires_in_secs: 90 * 86_400,
     });
-    expect(document.querySelector('[data-test="assistant-share-settings"]')).toBeNull();
   });
 
-  it("opens the chat's links instead of creating a second link, and the chip opens Manage link", async () => {
+  it("collapses Share to its icon in a narrow header, keeping the label for assistive tech", async () => {
+    const { button } = await setup();
+    const label = button().get('[data-test="assistant-thread-share-label"]');
+    expect(label.text()).toBe("Share");
+    expect(label.classes()).toContain("@max-[32rem]:sr-only");
+  });
+
+  it("reads Shared once a link exists and opens it in the popover, with All shared links", async () => {
     const { button, wrapper } = await setup({}, { shares: [share()] });
-    const chip = wrapper.find('[data-test="assistant-thread-share-chip"]');
-    expect(chip.text()).toBe("Shared · Org · Snapshot");
+    expect(button().text()).toContain("Shared");
+    expect(button().attributes("aria-label")).toBe("Shared with your organization");
+    expect(wrapper.find('[data-test="assistant-thread-share-chip"]').exists()).toBe(false);
     await button().trigger("click");
     await flushPromises();
     expect(api.create).not.toHaveBeenCalled();
-    expect(wrapper.emitted("manage")).toHaveLength(1);
-    await chip.trigger("click");
-    await flushPromises();
     expect(document.querySelector('[data-test="assistant-share-copy"]')).not.toBeNull();
+    const all = document.querySelector('[data-test="assistant-share-see-all"]') as HTMLElement;
+    expect(all.textContent?.trim()).toBe("All shared links");
+    all.click();
+    await flushPromises();
+    expect(wrapper.emitted("manage")).toHaveLength(1);
   });
 
   it("reviews a chat with attachments before any request when the server cannot hide them", async () => {
@@ -256,19 +348,23 @@ describe("AssistantShareControl", () => {
 
   it("shows the new link for copying when the clipboard refuses, never a second create form", async () => {
     copy.mockResolvedValue(false);
-    const { button, wrapper } = await setup();
+    const { button } = await setup();
     await button().trigger("click");
+    await flushPromises();
+    (document.querySelector('[data-test="assistant-share-create"]') as HTMLElement).click();
     await flushPromises();
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
     expect(document.querySelector('[data-test="assistant-share-link"]')).not.toBeNull();
     expect(document.querySelector('[data-test="assistant-share-create"]')).toBeNull();
-    expect(wrapper.find('[data-test="assistant-thread-share-chip"]').exists()).toBe(true);
+    expect(button().text()).toContain("Shared");
   });
 
   it("flips to the G3 state after the server refuses a create", async () => {
     const { button } = await setup({ canShare: "unknown" });
     api.create.mockRejectedValue({ response: { status: 403, data: {} } });
     await button().trigger("click");
+    await flushPromises();
+    (document.querySelector('[data-test="assistant-share-create"]') as HTMLElement).click();
     await flushPromises();
     expect(button().attributes("aria-disabled")).toBe("true");
     expect(button().text()).toContain("Only admins can share chats");
@@ -285,7 +381,6 @@ describe("AssistantShareSettings", () => {
     publicMaxExpiryDays: 30,
     redactAttachments: false,
     hasAttachments: false,
-    linkCount: 1,
     ...over,
   });
   const mountSettings = (over: Record<string, unknown> = {}) => {
@@ -400,6 +495,31 @@ describe("AssistantShareSettings", () => {
       "[aria-disabled]",
     );
     expect(option?.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("shows and sends the new link's own expiry after the last link's expiry was changed", async () => {
+    const wrapper = mountSettings();
+    const select = () => wrapper.findComponent(OSelect);
+    select().vm.$emit("update:modelValue", 7 * 86_400);
+    await flushPromises();
+    expect(api.update).toHaveBeenCalledWith("default", "s1", { expires_in_secs: 7 * 86_400 });
+    expect(select().props("modelValue")).toBe(7 * 86_400);
+    await wrapper.setProps({ share: null, cancelable: true });
+    await flushPromises();
+    expect(select().props("modelValue")).toBe(90 * 86_400);
+    await at(wrapper, "assistant-share-create").trigger("click");
+    await flushPromises();
+    expect(api.create.mock.calls[0][2]).toMatchObject({ expires_in_secs: 90 * 86_400 });
+  });
+
+  it("creates another link live while an answer runs, never a snapshot", async () => {
+    const wrapper = mountSettings({ running: true });
+    await wrapper.setProps({ share: null, cancelable: true });
+    await flushPromises();
+    expect(at(wrapper, "assistant-share-create").text()).toBe("Create live link and copy");
+    await at(wrapper, "assistant-share-create").trigger("click");
+    await flushPromises();
+    expect(api.create.mock.calls[0][2]).toMatchObject({ mode: "live" });
   });
 
   it("flips Share to the G3 state when Manage link's create is refused", async () => {

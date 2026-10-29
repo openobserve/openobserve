@@ -33,7 +33,8 @@ export type ChipKind =
   | "span"
   | "query_error"
   | "image"
-  | "report";
+  | "report"
+  | "pasted_text";
 
 export interface ContextChip {
   id: string;

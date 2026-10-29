@@ -9273,24 +9273,31 @@
       "askAgainPrompt": "Ask me again: {heading}",
       "askedElsewhere": "Asked in another tab",
       "cannotUndo": "Cannot be undone",
-      "changes": "Changes",
+      "change": "Change",
       "command": "Command",
+      "currentUnknown": "Current value unknown",
       "deny": "Deny",
       "details": "Details",
       "edit": "Edit then approve",
+      "editInEditor": "Edit in {editor}",
+      "editor": {
+        "alert": "alert editor"
+      },
+      "effect": "Effect",
       "escapeHint": "Esc declines",
       "expiresIn": "Expires in {time}",
       "expiresSoon": "This request expires in 1 minute.",
       "heading": {
-        "create": "Create {entity}",
         "delete": "Delete {count} {entity}",
         "permission": "Allow {tool}",
-        "runCommand": "Run command on {toolset}",
-        "update": "Update {entity} {name}"
+        "runCommand": "Run command on {toolset}"
       },
+      "inOrg": "in {org}",
       "minutes": "{count} minute | {count} minutes",
       "moreTargets": "and {count} more",
       "moreTime": "More time",
+      "named": "{verb} {name}",
+      "nameUnknown": "Couldn't load the name of {entity} {shortId}; you may not have access to it.",
       "needsOk": "Needs your OK",
       "newValues": "New values",
       "noDecision": "No answer was recorded for this request",
@@ -9303,6 +9310,7 @@
         "unknown": "error"
       },
       "reply": "Reply",
+      "replyConsequence": "Reply declines this request; the assistant can answer or ask again.",
       "result": {
         "approved": "Approved · {time}",
         "approvedNoTime": "Approved",
@@ -9313,6 +9321,7 @@
         "declined": "Declined · nothing was changed",
         "declinedElsewhere": "Denied in another tab · {time}",
         "declinedNewChat": "Declined because you started a new chat",
+        "editing": "You're editing this in the {editor}. Nothing was changed here.",
         "deliveryFailed": "Your decision didn't reach the assistant. Nothing was changed.",
         "done": {
           "create": "Created {entity}",
@@ -9347,7 +9356,13 @@
         "once": "Just this once",
         "tool": "Always for {tool}"
       },
-      "seconds": "{count} second | {count} seconds"
+      "seconds": "{count} second | {count} seconds",
+      "verb": {
+        "create": "Create {entity}",
+        "pause": "Pause {entity}",
+        "resume": "Resume {entity}",
+        "update": "Update {entity}"
+      }
     },
     "askAdmin": {
       "adminsOf": "Admins of {org}",
@@ -9360,6 +9375,7 @@
         "access": "Hi, could you grant me {product} access in OpenObserve ({whereToGrant}, Chat) for the {org} organization?",
         "consent": "Could you enable paid AI usage for {org}? Billing › Paid usage: {link}",
         "credits": "Could you enable paid AI usage for {org}? Billing › Paid usage: {link}",
+        "enable": "Could you turn {product} on for {org}? Settings › Assistant › Access: {link}",
         "settings": "Could you change the {product} settings for {org} in Settings › Assistant?",
         "share_read": "Could you grant me chat sharing access ({whereToGrant}, Chat sharing) in {org}?",
         "tool_policy": "The assistant wasn't allowed to run {tool} in {org}. Could you review the assistant's permissions in Settings › Assistant › Permissions?"
@@ -9369,6 +9385,7 @@
         "access": "{product} access for {org}",
         "consent": "Paid AI usage for {org}",
         "credits": "Paid AI usage for {org}",
+        "enable": "Turn on {product} for {org}",
         "settings": "{product} settings for {org}",
         "share_read": "Chat sharing access for {org}",
         "tool_policy": "{product} permissions for {org}"
@@ -9433,7 +9450,10 @@
     },
     "claim": {
       "name": "Evidence {n}, {step}",
-      "notAvailable": "Evidence not available in this view"
+      "notAvailable": "Evidence not available in this view",
+      "peekTitle": "Evidence {n}",
+      "showInSteps": "Show in steps",
+      "stepOf": "step {i} of {total}"
     },
     "client": {
       "copyManually": "Couldn't copy. Select the text and copy it.",
@@ -9445,15 +9465,12 @@
       "title": "You're signed in"
     },
     "composer": {
-      "attachImage": "Attach image",
       "cleared": "Draft cleared",
       "clearedOrg": "Draft from {org} cleared",
       "draftStayed": "New chat. Your draft stayed in {chat}",
       "draftStayedUnnamed": "New chat. Your draft stayed in the previous chat",
       "bringDraft": "Bring it here",
       "draftRestored": "Draft restored",
-      "hintsLabel": "Keyboard shortcuts",
-      "hintsTitle": "Keys",
       "imageReadFailed": "{name} couldn't be read",
       "imagesDropped": "{count} image wasn't kept across the reload | {count} images weren't kept across the reload",
       "imageTooBig": "{name} is {size}. Up to {count} images, {max} each",
@@ -9496,7 +9513,11 @@
       "waitingApproval": "Answer the request above to continue.",
       "waitingConsent": "Decide on paid usage above to continue.",
       "replyCancel": "Cancel reply",
-      "replyRefused": "Your reply wasn't sent. This request can't be answered from this page."
+      "replyRefused": "Your reply wasn't sent. This request can't be answered from this page.",
+      "addContext": "Add context",
+      "addMenuSearch": "Search streams, panels, alerts",
+      "addImage": "Image…",
+      "addGroupAttach": "Attach"
     },
     "consent": {
       "aMember": "a member",
@@ -9623,7 +9644,11 @@
       "usedName": "Context used",
       "usedNone": "No page context was used",
       "valueOff": "Off",
-      "valueOn": "On"
+      "valueOn": "On",
+      "pastedText": "Pasted text · {count} line | Pasted text · {count} lines",
+      "pastedAsChip": "Long paste attached as text.",
+      "pasteInline": "Paste into the message instead",
+      "pasteInlineShort": "Paste into the message"
     },
     "credits": {
       "copyRequest": "Please add AI credits for {org}: {used} of {limit} included credits used as of {date}.",
@@ -9826,8 +9851,9 @@
       },
       "agent_unavailable": {
         "action": "Retry",
-        "body": "Nothing was changed.",
-        "title": "The assistant service didn't respond."
+        "body": "Findings so far are kept above.",
+        "title": "The assistant didn't respond. Nothing was changed.",
+        "titleAfterChange": "The assistant didn't respond."
       },
       "already_submitted": {
         "action": "Reload chat",
@@ -9849,6 +9875,7 @@
       },
       "authorization_unavailable": {
         "action": "Retry",
+        "hint": "Nothing was charged.",
         "title": "Couldn't check AI credits. Your message wasn't sent."
       },
       "cancelled_elsewhere": {
@@ -9874,14 +9901,14 @@
         "bodyMember": "An admin of {org} can allow paid usage in Billing › Paid usage.",
         "bodyPayerMember": "An admin of {payer} can allow paid usage.",
         "bodyResets": "They reset {date}.",
-        "title": "AI credits are used up for {org}.",
-        "titlePayer": "AI credits are used up for {org}, billed to {payer}."
+        "title": "AI credits are used up for {org}. Your message wasn't sent.",
+        "titlePayer": "AI credits are used up for {org}, billed to {payer}. Your message wasn't sent."
       },
       "data_level_blocked": {
         "action": "Change level",
         "actionAdmin": "Change level",
         "actionMember": "Ask an admin",
-        "title": "Raw rows aren't shared with the model in this organization."
+        "title": "Raw rows aren't shared with the model in {org}."
       },
       "empty_response": {
         "action": "Retry",
@@ -9892,33 +9919,34 @@
         "title": "This chat's history couldn't be loaded. Your message wasn't sent."
       },
       "not_enabled": {
-        "action": "Open assistant settings",
-        "actionAdmin": "Open assistant settings",
+        "action": "Open access settings",
+        "actionAdmin": "Open access settings",
         "actionMember": "Ask an admin",
         "body": "Past chats stay readable.",
-        "title": "{product} is off for this organization."
+        "title": "{product} is turned off for {org}. Your message wasn't sent."
       },
       "off_for_org": {
-        "action": "Open assistant settings",
-        "actionAdmin": "Open assistant settings",
+        "action": "Open access settings",
+        "actionAdmin": "Open access settings",
         "actionMember": "Ask an admin",
         "body": "Past chats stay readable.",
-        "title": "{product} is off for this organization."
+        "title": "{product} is turned off for {org}. Your message wasn't sent."
       },
       "offline": {
         "action": "Retry",
+        "hint": "Retry turns on when you're back online.",
         "title": "You're offline. Your message wasn't sent."
       },
       "permission_denied": {
         "action": "Open IAM roles",
         "actionAdmin": "Open IAM roles",
         "actionMember": "Ask an admin",
-        "body": "An admin can grant access in IAM › Roles › Assistant.",
-        "title": "{product} isn't available to your role."
+        "body": "This chat stays readable. An admin can grant access in IAM › Roles › Assistant.",
+        "title": "Your role can no longer use {product}. Your message wasn't sent."
       },
       "permission_denied_tool": {
-        "action": "Open assistant settings",
-        "actionAdmin": "Open assistant settings",
+        "action": "Open assistant permissions",
+        "actionAdmin": "Open assistant permissions",
         "actionMember": "Ask an admin",
         "body": "Your organization's assistant policy blocks it.",
         "title": "The assistant wasn't allowed to run {tool}."
@@ -9929,15 +9957,16 @@
       },
       "provider_error": {
         "action": "Retry",
-        "body": "Findings so far are kept above.",
+        "body": "Nothing was changed.",
+        "bodyPartial": "Findings so far are kept above.",
         "reason": {
-          "modelUnavailable": "model unavailable",
-          "overloaded": "overloaded",
-          "requestTooLarge": "request too large",
-          "timedOut": "timed out"
+          "modelUnavailable": "can't reach the model",
+          "overloaded": "is overloaded",
+          "requestTooLarge": "can't take a question this long",
+          "timedOut": "took too long"
         },
-        "title": "The AI provider failed: {reason}.",
-        "titleNoReason": "The AI provider failed."
+        "title": "The AI provider {reason}, so the answer stopped.",
+        "titleNoReason": "The AI provider failed, so the answer stopped."
       },
       "rca_disabled": {
         "action": "Ask an admin",
@@ -9946,8 +9975,8 @@
       },
       "rate_limited": {
         "action": "Retry",
-        "title": "The AI provider is rate-limiting requests. Try again in about a minute.",
-        "titleTimed": "The AI provider is rate-limiting requests."
+        "title": "The AI provider is limiting requests. Your message wasn't sent.",
+        "titleTimed": "The AI provider is limiting requests. Your message wasn't sent."
       },
       "restore_required": {
         "action": "Reload chat",
@@ -9955,6 +9984,7 @@
       },
       "session_expired": {
         "action": "Sign in",
+        "body": "Sign in opens a new tab; come back here to send.",
         "title": "Your session expired. Your draft is kept."
       },
       "session_owner_unavailable": {
@@ -9976,7 +10006,9 @@
       "stream_dropped": {
         "action": "Retry",
         "body": "Findings so far are kept above.",
-        "title": "Connection lost after {elapsed}. Nothing was changed."
+        "bodyPartial": "The text above is incomplete.",
+        "title": "Connection lost after {elapsed}. Nothing was changed.",
+        "titleAfterChange": "Connection lost after {elapsed}."
       },
       "stream_oversized": {
         "action": "Retry",
@@ -9992,11 +10024,12 @@
       },
       "turn_busy": {
         "action": "Stop it",
-        "title": "Another answer is still running in this chat. Your message wasn't sent."
+        "title": "This chat is still answering. Your message wasn't sent."
       },
       "turn_limit": {
         "action": "Retry",
-        "title": "Too many answers are running. Wait for one to finish."
+        "body": "Send again when one ends.",
+        "title": "Too many answers are running. Your message wasn't sent."
       },
       "unknown": {
         "action": "Retry",
@@ -10030,6 +10063,8 @@
       "openHint": "Opens with the query loaded. Nothing runs until you choose Run query.",
       "opensNewTab": "{label} (opens in a new tab)",
       "otherOrg": "This query belongs to {org}. Switch organization to run it.",
+      "queriesCited": "{count} cited",
+      "queriesHeading": "Queries",
       "queryFailed": "Query failed: {reason}",
       "queryFailedPlain": "Query failed",
       "rangeFallback": "range: unknown · runs on the last 15 min",
@@ -10038,7 +10073,11 @@
       "rowsCount": "{count} row | {count} rows",
       "rowsScannedWindow": "{count} row · {took} · {size} scanned · {window} | {count} rows · {took} · {size} scanned · {window}",
       "rowsWindow": "{count} row · {took} · {window} | {count} rows · {took} · {window}",
-      "scrollHint": "Scroll sideways for the full query",
+      "runNow": "Run now",
+      "runNowHint": "Opens {explorer} with this query loaded; you run it there.",
+      "sawRows": "The assistant got {count} row | The assistant got {count} rows",
+      "sawRowsIn": "The assistant got {count} row in {range} | The assistant got {count} rows in {range}",
+      "showMore": "Show {count} more",
       "stopped": "Stopped",
       "windowCapped": "{window} (cut to the last 7 days)"
     },
@@ -10113,6 +10152,7 @@
     "footer": {
       "credits": "{count} credit | {count} credits",
       "creditsCountedHint": "Credits are counted when a request is accepted.",
+      "emptyWindow": "Nothing in the default range, {range}.",
       "evaluated": "Evaluated {range}",
       "evaluatedMore": "Evaluated {range} and {count} other window | Evaluated {range} and {count} other windows",
       "includedCredits": "{count} included credit | {count} included credits",
@@ -10125,6 +10165,7 @@
       "rerunFor": "Re-run for {range}",
       "stopped": "stopped",
       "tokens": "{tokens} tokens · {count} model call | {tokens} tokens · {count} model calls",
+      "tryWider": "Try the last {duration}",
       "windowsName": "Evaluated windows",
       "windowStep": "Step {n} · {range}"
     },
@@ -10148,6 +10189,8 @@
       "announce": {
         "locked": "{product} isn't available to your role."
       },
+      "checkAgain": "Check again",
+      "checkAgainHint": "Just got access?",
       "close": "Close",
       "learnMore": "Learn what it does",
       "learnTitle": "What {product} does",
@@ -10183,8 +10226,7 @@
         "body": "Past chats stay readable. An admin can turn it on in Settings › Assistant.",
         "title": "{product} is turned off for this organization"
       },
-      "reload": "Reload",
-      "reloadHint": "If an admin just granted access, reload to check.",
+      "openAccessSettings": "Open access settings",
       "tryAgain": "Try again",
       "unhealthy": {
         "body": "The assistant service isn't responding. Try again in a few minutes.",
@@ -10402,6 +10444,7 @@
         "browser": "In this browser",
         "older": "Older",
         "pinned": "Pinned",
+        "running": "In progress · {count}",
         "today": "Today",
         "week": "Previous 7 days",
         "yesterday": "Yesterday"
@@ -10434,7 +10477,6 @@
         "title": "Saved in this browser only · {count} of {cap}"
       },
       "matchCount": "{count} chat matches | {count} chats match",
-      "needsYou": "Waiting for your approval",
       "new": "New chat",
       "noMatch": "No chats match “{q}”",
       "offline": "You're offline · showing chats saved in this browser",
@@ -10463,19 +10505,28 @@
       "retentionDays": "{count} day | {count} days",
       "retentionNone": "Chats are kept until you delete them",
       "rowMenu": "Actions for {title}",
-      "running": "Answering…",
       "search": "Search chats",
       "searchPartial": "Searching the chats loaded so far · Load older to search more",
       "serverError": "Couldn't load your chats",
       "serverErrorCached": "Showing chats saved in this browser · Couldn't reach the server",
+      "sharedLinks": "Shared links",
       "sharedByMe": "Shared by me",
       "showAll": "Show all",
+      "state": {
+        "answering": "Answering",
+        "failed": "Answer failed",
+        "needsApproval": "Needs your approval"
+      },
       "storageBlocked": "Couldn't save to this browser. Private windows and full storage block history.",
       "title": "Chats",
       "traceId": "Trace ID {id}",
       "unpin": "Unpin",
       "unpinLocal": "Unpin (in this browser)",
-      "unpinned": "Unpinned"
+      "unpinned": "Unpinned",
+      "view": {
+        "back": "Back to chat: {title}",
+        "title": "Chats"
+      }
     },
     "label": {
       "acceptedAt": "Accepted {time}",
@@ -10560,8 +10611,10 @@
     "outcome": {
       "actions": {
         "askAdmin": "Ask an admin",
+        "changeLevel": "Change level",
         "managePaidUsage": "Manage paid usage",
         "openIamRoles": "Open IAM roles",
+        "openSettings": "Open assistant settings",
         "reloadChat": "Reload chat",
         "sendAgain": "Send again",
         "signIn": "Sign in",
@@ -10630,7 +10683,7 @@
         "builtInViewer": "No access",
         "cancel": "Cancel",
         "enabled": "Assistant enabled for this organization",
-        "enabledLine": "Members see '{product} is turned off for this organization'. Past chats stay readable.",
+        "enabledLine": "Turning it off shows members '{product} is turned off for this organization'. Past chats stay readable.",
         "grantedPerRole": "Access is granted per role in {whereToGrant}",
         "noRole": "Signed-in users with no role (SSO default) have no access.",
         "notice": "Per-organization controls need a newer server version. These values come from the deployment.",
@@ -10667,10 +10720,13 @@
         "tierRead": "Read and query",
         "tierReadLine": "The assistant runs queries only and never changes anything.",
         "tierStored": "Saved tier: {tier}. It applies once the agent can enforce it.",
+        "offInOrg": "Off in this organization",
+        "onInOrg": "On in this organization",
         "turnOff": {
           "confirm": "Turn off",
           "done": "{product} turned off for {org}",
           "message": "Turn off {product} for {org}? Running answers will be stopped. Members keep their chat history.",
+          "pending": "Turns off when you confirm",
           "title": "Turn off {product}?"
         },
         "valueOff": "Off",
@@ -10789,6 +10845,8 @@
     },
     "share": {
       "allOrgAdminOnly": "Only organization admins can see every shared chat.",
+      "allLinks": "All shared links",
+      "anotherLink": "Create another link",
       "attachmentHidden": "Attachment hidden",
       "attachmentsCheckFailed": "Couldn't check this chat for attachments. Review the link before you share it.",
       "attachmentsHiddenTag": "Attachments hidden",
@@ -10796,16 +10854,12 @@
       "changeExpiry": "Change expiry",
       "changeExpiryFor": "Change expiry for {title}",
       "changeSettings": "Change settings",
-      "chip": "Shared · {visibility} · {content}",
-      "chipExpiring": "Shared · {visibility} · {left}",
-      "chipOrg": "Org",
-      "chipOutOfDate": "{chip} · out of date",
-      "chipPublic": "Public",
       "content": "Content",
       "copied": "Link copied",
       "copyLink": "Copy link",
       "copyLinkFor": "Copy link for {title}",
-      "createAndCopy": "Create and copy",
+      "createAndCopy": "Create and copy link",
+      "createLiveAndCopy": "Create live link and copy",
       "createdNotCopied": "Link created. Copying was blocked, so the link is shown for you to copy.",
       "createdNotCopiedMenu": "Link created, but copying was blocked. Open Manage links to copy it.",
       "createFailed": "Couldn't create the link",
@@ -10814,7 +10868,6 @@
       "createdToast": "Link copied. People in {org} with shared-chat access can open it.",
       "empty": {
         "all": "No chats are shared in this organization.",
-        "chat": "This chat has no links yet.",
         "mine": "You haven't shared any chats."
       },
       "expires": "Expires",
@@ -10827,23 +10880,18 @@
       "historyUnavailable": "This chat's history can't be loaded right now, so it can't be shared.",
       "hours": "{count} h",
       "link": "Link",
+      "liveFollows": "Live, follows new messages",
       "liveMode": "Live",
       "loadFailed": "Couldn't load your links",
       "manage": "Manage link",
-      "manageLinks": "Manage links",
-      "managerTitle": "Shared chats",
+      "managerTitle": "Shared links",
       "minutes": "{count} min",
-      "multi": "Shared · {count} links",
       "never": "Never",
-      "newLink": "New link",
       "notSavedBlocked": "This chat's latest answer isn't saved, so it can't be shared yet.",
       "nothingToShare": "Send a message first",
       "offline": "You're offline",
       "openFailed": "Couldn't open the chat",
       "org": "Organization",
-      "orgHelp": "Signed-in members with shared-chat access.",
-      "orgHelpStreams": "They see every stream this chat queried.",
-      "outOfDate": "out of date",
       "outOfDateTag": "Out of date",
       "public": "Anyone with the link",
       "publicMax": "Public links expire within {days} days",
@@ -10859,24 +10907,29 @@
       "rowMenu": "Link actions for {title}",
       "scope": {
         "all": "All in organization",
-        "chat": "This chat",
         "mine": "Mine"
       },
       "scopeLabel": "Show links",
-      "seeAll": "See all links for this chat",
       "share": "Share",
+      "shareEllipsis": "Share…",
+      "shared": "Shared",
       "sharedBy": "Shared by {name}",
+      "sharedOrg": "Shared with your organization",
+      "sharedPublic": "Shared with anyone who has the link",
       "show": "Show",
       "showTools": "Show tool data",
       "showToolsConfirm": "Show tool inputs and outputs to anyone with this link?",
       "showToolsFor": "Show tool data for {title}",
       "snapshot": "Snapshot",
       "snapshotAsOf": "Snapshot · as of {time}",
+      "snapshotNow": "Snapshot of the chat as it is now",
+      "snapshotWaits": "Available when the answer finishes",
       "snapshotUpdated": "Snapshot updated",
       "switchLive": "Switch to live",
       "switchLiveFor": "Switch {title} to live",
       "switchSnapshot": "Switch to snapshot",
       "switchSnapshotFor": "Switch {title} to snapshot",
+      "title": "Share chat",
       "toolsHidden": "Tools hidden",
       "tooltip": "Share a snapshot with your organization. Tool data stays hidden.",
       "updateBlocked": "Finish or stop the answer first",
@@ -10887,7 +10940,10 @@
       "views": "{count} view | {count} views",
       "visibilityFixed": "To change who can open it, create a new link.",
       "waitForAnswer": "Wait for the answer to finish to share a snapshot. Live links are in Share settings.",
-      "who": "Who can open"
+      "who": "Who can open",
+      "whoContinue": "Continuing it in their own chats also needs AI access.",
+      "whoOrg": "People in {org} with shared-chat access can read it.",
+      "whoPublic": "Anyone with the link can read it."
     },
     "shared": {
       "attachmentsHidden": "Attachments were hidden by the owner.",
@@ -11008,6 +11064,7 @@
       "outputTruncated": "Output truncated",
       "rowName": "{step}, {state}",
       "rows": "{count} row | {count} rows",
+      "showEarlier": "Show {count} earlier step | Show {count} earlier steps",
       "soFar": "{count} step so far | {count} steps so far",
       "step": {
         "created": "Created {resource}",
@@ -11043,14 +11100,13 @@
       "downloadMarkdown": "Markdown",
       "draftKept": "Your draft is kept in “{title}”",
       "historyUnavailable": "History unavailable",
+      "keepsAnswering": "“{title}” keeps answering",
       "loadToContinue": "Load the chat to continue it",
       "menu": "Chat actions",
       "new": "New",
       "newAnnounce": "New chat",
       "newChat": "New chat",
       "newChatTitle": "New chat",
-      "newWhileRunningBody": "The current answer keeps running in the background. You can come back to it from Chats.",
-      "newWhileRunningTitle": "Start a new chat?",
       "notSaved": "Not saved",
       "notSavedSuffix": "· not saved",
       "pin": "Pin",
@@ -11060,7 +11116,7 @@
       "renameLabel": "Chat title",
       "renamed": "Renamed",
       "renaming": "Renaming…",
-      "start": "Start",
+      "shareSettings": "Share settings",
       "titleCounter": "{count}/200",
       "unpin": "Unpin"
     },
@@ -11190,8 +11246,10 @@
       "elapsedSeconds": "{n} s",
       "elsewhere": "Answering in another tab",
       "messageRestored": "Your message was restored",
+      "moreRunning": "{label} and {count} more",
       "noResponse": "No response for {n} s",
       "notSaved": "Answered, but not saved to history.",
+      "pausedAt": "paused at {elapsed}",
       "reconnecting": "Reconnecting…",
       "restored": "This chat moved to another server and continued.",
       "retrying": "Retrying the AI provider · attempt {n}",
@@ -11204,8 +11262,11 @@
       "stopLabel": "Stop answering",
       "stopped": "Stopped",
       "stoppedWithSteps": "Stopped after {n} step · findings kept | Stopped after {n} steps · findings kept",
+      "stepN": "step {n}",
       "stopping": "Stopping…",
       "thinking": "Thinking",
+      "thinkingAbout": "Thinking about {count} result | Thinking about {count} results",
+      "totalElapsed": "{elapsed} in all",
       "waitingApproval": "Waiting for your approval",
       "waitingConsent": "Waiting for your decision on paid usage",
       "withElapsed": "{status} · {elapsed}",
@@ -11222,15 +11283,16 @@
       "launcher": {
         "ask": "Ask",
         "clear": "Clear question",
-        "disclosure": "Sends with the default time range",
-        "disclosureNoStreams": "Sends with the default time range · no streams yet",
+        "allChats": "All chats",
+        "disclosure": "Sends with the default time range, {range}",
+        "disclosureNoStreams": "Sends with the default time range, {range} · no streams yet",
         "inputName": "Ask {product}",
         "noRecent": "No chats yet",
         "noRecentHint": "Start one above, or ask about a log row, panel or alert.",
-        "open": "Open {product}",
+        "openFull": "Open full view",
         "placeholder": "Ask about your logs, alerts and dashboards…",
-        "recent": "Recent chats",
-        "running": "Answering…"
+        "whatItSees": "What it sees",
+        "yourChats": "Your chats"
       },
       "prefill": {
         "append": "Append",
@@ -11267,8 +11329,9 @@
           "2": "Explain what this function does"
         },
         "home": {
-          "1": "What needs attention in `{org}` right now?",
-          "2": "Which alerts fired since yesterday?"
+          "attention": "What needs attention in `{org}` right now?",
+          "errorsSummary": "Summarise errors in `{stream}` over the last hour",
+          "slowSpans": "Which services had the slowest spans in the last hour?"
         },
         "ingest": {
           "1": "Show me how to send logs from my app",

@@ -440,6 +440,21 @@ describe("composer", () => {
     expect(store.state.sessions[sid].composer.chips).toHaveLength(1);
   });
 
+  it("keeps a Home starter's provenance until its text is replaced or emptied (PO A26)", () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    const composer = () => store.state.sessions[sid].composer;
+    store.stage(sid, { text: "What needs attention?", mode: "replace", homeStarter: true });
+    expect(composer().homeStarter).toBe(true);
+    store.stage(sid, { text: "and why", mode: "append" });
+    expect(composer().homeStarter).toBe(true);
+    store.stage(sid, { text: "Explain this row", mode: "replace" });
+    expect(composer().homeStarter).toBeUndefined();
+    store.stage(sid, { text: "What needs attention?", mode: "replace", homeStarter: true });
+    store.setDraft(sid, { text: "" });
+    expect(composer().homeStarter).toBeUndefined();
+  });
+
   it("never appends a prompt identical to the composer's last line", () => {
     const { store } = makeStore();
     const sid = newSession(store);
@@ -648,6 +663,22 @@ describe("composer", () => {
     store.recall(sid, "newer");
     store.recall(sid, "newer");
     expect(store.state.sessions[sid].composer).toMatchObject({ text: "live", recallIndex: -1 });
+  });
+
+  it("drops a Home starter's provenance on a recalled prompt and gives it back with the draft (PO A26)", async () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    store.setDraft(sid, { text: "earlier question" });
+    await store.send(sid);
+    store.stage(sid, { text: "What needs attention?", mode: "replace", homeStarter: true });
+    store.recall(sid, "older");
+    expect(store.state.sessions[sid].composer).toMatchObject({ text: "earlier question" });
+    expect(store.state.sessions[sid].composer.homeStarter).toBeUndefined();
+    store.recall(sid, "newer");
+    expect(store.state.sessions[sid].composer).toMatchObject({
+      text: "What needs attention?",
+      homeStarter: true,
+    });
   });
 
   it("keeps a door's helper line until the next edit", () => {
@@ -1233,6 +1264,33 @@ describe("draft restore after a reload (WP-05)", () => {
     const { store } = makeStore();
     await flushPromises();
     expect(Object.keys(store.state.sessions)).toEqual([]);
+  });
+
+  it("saves a Home starter's provenance with the draft (PO A26)", () => {
+    const saved = makeStore();
+    const staged = newSession(saved.store);
+    saved.store.stage(staged, {
+      text: "What needs attention?",
+      mode: "replace",
+      homeStarter: true,
+    });
+    saved.drafts.flush();
+    expect(saved.drafts.read("k1", staged)).toMatchObject({ homeStarter: true });
+  });
+
+  it("brings a Home starter's provenance back with the stored draft after a reload (PO A26)", async () => {
+    const sid = "0190f3a0-0000-7000-8000-000000000095";
+    sessionStorage.setItem("o2.assistant.selected:k1", sid);
+    sessionStorage.setItem(
+      `o2.assistant.draft:k1:${sid}`,
+      JSON.stringify({ text: "What needs attention?", chips: [], homeStarter: true }),
+    );
+    const { store } = makeStore();
+    await flushPromises();
+    expect(store.state.sessions[sid].composer).toMatchObject({
+      text: "What needs attention?",
+      homeStarter: true,
+    });
   });
 
   it("keeps the image count with the draft so the reload notice can name it", () => {

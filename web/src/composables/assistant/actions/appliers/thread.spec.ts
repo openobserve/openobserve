@@ -20,7 +20,13 @@ import { raw } from "@/types/i18n";
 
 import { makeEnv } from "../__tests__/actionEnv";
 import { turnAnnotationKey } from "../../evidence";
-import { feedbackApplier, openStepApplier, rerunApplier, turnOf } from "./thread";
+import {
+  feedbackApplier,
+  openStepApplier,
+  rerunApplier,
+  rerunWiderApplier,
+  turnOf,
+} from "./thread";
 
 const FROM = 1_760_000_000_000;
 const TO = FROM + 15 * 60_000;
@@ -117,6 +123,40 @@ describe("thread appliers", () => {
       from: 2_000_000 - (TO - FROM),
       to: 2_000_000,
     });
+  });
+
+  it("rerun_wider sends the question and its chips once over the last 1 h, draft untouched", () => {
+    const { env, sid, store } = makeEnv({ messages: [prompt("t1"), answer("tr", [query])] });
+    store.setDraft(sid, { text: "half typed" });
+    const resend = vi
+      .spyOn(store, "resend")
+      .mockResolvedValue({ state: "done", saved: "local" } as any);
+    expect(rerunWiderApplier(sid, { kind: "rerun_wider", turnId: "t1" }, env)).toEqual({
+      ok: true,
+    });
+    expect(resend).toHaveBeenCalledTimes(1);
+    const [, snapshot, input] = resend.mock.calls[0];
+    expect(input).toBe("rerun");
+    expect(snapshot.text).toBe("why?");
+    expect(snapshot.timeOverride).toEqual({
+      from: 2_000_000 - 3_600_000,
+      to: 2_000_000,
+      period: "1h",
+    });
+    expect(snapshot.chips.map((chip) => chip.id)).toEqual(["starter-time", "page:stream"]);
+    expect(snapshot.chips[0].ref).toMatchObject({ from: 2_000_000 - 3_600_000, to: 2_000_000 });
+    expect(store.state.sessions[sid].composer.text).toBe("half typed");
+  });
+
+  it("refuses rerun_wider while a turn runs, as the send would join that turn", () => {
+    const { env, sid, store } = makeEnv({ messages: [prompt("t1"), answer("tr", [query])] });
+    store.state.sessions[sid].turn = { state: "connecting" } as never;
+    const resend = vi.spyOn(store, "resend");
+    expect(rerunWiderApplier(sid, { kind: "rerun_wider", turnId: "t1" }, env)).toEqual({
+      ok: false,
+      reason: "gated",
+    });
+    expect(resend).not.toHaveBeenCalled();
   });
 
   it("feedback carries each turn's own trace id and position", async () => {

@@ -24,7 +24,7 @@ const DRAFT_PREFIX = "o2.assistant.draft:";
 /** What survives a reload; images stay in memory, only their count is kept for the notice (`00` §10.4). */
 export type DraftPayload = Pick<
   ComposerState,
-  "text" | "chips" | "timeOverride" | "removedPageKeys"
+  "text" | "chips" | "timeOverride" | "removedPageKeys" | "homeStarter"
 > & {
   imageCount?: number;
 };
@@ -155,6 +155,7 @@ function toPayload(draft: DraftPayload): DraftPayload {
     chips: Array.isArray(draft.chips) ? draft.chips.map((chip) => ({ ...chip })) : [],
     timeOverride: draft.timeOverride ? { ...draft.timeOverride } : null,
     removedPageKeys: Array.isArray(draft.removedPageKeys) ? [...draft.removedPageKeys] : [],
+    ...(draft.homeStarter === true && { homeStarter: true }),
     ...(typeof draft.imageCount === "number" &&
       draft.imageCount > 0 && { imageCount: draft.imageCount }),
   };

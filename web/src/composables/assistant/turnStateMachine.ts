@@ -42,6 +42,10 @@ import {
 declare module "./assistantStore.types" {
   interface TurnMeta {
     lastFrameAt?: number | null;
+    /** The last data frame on the wire, replays included and keepalive comments excluded; the stall line reads it. */
+    lastByteAt?: number | null;
+    /** When the current state began; a new step counts as a new state (`30` §3.1). */
+    stateEnteredAt?: number | null;
     pausedAt?: number | null;
     pausedMs?: number;
     caughtUpAt?: number | null;
@@ -61,6 +65,9 @@ declare module "./assistantStore.types" {
 export const STALL_MS = 30_000;
 
 export const ELAPSED_AFTER_MS = 5_000;
+
+/** The turn total joins the live line once the turn has run this long (`30` §3.1). */
+export const TOTAL_AFTER_MS = 30_000;
 
 /** Stopping becomes stopped after the cancel ack or this long (HT-04 AC 3). */
 export const STOP_TIMEOUT_MS = 3_000;
@@ -229,6 +236,16 @@ export type TurnEffect =
   | { kind: "not_saved" }
   | { kind: "save" };
 
+/** What the answer has shown so far, for "step {n}", "{label} and {count} more" and "Thinking about {count} results". */
+export interface TurnProgress {
+  /** The trail number of the running step. */
+  step?: number | null;
+  /** Steps running at once, the newest included. */
+  running?: number;
+  /** Tool results received so far in this turn. */
+  results?: number;
+}
+
 /** The status row of a live turn; `null` for idle and every terminal (the outcome block owns those). */
 export interface TurnStatusText {
   line: I18nText;
@@ -250,6 +267,8 @@ export function turnReducer(
     : onClientEvent(turn, event as TurnClientEvent, ctx);
   const meta = frame && isLive(next.state) ? lifecycleMeta(frame, ctx.now) : null;
   const effects = [...next.effects, ...entryEffects(turn, next.state)];
+  if (isLive(next.state) && stateKey(turn) !== stateKey(next.state))
+    effects.push({ kind: "meta", patch: { stateEnteredAt: ctx.now } });
   return { turn: next.state, effects: meta ? [...effects, meta] : effects };
 }
 
@@ -259,10 +278,12 @@ export function turnStatusText(
   meta: TurnMeta,
   t: TranslateFn,
   now: number,
+  progress?: TurnProgress,
 ): TurnStatusText | null {
   if (turn.state === "idle" || isTerminal(turn)) return null;
-  const line = statusLine(turn, meta, t, now);
-  const silentMs = now - (meta.lastFrameAt ?? meta.startedAt ?? now);
+  const line = statusLine(turn, meta, t, now, progress);
+  // Keepalives only prove the transport is open, so a turn sending nothing else still stalls.
+  const silentMs = now - (meta.lastByteAt ?? meta.lastFrameAt ?? meta.startedAt ?? now);
   const watching = !turn.state.startsWith("awaiting") && turn.state !== "stopping";
   if (watching && silentMs >= STALL_MS) {
     const n = Math.floor(silentMs / 1000);
@@ -347,6 +368,7 @@ export function outcomeRecordOf(
     ...((error.sessionId ?? ids.sessionId) && { sessionId: error.sessionId ?? ids.sessionId }),
     ...(error.serverMessage && { serverMessage: error.serverMessage }),
     ...(error.reason && { reason: error.reason }),
+    ...(error.afterChange && { afterChange: true }),
   };
 }
 
@@ -370,7 +392,20 @@ export function outcomeError(record: TurnOutcomeRecord): AssistantError {
   if (record.sessionId) error.sessionId = record.sessionId;
   if (record.serverMessage) error.serverMessage = record.serverMessage;
   if (record.reason && REASONS.has(record.reason)) error.reason = record.reason as ProviderReason;
+  if (record.afterChange) error.afterChange = true;
   return error;
+}
+
+// Titles that claim "Nothing was changed."; after an applied change they have a variant without it (D7 §3.2).
+const AFTER_CHANGE_TITLES: Partial<Record<AssistantErrorCode, I18nKey>> = {
+  agent_unavailable: "assistant.error.agent_unavailable.titleAfterChange",
+  stream_dropped: "assistant.error.stream_dropped.titleAfterChange",
+};
+
+/** A failed turn after an approved change ran: flagged by the engine, or a stored turn whose Retry became Ask again. */
+export function failedAfterChange(error: AssistantError): boolean {
+  if (error.afterChange) return true;
+  return error.action === "ask_again" && error.code !== "approval_expired";
 }
 
 export function errorTitleKey(code: AssistantErrorCode): I18nKey {
@@ -389,6 +424,8 @@ export function errorTitle(
   // A `retry_after` countdown is on the button, so the title gives no estimate of its own.
   if (error.code === "rate_limited" && error.retryAfterMs)
     return { key: "assistant.error.rate_limited.titleTimed", params };
+  const afterChange = failedAfterChange(error) ? AFTER_CHANGE_TITLES[error.code] : undefined;
+  if (afterChange) return { key: afterChange, params };
   if (error.code !== "provider_error") return { key: errorTitleKey(error.code), params };
   if (!error.reason) return { key: "assistant.error.provider_error.titleNoReason", params };
   if (copy.t) params.reason = copy.t(REASON_KEYS[error.reason]);
@@ -705,17 +742,70 @@ function entryEffects(prev: TurnState, next: TurnState): TurnEffect[] {
   return effects;
 }
 
-function statusLine(turn: TurnState, meta: TurnMeta, t: TranslateFn, now: number): I18nText {
+function statusLine(
+  turn: TurnState,
+  meta: TurnMeta,
+  t: TranslateFn,
+  now: number,
+  progress?: TurnProgress,
+): I18nText {
   if (meta.caughtUpAt && now - meta.caughtUpAt < CAUGHT_UP_MS && turn.state !== "reconnecting")
     return t("assistant.turn.caughtUp");
-  const label = turn.state === "running_tool" ? stepLabel(turn.tool, turn.target) : null;
-  const status = label
-    ? t(label.key, label.params)
-    : (lifecycleLine(turn, meta, t, now) ??
-      t(STATUS_KEYS[turn.state] ?? "assistant.turn.thinking"));
-  const elapsed = elapsedMs(meta, now);
-  if (NO_ELAPSED.has(turn.state) || elapsed < ELAPSED_AFTER_MS) return status;
-  return t("assistant.turn.withElapsed", { status, elapsed: elapsedText(elapsed, t) });
+  const status = stateText(turn, meta, t, now, progress);
+  const total = elapsedMs(meta, now);
+  if (isAwaiting(turn))
+    return total < ELAPSED_AFTER_MS
+      ? status
+      : t("assistant.turn.withElapsed", {
+          status,
+          elapsed: t("assistant.turn.pausedAt", { elapsed: elapsedText(total, t) }),
+        });
+  if (NO_ELAPSED.has(turn.state)) return status;
+  // Without its entry time the state's time is the turn's, so the total would repeat it.
+  const entered = meta.stateEnteredAt ?? null;
+  const inState = entered === null ? total : Math.max(0, now - entered);
+  const timed =
+    inState < ELAPSED_AFTER_MS
+      ? status
+      : t("assistant.turn.withElapsed", { status, elapsed: elapsedText(inState, t) });
+  if (entered === null || total < TOTAL_AFTER_MS) return timed;
+  return t("assistant.turn.withElapsed", {
+    status: timed,
+    elapsed: t("assistant.turn.totalElapsed", { elapsed: elapsedText(total, t) }),
+  });
+}
+
+// The state's own sentence: a step names itself and its number, a pause between steps counts the results.
+function stateText(
+  turn: TurnState,
+  meta: TurnMeta,
+  t: TranslateFn,
+  now: number,
+  progress?: TurnProgress,
+): I18nText {
+  if (turn.state === "running_tool") {
+    const label = stepLabel(turn.tool, turn.target);
+    const text = t(label.key, label.params);
+    const others = (progress?.running ?? 1) - 1;
+    if (others > 0) return t("assistant.turn.moreRunning", { label: text, count: others });
+    return progress?.step
+      ? t("assistant.turn.withElapsed", {
+          status: text,
+          elapsed: t("assistant.turn.stepN", { n: progress.step }),
+        })
+      : text;
+  }
+  const lifecycle = lifecycleLine(turn, meta, t, now);
+  if (lifecycle) return lifecycle;
+  const results = progress?.results ?? 0;
+  if (turn.state === "responding.thinking" && results > 0)
+    return t("assistant.turn.thinkingAbout", { count: results }, results);
+  return t(STATUS_KEYS[turn.state] ?? "assistant.turn.thinking");
+}
+
+// A new step is a new state even though the state name stays `running_tool`.
+function stateKey(turn: TurnState): string {
+  return turn.state === "running_tool" ? `running_tool:${turn.callId}` : turn.state;
 }
 
 // The provider retry and the compaction are said only while the turn has nothing else to show.

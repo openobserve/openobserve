@@ -22,10 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-context-tray"
     data-dd-privacy="mask"
     :data-collapsed="compact && !expanded ? '' : undefined"
-    class="flex shrink-0 flex-col gap-1 px-3 pt-2"
+    :class="['flex shrink-0 flex-col gap-1', framed ? '' : 'px-3 pt-2']"
   >
-    <div class="flex min-w-0 items-start gap-1">
-      <ul class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+    <div class="flex min-w-0 flex-wrap items-start gap-1">
+      <ul class="flex min-w-0 flex-[1_1_auto] flex-wrap items-center gap-1.5">
         <li v-for="chip in shownChips" :key="chip.id" class="max-w-full min-w-0 shrink-0">
           <AssistantChipPopover
             :chip="chip"
@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :open-label="openLabelOf(chip)"
             @update:open="(open) => (openId = open ? chip.id : null)"
             @open-source="openSource(chip)"
+            @paste-inline="pasteInline(chip)"
             @remove="remove(chip)"
             @remove-row="(index) => removeRow(chip, index)"
             @trim="(include) => trim(chip, include)"
@@ -85,7 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </li>
       </ul>
-      <AssistantContextSeesPopover :sid="sid" :icon-only="compact" class="shrink-0" />
+      <div class="ms-auto shrink-0">
+        <AssistantContextSeesPopover :sid="sid" :icon-only="compact" />
+      </div>
     </div>
 
     <p
@@ -121,6 +124,8 @@ export interface AssistantContextTrayProps {
   collapsed?: boolean;
   /** Only the container the user sees announces and reacts to page changes. */
   visible?: boolean;
+  /** Inside the composer frame, which pads it (D4 §3.1). */
+  framed?: boolean;
 }
 </script>
 
@@ -166,6 +171,7 @@ const PAGE_SETTLE_MS = 3_000;
 const props = withDefaults(defineProps<AssistantContextTrayProps>(), {
   collapsed: false,
   visible: true,
+  framed: false,
 });
 
 const { t } = useI18nTyped();
@@ -288,6 +294,17 @@ async function remove(chip: ContextChip): Promise<void> {
   changed("remove", chip);
   await nextTick();
   focusChip(next === chip.id ? null : next);
+}
+
+// The text joins the end of the draft on its own line, so nothing typed is overwritten.
+function pasteInline(chip: ContextChip): void {
+  const current = session.value;
+  if (!current || typeof chip.data !== "string") return;
+  const typed = current.composer.text;
+  store.removeChip(current.sid, chip.id);
+  store.setDraft(current.sid, { text: typed ? `${typed}\n${chip.data}` : chip.data });
+  openId.value = null;
+  changed("remove", chip);
 }
 
 function addBack(chip: ContextChip): void {

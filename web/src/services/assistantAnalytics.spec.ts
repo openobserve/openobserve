@@ -147,7 +147,7 @@ const SAMPLES: { [N in AiEventName]: AiEventProps[N] } = {
     to: "full",
     count: 1,
   },
-  ai_history_open: { placement: "popover" },
+  ai_history_open: { placement: "panel" },
   ai_history_search: { length_bucket: "1_20", server: false },
   ai_share: { action: "create", visibility: "org", mode: "snapshot", scope: "chat" },
   ai_shared_view: {

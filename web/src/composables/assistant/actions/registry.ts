@@ -88,6 +88,7 @@ type AnyApplier = Applier<AssistantAction>;
 // Reads and the user's own clicks (Open, Run, drafts, Insert) are never carded; these start an agent turn.
 const TURN_KINDS: ReadonlySet<AssistantAction["kind"]> = new Set([
   "rerun_now",
+  "rerun_wider",
   "retry",
   "ask_again",
   "regenerate",
@@ -108,6 +109,7 @@ const ORG_BOUND_KINDS: ReadonlySet<AssistantAction["kind"]> = new Set([
   "add_to_dashboard_draft",
   "create_alert_draft",
   "rerun_now",
+  "rerun_wider",
   "retry",
   "ask_again",
   "regenerate",
@@ -199,6 +201,8 @@ function trackAction(sid: Sid, action: AssistantAction, result: ActionResult): v
       return evidence("create_alert", "query", action.query.language);
     case "rerun_now":
       return evidence("rerun_now", "footer");
+    case "rerun_wider":
+      return evidence("rerun_wider", "footer");
     case "insert_into_editor": {
       const decision = (result.detail as { decision?: string } | undefined)?.decision;
       if (decision === "accepted") evidence("insert_diff", "query", action.language);

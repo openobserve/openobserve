@@ -160,6 +160,14 @@ describe("annotations", () => {
     expect(readAnnotations("k2", "s1")).toEqual({});
   });
 
+  it("keeps a turn's Home default-window flag on its own, and only a literal true (PO A26)", () => {
+    writeAnnotation("k1", "s1", "turn:t1:window", { homeDefaultWindow: true }, 1);
+    writeAnnotation("k1", "s1", "turn:t2:window", { homeDefaultWindow: "yes" } as never, 2);
+    expect(readAnnotations("k1", "s1")).toEqual({
+      "turn:t1:window": { homeDefaultWindow: true },
+    });
+  });
+
   it("validates what it reads back and forgets everything on sign-out", () => {
     localStorage.setItem(
       "o2.assistant.annotations:k1",

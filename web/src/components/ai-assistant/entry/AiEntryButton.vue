@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPopover
     v-if="state !== 'hidden'"
+    privacy="mask"
     :open="gateOpen"
     side="bottom"
     align="start"
@@ -467,6 +468,7 @@ import { computed, inject, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { announceComposer, noteCap } from "@/components/ai-assistant/composer/composerUi";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
@@ -500,6 +502,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { uiIntlLocale } from "@/utils/formatters";
 
 defineOptions({ inheritAttrs: false });
+
+// Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
+provideAssistantSurface();
 
 const props = withDefaults(defineProps<AiEntryButtonProps>(), {
   thread: undefined,
@@ -876,7 +881,8 @@ function onGateOpen(open: boolean): void {
 }
 
 function onGateAction(cta: GateCta): void {
-  if (cta === "close" || cta === "see_plans") gateOpen.value = false;
+  if (cta === "close" || cta === "see_plans" || cta === "learn_more" || cta === "open_settings")
+    gateOpen.value = false;
 }
 
 function toastAdded(): void {

@@ -85,6 +85,8 @@ export interface AssistantContextOptions {
   t?: TranslateFn;
   /** Overrides the registry read, for specs. */
   read?: () => Promise<PageContext | null>;
+  /** The display name of an org id; defaults to the host's selected org. */
+  orgName?: (id: string) => string;
 }
 
 /** The tray, the sees popover and the placeholder of one session (`00` §6.3). */
@@ -147,6 +149,7 @@ export function useAssistantContext(
         window: window.value,
         timezone: browserTimezone(),
         pageLabel: pageLabelOf(t),
+        orgName: options.orgName ?? hostOrgName,
         t,
       },
     );
@@ -210,6 +213,12 @@ export function resetAssistantContextForTests(): void {
   stopWatchers?.();
   stopWatchers = null;
   reader = () => contextRegistry.getActiveContext();
+}
+
+/** The host's name for its selected org; any other id reads as itself. */
+export function hostOrgName(id: string): string {
+  const org = getAssistantRuntime().context.value?.getOrg();
+  return org?.identifier === id && org.name ? org.name : id;
 }
 
 function subscribe(store: AssistantStoreInternal, read: () => Promise<PageContext | null>): void {

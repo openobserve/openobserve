@@ -58,21 +58,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OForm :form="form" class="flex flex-col gap-5" data-test="settings-assistant-policy-form">
         <div class="flex flex-col gap-1">
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <OFormSwitch
               name="enabled"
               :label="t('assistant.settings.access.enabled')"
-              :disabled="readOnly"
-              :aria-describedby="ids.enabled"
+              :disabled="readOnly || confirmingOff"
+              :aria-describedby="enabledDescribedBy"
               data-test="settings-assistant-enabled-switch"
             />
-            <!-- The switch already exposes its state; the word is for sighted readers of a disabled control. -->
+            <OBadge
+              v-if="confirmingOff"
+              :id="ids.pending"
+              variant="warning-quiet"
+              size="sm"
+              shape="rounded"
+              data-test="settings-assistant-enabled-pending"
+              >{{ t("assistant.settings.access.turnOff.pending") }}</OBadge
+            >
+            <!-- The saved state, so an unsaved flip still reads as the org's current setting. -->
             <span
-              v-if="readOnly"
+              v-else
               aria-hidden="true"
               class="text-text-secondary shrink-0 text-xs"
               data-test="settings-assistant-enabled-value"
-              >{{ onOff(formValues.enabled) }}</span
+              >{{ inOrg(baseline.enabled) }}</span
             >
           </div>
           <p :id="ids.enabled" class="text-text-secondary text-xs">
@@ -213,6 +222,7 @@ import { computed, ref, useId, watch } from "vue";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import { useAssistantName } from "@/composables/assistant";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
@@ -269,8 +279,10 @@ const { t } = useI18nTyped();
 const name = useAssistantName();
 const page = useAssistantSettingsPage();
 const { confirm } = useConfirmDialog();
-const ids = { enabled: useId(), tier: useId(), public: useId() };
+const ids = { enabled: useId(), tier: useId(), public: useId(), pending: useId() };
 const saveButton = ref<InstanceType<typeof OButton> | null>(null);
+// Save leaves the switch off but not yet applied while the turn-off confirm is open.
+const confirmingOff = ref(false);
 
 const settings = useQuery(computed(() => assistantSettingsQuery(page.org.value)));
 const capabilities = useQuery(
@@ -317,6 +329,10 @@ const pristine = form.useStore((s: { isDefaultValue: boolean }) => s.isDefaultVa
 const submitting = form.useStore((s: { isSubmitting: boolean }) => s.isSubmitting);
 const dirty = computed(() => !pristine.value && !readOnly.value);
 
+const enabledDescribedBy = computed(() =>
+  confirmingOff.value ? `${ids.pending} ${ids.enabled}` : ids.enabled,
+);
+
 const tierLine = computed(() =>
   t(TIERS.find((x) => x.value === tier.value)?.lineKey ?? TIERS[2].lineKey),
 );
@@ -332,6 +348,10 @@ useSettingsLeaveGuard(page, () => dirty.value);
 function resetTo(next: AssistantOrgPolicyValues) {
   baseline.value = next;
   form.reset(next);
+}
+
+function inOrg(value: boolean) {
+  return value ? t("assistant.settings.access.onInOrg") : t("assistant.settings.access.offInOrg");
 }
 
 function onOff(value: boolean) {
@@ -356,16 +376,7 @@ async function save(values: AssistantOrgPolicyValues) {
   const org = page.org.value;
   const orgName = raw(page.orgName.value);
   const turningOff = baseline.value.enabled && !values.enabled;
-  if (turningOff) {
-    const ok = await confirm({
-      title: t("assistant.settings.access.turnOff.title", name),
-      message: t("assistant.settings.access.turnOff.message", { ...name, org: orgName }),
-      confirmLabel: t("assistant.settings.access.turnOff.confirm"),
-      confirmVariant: "destructive",
-      focusCancel: true,
-    });
-    if (!ok) return;
-  }
+  if (turningOff && !(await confirmTurnOff(orgName))) return;
   const links = current.public_link_count ?? 0;
   const publicOff =
     !locks.value.publicLinks && baseline.value.public_sharing && !values.public_sharing;
@@ -394,6 +405,21 @@ async function save(values: AssistantOrgPolicyValues) {
       ? t("assistant.settings.access.turnOff.done", { ...name, org: orgName })
       : t("assistant.settings.access.saved"),
   });
+}
+
+async function confirmTurnOff(orgName: ReturnType<typeof raw>): Promise<boolean> {
+  confirmingOff.value = true;
+  try {
+    return await confirm({
+      title: t("assistant.settings.access.turnOff.title", name),
+      message: t("assistant.settings.access.turnOff.message", { ...name, org: orgName }),
+      confirmLabel: t("assistant.settings.access.turnOff.confirm"),
+      confirmVariant: "destructive",
+      focusCancel: true,
+    });
+  } finally {
+    confirmingOff.value = false;
+  }
 }
 
 function focusSave() {

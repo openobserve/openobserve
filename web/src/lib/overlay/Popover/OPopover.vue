@@ -42,6 +42,7 @@ if (typeof document !== "undefined" && !(globalThis as any)[_oPopKey]) {
 <script setup lang="ts">
 import { PopoverAnchor, PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
 import { inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
+import { useOverlayScope } from "@/lib/overlay/overlayScope";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -292,6 +293,9 @@ onBeforeUnmount(() => {
     window.removeEventListener("scroll", handleViewportScroll, true);
   }
 });
+
+// A scope that provides attributes (the assistant surface) keeps them on content teleported out of it.
+const overlayScope = useOverlayScope();
 </script>
 
 <template>
@@ -306,6 +310,7 @@ onBeforeUnmount(() => {
     <PopoverPortal>
       <PopoverContent
         data-o-popover-content
+        v-bind="overlayScope"
         :data-dd-privacy="privacy"
         :side="side"
         :align="align"

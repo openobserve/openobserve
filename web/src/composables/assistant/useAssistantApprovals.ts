@@ -26,6 +26,7 @@ import {
   type ApprovalDetail,
 } from "./actions/appliers/approval";
 import type { ActionResult, AssistantAction } from "./actions/types";
+import { approvalName, approvalToolEntity, approvalVerb } from "./approvalAnatomy";
 import type {
   ApprovalDecision,
   ApprovalOutcome,
@@ -459,30 +460,43 @@ export function entityKeyOf(type: string | undefined): string {
   return type && ENTITY_KEYS.has(type) ? type : "object";
 }
 
-/** The card's heading: operation, count and entity in one sentence. */
+/** The card's heading: verb, entity and name in one sentence; the raw id is never part of it (D3-n). */
 export function approvalHeading(
   t: TranslateFn,
   card: Pick<ApprovalBlockData, "kind" | "targets" | "tool" | "args">,
   count: number,
 ): I18nText {
-  const entity = approvalEntity(card);
-  const noun = t(`assistant.entity.${entity}`, count);
+  const verb = approvalVerb(card);
   const toolset = typeof card.args?.toolset === "string" ? card.args.toolset : card.tool;
-  switch (card.kind) {
-    case "delete":
-      return t("assistant.approval.heading.delete", { count, entity: noun }, count);
-    case "update":
-      return t("assistant.approval.heading.update", {
-        entity: t(`assistant.entity.${entity}`, 1),
-        name: raw(card.targets[0]?.name ?? ""),
-      });
-    case "create":
-      return t("assistant.approval.heading.create", { entity: t(`assistant.entity.${entity}`, 1) });
-    case "run_command":
-      return t("assistant.approval.heading.runCommand", { toolset: raw(toolset) });
-    default:
-      return t("assistant.approval.heading.permission", { tool: raw(card.tool) });
+  if (verb === "delete") {
+    const noun = t(`assistant.entity.${approvalNoun(card)}`, count);
+    return t("assistant.approval.heading.delete", { count, entity: noun }, count);
   }
+  if (verb) {
+    const text = approvalVerbText(t, card);
+    const name = approvalName(card);
+    return name ? t("assistant.approval.named", { verb: text, name: raw(name) }) : text;
+  }
+  if (card.kind === "run_command")
+    return t("assistant.approval.heading.runCommand", { toolset: raw(toolset) });
+  return t("assistant.approval.heading.permission", { tool: raw(card.tool) });
+}
+
+/** "Pause alert", "Update dashboard": the verb with its entity, which also labels Approve. */
+export function approvalVerbText(
+  t: TranslateFn,
+  card: Pick<ApprovalBlockData, "kind" | "targets" | "tool" | "args">,
+): I18nText {
+  const verb = approvalVerb(card) ?? "update";
+  const entity = t(`assistant.entity.${approvalNoun(card)}`, 1);
+  return t(`assistant.approval.verb.${verb}`, { entity });
+}
+
+/** The entity noun key of a card: its targets' type, else the type a toggle tool names. */
+export function approvalNoun(card: Pick<ApprovalBlockData, "targets" | "tool">): string {
+  const entity = approvalEntity(card);
+  if (entity !== "object" || card.targets.length) return entity;
+  return entityKeyOf(approvalToolEntity(card) ?? undefined);
 }
 
 /** The in-app href of a target with an id, or of its type's list without one; `null` when this build has no such route. */

@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import type { TurnMeta, TurnState } from "@/composables/assistant/pure";
+import type { ChatMessage } from "@/ts/interfaces/chat";
 import type { I18nText } from "@/types/i18n";
 
 export interface AssistantTurnStatusProps {
@@ -67,8 +68,8 @@ export interface AssistantTurnStatusProps {
   /** `block` under the running message (no Stop: the composer owns it); `line` the helper, `card` the RCA drawer. */
   variant: "block" | "line" | "card";
   ownedByThisTab: boolean;
-  /** The answer's trail already shows the running tool as a row. */
-  trailShown?: boolean;
+  /** The running answer; its steps give the line its step number and result count. */
+  answer?: ChatMessage | null;
   /** Injected by specs; elapsed is computed from it, never from a counter. */
   now?: () => number;
   /** False where the host owns Stop in its own slot (the helper's Send ↔ Stop). */
@@ -100,7 +101,13 @@ const OWN_WORDS: ReadonlySet<string> = new Set([
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { elapsedMs, isTerminal, stepLabel, turnStatusText } from "@/composables/assistant/pure";
+import {
+  elapsedMs,
+  isTerminal,
+  stepsOf,
+  turnStatusText,
+  type TurnProgress,
+} from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -110,7 +117,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { formatElapsed } from "@/utils/formatters";
 
 const props = withDefaults(defineProps<AssistantTurnStatusProps>(), {
-  trailShown: false,
+  answer: null,
   now: undefined,
   stoppable: true,
   copy: "chat",
@@ -136,16 +143,19 @@ const status = computed(() => {
   if (!props.ownedByThisTab)
     return { line: t("assistant.turn.elsewhere"), tone: "neutral" as const };
   const now = clock();
-  const shared = turnStatusText(props.turn, props.meta, t, now);
+  const shared = turnStatusText(props.turn, props.meta, t, now, progress.value);
   const own = shared ? (props.line ?? hostLine(now, shared.line)) : null;
-  const text = shared && own ? { ...shared, line: own } : shared;
-  // A tool with no label of its own would only read "Running {tool}" beside the trail's real row.
-  const repeatsTrail =
-    props.variant === "block" &&
-    props.trailShown &&
-    props.turn.state === "running_tool" &&
-    stepLabel(props.turn.tool, props.turn.target).key === "assistant.step.fallback";
-  return repeatsTrail && !text?.second ? null : text;
+  return shared && own ? { ...shared, line: own } : shared;
+});
+
+const progress = computed<TurnProgress>(() => {
+  const steps = stepsOf(props.answer, "");
+  const callId = props.turn.state === "running_tool" ? props.turn.callId : null;
+  return {
+    step: steps.find((step) => step.callId === callId)?.n ?? null,
+    running: steps.filter((step) => step.state === "running").length || 1,
+    results: steps.filter((step) => step.state === "done" || step.state === "failed").length,
+  };
 });
 
 function hostLine(now: number, shared: I18nText): I18nText | null {

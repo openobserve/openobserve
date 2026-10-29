@@ -193,10 +193,9 @@ test.describe("assistant gates", () => {
       "aria-label",
       "O2 Assistant, locked",
     );
+    // A locked user gets the gate popover at the button, never an empty sidebar (D7 decision 2).
     await assistant.headerButton.click();
-    const gate = assistant.sidebar.locator(
-      '[data-gate="no_permission"][data-size="inline"]',
-    );
+    const gate = page.locator('[data-gate="no_permission"][data-size="popover"]');
     await expect(gate).toBeVisible();
     await expect(gate.locator("h2")).toHaveText(
       "O2 Assistant isn't available to your role",
@@ -204,26 +203,14 @@ test.describe("assistant gates", () => {
     await expect(
       gate.locator('[data-test="assistant-gate-ask-admin"]'),
     ).toBeFocused();
+    await expect(gate.locator('[data-test="assistant-gate-reload"]')).toHaveText("Check again");
     await gate.locator('[data-test="assistant-gate-ask-admin"]').click();
     await expect(assistant.askAdmin()).toBeVisible();
     await expect(assistant.askAdmin().locator("textarea")).toHaveValue(
       /grant me O2 Assistant access/,
     );
     await page.keyboard.press("Escape");
-    await expect(
-      assistant.sidebar.locator('[data-test="assistant-composer"]'),
-    ).toHaveCount(0);
-    await assistant.sidebar
-      .locator('[data-test="assistant-shell-open-in-full-view"]')
-      .click();
-    const hero = page.locator('[data-gate="no_permission"][data-size="hero"]');
-    await expect(hero).toBeVisible({ timeout: 30_000 });
-    await expect(
-      hero.locator('[data-test="assistant-gate-ask-admin"]'),
-    ).toBeFocused();
-    await expect(
-      page.locator('[data-test="assistant-container-status"]'),
-    ).not.toHaveText(/closed/);
+    await expect(assistant.sidebar.locator('[data-test="assistant-composer"]')).toHaveCount(0);
     expect(
       state.log.filter((line) => line.includes("/ai/chat_stream")),
     ).toEqual([]);

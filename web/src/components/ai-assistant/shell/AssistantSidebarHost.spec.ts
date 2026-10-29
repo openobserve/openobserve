@@ -21,7 +21,8 @@ import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant"
 import AssistantSidebarHost, { coveredBy } from "./AssistantSidebarHost.vue";
 import { closeLockedPanel, openLockedPanel, useLockedPanel } from "./lockedPanel";
 
-const { fake, lg, closers, shortcuts, track } = vi.hoisted(() => ({
+const { fake, lg, closers, shortcuts, track, deep } = vi.hoisted(() => ({
+  deep: { blocked: null as null | "no_permission" | "off_for_org" },
   fake: { current: null as any },
   lg: { value: true },
   closers: [] as (() => void)[],
@@ -45,8 +46,14 @@ vi.mock("@/composables/useBreakpoint", async () => {
 });
 vi.mock("@/composables/assistant", async (importOriginal) => {
   const { computed } = await import("vue");
+  const original = await importOriginal<typeof import("@/composables/assistant")>();
   return {
-    ...(await importOriginal<typeof import("@/composables/assistant")>()),
+    ...original,
+    // A test may block the deep-link door to render its gate; every other test gets the real door.
+    useDeepLinkDoor: () => {
+      const real = original.useDeepLinkDoor();
+      return deep.blocked ? { ...real, blocked: computed(() => deep.blocked) } : real;
+    },
     useAssistantStore: () => fake.current.store,
     useAssistantHistory: () => fake.current.history,
     useAssistantCapability: () => fake.current.handle,
@@ -112,6 +119,32 @@ afterEach(() => {
 });
 
 describe("AssistantSidebarHost", () => {
+  it("gives the blocked deep-link gate and its Ask an admin request the assistant roles (`90` §2.2)", async () => {
+    deep.blocked = "no_permission";
+    fake.current = fakeAssistant("no_permission");
+    const router = fakeRouter();
+    await router.push("/logs");
+    const wrapper = mount(
+      defineComponent({
+        setup: () => () =>
+          h("div", [h("main", { "data-test": "main-content" }), h(AssistantSidebarHost)]),
+      }),
+      { global: { plugins: [router, fakeVuex()] }, attachTo: document.body },
+    );
+    await flushPromises();
+    const gate = document.body.querySelector<HTMLElement>(
+      '[data-test="assistant-deep-link-gate"] [data-test="assistant-gate-state"]',
+    )!;
+    expect(gate.closest("[data-assistant-surface]")).not.toBeNull();
+    gate.querySelector<HTMLElement>('[data-test="assistant-gate-ask-admin"]')!.click();
+    await flushPromises();
+    const copy = document.body.querySelector('[data-test="assistant-ask-admin-copy"]');
+    expect(copy).not.toBeNull();
+    expect(copy!.closest("[data-assistant-surface]")).not.toBeNull();
+    deep.blocked = null;
+    wrapper.unmount();
+  });
+
   it("stays mounted and toggles with v-show, binding the chords once", async () => {
     const { open } = await setup();
     expect(shortcuts).toHaveBeenCalled();

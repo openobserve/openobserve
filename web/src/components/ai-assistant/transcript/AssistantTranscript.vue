@@ -101,17 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
       </AssistantMessage>
-      <div v-if="turn.live && !readonly" data-status-row>
-        <AssistantTurnStatus
-          variant="block"
-          :turn="session!.turn"
-          :meta="session!.turnMeta"
-          :owned-by-this-tab="session!.turnMeta.ownedByThisTab"
-          :trail-shown="stepsOf(turn.answer, session?.org ?? '').length > 0"
-        />
-      </div>
       <article
-        v-if="turn.answer"
+        v-if="turn.answer || statusShown(turn)"
         :aria-label="t('assistant.transcript.answerName', { prompt: turn.firstLine })"
         tabindex="-1"
         data-answer
@@ -119,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="rounded-default focus-visible:ring-border-strong flex min-w-0 flex-col gap-2 outline-none focus-visible:ring-2"
       >
         <AssistantMessage
-          :message="turn.answer"
+          :message="turn.answer ?? pendingAnswer"
           :turn-id="`${sid ?? 'shared'}:${turn.turnId}:v${turn.version.current}`"
           :live="turn.live"
           :readonly="readonly"
@@ -132,6 +123,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :count="turn.version.count"
               @select="(n) => selectVersion(turn.turnId, n, turn.version.count)"
             />
+          </template>
+          <template v-if="statusShown(turn)" #status>
+            <div data-status-row>
+              <AssistantTurnStatus
+                variant="block"
+                :turn="session!.turn"
+                :meta="session!.turnMeta"
+                :owned-by-this-tab="session!.turnMeta.ownedByThisTab"
+                :answer="turn.answer"
+              />
+            </div>
           </template>
           <template #after>
             <AssistantTurnOutcome
@@ -156,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @manual="(query: QueryRef) => onManualRoute(query, turn.turnId)"
             />
           </template>
-          <template v-if="answerActionsFor(turn)" #actions>
+          <template v-if="turn.answer && answerActionsFor(turn)" #actions>
             <AssistantMessageActions
               :sid="sid!"
               :message="turn.answer"
@@ -200,8 +202,10 @@ export interface AssistantTranscriptProps {
 }
 
 export interface AssistantTranscriptEmits {
-  /** The live status row scrolled in or out of view; the strip shows its text meanwhile (HT-01 AC 8). */
+  /** The live line scrolled in or out of view; the strip shows its text meanwhile (HT-01 AC 8). */
   (e: "status-visible", visible: boolean): void;
+  /** The latest answer scrolled in or out of view; the strip offers Go to answer only while it is out. */
+  (e: "answer-visible", visible: boolean): void;
   /** A new outcome block mounted on the latest turn; a half sheet grows so it fits. */
   (e: "outcome-shown"): void;
 }
@@ -309,7 +313,6 @@ import {
   manualRouteOf,
   outcomeError,
   promptRange,
-  stepsOf,
   turnAnnotationKey,
   useAssistantName,
 } from "@/composables/assistant/pure";
@@ -345,6 +348,9 @@ const { product } = useAssistantName();
 const source = inject(assistantSessionSourceKey, null);
 const live = props.readonly || props.messages ? null : inject(assistantTranscriptHostKey, null);
 const evidence = live ? inject(assistantEvidenceHostKey, null) : null;
+
+// Before the first frame the running turn has no answer yet; its live line still sits where the answer will grow.
+const pendingAnswer: ChatMessage = { role: "assistant", content: raw(""), contentBlocks: [] };
 
 const root = ref<HTMLElement | null>(null);
 const editing = ref<string | null>(null);
@@ -441,6 +447,10 @@ const scroll = useTranscriptScroll({
 function compactionOf(message: ChatMessage | null | undefined): string | null {
   const block = message?.contentBlocks?.find((candidate) => candidate.compactedAt !== undefined);
   return block?.message ? String(block.message) : null;
+}
+
+function statusShown(turn: TranscriptTurn): boolean {
+  return turn.live && !props.readonly && !!session.value;
 }
 
 function turnName(turn: TranscriptTurn): I18nText {
@@ -550,6 +560,7 @@ function focusLatestAnswer(): boolean {
 }
 
 let observer: IntersectionObserver | null = null;
+let answerObserver: IntersectionObserver | null = null;
 
 // Each running turn mounts its own row, so the observer follows the live turn, not a template ref.
 const liveTurnId = computed(() =>
@@ -575,6 +586,32 @@ function observeStatusRow(): void {
 }
 
 watch(liveTurnId, observeStatusRow, { flush: "post" });
+
+// The latest article changes when a turn is added or its answer mounts, so the key names both.
+const latestAnswerKey = computed(() => {
+  const last = mounted.value.at(-1);
+  return last ? `${props.sid ?? ""}:${last.turnId}:${last.answer ? "answer" : "status"}` : null;
+});
+
+function observeLatestAnswer(): void {
+  answerObserver?.disconnect();
+  answerObserver = null;
+  const answers = root.value?.querySelectorAll<HTMLElement>("[data-answer]");
+  const el = answers?.[answers.length - 1];
+  if (!el) return emit("answer-visible", false);
+  if (typeof IntersectionObserver === "undefined") return emit("answer-visible", true);
+  answerObserver = new IntersectionObserver(
+    (entries) =>
+      emit(
+        "answer-visible",
+        entries.some((entry) => entry.isIntersecting),
+      ),
+    { root: root.value },
+  );
+  answerObserver.observe(el);
+}
+
+watch(latestAnswerKey, observeLatestAnswer, { flush: "post" });
 
 // Following pins the bottom, so a short viewport would show an outcome's action without its title (`30` §4.3).
 watch(
@@ -609,8 +646,14 @@ watch(
   },
 );
 
-onMounted(observeStatusRow);
-onBeforeUnmount(() => observer?.disconnect());
+onMounted(() => {
+  observeStatusRow();
+  observeLatestAnswer();
+});
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  answerObserver?.disconnect();
+});
 
 defineExpose({ jumpToLatest: scroll.jumpToLatest, focusLatestAnswer, root });
 </script>

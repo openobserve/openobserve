@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="open || keepMounted"
       v-show="open"
       ref="root"
+      v-bind="overlayScope"
       role="dialog"
       aria-modal="false"
       :aria-label="ariaLabel"
@@ -107,6 +108,7 @@ function publishInset(): void {
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useSlots, watch } from "vue";
+import { useOverlayScope } from "@/lib/overlay/overlayScope";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 
@@ -352,4 +354,7 @@ watch(
 );
 
 onBeforeUnmount(detach);
+
+// A scope that provides attributes (the assistant surface) keeps them on content teleported out of it.
+const overlayScope = useOverlayScope();
 </script>

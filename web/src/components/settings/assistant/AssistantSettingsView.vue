@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('assistant.settings.pageTitle', name)"
     :icon="assistantGlyph.assistant"
     title-data-test="settings-assistant-page-title"
+    data-assistant-surface
     tabs-below
     scroll
   >
@@ -112,6 +113,7 @@ export const SETTINGS_TABS: { id: AssistantSettingsTab; labelKey: I18nKey; write
 import { computed, ref, watch, type Component } from "vue";
 import { useRouter } from "vue-router";
 
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import { useAssistantName } from "@/composables/assistant";
@@ -131,6 +133,9 @@ import StatusTab from "./StatusTab.vue";
 import ToolsetsTab from "./ToolsetsTab.vue";
 import UsageTab from "./UsageTab.vue";
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";
+
+// Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
+provideAssistantSurface();
 
 const TABS = SETTINGS_TABS;
 

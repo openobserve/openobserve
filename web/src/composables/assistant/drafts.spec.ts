@@ -56,6 +56,16 @@ describe("drafts", () => {
     expect(sessionStorage.getItem(draftKey(KEY, "sid-1"))).toContain("typing");
   });
 
+  it("keeps a Home starter's provenance only as a literal true (PO A26)", () => {
+    const drafts = createDraftStore();
+    drafts.schedule(KEY, "sid-1", { ...draft("home"), homeStarter: true });
+    drafts.schedule(KEY, "sid-2", { ...draft("odd"), homeStarter: "yes" } as never);
+    drafts.flush();
+    const reread = createDraftStore();
+    expect(reread.read(KEY, "sid-1")?.homeStarter).toBe(true);
+    expect(reread.read(KEY, "sid-2")).not.toHaveProperty("homeStarter");
+  });
+
   it("never persists images", () => {
     const drafts = createDraftStore();
     const withImage = { ...draft("look"), images: [{ filename: "a.png" }] } as DraftPayload;

@@ -161,7 +161,14 @@ const wrapperClasses = computed(() => [
     </label>
 
     <!-- Textarea wrapper -->
-    <div :class="[wrapperClasses, fill && 'min-h-0 flex-1']">
+    <div
+      :class="[
+        wrapperClasses,
+        fill && 'min-h-0 flex-1',
+        ($slots.header || $slots.footer) && 'flex-col',
+      ]"
+    >
+      <slot name="header" />
       <textarea
         :id="textareaId"
         ref="textareaRef"
@@ -194,6 +201,7 @@ const wrapperClasses = computed(() => [
         @focus="emit('focus', $event)"
         @keydown="emit('keydown', $event)"
       />
+      <slot name="footer" />
     </div>
 
     <!-- Bottom row: helpText / error / counter -->

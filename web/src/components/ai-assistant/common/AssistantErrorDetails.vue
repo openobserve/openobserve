@@ -21,7 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-error-details"
   >
     <template v-if="variant === 'popover'" #trigger>
-      <OButton variant="ghost" size="sm" class="max-md:min-h-11 pointer-coarse:min-h-11">
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        class="max-md:min-h-11 pointer-coarse:min-h-11"
+        data-test="assistant-error-details-trigger"
+      >
         {{ t("assistant.errorDetails.title") }}
       </OButton>
     </template>

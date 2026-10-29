@@ -419,6 +419,7 @@ describe("ghost and prefill (IW-06, `70` §5)", () => {
     await textarea().trigger("keydown", { key: "ArrowRight" });
     await flushPromises();
     expect(store.state.sessions[sid].composer).toMatchObject({ text: "Why did errors spike?" });
+    expect(store.state.sessions[sid].composer.homeStarter).toBeUndefined();
     expect(store.state.sessions[sid].composer.chips.map((c: ContextChip) => c.id)).toEqual([
       "row-1",
     ]);
@@ -429,6 +430,16 @@ describe("ghost and prefill (IW-06, `70` §5)", () => {
       starter_kind: "page",
       index: 0,
       via: "ghost",
+    });
+  });
+
+  it("accepts a Home starter's ghost with its provenance (PO A26)", async () => {
+    const { textarea, store, sid } = setup({ ghost: { ...ghost, home: true } });
+    await textarea().trigger("keydown", { key: "ArrowRight" });
+    await flushPromises();
+    expect(store.state.sessions[sid].composer).toMatchObject({
+      text: "Why did errors spike?",
+      homeStarter: true,
     });
   });
 
@@ -548,6 +559,109 @@ describe("images (CT-10)", () => {
     await flushPromises();
     expect(composerUi(sid).cap?.text).toBe("Only PNG and JPEG images can be attached");
     expect(trackAssistant).toHaveBeenCalledWith("ai_composer_cap_hit", { cap: "type" });
+  });
+});
+
+describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () => {
+  const long = Array.from({ length: 25 }, (_, i) => `line ${i}`).join("\n");
+  const paste = (textarea: ReturnType<ReturnType<typeof setup>["textarea"]>, text: string) =>
+    textarea.trigger("paste", { clipboardData: { files: [], getData: () => text } });
+
+  it("holds the chips slot, the text and the controls inside the one bordered frame", () => {
+    const { wrapper, textarea } = setup();
+    const frame = textarea().element.parentElement!;
+    expect(frame.className).toContain("border");
+    expect(frame.querySelector('[data-test="assistant-composer-controls"]')).not.toBeNull();
+    expect(frame.querySelector('[data-test="assistant-add-context"]')).not.toBeNull();
+    expect(frame.querySelector('[data-test="assistant-send"]')).not.toBeNull();
+    expect(wrapper.find('[data-test="assistant-composer-hints"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-attach-image"]').exists()).toBe(false);
+    const withChips = mount(AssistantComposer, {
+      props: { sid: null },
+      slots: { chips: '<div data-test="tray-stub">tray</div>' },
+      global: { plugins: [fakeRouter(), fakeVuex()] },
+    });
+    const field = withChips.get('[data-test="assistant-composer-field"]').element;
+    const head = withChips.get('[data-test="assistant-composer-chips"]').element;
+    expect(head.parentElement).toBe(field.parentElement);
+    expect(head.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(head.querySelector('[data-test="tray-stub"]')).not.toBeNull();
+  });
+
+  it("opens the + menu with a search, the context groups, Image and the keys footer", async () => {
+    seedMentionGroups();
+    const { wrapper } = setup();
+    await wrapper.get('[data-test="assistant-add-context"]').trigger("click");
+    await flushPromises();
+    const menu = document.body.querySelector('[data-test="assistant-add-context-menu"]')!;
+    expect(menu.querySelector('[data-test="assistant-add-context-search"]')).not.toBeNull();
+    expect(menu.querySelector('[data-test="assistant-mention-group-streams"]')).not.toBeNull();
+    expect(menu.querySelector('[data-test="assistant-mention-image"]')?.textContent).toContain(
+      "Image…",
+    );
+    const keys = menu.querySelector('[data-test="assistant-add-context-keys"]')!;
+    expect(keys.querySelectorAll("li")).toHaveLength(4);
+  });
+
+  it("adds a + pick as a chip without touching the typed text", async () => {
+    seedMentionGroups();
+    const { wrapper, textarea, store, sid } = setup();
+    await type(textarea(), "why is it slow");
+    await wrapper.get('[data-test="assistant-add-context"]').trigger("click");
+    await flushPromises();
+    document.body
+      .querySelector<HTMLElement>('[data-test="assistant-mention-option"][data-kind="stream"]')!
+      .click();
+    await flushPromises();
+    const composer = store.state.sessions[sid].composer;
+    expect(composer.text).toBe("why is it slow");
+    expect(composer.chips.map((chip: ContextChip) => chip.ref?.id)).toContain("checkout");
+  });
+
+  it("turns a long paste into a Pasted text chip and offers it back as text until the next edit", async () => {
+    const { wrapper, textarea, store, sid } = setup();
+    await type(textarea(), "see ");
+    textarea().element.setSelectionRange(4, 4);
+    await paste(textarea(), long);
+    await flushPromises();
+    const chips = () => store.state.sessions[sid].composer.chips as ContextChip[];
+    expect(chips().map((chip) => [chip.kind, chip.label, chip.data])).toEqual([
+      ["pasted_text", "Pasted text · 25 lines", long],
+    ]);
+    expect(store.state.sessions[sid].composer.text).toBe("see ");
+    expect(wrapper.get('[data-test="assistant-composer-helper"]').text()).toBe(
+      "Long paste attached as text.",
+    );
+    await wrapper.get('[data-test="assistant-composer-paste-inline"]').trigger("click");
+    await flushPromises();
+    expect(chips()).toEqual([]);
+    expect(store.state.sessions[sid].composer.text).toBe(`see ${long}`);
+    await paste(textarea(), long);
+    await flushPromises();
+    await type(textarea(), "edited");
+    expect(wrapper.find('[data-test="assistant-composer-paste-inline"]').exists()).toBe(false);
+    expect(chips()).toHaveLength(1);
+  });
+
+  it("leaves a short paste, and one over the attached-data cap, to the textbox", async () => {
+    const { textarea, store, sid } = setup();
+    await paste(textarea(), "a\nb\nc");
+    await paste(textarea(), "x".repeat(40 * 1024));
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.chips).toEqual([]);
+    expect(trackAssistant).toHaveBeenCalledWith("ai_composer_cap_hit", { cap: "bytes" });
+  });
+
+  it("keeps the pasted text chip in the stored draft (D4 §3.11)", async () => {
+    vi.useFakeTimers();
+    const { textarea, store, sid } = setup();
+    await paste(textarea(), long);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const stored = store.drafts.read(store.state.userOrgKey, sid);
+    expect(stored?.chips.map((chip: ContextChip) => [chip.kind, chip.data])).toEqual([
+      ["pasted_text", long],
+    ]);
+    vi.useRealTimers();
   });
 });
 

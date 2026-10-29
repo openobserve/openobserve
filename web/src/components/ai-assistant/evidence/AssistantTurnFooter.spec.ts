@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { computed } from "vue";
 
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+import { turnAnnotationKey } from "@/composables/assistant/pure";
 
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
@@ -135,6 +136,74 @@ describe("AssistantTurnFooter", () => {
     await credits.trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("Credits are counted when a request is accepted.");
+    // Portalled out of the transcript's masked ancestor, so it masks itself.
+    expect(
+      document.body.querySelector("[data-o-popover-content]")?.getAttribute("data-dd-privacy"),
+    ).toBe("mask");
+  });
+
+  it("masks the windows list and the not-saved note, which are portalled out of the transcript", async () => {
+    const windows = mountFooter(
+      answer([query("c2"), query("c3", FROM - 3_600_000, TO)], { persisted: false }),
+    );
+    for (const id of ["assistant-turn-footer-windows", "assistant-turn-footer-not-saved"]) {
+      await windows.wrapper.get(`[data-test="${id}"]`).trigger("click");
+      await flushPromises();
+      const opened = [...document.body.querySelectorAll("[data-o-popover-content]")];
+      expect(opened.length).toBeGreaterThan(0);
+      expect(opened.every((el) => el.getAttribute("data-dd-privacy") === "mask")).toBe(true);
+      await windows.wrapper.get(`[data-test="${id}"]`).trigger("click");
+      await flushPromises();
+    }
+  });
+
+  describe("empty default window (PO A26)", () => {
+    const empty = (id: string): ContentBlock => ({ ...query(id), summary: { count: 0 } as any });
+    const flagged = (
+      message: ChatMessage,
+      turn: Record<string, unknown> = {},
+      evidenceOver: Parameters<typeof fakeEvidence>[0] = {},
+    ) => {
+      const mounted = mountFooter(message, turn, evidenceOver);
+      mounted.store.annotate(mounted.sid, turnAnnotationKey("t1", "window"), {
+        homeDefaultWindow: true,
+      });
+      return mounted;
+    };
+
+    it("offers the last 1 h under a Home ask whose queries all came back empty, and sends it on click", async () => {
+      const { wrapper, host, sid } = flagged(answer([empty("c3")]));
+      await flushPromises();
+      const offer = wrapper.get('[data-test="assistant-turn-empty-window"]');
+      expect(offer.text()).toContain("Nothing in the default range, last 15 min.");
+      const button = wrapper.get('[data-test="assistant-rerun-wider"]');
+      expect(button.text()).toBe("Try the last 1 h");
+      await button.trigger("click");
+      await flushPromises();
+      expect(host.dispatch).toHaveBeenCalledTimes(1);
+      expect(host.dispatch).toHaveBeenCalledWith(sid, { kind: "rerun_wider", turnId: "t1" });
+    });
+
+    it("is absent when a query found rows or was denied, the window was not the default, or the turn is not the last", async () => {
+      const found = flagged(answer([empty("c2"), query("c3")]));
+      const unflagged = mountFooter(answer([empty("c3")]));
+      const earlier = flagged(answer([empty("c3")]), { isLast: false });
+      const denied = flagged(
+        answer([empty("c2"), { ...query("c3"), errorType: "permission_denied_tool" }]),
+      );
+      await flushPromises();
+      for (const { wrapper } of [found, unflagged, earlier, denied])
+        expect(wrapper.find('[data-test="assistant-turn-empty-window"]').exists()).toBe(false);
+    });
+
+    it("holds the offer with the credits reason when credits are used up", async () => {
+      const { wrapper, host } = flagged(answer([empty("c3")]), {}, { creditMode: "exhausted" });
+      await flushPromises();
+      const button = wrapper.get('[data-test="assistant-rerun-wider"]');
+      expect(button.attributes("aria-disabled")).toBe("true");
+      await button.trigger("click");
+      expect(host.dispatch).not.toHaveBeenCalled();
+    });
   });
 
   it("never shows credits off Cloud and says included credits on the free mode", () => {

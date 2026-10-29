@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { historyStubs } from "../__tests__/historyStubs";
 import AssistantLocalOnlyHeader, {
@@ -29,6 +29,25 @@ const setup = (props: Partial<AssistantLocalOnlyHeaderProps> = {}) =>
   });
 
 describe("AssistantLocalOnlyHeader", () => {
+  afterEach(() => (document.body.innerHTML = ""));
+
+  it("masks the info popover, which is portalled out of the panel", async () => {
+    const wrapper = mount(AssistantLocalOnlyHeader, {
+      props: { count: 37, cap: 100, isAdmin: false, clearOnSignOut: false },
+      attachTo: document.body,
+      global: { stubs: { ...historyStubs, OPopover: false } },
+    });
+    await wrapper.get('[data-test="assistant-local-info"]').trigger("click");
+    await flushPromises();
+    expect(
+      document.body
+        .querySelector('[data-test="assistant-local-info-help"]')
+        ?.closest("[data-o-popover-content]")
+        ?.getAttribute("data-dd-privacy"),
+    ).toBe("mask");
+    wrapper.unmount();
+  });
+
   it("names the mode with the count and cap", () => {
     const line = setup().get('[data-test="assistant-local-only-line"]');
     expect(line.text()).toBe("Saved in this browser only · 37 of 100");

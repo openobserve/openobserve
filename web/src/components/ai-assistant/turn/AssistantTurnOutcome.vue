@@ -36,104 +36,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-kind="kind"
     :data-code="code"
   >
-    <p :id="titleId" class="min-w-0 break-words" data-test="assistant-turn-outcome-title">
-      {{ title }}
-    </p>
-    <p
-      v-for="line in lines"
-      :key="line"
-      class="min-w-0 text-xs break-words"
-      data-test="assistant-turn-outcome-body"
-    >
-      {{ line }}
-    </p>
-    <p
-      v-if="popupBlocked"
-      class="min-w-0 text-xs break-words"
-      data-test="assistant-turn-outcome-popup-blocked"
-    >
-      {{ t("assistant.client.popupBlocked") }}
-      <OButton
-        variant="ghost-primary"
-        size="xs"
-        class="max-md:min-h-11 pointer-coarse:min-h-11"
-        data-test="assistant-turn-outcome-open-here"
-        @click="emit('open-here')"
-      >
-        {{ t("assistant.outcome.openHere") }}
-      </OButton>
-    </p>
-    <!-- The one action comes before Details in reading and tab order (`30` §4.4, HT-10 AC 5) -->
-    <div v-if="action" class="flex flex-wrap items-center gap-2 pt-1.5">
-      <AssistantAskAdminPopover
-        v-if="action === 'ask_admin'"
-        :kind="askKind"
-        :org="org"
-        :payer="creditCopy?.payer"
-      >
-        <template #trigger>
+    <div class="@container min-w-0">
+      <!-- The one action ends the title row and comes before the meta row in reading and tab order (D7 §3.1, HT-10 AC 5) -->
+      <div class="flex min-w-0 items-start gap-x-3 gap-y-1.5 @max-[28rem]:flex-col">
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p :id="titleId" class="min-w-0 break-words" data-test="assistant-turn-outcome-title">
+            {{ title }}
+          </p>
+          <p
+            v-for="line in lines"
+            :key="line"
+            class="min-w-0 text-xs break-words"
+            data-test="assistant-turn-outcome-body"
+          >
+            {{ line }}
+          </p>
+          <p
+            v-if="popupBlocked"
+            class="min-w-0 text-xs break-words"
+            data-test="assistant-turn-outcome-popup-blocked"
+          >
+            {{ t("assistant.client.popupBlocked") }}
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              class="max-md:min-h-11 pointer-coarse:min-h-11"
+              data-test="assistant-turn-outcome-open-here"
+              @click="emit('open-here')"
+            >
+              {{ t("assistant.outcome.openHere") }}
+            </OButton>
+          </p>
+        </div>
+        <div v-if="action" class="flex shrink-0 @max-[28rem]:w-full">
+          <AssistantAskAdminPopover
+            v-if="action === 'ask_admin'"
+            :kind="askKind"
+            :org="org"
+            :payer="creditCopy?.payer"
+          >
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="xs"
+                :class="ACTION_CLASS"
+                :aria-describedby="titleId"
+                data-test="assistant-turn-outcome-action"
+                @click="emit('action', 'ask_admin')"
+              >
+                {{ actionLabel }}
+              </OButton>
+            </template>
+          </AssistantAskAdminPopover>
           <OButton
-            variant="secondary"
-            size="sm"
-            class="max-md:min-h-11 max-md:w-full pointer-coarse:min-h-11"
+            v-else-if="newTabHref"
+            variant="outline"
+            size="xs"
+            as="a"
+            :href="newTabHref"
+            target="_blank"
+            rel="noopener noreferrer"
+            :class="ACTION_CLASS"
             :aria-describedby="titleId"
             data-test="assistant-turn-outcome-action"
-            @click="emit('action', 'ask_admin')"
+            :data-settings="settingsHref ? '' : undefined"
           >
             {{ actionLabel }}
+            <span class="sr-only">{{ t("assistant.docs.opensInNewTab") }}</span>
+            <template #icon-right><OIcon :name="newTabIcon" size="xs" /></template>
           </OButton>
-        </template>
-      </AssistantAskAdminPopover>
-      <OButton
-        v-else-if="newTabHref"
-        variant="secondary"
-        size="sm"
-        as="a"
-        :href="newTabHref"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="max-md:min-h-11 max-md:w-full pointer-coarse:min-h-11"
-        :aria-describedby="titleId"
-        data-test="assistant-turn-outcome-action"
-        :data-docs="docsLink ? '' : undefined"
+          <OButton
+            v-else
+            variant="outline"
+            size="xs"
+            :disabled="unavailable"
+            :focusable-unavailable="unavailable"
+            :class="ACTION_CLASS"
+            :aria-describedby="disabledReason ? undefined : titleId"
+            data-test="assistant-turn-outcome-action"
+            @click="emit('action', action)"
+          >
+            {{ actionLabel }}
+            <template v-if="disabledReason" #unavailable-reason>{{ disabledReason }}</template>
+            <OTooltip v-if="disabledReason" :content="disabledReason" />
+          </OButton>
+        </div>
+      </div>
+      <div
+        v-if="hint || manualShown || detailsShown"
+        class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs"
+        data-test="assistant-turn-outcome-meta"
       >
-        {{ actionLabel }}
-        <span class="sr-only">{{ t("assistant.docs.opensInNewTab") }}</span>
-        <template #icon-right><OIcon :name="newTabIcon" size="sm" /></template>
-      </OButton>
-      <OButton
-        v-else
-        variant="secondary"
-        size="sm"
-        :disabled="unavailable"
-        :focusable-unavailable="unavailable"
-        class="max-md:min-h-11 max-md:w-full pointer-coarse:min-h-11"
-        :aria-describedby="disabledReason ? undefined : titleId"
-        data-test="assistant-turn-outcome-action"
-        @click="emit('action', action)"
-      >
-        {{ actionLabel }}
-        <template v-if="disabledReason" #unavailable-reason>{{ disabledReason }}</template>
-        <OTooltip v-if="disabledReason" :content="disabledReason" />
-      </OButton>
+        <span v-if="hint" class="min-w-0 break-words" data-test="assistant-turn-outcome-hint">
+          {{ hint }}
+        </span>
+        <OButton
+          v-if="manualShown"
+          variant="ghost-primary"
+          size="xs"
+          class="max-md:min-h-11 pointer-coarse:min-h-11"
+          data-test="assistant-turn-outcome-manual"
+          @click="emit('manual', manualRoute!)"
+        >
+          {{ manualLabel }}
+        </OButton>
+        <AssistantErrorDetails
+          v-if="detailsShown"
+          variant="popover"
+          :error="error!"
+          :at="at ?? now()"
+          :is-admin="role === 'admin'"
+        />
+      </div>
     </div>
-    <OButton
-      v-if="manualShown"
-      variant="ghost-primary"
-      size="sm"
-      class="self-start max-md:min-h-11 pointer-coarse:min-h-11"
-      data-test="assistant-turn-outcome-manual"
-      @click="emit('manual', manualRoute!)"
-    >
-      {{ manualLabel }}
-    </OButton>
-    <AssistantErrorDetails
-      v-if="error && showsDetails"
-      class="pt-1"
-      :error="error"
-      :at="at ?? now()"
-      :is-admin="role === 'admin'"
-    />
   </OBanner>
 </template>
 
@@ -215,15 +230,21 @@ const LOOKS: Record<OutcomeKind, { variant: "info" | "error-soft" | "default"; i
 };
 
 // Bodies that claim findings exist are said only when they do (`80` §1.3).
-const FINDINGS_BODIES: ReadonlySet<string> = new Set(["provider_error", "stream_dropped"]);
+const FINDINGS_BODIES: ReadonlySet<string> = new Set(["agent_unavailable", "stream_dropped"]);
+
+// Bodies that only say "Nothing was changed."; after an applied change the Ask again line replaces them (D7 §3.2).
+const NO_CHANGE_BODIES: ReadonlySet<string> = new Set(["provider_error", "stream_oversized"]);
+
+// Full width under a 28 rem container, 2.75 rem tall on phones (D7 §3.1).
+const ACTION_CLASS = "max-md:min-h-11 pointer-coarse:min-h-11 @max-[28rem]:w-full";
 
 const ROLE_SPLIT_KINDS: Record<string, AskAdminKind> = {
   permission_denied: "access",
   credits_exhausted: "credits",
   subscription_required: "credits",
   consent_still_required: "consent",
-  not_enabled: "settings",
-  off_for_org: "settings",
+  not_enabled: "enable",
+  off_for_org: "enable",
   permission_denied_tool: "tool_policy",
   data_level_blocked: "tool_policy",
 };
@@ -240,8 +261,13 @@ const STARTS_TURN: ReadonlySet<OutcomeAction> = new Set([
 // Billing opens in a new tab so the open thread is never left.
 const BILLING_ACTIONS: ReadonlySet<OutcomeAction> = new Set(["manage_usage", "view_plans"]);
 
-/** Actions whose control does not exist yet; they lead to the setup guide, labelled as such (HT-02 AC 6). */
-export const DOCS_ACTIONS: ReadonlySet<OutcomeAction> = new Set(["open_settings", "change_level"]);
+/** The Settings › Assistant tab a settings action opens, per code; it opens in a new tab like billing. */
+export const SETTINGS_TABS: Readonly<Record<string, string>> = {
+  not_enabled: "access",
+  off_for_org: "access",
+  permission_denied_tool: "permissions",
+  data_level_blocked: "data",
+};
 
 // A code the client does not know is labelled by its action, never by the unknown code's Retry.
 const ACTION_LABEL_KEYS: Partial<Record<OutcomeAction, I18nKey>> = {
@@ -254,8 +280,8 @@ const ACTION_LABEL_KEYS: Partial<Record<OutcomeAction, I18nKey>> = {
   stop_it: "assistant.outcome.actions.stopIt",
   reload_chat: "assistant.outcome.actions.reloadChat",
   send_again: "assistant.outcome.actions.sendAgain",
-  open_settings: "assistant.docs.setupGuide",
-  change_level: "assistant.docs.setupGuide",
+  open_settings: "assistant.outcome.actions.openSettings",
+  change_level: "assistant.outcome.actions.changeLevel",
 };
 
 let outcomeSeq = 0;
@@ -273,7 +299,6 @@ export function outcomeActionLabel(
   if (action === "ask_again") return t("assistant.outcome.askAgain");
   if (action === "edit_resend") return t("assistant.outcome.editResend");
   if (action === "retry") return t("assistant.outcome.retry");
-  if (DOCS_ACTIONS.has(action)) return t("assistant.docs.setupGuide");
   const split = `assistant.error.${code}.action${role === "admin" ? "Admin" : "Member"}`;
   if (code !== "unknown" && te(split)) return t(split);
   const own = `assistant.error.${code}.action`;
@@ -302,13 +327,12 @@ export function outcomeActionOf(
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import AssistantErrorDetails, {
-  ASSISTANT_SETUP_DOCS_URL,
-} from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
+import AssistantErrorDetails from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
 import { billingHrefOf } from "@/components/ai-assistant/credits/AssistantCreditManage.vue";
 import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
 import {
   errorTitle,
+  failedAfterChange,
   turnLockKey,
   useAssistantName,
   useTurnLock,
@@ -418,8 +442,12 @@ const lines = computed<I18nText[]>(() => {
   if (creditCopy.value) return [...out, t(creditCopy.value.bodyKey, creditParams.value)];
   const bodyKey = `assistant.error.${error.code}.body`;
   const claimsFindings = FINDINGS_BODIES.has(error.code);
-  if (te(bodyKey) && (!claimsFindings || props.partial)) out.push(t(bodyKey));
-  if (action.value === "ask_again") out.push(t("assistant.turn.retryNote"));
+  const claimsNoChange = NO_CHANGE_BODIES.has(error.code) && failedAfterChange(error);
+  if (te(bodyKey) && (!claimsFindings || props.partial) && !claimsNoChange) out.push(t(bodyKey));
+  const partialKey = `assistant.error.${error.code}.bodyPartial`;
+  if (props.partial && te(partialKey)) out.push(t(partialKey));
+  if (action.value === "ask_again" || failedAfterChange(error))
+    out.push(t("assistant.turn.retryNote"));
   return out;
 });
 
@@ -441,10 +469,17 @@ const action = computed<OutcomeAction | null>(
 const billingHref = computed(() =>
   action.value && BILLING_ACTIONS.has(action.value) ? billingHrefOf(router, props.org) : null,
 );
-const docsLink = computed(() => !!action.value && DOCS_ACTIONS.has(action.value));
-const newTabHref = computed(
-  () => billingHref.value ?? (docsLink.value ? ASSISTANT_SETUP_DOCS_URL : null),
-);
+const settingsHref = computed(() => {
+  const tab = SETTINGS_TABS[code.value ?? ""];
+  if (!tab || (action.value !== "open_settings" && action.value !== "change_level")) return null;
+  const target = {
+    name: "assistantSettings",
+    params: { tab },
+    query: { org_identifier: props.org },
+  };
+  return router?.hasRoute("assistantSettings") ? router.resolve(target).href : null;
+});
+const newTabHref = computed(() => billingHref.value ?? settingsHref.value);
 const newTabIcon = assistantGlyph.newTab;
 
 // Retry after `retry_after` counts down once a second; the count is never announced (`80` §2.4).
@@ -486,9 +521,19 @@ const disabledReason = computed<I18nText | null>(() => {
 // While counting down the label itself says why, so the button needs no separate reason.
 const unavailable = computed(() => !!disabledReason.value || countingDown.value);
 
-const showsDetails = computed(
-  () => props.kind === "failed" || props.kind === "refused" || props.cancelUnconfirmed,
+const detailsShown = computed(
+  () =>
+    !!props.error &&
+    (props.kind === "failed" || props.kind === "refused" || props.cancelUnconfirmed),
 );
+
+// One optional meta-row sentence per code; a 402 words its own lines, so it carries none.
+const hint = computed<I18nText | null>(() => {
+  const key = `assistant.error.${code.value}.hint`;
+  if (!code.value || creditCopy.value || (props.kind !== "failed" && props.kind !== "refused"))
+    return null;
+  return te(key) ? t(key) : null;
+});
 
 function stopTimer(): void {
   if (timer) clearInterval(timer);

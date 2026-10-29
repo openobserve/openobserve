@@ -32,13 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('assistant.share.scopeLabel')"
         data-test="assistant-share-manager-scope"
       >
-        <OToggleGroupItem
-          v-if="sid"
-          value="chat"
-          size="sm"
-          data-test="assistant-share-manager-scope-chat"
-          >{{ t("assistant.share.scope.chat") }}</OToggleGroupItem
-        >
         <OToggleGroupItem value="mine" size="sm" data-test="assistant-share-manager-scope-mine">{{
           t("assistant.share.scope.mine")
         }}</OToggleGroupItem>
@@ -50,28 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("assistant.share.scope.all") }}</OToggleGroupItem
         >
       </OToggleGroup>
-
-      <OCollapsible
-        v-if="sid && scope === 'chat'"
-        v-model="newOpen"
-        :label="t('assistant.share.newLink')"
-        data-test="assistant-share-manager-new"
-      >
-        <AssistantShareSettings
-          :key="formKey"
-          :org="org"
-          :sid="sid"
-          :share="null"
-          :running="running(sid)"
-          :public-links="capability.publicLinks"
-          :public-max-expiry-days="capability.publicMaxExpiryDays"
-          :redact-attachments="redactAttachments"
-          :has-attachments="attachments"
-          :link-count="0"
-          @created="onCreated"
-          @announce="announce"
-        />
-      </OCollapsible>
 
       <div
         v-if="read.isPending.value"
@@ -143,13 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { Sid } from "@/composables/assistant";
-
-export type ShareManagerScope = "chat" | "mine" | "all";
+/** Links are created only in the Share popover; the manager lists them (D5 §3.4). */
+export type ShareManagerScope = "mine" | "all";
 
 export interface AssistantShareManagerProps {
-  /** Opened from a thread; offers This chat and the New link form. */
-  sid?: Sid | null;
   initialScope: ShareManagerScope;
 }
 </script>
@@ -170,7 +138,6 @@ import {
 import { isTerminal } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -179,21 +146,18 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { ShareView } from "@/services/ai_chat_share";
-import { allSharesQuery, chatSharesQuery, mySharesQuery } from "@/services/ai_chat_share.queries";
+import { allSharesQuery, mySharesQuery } from "@/services/ai_chat_share.queries";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 
 import AssistantShareRow from "./AssistantShareRow.vue";
-import AssistantShareSettings from "./AssistantShareSettings.vue";
-import { checkAttachments, knownAttachments } from "./chatAttachments";
-import { canRedactAttachments, isOutOfDate, statusOfError } from "./chatShare";
+import { isOutOfDate, statusOfError } from "./chatShare";
 
 const EMPTY_KEYS: Record<ShareManagerScope, I18nKey> = {
-  chat: "assistant.share.empty.chat",
   mine: "assistant.share.empty.mine",
   all: "assistant.share.empty.all",
 };
 
-const props = withDefaults(defineProps<AssistantShareManagerProps>(), { sid: null });
+const props = defineProps<AssistantShareManagerProps>();
 
 const open = defineModel<boolean>("open", { default: false });
 
@@ -204,28 +168,15 @@ const capability = useAssistantCapability();
 const { mdUp } = useBreakpoint();
 
 const scope = ref<ShareManagerScope>(props.initialScope);
-const newOpen = ref(false);
-const formKey = ref(0);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
 const rowRefs: (ComponentPublicInstance | null)[] = [];
-let focusNew: string | null = null;
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
-const redactAttachments = computed(() => canRedactAttachments(vuex.state.zoConfig));
-const known = computed(() =>
-  props.sid
-    ? knownAttachments(org.value, props.sid, store.state.sessions[props.sid]?.messages)
-    : "no",
-);
-// Unknown counts as present until the stored chat has been read.
-const attachments = computed(() => known.value !== "no");
 
 const read = useQuery(() => {
   const enabled = open.value && !!org.value;
-  if (scope.value === "chat" && props.sid) {
-    return Object.assign(chatSharesQuery(org.value, props.sid), { enabled });
-  }
-  if (scope.value === "all") return Object.assign(allSharesQuery(org.value), { enabled });
+  if (scope.value === "all" && capability.value.isAdmin)
+    return Object.assign(allSharesQuery(org.value), { enabled });
   return Object.assign(mySharesQuery(org.value), { enabled });
 });
 
@@ -240,36 +191,20 @@ const emptyKey = computed(() => EMPTY_KEYS[scope.value]);
 watch(
   () => [open.value, props.initialScope] as const,
   ([isOpen]) => {
-    if (isOpen)
-      scope.value = props.sid || props.initialScope !== "chat" ? props.initialScope : "mine";
+    if (isOpen) scope.value = props.initialScope;
   },
   { immediate: true },
 );
 
-watch(
-  () => open.value && !redactAttachments.value && known.value === "unknown",
-  (check) => {
-    if (check && props.sid) void checkAttachments(org.value, props.sid).catch(() => undefined);
-  },
-  { immediate: true },
-);
-
-// Opening lands on the first row's title, and a link just created lands on its own row.
+// Opening lands on the first row's title.
 watch(
   () => [open.value, rows.value] as const,
   async ([isOpen, list]) => {
     if (!isOpen || !list.length) return;
     await nextTick();
-    const index = focusNew
-      ? Math.max(
-          0,
-          list.findIndex((share) => share.id === focusNew),
-        )
-      : 0;
-    if (focusNew || document.activeElement === document.body || !document.activeElement) {
-      (rowRefs[index] as unknown as { focusTitle?: () => void } | null)?.focusTitle?.();
+    if (document.activeElement === document.body || !document.activeElement) {
+      (rowRefs[0] as unknown as { focusTitle?: () => void } | null)?.focusTitle?.();
     }
-    focusNew = null;
   },
 );
 
@@ -285,13 +220,6 @@ function running(sid: string | null | undefined): boolean {
 function outOfDate(share: ShareView): boolean {
   const session = store.state.sessions[share.session_id];
   return isOutOfDate(share, session?.record.cachedLastSeq ?? session?.turnMeta.lastSeq ?? null);
-}
-
-function onCreated(share: ShareView, copied: boolean): void {
-  focusNew = share.id;
-  newOpen.value = false;
-  formKey.value += 1;
-  announce(copied ? "assistant.share.createdCopied" : "assistant.share.created");
 }
 
 async function openChat(sessionId: string): Promise<void> {

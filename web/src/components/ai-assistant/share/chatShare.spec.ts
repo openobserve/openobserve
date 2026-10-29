@@ -275,8 +275,9 @@ describe("shareButtonState", () => {
     [{ hasTurn: false }, { kind: "blocked", reason: "assistant.share.nothingToShare" }],
     [
       { running: true, shared: true },
-      { kind: "blocked", reason: "assistant.share.waitForAnswer" },
+      { kind: "manage", tooltip: "assistant.share.manage" },
     ],
+    [{ running: true }, { kind: "quick", tooltip: "assistant.share.waitForAnswer" }],
     [{ notSaved: true }, { kind: "blocked", reason: "assistant.share.notSavedBlocked" }],
     [
       { historyUnavailable: true },

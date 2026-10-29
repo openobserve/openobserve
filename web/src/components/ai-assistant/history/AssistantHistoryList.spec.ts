@@ -27,6 +27,7 @@ import { historyStubs } from "../__tests__/historyStubs";
 import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
 import AssistantHistoryList, {
   type AssistantHistoryListProps,
+  SEARCH_DEBOUNCE_MS,
   VIRTUAL_FROM,
 } from "./AssistantHistoryList.vue";
 
@@ -90,7 +91,7 @@ async function setup(
   for (const row of seed) fake.current.db.rows.set(row.id, structuredClone(row));
   const router = fakeRouter();
   const wrapper = mount(AssistantHistoryList, {
-    props: { mode: "popover", currentSid: null, container: "sidebar", ...props },
+    props: { mode: "panel", currentSid: null, container: "sidebar", ...props },
     global: { plugins: [router, fakeVuex()], stubs: historyStubs },
     attachTo: document.body,
   });
@@ -350,6 +351,36 @@ describe("AssistantHistoryList", () => {
     await flushPromises();
     expect(wrapper.emitted("opened")?.[0]).toEqual([SEED[0].sessionId]);
     expect(store.state.shell.activeSid).toBe(SEED[0].sessionId);
+  });
+
+  it("is a region named Chats in a panel, with no New of its own, and Escape asks to close", async () => {
+    const { wrapper } = await setup();
+    const root = wrapper.get('[data-test="assistant-history"]');
+    expect(root.attributes("role")).toBe("region");
+    expect(root.attributes("aria-label")).toBe("Chats");
+    expect(wrapper.find('[data-test="assistant-history-new"]').exists()).toBe(false);
+    const search = wrapper.get('[data-test="assistant-history-search"] input');
+    await search.setValue("alpha");
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS + 50));
+    await flushPromises();
+    await search.trigger("keydown", { key: "Escape" });
+    expect(wrapper.emitted("close")).toBeUndefined();
+    await root.trigger("keydown", { key: "Escape" });
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("leads with In progress for chats that answer or wait, out of their day group", async () => {
+    const { wrapper, store } = await setup();
+    const sid = SEED[2].sessionId;
+    await store.openSession({ sid });
+    store.state.sessions[sid].pendingApproval = { id: "a1" } as never;
+    await flushPromises();
+    const groups = wrapper.findAll('[data-test="assistant-history-group"]');
+    expect(groups[0].attributes("data-group")).toBe("running");
+    expect(groups[0].get("h3").text()).toBe("In progress · 1");
+    expect(groups[0].text()).toContain("Gamma this week");
+    expect(groups[0].text()).toContain("Needs your approval");
+    expect(wrapper.find('[data-group="week"]').exists()).toBe(false);
   });
 
   it("routes the rail to the full view", async () => {

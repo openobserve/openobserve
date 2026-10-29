@@ -33,7 +33,18 @@ import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantApprovalCard from "./AssistantApprovalCard.vue";
 import type { ApprovalCardView } from "./approvals.types";
 
-const routes = [{ path: "/alerts/:alert_id", name: "alertDetail", component: {} }];
+const routes = [
+  { path: "/alerts/:alert_id", name: "alertDetail", component: {} },
+  { path: "/alerts", name: "alertList", component: {} },
+];
+
+// How o2-ai asks to pause an alert: the raw arguments, no targets, no before.
+const PAUSE = {
+  type: "confirmation_required",
+  tool: "EnableAlert",
+  message: "Pause the alert?",
+  args: { org_id: "default", alert_id: "2Yx9alertcart", value: false },
+};
 
 const DELETE_ONE = {
   type: "confirmation_required",
@@ -119,6 +130,20 @@ describe("AssistantApprovalCard", () => {
     expect(wrapper.get('[data-test="assistant-approval-approve"]').text()).toBe("Delete 1 alert");
     expect(wrapper.find('[data-test="assistant-approval-scope"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-approval-impact"]').text()).toBe("Cannot be undone");
+  });
+
+  it("keeps a neutral border and tag, and takes its primary colour from the assistant roles", async () => {
+    const wrapper = mountCard(cardOf(PAUSE));
+    await flushPromises();
+    const classes = wrapper.get('[data-test="assistant-approval-card"]').classes();
+    expect(classes).toContain("border-border-default");
+    expect(classes.some((c) => c.includes("warning"))).toBe(false);
+    const tag = wrapper.get('[data-test="assistant-approval-needs-ok"]').classes().join(" ");
+    expect(tag).toContain("bg-badge-default-soft-bg");
+    // `[data-assistant-surface]` remaps the button-primary tokens to the assistant primary role.
+    const approve = wrapper.get('[data-test="assistant-approval-approve"]').classes();
+    expect(approve).toContain("bg-button-primary");
+    expect(approve.some((c) => /(^|:)(bg|text|border)-primary-\d/.test(c))).toBe(false);
   });
 
   it("takes focus to Deny within one frame from the page, and says it is waiting", async () => {
@@ -260,7 +285,7 @@ describe("AssistantApprovalCard", () => {
         targets: [{ type: "alert", name: "x" }],
         after: { name: "x" },
       },
-      "Create alert",
+      "Create alert x",
     ],
     [
       "run_command",
@@ -291,22 +316,112 @@ describe("AssistantApprovalCard", () => {
     );
     await flushPromises();
     const diff = wrapper.get('[data-test="assistant-approval-diff"]');
-    expect(diff.text()).toContain("Changes");
+    expect(diff.text()).toContain("Change");
     expect(diff.text()).toContain("threshold");
     expect(diff.text()).toContain("1s → 2s");
     expect(diff.text()).not.toContain("same");
-    expect(wrapper.get('[data-test="assistant-approval-approve"]').text()).toBe("Approve");
+    const approve = wrapper.get('[data-test="assistant-approval-approve"]');
+    expect(approve.text()).toBe("Update alert");
+    expect(approve.classes().join(" ")).not.toContain("destructive");
     const noBefore = mountCard(
       cardOf({
         type: "confirmation_required",
         tool: "o2_UpdateAlert",
         kind: "update",
         targets: [{ type: "alert", name: "a" }],
-        after: { threshold: "2s" },
+        after: { threshold: "2s", org_id: "default", folder: "f1" },
       }),
     );
     await flushPromises();
-    expect(noBefore.get('[data-test="assistant-approval-diff"]').text()).toContain("New values");
+    const oneSided = noBefore.get('[data-test="assistant-approval-diff"]').text();
+    expect(oneSided).toContain("Current value unknown → 2s");
+    expect(oneSided).not.toContain("org_id");
+    expect(oneSided).not.toContain("folder");
+  });
+
+  it("reads a toggle as Pause, names the object by its body and shows its one changed field (D3-n)", async () => {
+    const named = mountCard(
+      cardOf({ ...PAUSE, args: { ...PAUSE.args, request_body: { name: "cart-5xx-spike" } } }),
+    );
+    await flushPromises();
+    expect(named.get('[data-test="assistant-approval-heading"]').text()).toBe(
+      "Pause alert cart-5xx-spike",
+    );
+    expect(named.get('[data-test="assistant-approval-approve"]').text()).toBe("Pause alert");
+    expect(named.get('[data-test="assistant-approval-diff"]').text()).toContain(
+      "enabledCurrent value unknown → false",
+    );
+    expect(named.find('[data-test="assistant-approval-meta"]').exists()).toBe(false);
+    const resume = mountCard(cardOf({ ...PAUSE, args: { ...PAUSE.args, value: "true" } }));
+    await flushPromises();
+    expect(resume.get('[data-test="assistant-approval-heading"]').text()).toBe("Resume alert");
+  });
+
+  it("never puts a raw id in the heading: an unresolved name is said once, shortened, in the meta line", async () => {
+    const wrapper = mountCard(cardOf(PAUSE));
+    await flushPromises();
+    const heading = wrapper.get('[data-test="assistant-approval-heading"]').text();
+    expect(heading).toBe("Pause alert");
+    expect(wrapper.get('[data-test="assistant-approval-meta"]').text()).toBe(
+      "Couldn't load the name of alert 2Yx9aler…; you may not have access to it.",
+    );
+    expect(wrapper.text()).not.toContain("2Yx9alertcart");
+  });
+
+  it("names the org, not its id, only when the user can be in another org", async () => {
+    const many = mountCard(cardOf(PAUSE, { targets: [{ type: "alert", name: "a", id: "1" }] }), {
+      orgName: "Production",
+      multiOrg: true,
+    });
+    await flushPromises();
+    expect(many.get('[data-test="assistant-approval-meta"]').text()).toBe("in Production");
+    const one = mountCard(cardOf(PAUSE, { targets: [{ type: "alert", name: "a", id: "1" }] }), {
+      orgName: "Production",
+    });
+    await flushPromises();
+    expect(one.find('[data-test="assistant-approval-meta"]').exists()).toBe(false);
+  });
+
+  it("hands a single alert change to the alert editor, resolving the card first (PO A9)", async () => {
+    const router = fakeRouter(routes);
+    const wrapper = mount(AssistantApprovalCard, {
+      props: { card: cardOf(PAUSE), org: "default" },
+      attachTo: document.body,
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+    const edit = wrapper.get('[data-test="assistant-approval-edit-in-editor"]');
+    expect(edit.text()).toBe("Edit in alert editor");
+    expect(buttons(wrapper).indexOf("assistant-approval-edit-in-editor")).toBeLessThan(
+      buttons(wrapper).indexOf("assistant-approval-approve"),
+    );
+    await press(edit);
+    expect(wrapper.emitted("decide")?.[0]?.[0]).toEqual({
+      decision: { approved: false, reason: "edited" },
+      approvalId: "t1:1",
+    });
+    expect(router.currentRoute.value.name).toBe("alertList");
+    expect(router.currentRoute.value.query).toMatchObject({
+      action: "update",
+      alert_id: "2Yx9alertcart",
+      org_identifier: "default",
+    });
+    const batch = mountCard(cardOf(DELETE_ONE));
+    await flushPromises();
+    expect(batch.find('[data-test="assistant-approval-edit-in-editor"]').exists()).toBe(false);
+  });
+
+  it("states Reply's consequence under the actions and describes Reply with it (PO A18)", async () => {
+    const wrapper = mountCard(cardOf(DELETE_ONE));
+    await flushPromises();
+    const consequence = wrapper.get('[data-test="assistant-approval-reply-consequence"]');
+    expect(consequence.text()).toBe(
+      "Reply declines this request; the assistant can answer or ask again.",
+    );
+    expect(
+      wrapper.get('[data-test="assistant-approval-reply"]').attributes("aria-describedby"),
+    ).toBe(consequence.attributes("id"));
+    expect(wrapper.get('[data-test="assistant-approval-reply"]').text()).toBe("Reply");
   });
 
   it("offers a scope only when the server says it may be granted, never on a destructive card", async () => {
@@ -325,6 +440,27 @@ describe("AssistantApprovalCard", () => {
     );
     await flushPromises();
     expect(destructive.find('[data-test="assistant-approval-scope"]').exists()).toBe(false);
+    const update = {
+      type: "confirmation_required",
+      tool: "o2_UpdateAlert",
+      kind: "update",
+      grantable: true,
+      after: { threshold: "2s" },
+    };
+    const single = mountCard(cardOf({ ...update, targets: [{ type: "alert", name: "a" }] }));
+    await flushPromises();
+    expect(single.find('[data-test="assistant-approval-scope"]').exists()).toBe(false);
+    const several = mountCard(
+      cardOf({
+        ...update,
+        targets: [
+          { type: "alert", name: "a" },
+          { type: "alert", name: "b" },
+        ],
+      }),
+    );
+    await flushPromises();
+    expect(several.find('[data-test="assistant-approval-scope"]').exists()).toBe(true);
   });
 
   it("plans a batch with tick boxes, and Approve follows the ticked items", async () => {
@@ -456,15 +592,18 @@ describe("AssistantApprovalCard", () => {
     expect(wrapper.find('[data-test="assistant-approval-edit"]').exists()).toBe(false);
   });
 
-  it("offers More time only when the server allows it, and only in the last 20 s", async () => {
-    const soon = cardOf(DELETE_ONE, { expiresAt: Date.now() + 15_000 });
-    expect(mountCard(soon).find('[data-test="assistant-approval-extend"]').exists()).toBe(false);
-    const extendable = mountCard(soon, { extendable: true });
+  it("offers More time from mount when the server allows it, in the action row before Approve (PO A11, A23)", async () => {
+    const later = cardOf(DELETE_ONE, { expiresAt: Date.now() + 240_000 });
+    expect(mountCard(later).find('[data-test="assistant-approval-extend"]').exists()).toBe(false);
+    const extendable = mountCard(later, { extendable: true });
     expect(extendable.find('[data-test="assistant-approval-extend"]').exists()).toBe(true);
-    const later = mountCard(cardOf(DELETE_ONE, { expiresAt: Date.now() + 60_000 }), {
-      extendable: true,
-    });
-    expect(later.find('[data-test="assistant-approval-extend"]').exists()).toBe(false);
+    const order = buttons(extendable);
+    expect(order.indexOf("assistant-approval-extend")).toBeLessThan(
+      order.indexOf("assistant-approval-approve"),
+    );
+    expect(order.indexOf("assistant-approval-reply")).toBeLessThan(
+      order.indexOf("assistant-approval-extend"),
+    );
   });
 
   it("keeps the raw arguments behind Details", async () => {

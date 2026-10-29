@@ -54,10 +54,10 @@ const share = (id: string, over: Partial<ShareView> = {}): ShareView => ({
   ...over,
 });
 
-async function setup(initialScope: "chat" | "mine" | "all", isAdmin = true) {
+async function setup(initialScope: "mine" | "all", isAdmin = true) {
   fake.current = fakeAssistant("available", { isAdmin });
   const wrapper = mount(AssistantShareManager, {
-    props: { open: true, sid: initialScope === "chat" ? "c1" : null, initialScope },
+    props: { open: true, initialScope },
     global: {
       plugins: [
         createStore({ state: { selectedOrganization: { identifier: "default" }, zoConfig: {} } }),
@@ -85,14 +85,7 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe("AssistantShareManager", () => {
-  it("reads the scope it opened on: this chat, mine or the whole org", async () => {
-    await setup("chat");
-    expect(api.listForChat).toHaveBeenCalledWith("default", "c1");
-    expect(q("assistant-share-manager-row-a")).not.toBeNull();
-    expect(q("assistant-share-manager-new")).not.toBeNull();
-  });
-
-  it("lists mine without the New link form, which needs a chat", async () => {
+  it("lists mine with only Mine and All in organization, and no form to create a link", async () => {
     await setup("mine");
     expect(api.listMine).toHaveBeenCalledWith("default");
     expect(
@@ -101,6 +94,9 @@ describe("AssistantShareManager", () => {
       ).length,
     ).toBe(2);
     expect(q("assistant-share-manager-new")).toBeNull();
+    expect(q("assistant-share-manager-scope-chat")).toBeNull();
+    expect(q("assistant-share-manager-scope-all")).not.toBeNull();
+    expect(api.listForChat).not.toHaveBeenCalled();
   });
 
   it("never exposes another owner's token in the org list", async () => {
@@ -117,7 +113,6 @@ describe("AssistantShareManager", () => {
 
   it.each([
     ["mine", "You haven't shared any chats."],
-    ["chat", "This chat has no links yet."],
     ["all", "No chats are shared in this organization."],
   ] as const)("says so when %s has no links", async (scope, text) => {
     api.listForChat.mockResolvedValue({ data: { shares: [] } });

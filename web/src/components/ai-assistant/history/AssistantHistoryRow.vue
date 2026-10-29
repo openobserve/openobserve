@@ -57,10 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('open', row.sid)"
           @keydown="(event: KeyboardEvent) => emit('navigate', event)"
         >
-          <span
-            class="flex min-w-0 flex-1 flex-col gap-0.5 @min-[20rem]:flex-row @min-[20rem]:items-center @min-[20rem]:gap-2"
-          >
-            <span class="flex min-w-12 flex-1 items-center gap-1.5">
+          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span class="flex min-w-0 items-center gap-1.5">
               <OIcon
                 v-if="row.pinned"
                 :name="assistantGlyph.pin"
@@ -73,45 +71,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :tooltip="fullTitle"
                 >{{ row.title }}</OTruncatedText
               >
+              <!-- The button is named by its content; these keep the spoken parts apart. -->
+              <span class="sr-only">, </span>
+              <OText
+                variant="meta"
+                as="span"
+                class="text-text-body shrink-0"
+                data-test="assistant-history-row-time"
+                >{{ time }}</OText
+              >
             </span>
-            <!-- The button is named by its content; these keep the spoken parts apart. -->
-            <span class="sr-only">, </span>
-            <span class="flex shrink-0 items-center gap-1.5">
+            <span
+              v-if="pending || status || originTag"
+              class="flex min-w-0 items-center gap-1.5"
+              data-test="assistant-history-row-meta"
+            >
               <template v-if="pending">
                 <OSpinner size="xs" />
                 <OText variant="meta" data-test="assistant-history-row-pending">{{
                   pendingText
                 }}</OText>
               </template>
-              <template v-else>
-                <AssistantStatusDot
-                  v-if="row.pendingApproval"
-                  state="attention"
-                  placement="inline"
-                />
-                <AssistantStatusDot v-else-if="row.activeTurn" state="working" placement="inline" />
+              <template v-else-if="status">
+                <span class="sr-only">, </span>
+                <AssistantStatusDot :state="CHAT_STATUS_SIGNAL[status]" placement="inline" />
                 <OText
-                  v-if="row.pendingApproval || row.activeTurn"
                   variant="meta"
+                  class="text-text-body"
+                  :data-status="status"
                   data-test="assistant-history-row-state"
-                  >{{
-                    row.pendingApproval
-                      ? t("assistant.history.needsYou")
-                      : t("assistant.history.running")
-                  }}</OText
+                  >{{ t(CHAT_STATUS_KEYS[status]) }}</OText
                 >
-                <OText v-else variant="meta" as="span" data-test="assistant-history-row-time">{{
-                  time
-                }}</OText>
               </template>
-              <span v-if="originTag" class="sr-only">, </span>
-              <OTag
-                v-if="originTag"
-                type="assistantOrigin"
-                :value="originTag"
-                size="xs"
-                data-test="assistant-history-row-origin"
-              />
+              <template v-if="originTag">
+                <span class="sr-only">, </span>
+                <OTag
+                  type="assistantOrigin"
+                  :value="originTag"
+                  size="xs"
+                  data-test="assistant-history-row-origin"
+                />
+              </template>
             </span>
           </span>
         </OButton>
@@ -205,10 +205,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import type { HistoryPending, HistoryRow, Sid } from "@/composables/assistant";
 
+import type { ChatStatus } from "./chatStatus";
+
 export interface AssistantHistoryRowProps {
   row: HistoryRow;
   current: boolean;
-  mode: "popover" | "rail" | "drawer";
+  mode: "panel" | "rail";
+  /** The chat's live state; the list adds this tab's failed turns, which the row alone cannot see. */
+  status?: ChatStatus | null;
   pending: HistoryPending | null;
   /** The one row button in the Tab order (roving tabindex). */
   tabbable: boolean;
@@ -256,7 +260,10 @@ import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";
 
+import { CHAT_STATUS_KEYS, CHAT_STATUS_SIGNAL, chatStatusOf } from "./chatStatus";
+
 const props = withDefaults(defineProps<AssistantHistoryRowProps>(), {
+  status: undefined,
   readonly: false,
   timezone: undefined,
   tag: "li",
@@ -281,6 +288,9 @@ const menuOpen = ref(false);
 const draft = ref("");
 let cancelled = false;
 
+const status = computed(() =>
+  props.status === undefined ? chatStatusOf(props.row) : props.status,
+);
 const pendingText = computed(() =>
   props.pending ? t(`assistant.history.pending.${props.pending}`) : undefined,
 );

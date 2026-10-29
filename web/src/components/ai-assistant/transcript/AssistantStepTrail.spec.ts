@@ -166,6 +166,39 @@ describe("AssistantStepTrail", () => {
     );
   });
 
+  it("shows the newest 3 rows of a running trail and folds the rest behind Show earlier (D3-f)", async () => {
+    const { provide, turn } = fakeEvidence();
+    const done = (n: number): ContentBlock => ({
+      type: "tool_call",
+      tool: "StreamSchema",
+      call_id: `d${n}`,
+      stepState: "done",
+      context: { stream_name: `s${n}` },
+    });
+    const running: ContentBlock = {
+      type: "tool_call",
+      tool: "SearchSQL",
+      call_id: "c9",
+      stepState: "running",
+      context: { stream_name: "default" },
+    };
+    const wrapper = mountTrail(
+      {
+        message: message([done(1), done(2), done(3), done(4), running]),
+        turn: turn({ outcome: "live" }),
+      },
+      provide,
+    );
+    const rows = () =>
+      wrapper.findAll("[data-step-header]").map((el) => el.attributes("data-step-header"));
+    expect(rows()).toEqual(["d3", "d4", "c9"]);
+    const earlier = wrapper.get('[data-test="assistant-trail-earlier"]');
+    expect(earlier.text()).toBe("Show 2 earlier steps");
+    await earlier.trigger("click");
+    expect(rows()).toEqual(["d1", "d2", "d3", "d4", "c9"]);
+    expect(wrapper.find('[data-test="assistant-trail-earlier"]').exists()).toBe(false);
+  });
+
   it("lets the reader close a running trail, and keeps that choice in the session", async () => {
     const { provide, turn, store, sid } = fakeEvidence();
     const running: ContentBlock = {

@@ -299,7 +299,7 @@ describe("container rungs f and h", () => {
     const popover = document.createElement("div");
     popover.setAttribute("data-o-popover-content", "");
     popover.dataset.state = "open";
-    popover.innerHTML = '<div data-test="assistant-composer-hints-popover"></div>';
+    popover.innerHTML = '<div data-test="assistant-add-context-menu"></div>';
     document.body.appendChild(popover);
     expect(runEscapeLadder(escapeFrom(rootWith("sidebar")))).toBe(true);
     expect(close).not.toHaveBeenCalled();

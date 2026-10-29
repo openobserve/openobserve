@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OText>
     <OPopover
       v-model:open="infoOpen"
+      privacy="mask"
       side="bottom"
       align="start"
       :aria-label="t('assistant.history.localOnly.info')"

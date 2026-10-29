@@ -475,6 +475,7 @@ function toAnnotation(value: unknown): BlockAnnotation | null {
   const from = source.window?.from;
   const to = source.window?.to;
   if (typeof from === "number" && typeof to === "number" && to > from) out.window = { from, to };
+  if (source.homeDefaultWindow === true) out.homeDefaultWindow = true;
   const outcome = keptOutcome(source.approvalOutcome);
   if (outcome) out.approvalOutcome = outcome;
   const result = keptResult(source.approvalResult);

@@ -120,6 +120,7 @@ import { useRouter } from "vue-router";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import {
+  approvalEditor,
   approvalEntity,
   approvalOutcomeOf,
   approvalTargetHref,
@@ -251,8 +252,9 @@ const line = computed<I18nText>(() => {
     case "failed":
       return t("assistant.approval.result.failed", { reason: failedReason() });
     case "declined":
-    case "editing":
       return t("assistant.approval.result.declined");
+    case "editing":
+      return editingLine();
     case "new_chat":
       return t("assistant.approval.result.declinedNewChat");
     case "stopped":
@@ -454,6 +456,15 @@ function itemReason(item: ApprovalResultItem): I18nText {
   if (item.code === "404") return t("assistant.approval.reason.notFound");
   if (item.code) return t("assistant.approval.reason.status", { code: raw(item.code) });
   return t("assistant.approval.reason.unknown");
+}
+
+// The editor is named from the card, so a reload says the same thing.
+function editingLine(): I18nText {
+  const editor = card.value ? approvalEditor(card.value, org.value) : null;
+  if (!editor) return t("assistant.approval.result.declined");
+  return t("assistant.approval.result.editing", {
+    editor: t(`assistant.approval.editor.${editor.type}`),
+  });
 }
 
 function replyOf(): string {

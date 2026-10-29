@@ -49,12 +49,14 @@ export { ERROR_LEDGER } from "./assistantErrors";
 export {
   elapsedMs,
   errorTitle,
+  failedAfterChange,
   outcomeError,
   outcomeRecordOf,
   stepLabel,
   stepLabelOf,
   turnStatusText,
   STALL_MS,
+  type TurnProgress,
 } from "./turnStateMachine";
 export { isTerminal } from "./turnStates";
 export { diffCounts, diffLines, type DiffLine } from "./lineDiff";
@@ -100,6 +102,7 @@ export type {
 } from "./useEditorProposal";
 export {
   MAX_HIT_ROWS,
+  answerQueriesAllEmpty,
   chipOpenQuery,
   claimNumbers,
   fenceQuery,
@@ -133,11 +136,25 @@ export type {
 export type { QueryRun } from "./actions/appliers/query";
 export { canAlwaysAllow } from "./actions/appliers/approval";
 export {
+  approvalDiff,
+  approvalEditor,
+  approvalName,
+  approvalObjectId,
+  approvalVerb,
+  isApprovalChange,
+  type ApprovalDiff,
+  type ApprovalDiffRow,
+  type ApprovalEditor,
+  type ApprovalVerb,
+} from "./approvalAnatomy";
+export {
   approvalClock,
   approvalEntity,
   approvalHeading,
+  approvalNoun,
   approvalOutcomeOf,
   approvalTargetHref,
+  approvalVerbText,
   entityKeyOf,
 } from "./useAssistantApprovals";
 export type {

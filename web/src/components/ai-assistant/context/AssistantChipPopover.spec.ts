@@ -50,6 +50,27 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+describe("AssistantChipPopover: pasted text (D4 §3.9)", () => {
+  it("shows the text and offers Paste into the message only on a pasted text chip", async () => {
+    const pasted: ContextChip = {
+      id: "paste:1",
+      kind: "pasted_text",
+      label: raw("Pasted text · 2 lines"),
+      data: "a\nb",
+      sizeBytes: 5,
+      provenance: "attach",
+      sent: "serialized",
+    };
+    const { wrapper, popover } = await open({ chip: pasted });
+    expect(popover()!.querySelector('[data-test="assistant-chip-code"]')?.textContent).toBe("a\nb");
+    popover()!.querySelector<HTMLElement>('[data-test="assistant-chip-paste-inline"]')!.click();
+    expect(wrapper.emitted("paste-inline")).toHaveLength(1);
+    document.body.innerHTML = "";
+    const row = await open();
+    expect(row.popover()!.querySelector('[data-test="assistant-chip-paste-inline"]')).toBeNull();
+  });
+});
+
 describe("AssistantChipPopover: Open in {page}", () => {
   it("offers Open when the tray names a page, and emits it", async () => {
     const { wrapper, popover } = await open({ openLabel: raw("Open in Logs") });

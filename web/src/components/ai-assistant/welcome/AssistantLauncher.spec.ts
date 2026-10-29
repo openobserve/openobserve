@@ -155,6 +155,24 @@ describe("AssistantLauncher", () => {
     expect(open.mock.calls[0][0]).toMatchObject({ intent: "stage", payload: { text: "Prompt 1" } });
   });
 
+  it("carries a Home starter's provenance into the staged payload (PO A26)", async () => {
+    STARTERS[1].home = true;
+    const { wrapper } = setup();
+    await wrapper.get('[data-test="assistant-launcher-starter-1"]').trigger("click");
+    delete STARTERS[1].home;
+    expect(open.mock.calls[0][0].payload).toMatchObject({ text: "Prompt 1", homeStarter: true });
+  });
+
+  it("stages a starter's window as a time chip ending at the click", async () => {
+    STARTERS[0].period = "1h";
+    const { wrapper } = setup();
+    await wrapper.get('[data-test="assistant-launcher-starter-0"]').trigger("click");
+    delete STARTERS[0].period;
+    const chips = open.mock.calls[0][0].payload.chips;
+    expect(chips[0]).toMatchObject({ kind: "time", provenance: "door" });
+    expect(chips[0].ref.to - chips[0].ref.from).toBe(3_600_000);
+  });
+
   it("lists this tab's recent chats, a running one marked, and says when there are none", async () => {
     const { wrapper, store } = setup();
     expect(wrapper.find('[data-test="assistant-launcher-recent-empty"]').exists()).toBe(true);
@@ -165,8 +183,60 @@ describe("AssistantLauncher", () => {
     store.state.sessions[sid].turn = { state: "responding.writing" };
     await flushPromises();
     const row = wrapper.get('[data-test="assistant-launcher-recent-0"]');
-    expect(row.attributes("data-running")).toBe("");
-    expect(row.text()).toContain("Answering…");
+    expect(row.attributes("data-status")).toBe("answering");
+    expect(row.get('[data-test="assistant-launcher-recent-status"]').text()).toBe("Answering");
+  });
+
+  it("puts a chat that needs the user first in Your chats, with its state in words", async () => {
+    const { wrapper, store } = setup();
+    const waiting = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.state.sessions[waiting].messages.push({ role: "user", content: raw("old") });
+    store.state.sessions[waiting].pendingApproval = { id: "a1" } as never;
+    store.setActive(null);
+    for (const title of ["b", "c", "d"]) {
+      const sid = store.createSession({
+        origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      });
+      store.state.sessions[sid].messages.push({ role: "user", content: raw(title) });
+      store.setActive(null);
+    }
+    await flushPromises();
+    const first = wrapper.get('[data-test="assistant-launcher-recent-0"]');
+    expect(first.attributes("data-status")).toBe("needs_you");
+    expect(first.text()).toContain("Needs your approval");
+    expect(wrapper.findAll('[data-test^="assistant-launcher-recent-"]').length).toBeLessThanOrEqual(
+      4,
+    );
+    expect(wrapper.get('[data-test="assistant-launcher-your-chats"]').classes()).toContain(
+      "max-md:order-first",
+    );
+  });
+
+  it("keeps a read-only Your chats under the locked row on G2 (PO A7)", () => {
+    const { wrapper } = setup("no_permission");
+    expect(wrapper.find('[data-test="assistant-gate-state"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
+  });
+
+  it("hides its Suggestions while the sidebar shows its own welcome (D5 decision 10)", async () => {
+    const { wrapper, store } = setup();
+    expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(true);
+    store.state.shell.placement = { kind: "sidebar", mode: "pinned" };
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(true);
+  });
+
+  it("names the default window in the disclosure and opens the full view in place", () => {
+    const { wrapper } = setup();
+    expect(wrapper.get('[data-test="assistant-launcher-disclosure"]').text()).toMatch(
+      /^Sends with the default time range, \S/,
+    );
+    expect(wrapper.get('[data-test="assistant-launcher-sees"]').text()).toBe("What it sees");
+    expect(wrapper.get('[data-test="assistant-launcher-open"]').text()).toBe("Open full view");
   });
 
   it("shows skeleton rows while the starters load", () => {

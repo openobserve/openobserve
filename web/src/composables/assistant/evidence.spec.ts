@@ -19,6 +19,7 @@ import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
 
 import {
+  answerQueriesAllEmpty,
   boundedFindings,
   boundedResult,
   boundedRow,
@@ -131,6 +132,29 @@ describe("windowsOf / queryCount", () => {
     const facts = stepsOf(answer([...steps, { ...steps[2], call_id: "call_4" }]), "acme");
     expect(windowsOf(facts)).toHaveLength(1);
     expect(queryCount(facts)).toBe(2);
+  });
+});
+
+describe("answerQueriesAllEmpty", () => {
+  const empty = { ...steps[2], summary: { count: 0 } as any, result: { hits: [], total: 0 } };
+  const isEmpty = (blocks: ContentBlock[]) => answerQueriesAllEmpty(answer(blocks), "acme");
+
+  it("is true only when every query ran and reported zero rows", () => {
+    expect(isEmpty([steps[0], empty])).toBe(true);
+    expect(isEmpty([empty, steps[2]])).toBe(false);
+    expect(isEmpty([steps[0], steps[1]])).toBe(false);
+    expect(isEmpty([{ ...empty, stepState: "failed" }])).toBe(false);
+  });
+
+  it("never reads an unknown count as empty", () => {
+    expect(isEmpty([{ ...steps[2], summary: "ran" as any, result: undefined }])).toBe(false);
+  });
+
+  it("is false when another query was denied by policy, though the trail hides that call", () => {
+    const denied = { ...steps[2], call_id: "call_9", errorType: "permission_denied_tool" };
+    expect(stepsOf(answer([empty, denied]), "acme")).toHaveLength(1);
+    expect(isEmpty([empty, denied])).toBe(false);
+    expect(isEmpty([empty, { ...denied, errorType: "data_level_blocked" }])).toBe(false);
   });
 });
 

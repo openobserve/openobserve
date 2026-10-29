@@ -86,7 +86,10 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
   sentWindows.set(session.sid, window);
   const attached = composer.chips.filter((chip) => serializedNameOf(chip) !== undefined);
   const typed = turn?.attachments ?? false;
-  const blocks = typed ? null : serializeBlocks(attached, makeNonce());
+  // B-09 has no pasted-text kind, so a paste always rides in the message body.
+  const typedChips = typed ? attached.filter((chip) => chip.kind !== "pasted_text") : [];
+  const inline = typed ? attached.filter((chip) => chip.kind === "pasted_text") : attached;
+  const blocks = inline.length > 0 ? serializeBlocks(inline, makeNonce()) : null;
   const typedText = neutralizeBlockSyntax(snapshot.text.trim());
   const text = [typedText, blocks?.text ?? ""].filter(Boolean).join("\n\n");
   const context = wireContextOf(page, composer, { org: session.org, window, now });
@@ -108,7 +111,7 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
     ...(turn?.mode && { mode: turn.mode }),
     ...(incidentId && { mode: "chat" as const }),
     ...(turn?.ephemeral && { ephemeral: true }),
-    ...(typed && attached.length > 0 && { attachments: attached.map(toAttachment) }),
+    ...(typedChips.length > 0 && { attachments: typedChips.map(toAttachment) }),
     ...(turn?.replyToApproval && { replyToApproval: turn.replyToApproval }),
   };
   if (turn?.persisted) {
@@ -198,8 +201,17 @@ export function transcriptOf(
 ): WireMessage[] {
   const prior = typeof upTo === "number" && upTo >= 0 ? messages.slice(0, upTo) : messages;
   return prior
-    .map((message) => ({ role: message.role, content: String(message.content ?? "") }))
+    .map((message) => ({ role: message.role, content: transcriptContentOf(message) }))
     .filter((message) => message.content.trim() !== "");
+}
+
+// A paste rode as a chip, not as text, so a browser-only chat carries it forward or the next turn loses it.
+function transcriptContentOf(message: AssistantSession["messages"][number]): string {
+  const text = String(message.content ?? "");
+  const pasted = (message.chips ?? []).filter((chip) => chip.kind === "pasted_text");
+  if (message.role !== "user" || pasted.length === 0) return text;
+  const blocks = serializeBlocks(pasted, makeNonce()).text;
+  return [text.trim(), blocks].filter(Boolean).join("\n\n");
 }
 
 // Mentions add the ids the tray shows (CT-05 AC 12); a page value of the same kind is replaced.

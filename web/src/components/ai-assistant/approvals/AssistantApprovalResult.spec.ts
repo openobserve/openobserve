@@ -162,6 +162,24 @@ describe("AssistantApprovalResult", () => {
     expect(line(wrapper)).toBe("Declined · replied: “keep it”");
   });
 
+  it("says the change moved to its editor when Edit in {editor} resolved the card (PO A9)", () => {
+    const pause = approvalOf({
+      type: "confirmation_required",
+      tool: "EnableAlert",
+      call_id: "c9",
+      args: { alert_id: "a1", value: false },
+    });
+    const { wrapper } = mountRecord(
+      { outcome: { state: "editing", at: 1, decision: { approved: false, reason: "edited" } } },
+      { blocks: [{ type: "approval", approval: pause }] },
+    );
+    expect(line(wrapper)).toBe(
+      "You're editing this in the alert editor. Nothing was changed here.",
+    );
+    const batch = mountRecord({ outcome: { state: "editing", at: 1 } });
+    expect(line(batch.wrapper)).toBe("Declined · nothing was changed");
+  });
+
   it("offers Send again after a lost decision, and Ask again after an expiry", async () => {
     const lost = mountRecord({ outcome: { state: "delivery_failed", at: 1 } });
     expect(line(lost.wrapper)).toBe(

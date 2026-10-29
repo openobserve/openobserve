@@ -99,10 +99,11 @@ test.describe("assistant refusals and recovery", () => {
   test("ERR-04 an org with the assistant off says so with the admin action", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await refuse(page, "not_enabled_400");
-    await expect(assistant.outcome()).toContainText("O2 Assistant is off for this organization.");
-    // Settings › Assistant does not exist yet, so the admin action is the setup guide, labelled as a new tab.
-    await expect(assistant.outcomeAction()).toHaveText("Read the setup guide (opens in a new tab)");
+    await expect(assistant.outcome()).toContainText("O2 Assistant is turned off for");
+    // The admin action opens Settings › Assistant › Access in a new tab, so the chat stays open.
+    await expect(assistant.outcomeAction()).toHaveText("Open access settings (opens in a new tab)");
     await expect(assistant.outcomeAction()).toHaveAttribute("target", "_blank");
+    await expect(assistant.outcomeAction()).toHaveAttribute("href", /\/settings\/assistant\/access/);
   });
 
   test("ERR-05 a busy chat restores the prompt and Stop it cancels the running turn", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
@@ -110,7 +111,7 @@ test.describe("assistant refusals and recovery", () => {
     await harness.setKnobs(page, { envelopeEnabled: true });
     await refuse(page, "lease_409", "busy prompt");
     await expect(assistant.outcome()).toContainText(
-      "Another answer is still running in this chat. Your message wasn't sent.",
+      "This chat is still answering. Your message wasn't sent.",
     );
     await expect(assistant.composer()).toHaveValue("busy prompt");
     await assistant.outcomeAction().click();
@@ -129,7 +130,7 @@ test.describe("assistant refusals and recovery", () => {
   test("ERR-07 the turn limit refuses with Retry, in at most two lines at the sidebar width", { tag: ["@mock", "@responsive"] }, async ({ page }) => {
     await openOnLogs(page);
     await refuse(page, "turn_limit");
-    await expect(assistant.outcome()).toContainText("Too many answers are running. Wait for one to finish.");
+    await expect(assistant.outcome()).toContainText("Too many answers are running. Your message wasn't sent.");
     const title = assistant.outcome().locator('[data-test="assistant-turn-outcome-title"]');
     const lines = await title.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
     expect(lines).toBeLessThanOrEqual(2);
@@ -142,7 +143,7 @@ test.describe("assistant refusals and recovery", () => {
     await refuse(page, "upstream_429");
     await expect(assistant.outcomeAction()).toHaveText(/Retry in (30|29|28) s/);
     await expect(assistant.outcome().locator('[data-test="assistant-turn-outcome-title"]')).toHaveText(
-      "The AI provider is rate-limiting requests.",
+      "The AI provider is limiting requests. Your message wasn't sent.",
     );
     await expect(assistant.container().locator('[data-test="assistant-send"]')).toHaveAttribute("aria-disabled", "true");
     const before = await region().textContent();
@@ -168,7 +169,7 @@ test.describe("assistant refusals and recovery", () => {
     await harness.nextScenario(page, "agent_503");
     await assistant.send("why?");
     await expect(assistant.outcome()).toHaveAttribute("data-code", "agent_unavailable");
-    await expect(assistant.outcome()).toContainText("The assistant service didn't respond.");
+    await expect(assistant.outcome()).toContainText("The assistant didn't respond. Nothing was changed.");
     await expect(assistant.composer()).toBeEditable();
   });
 

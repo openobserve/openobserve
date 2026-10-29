@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h3 class="text-text-heading text-sm font-medium">{{ t("assistant.askAdmin.title") }}</h3>
       <div v-if="admins.length" class="flex flex-col gap-1" data-test="assistant-ask-admin-admins">
         <p class="text-text-secondary text-xs">
-          {{ t("assistant.askAdmin.adminsOf", { org: targetOrg }) }}
+          {{ t("assistant.askAdmin.adminsOf", { org: targetOrgName }) }}
         </p>
         <OUserCell v-for="email in admins.slice(0, ADMIN_LIST_MAX)" :key="email" :value="email" />
       </div>
       <p v-else class="text-text-secondary text-sm" data-test="assistant-ask-admin-unknown">
-        {{ t("assistant.askAdmin.anAdminOf", { org: targetOrg }) }}
+        {{ t("assistant.askAdmin.anAdminOf", { org: targetOrgName }) }}
       </p>
       <div ref="messageField">
         <OTextarea
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 export type AskAdminKind =
-  "access" | "credits" | "consent" | "share_read" | "settings" | "tool_policy";
+  "access" | "credits" | "consent" | "enable" | "share_read" | "settings" | "tool_policy";
 
 export interface AssistantAskAdminPopoverProps {
   kind: AskAdminKind;
@@ -146,9 +146,10 @@ import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { useAssistantName } from "@/composables/assistant";
+import { hostOrgName, useAssistantName } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -161,6 +162,9 @@ import type { SheetSnap } from "@/lib/overlay/Sheet/OSheet.types";
 import { orgUsersQuery } from "@/services/users.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
+
+// Gates and requests render on any host page and teleport their popovers, so they bring the assistant roles themselves.
+provideAssistantSurface();
 
 const props = withDefaults(defineProps<AssistantAskAdminPopoverProps>(), {
   payer: undefined,
@@ -184,6 +188,7 @@ const messageField = ref<HTMLElement | null>(null);
 const mobileTrigger = ref<HTMLElement | null>(null);
 
 const targetOrg = computed(() => props.payer ?? props.org);
+const targetOrgName = computed(() => hostOrgName(targetOrg.value));
 
 // A disabled observer reads the IAM users page's cache, so a role that cannot list members sends nothing.
 const members = useQuery(
@@ -247,11 +252,17 @@ const wrapperProps = computed<Record<string, unknown>>(() =>
       },
 );
 
-// Only Billing exists to link to; Settings › Assistant is named in words until its route ships.
+// Billing and the Access tab of Settings › Assistant are the pages a message can link to.
 function linkFor(kind: AskAdminKind): string {
-  if (kind !== "credits" && kind !== "consent") return "";
+  const query = { org_identifier: targetOrg.value };
+  const target =
+    kind === "credits" || kind === "consent"
+      ? { name: "plans", query }
+      : kind === "enable" && router.hasRoute("assistantSettings")
+        ? { name: "assistantSettings", params: { tab: "access" }, query }
+        : null;
+  if (!target) return "";
   try {
-    const target = { name: "plans", query: { org_identifier: targetOrg.value } };
     return new URL(router.resolve(target).href, window.location.origin).toString();
   } catch {
     return "";

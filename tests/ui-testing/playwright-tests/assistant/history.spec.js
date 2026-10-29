@@ -344,10 +344,10 @@ test.describe("assistant history", () => {
     await openOnLogs(page);
     await assistant.openHistory();
     await expect(item(state.chats[1].title).locator('[data-test="assistant-history-row-state"]')).toHaveText(
-      "Answering…",
+      "Answering",
     );
     await expect(item(state.chats[2].title).locator('[data-test="assistant-history-row-state"]')).toHaveText(
-      "Waiting for your approval",
+      "Needs your approval",
     );
     await page.keyboard.press("Escape");
     await assistant.close();

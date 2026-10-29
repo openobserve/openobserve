@@ -30,31 +30,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="assistant-share-visibility"
         @update:model-value="onVisibility"
       >
-        <ORadio
-          value="org"
-          :label="t('assistant.share.org')"
-          data-test="assistant-share-visibility-org"
-        />
+        <ORadio value="org" data-test="assistant-share-visibility-org">
+          <template #label>
+            <span class="flex flex-col gap-0.5">
+              <span>{{ t("assistant.share.org") }}</span>
+              <span class="text-text-secondary text-xs font-normal">{{
+                t("assistant.share.whoOrg", { org: raw(orgName || org) })
+              }}</span>
+            </span>
+          </template>
+        </ORadio>
         <div v-if="publicLinks" class="contents" :aria-disabled="publicBlocked || undefined">
           <ORadio
             value="public"
-            :label="t('assistant.share.public')"
             :disabled="publicBlocked"
             data-test="assistant-share-visibility-public"
-          />
+          >
+            <template #label>
+              <span class="flex flex-col gap-0.5">
+                <span>{{ t("assistant.share.public") }}</span>
+                <span class="text-text-secondary text-xs font-normal">{{
+                  t("assistant.share.whoPublic")
+                }}</span>
+              </span>
+            </template>
+          </ORadio>
         </div>
       </ORadioGroup>
+      <OText variant="meta" data-test="assistant-share-who-continue">{{
+        t("assistant.share.whoContinue")
+      }}</OText>
       <OText v-if="share" variant="meta" data-test="assistant-share-visibility-fixed">{{
         t("assistant.share.visibilityFixed")
       }}</OText>
-      <OText variant="meta" data-test="assistant-share-visibility-help">
-        <template v-if="form.visibility === 'org'"
-          >{{ t("assistant.share.orgHelp") }} {{ t("assistant.share.orgHelpStreams") }}</template
-        >
-        <template v-else>{{
-          t("assistant.share.publicMax", { days: publicMaxExpiryDays })
-        }}</template>
-      </OText>
+      <OText
+        v-if="form.visibility === 'public'"
+        variant="meta"
+        data-test="assistant-share-visibility-help"
+        >{{ t("assistant.share.publicMax", { days: publicMaxExpiryDays }) }}</OText
+      >
       <OText v-if="!publicLinks" variant="meta" data-test="assistant-share-public-off">{{
         t("assistant.share.publicOff")
       }}</OText>
@@ -80,12 +94,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="assistant-share-mode"
         @update:model-value="onMode"
       >
-        <ORadio value="snapshot" :label="snapshotLabel" data-test="assistant-share-mode-snapshot" />
-        <ORadio
-          value="live"
-          :label="t('assistant.share.liveMode')"
-          data-test="assistant-share-mode-live"
-        />
+        <ORadio value="snapshot" :disabled="running" data-test="assistant-share-mode-snapshot">
+          <template #label>
+            <span class="flex flex-col gap-0.5">
+              <span>{{ snapshotLabel }}</span>
+              <span class="text-text-secondary text-xs font-normal">{{
+                running ? t("assistant.share.snapshotWaits") : t("assistant.share.snapshotNow")
+              }}</span>
+            </span>
+          </template>
+        </ORadio>
+        <ORadio value="live" data-test="assistant-share-mode-live">
+          <template #label>
+            <span class="flex flex-col gap-0.5">
+              <span>{{ t("assistant.share.liveMode") }}</span>
+              <span class="text-text-secondary text-xs font-normal">{{
+                t("assistant.share.liveFollows")
+              }}</span>
+            </span>
+          </template>
+        </ORadio>
       </ORadioGroup>
       <OButton
         v-if="share && share.mode === 'snapshot'"
@@ -234,18 +262,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="pending !== null"
         data-test="assistant-share-create"
         @click="create"
-        >{{ t("assistant.share.createAndCopy") }}</OButton
+        >{{
+          form.mode === "live"
+            ? t("assistant.share.createLiveAndCopy")
+            : t("assistant.share.createAndCopy")
+        }}</OButton
+      >
+      <OButton
+        v-if="!share && cancelable"
+        variant="ghost"
+        size="sm"
+        class="max-md:min-h-11"
+        :disabled="pending !== null"
+        data-test="assistant-share-new-cancel"
+        @click="emit('cancelNew')"
+        >{{ t("common.cancel") }}</OButton
       >
     </div>
-    <OButton
-      v-if="linkCount > 3"
-      variant="ghost"
-      size="sm"
-      class="self-start max-md:min-h-11"
-      data-test="assistant-share-see-all"
-      @click="emit('seeAll')"
-      >{{ t("assistant.share.seeAll") }}</OButton
-    >
+    <div v-if="share" class="flex flex-wrap items-center gap-2">
+      <OButton
+        variant="ghost"
+        size="sm"
+        class="max-md:min-h-11"
+        :icon-left="assistantGlyph.newChat"
+        data-test="assistant-share-new-link"
+        @click="emit('newLink')"
+        >{{ t("assistant.share.anotherLink") }}</OButton
+      >
+      <OButton
+        variant="ghost"
+        size="sm"
+        class="max-md:min-h-11"
+        data-test="assistant-share-see-all"
+        @click="emit('seeAll')"
+        >{{ t("assistant.share.allLinks") }}</OButton
+      >
+    </div>
   </div>
 </template>
 
@@ -255,6 +307,8 @@ import type { I18nKey } from "@/types/i18n";
 
 export interface AssistantShareSettingsProps {
   org: string;
+  /** The org's display name for the audience help; the identifier can be an opaque hash. */
+  orgName?: string;
   sid: string;
   /** `null` is create mode: nothing exists until Create and copy. */
   share: ShareView | null;
@@ -264,13 +318,16 @@ export interface AssistantShareSettingsProps {
   /** The server strips attachments (`ai_share_redact_attachments`). */
   redactAttachments: boolean;
   hasAttachments: boolean;
-  linkCount: number;
+  /** Create mode next to an existing link: Cancel goes back to that link. */
+  cancelable?: boolean;
 }
 
 export interface AssistantShareSettingsEmits {
   (e: "created", share: ShareView, copied: boolean): void;
   (e: "revoked"): void;
   (e: "seeAll"): void;
+  (e: "newLink"): void;
+  (e: "cancelNew"): void;
   (e: "announce", key: I18nKey): void;
 }
 </script>
@@ -306,7 +363,7 @@ import {
   updateShareMutation,
 } from "@/services/ai_chat_share.queries";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -378,11 +435,23 @@ const expiryOptions = computed(() => {
   return [{ value: CURRENT_EXPIRY, label: t("assistant.share.expiresOn", { time }) }, ...presets];
 });
 
+// Another link (or create mode) starts from its own expiry, never the one picked for the last link.
 watch(
   () => props.share,
-  (share) => {
+  (share, before) => {
+    if (share?.id !== before?.id) chosenExpiry.value = null;
     if (pending.value === null) Object.assign(form, formOf(share));
   },
+);
+
+// A running answer has no snapshot yet, so a new link starts live; it goes back once the answer ends.
+watch(
+  () => props.running,
+  (running) => {
+    if (props.share || pending.value !== null) return;
+    form.mode = running ? "live" : "snapshot";
+  },
+  { immediate: true },
 );
 
 onMounted(() => rootEl.value?.addEventListener("keydown", onKeydown));
@@ -391,7 +460,7 @@ onBeforeUnmount(() => rootEl.value?.removeEventListener("keydown", onKeydown));
 function formOf(share: ShareView | null): ShareForm {
   if (!share) {
     return {
-      mode: "snapshot",
+      mode: props.running ? "live" : "snapshot",
       visibility: "org",
       expiresInSecs: 90 * DAY_SECS,
       redactTools: true,
@@ -414,7 +483,7 @@ function onVisibility(value: unknown): void {
 
 function onMode(value: unknown): void {
   const mode = value as ShareMode;
-  if (mode === form.mode) return;
+  if (mode === form.mode || (mode === "snapshot" && props.running)) return;
   form.mode = mode;
   if (props.share) void apply({ mode }, "update");
 }
@@ -499,8 +568,9 @@ async function create(): Promise<void> {
   if (pending.value !== null) return;
   pending.value = "create";
   try {
+    // A running answer has no snapshot to take, whatever the form last held.
     const body = buildCreateRequest(
-      form,
+      props.running ? { ...form, mode: "live" } : form,
       props.publicLinks && !publicBlocked.value,
       maxPublicSecs.value,
       props.redactAttachments,

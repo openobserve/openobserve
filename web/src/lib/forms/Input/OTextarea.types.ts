@@ -81,6 +81,10 @@ export interface TextareaEmits {
 export interface TextareaSlots {
   /** Appended block outside the border */
   append?: () => unknown;
+  /** A row inside the border above the text, such as chips that belong to the message. */
+  header?: () => unknown;
+  /** A row inside the border below the text, such as the message's own actions. */
+  footer?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
    * Provide a tooltip element as the slot content.

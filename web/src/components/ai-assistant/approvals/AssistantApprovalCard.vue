@@ -30,16 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-labelledby="headingId"
       :aria-describedby="describedBy"
       :aria-busy="sending ? 'true' : undefined"
-      :class="[
-        'rounded-surface bg-surface-base flex min-w-0 flex-col gap-2 border p-3',
-        sending ? 'border-border-default' : 'border-badge-warning-ol-border',
-      ]"
+      class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col gap-2 border p-3"
       :data-kind="card.kind"
       data-test="assistant-approval-card"
     >
       <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <OTag
-          variant="warning-soft"
+          variant="default-soft"
           size="xs"
           :label="t('assistant.approval.needsOk')"
           data-test="assistant-approval-needs-ok"
@@ -65,6 +62,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OText v-if="card.askedIn === 'other_tab'" variant="meta" as="p">
         {{ t("assistant.approval.askedElsewhere") }}
+      </OText>
+      <OText
+        v-if="metaLine"
+        :id="metaId"
+        variant="meta"
+        as="p"
+        class="break-words"
+        data-test="assistant-approval-meta"
+      >
+        {{ metaLine }}
       </OText>
 
       <p
@@ -124,26 +131,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OCollapsible>
       </div>
 
-      <div v-if="diff" class="flex min-w-0 flex-col gap-1" data-test="assistant-approval-diff">
+      <div
+        v-if="diff"
+        :id="diffId"
+        class="flex min-w-0 flex-col gap-1"
+        data-test="assistant-approval-diff"
+      >
         <OText variant="label" as="p">
-          {{ diff.before ? t("assistant.approval.changes") : t("assistant.approval.newValues") }}
+          {{
+            card.kind === "create"
+              ? t("assistant.approval.newValues")
+              : t("assistant.approval.change")
+          }}
         </OText>
         <dl class="grid min-w-0 grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5">
-          <template v-for="row in diff.rows" :key="row.field">
+          <template v-for="row in diff" :key="row.field">
             <dt class="text-text-secondary text-xs break-all">{{ row.field }}</dt>
             <dd class="text-text-body text-xs break-all">{{ row.value }}</dd>
           </template>
         </dl>
       </div>
 
-      <ul
-        v-if="impact.length"
-        :id="impactId"
-        class="text-text-body flex min-w-0 list-disc flex-col gap-0.5 ps-5 text-sm"
-        data-test="assistant-approval-impact"
-      >
-        <li v-for="(line, index) in impact" :key="index" class="break-words">{{ line }}</li>
-      </ul>
+      <div v-if="impact.length" :id="impactId" class="flex min-w-0 flex-col gap-1">
+        <OText variant="label" as="p">{{ t("assistant.approval.effect") }}</OText>
+        <ul
+          class="text-text-body flex min-w-0 list-disc flex-col gap-0.5 ps-5 text-sm"
+          data-test="assistant-approval-impact"
+        >
+          <li v-for="(line, index) in impact" :key="index" class="break-words">{{ line }}</li>
+        </ul>
+      </div>
 
       <p
         v-if="remainingMs !== null && !sending"
@@ -186,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :disabled="sending"
             focusable-unavailable
+            :aria-describedby="replyId"
             :class="TOUCH_TARGET_CLASS"
             data-test="assistant-approval-reply"
             @click="(event: MouseEvent) => act(event, () => emit('reply'))"
@@ -203,6 +221,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="(event: MouseEvent) => act(event, edit)"
           >
             {{ t("assistant.approval.edit") }}
+          </OButton>
+          <OButton
+            v-if="editor"
+            variant="ghost"
+            size="sm"
+            :disabled="sending"
+            focusable-unavailable
+            :class="TOUCH_TARGET_CLASS"
+            data-test="assistant-approval-edit-in-editor"
+            @click="(event: MouseEvent) => act(event, editInEditor)"
+          >
+            {{ t("assistant.approval.editInEditor", { editor: editorLabel }) }}
           </OButton>
           <OButton
             v-if="moreTime"
@@ -260,6 +290,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OButton>
         </div>
+        <OText :id="replyId" variant="meta" as="p" data-test="assistant-approval-reply-consequence">
+          {{ t("assistant.approval.replyConsequence") }}
+        </OText>
         <div
           v-if="sending"
           class="text-text-secondary flex items-center gap-2 text-sm"
@@ -310,12 +343,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
 function valueText(value: unknown): string {
   if (value === undefined) return "—";
   return typeof value === "string" ? value : JSON.stringify(value);
@@ -338,10 +365,18 @@ import {
 } from "@/composables/assistant";
 import {
   approvalClock,
+  approvalDiff,
+  approvalEditor,
   approvalEntity,
   approvalHeading,
+  approvalName,
+  approvalNoun,
+  approvalObjectId,
   approvalTargetHref,
+  approvalVerb,
+  approvalVerbText,
   canAlwaysAllow,
+  isApprovalChange,
 } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -359,15 +394,13 @@ import type { ApprovalCardDecision, ApprovalCardView } from "./approvals.types";
 /** The first targets listed; the rest sit behind "and N more". */
 const FIRST_TARGETS = 5;
 
-/** More time appears this close to the end. */
-const EXTEND_AT_MS = 20_000;
+/** An id the name could not be resolved for is shown this short (D3-n). */
+const SHORT_ID_CHARS = 8;
 
 /** A card this long gets one spoken warning at a minute left (WCAG 2.2.1). */
 const LONG_CARD_MS = 120_000;
 
 const WARN_AT_MS = 60_000;
-
-const MAX_DIFF_ROWS = 20;
 
 /** Past this many items the impact says it is a large batch, without blocking it. */
 const LARGE_BATCH = 20;
@@ -383,8 +416,11 @@ const props = withDefaults(
     sending?: boolean;
     /** The server lets the card ask for more time. */
     extendable?: boolean;
+    /** The org's display name; shown only when the user can switch between orgs. */
+    orgName?: string;
+    multiOrg?: boolean;
   }>(),
-  { org: "", sending: false, extendable: false },
+  { org: "", sending: false, extendable: false, orgName: "", multiOrg: false },
 );
 
 const emit = defineEmits<{
@@ -406,6 +442,9 @@ const commandId = `assistant-approval-command-${uid}`;
 const targetsId = `assistant-approval-targets-${uid}`;
 const impactId = `assistant-approval-impact-${uid}`;
 const expiryId = `assistant-approval-expiry-${uid}`;
+const metaId = `assistant-approval-meta-${uid}`;
+const diffId = `assistant-approval-diff-${uid}`;
+const replyId = `assistant-approval-reply-consequence-${uid}`;
 
 const root = ref<HTMLElement | null>(null);
 const denyButton = ref<{ $el: HTMLElement } | null>(null);
@@ -437,8 +476,9 @@ const remainingMs = computed(() =>
   typeof props.card.expiresAt === "number" ? Math.max(0, props.card.expiresAt - now.value) : null,
 );
 const clockText = computed(() => raw(approvalClock(remainingMs.value ?? 0)));
+// From mount, so the reader never has to race the countdown for it (PO A11, A23).
 const moreTime = computed(
-  () => props.extendable && remainingMs.value !== null && remainingMs.value <= EXTEND_AT_MS,
+  () => props.extendable && remainingMs.value !== null && remainingMs.value > 0,
 );
 
 const targets = computed(() =>
@@ -468,22 +508,47 @@ const impact = computed(() => {
 });
 
 const diff = computed(() => {
-  if (props.card.kind !== "update" && props.card.kind !== "create") return null;
-  const after = asRecord(props.card.after);
-  if (!after) return null;
-  const before = asRecord(props.card.before);
-  const rows = Object.entries(after)
-    .filter(([field, value]) => !before || JSON.stringify(before[field]) !== JSON.stringify(value))
-    .slice(0, MAX_DIFF_ROWS)
-    .map(([field, value]) => ({
-      field: raw(field),
-      value: raw(before ? `${valueText(before[field])} → ${valueText(value)}` : valueText(value)),
-    }));
-  return rows.length ? { before: !!before, rows } : null;
+  const changed = approvalDiff(props.card);
+  if (!changed) return null;
+  const unknown = t("assistant.approval.currentUnknown");
+  return changed.rows.map((row) => {
+    const after = valueText(row.after);
+    if (props.card.kind === "create") return { field: raw(row.field), value: raw(after) };
+    const before = "before" in row ? valueText(row.before) : changed.oneSided ? unknown : "—";
+    return { field: raw(row.field), value: raw(`${before} → ${after}`) };
+  });
 });
 
+// The name could not be resolved, so the id is said once here and never in the heading (D3-n).
+const nameUnknown = computed<I18nText | null>(() => {
+  if (!isApprovalChange(props.card) || approvalName(props.card)) return null;
+  const id = approvalObjectId(props.card);
+  if (!id) return null;
+  const shortId = id.length > SHORT_ID_CHARS ? `${id.slice(0, SHORT_ID_CHARS)}…` : id;
+  return t("assistant.approval.nameUnknown", {
+    entity: t(`assistant.entity.${approvalNoun(props.card)}`, 1),
+    shortId: raw(shortId),
+  });
+});
+
+const metaLine = computed<I18nText | null>(() => {
+  const inOrg =
+    props.multiOrg && props.orgName
+      ? t("assistant.approval.inOrg", { org: raw(props.orgName) })
+      : null;
+  if (nameUnknown.value && inOrg)
+    return t("assistant.turn.withElapsed", { status: nameUnknown.value, elapsed: inOrg });
+  return nameUnknown.value ?? inOrg;
+});
+
+const editor = computed(() => (planned.value ? null : approvalEditor(props.card, props.org)));
+const editorLabel = computed(() =>
+  editor.value ? t(`assistant.approval.editor.${editor.value.type}`) : raw(""),
+);
+
+// A single change has nothing to scope: "always" would grant a write the reader saw once (D3-p).
 const scopeOptions = computed(() =>
-  canAlwaysAllow(props.card)
+  canAlwaysAllow(props.card) && (!isApprovalChange(props.card) || props.card.targets.length > 1)
     ? [
         { label: t("assistant.approval.scope.once"), value: "once" },
         { label: t("assistant.approval.scope.chat"), value: "chat" },
@@ -496,7 +561,11 @@ const scopeOptions = computed(() =>
 );
 
 const approveLabel = computed(() => {
-  if (!props.card.destructive) return t("assistant.approval.approve");
+  const verb = approvalVerb(props.card);
+  if (!props.card.destructive)
+    return verb && verb !== "delete"
+      ? approvalVerbText(t, props.card)
+      : t("assistant.approval.approve");
   if (props.card.kind !== "delete") return heading.value;
   const noun = t(`assistant.entity.${entity.value}`, count.value);
   return t("assistant.approval.approveDelete", { count: count.value, entity: noun });
@@ -512,8 +581,10 @@ const describedBy = computed(
   () =>
     [
       props.card.question ? questionId : null,
+      metaLine.value ? metaId : null,
       props.card.command ? commandId : null,
       targets.value.length && !planned.value ? targetsId : null,
+      diff.value ? diffId : null,
       impact.value.length ? impactId : null,
       remainingMs.value !== null && !props.sending ? expiryId : null,
     ]
@@ -551,6 +622,14 @@ function approve(): void {
 function edit(): void {
   plan.value?.$el.querySelector<HTMLElement>("button, input")?.focus();
   emit("announce", t("assistant.plan.deselectHint"));
+}
+
+// The card resolves before the editor opens, so its countdown never runs out mid-edit.
+function editInEditor(): void {
+  const target = editor.value;
+  if (!target) return;
+  decide({ approved: false, reason: "edited" });
+  void router.push(target.route).catch(() => {});
 }
 
 function decide(decision: ApprovalDecision): void {

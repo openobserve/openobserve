@@ -16,6 +16,21 @@ describe("OTextarea", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  it("renders the header and footer slots inside the bordered frame, around the text", () => {
+    wrapper = mount(OTextarea, {
+      slots: { header: '<p data-testid="head">h</p>', footer: '<p data-testid="foot">f</p>' },
+    });
+    const frame = wrapper.find("textarea").element.parentElement!;
+    expect(frame.className).toContain("border");
+    expect(frame.className).toContain("flex-col");
+    expect([...frame.children].map((el) => el.tagName)).toEqual(["P", "TEXTAREA", "P"]);
+  });
+
+  it("keeps the row layout when no frame slot is given", () => {
+    wrapper = mount(OTextarea);
+    expect(wrapper.find("textarea").element.parentElement!.className).not.toContain("flex-col");
+  });
+
   it("renders a textarea element", () => {
     wrapper = mount(OTextarea);
     expect(wrapper.find("textarea").exists()).toBe(true);

@@ -1015,3 +1015,13 @@
     0 0.5rem 1.375rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
     0 1.25rem 3rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 45%, transparent);
 }
+
+/* ── O2 Assistant link and primary roles, dark: the normal dark pairing already clears AA (PO B91) ── */
+:root.dark,
+.dark :root,
+.dark {
+  --color-assistant-link: var(--color-primary-400);
+  --color-assistant-link-hover: var(--color-primary-300);
+  --color-assistant-primary: var(--color-primary-600);
+  --color-assistant-primary-hover: var(--color-primary-600);
+}

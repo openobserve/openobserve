@@ -108,6 +108,33 @@ afterEach(() => {
 });
 
 describe("AssistantContextTray", () => {
+  it("drops its own padding inside the composer frame", async () => {
+    const { wrapper } = await setup({ framed: true });
+    expect(wrapper.get('[data-test="assistant-context-tray"]').classes()).not.toContain("px-3");
+  });
+
+  it("puts a pasted text chip back into the draft from its popover (D4 §3.9)", async () => {
+    const { wrapper, store, sid } = await setup();
+    store.setDraft(sid, { text: "why" });
+    store.addChip(sid, {
+      id: "paste:1",
+      kind: "pasted_text",
+      label: raw("Pasted text · 2 lines"),
+      data: "a\nb",
+      sizeBytes: 5,
+      provenance: "attach",
+      sent: "serialized",
+    });
+    await flushPromises();
+    wrapper
+      .findAllComponents({ name: "AssistantChipPopover" })
+      .find((popover) => popover.props("chip").kind === "pasted_text")!
+      .vm.$emit("paste-inline");
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.text).toBe("why\na\nb");
+    expect(store.state.sessions[sid].composer.chips).toEqual([]);
+  });
+
   it("is a named group: time first, then page chips, then staged chips, then ghosts (`40` §2.1)", async () => {
     const { wrapper, store, sid, labels } = await setup();
     const group = wrapper.get('[data-test="assistant-context-tray"]');

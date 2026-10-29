@@ -548,7 +548,7 @@ function createCore(
     persistDraft(session) {
       // A helper or analysis request is never written anywhere, not even as a draft.
       if (!core.writable(session) || session.record.ephemeral) return;
-      const { chips, timeOverride, removedPageKeys, images, mode, replyStash } = toRaw(
+      const { chips, timeOverride, removedPageKeys, images, mode, replyStash, homeStarter } = toRaw(
         session.composer,
       );
       // A reply is not a draft: the one kept is the text Reply set aside.
@@ -559,6 +559,7 @@ function createCore(
         timeOverride,
         removedPageKeys,
         imageCount: images.length,
+        ...(homeStarter && mode !== "reply" && { homeStarter: true }),
       });
     },
     persistPlacement() {
@@ -838,6 +839,8 @@ function createComposerSlice(core: StoreCore) {
           if (range) composer.timeOverride = range;
           else addChipTo(composer, chip);
         }
+        if (payload.homeStarter) composer.homeStarter = true;
+        else if (payload.text && payload.mode === "replace") composer.homeStarter = undefined;
         if (!payload.text) return;
         const keep = payload.mode === "append" && composer.text.trim() !== "";
         // A repeated door never doubles its prompt (`40` §4).
@@ -847,7 +850,10 @@ function createComposerSlice(core: StoreCore) {
     },
     setDraft(sid, patch) {
       if (patch.text !== undefined) delete core.notices[sid];
-      edit(sid, (composer) => Object.assign(composer, patch));
+      edit(sid, (composer) => {
+        Object.assign(composer, patch);
+        if (patch.text !== undefined && !patch.text.trim()) composer.homeStarter = undefined;
+      });
     },
     restoreDraft(sid, snapshot) {
       edit(sid, (composer) => {
@@ -855,6 +861,7 @@ function createComposerSlice(core: StoreCore) {
         composer.chips = snapshot.chips.map((chip) => ({ ...chip }));
         composer.images = snapshot.images.map((image) => withImageId(image, deps.uuid));
         composer.timeOverride = snapshot.timeOverride ? { ...snapshot.timeOverride } : null;
+        composer.homeStarter = snapshot.homeStarter;
       });
     },
     addChip(sid, chip) {
@@ -1360,6 +1367,7 @@ function snapshotOf(composer: ComposerState): ComposerSnapshot {
     mentions: [],
     timeOverride: composer.timeOverride ? { ...composer.timeOverride } : null,
     removedPageKeys: [...composer.removedPageKeys],
+    ...(composer.homeStarter && { homeStarter: true }),
   };
 }
 
@@ -1431,13 +1439,17 @@ function recallStep(
   if (index - 1 >= 0) return applyRecall(composer, entries[index - 1]);
   const draft = composer.recallDraft;
   composer.recallDraft = null;
-  if (draft) applyRecall(composer, { text: draft.text, chips: draft.chips, at: 0 });
+  if (!draft) return;
+  applyRecall(composer, { text: draft.text, chips: draft.chips, at: 0 });
+  composer.homeStarter = draft.homeStarter;
 }
 
+// A recalled prompt is the user's own question, so it never carries a Home starter's provenance.
 function applyRecall(composer: ComposerState, entry: RecallEntry | undefined): void {
   if (!entry) return;
   composer.text = entry.text;
   composer.chips = entry.chips.map((chip) => ({ ...chip }));
+  composer.homeStarter = undefined;
 }
 
 function rememberPrompt(core: StoreCore, session: AssistantSession): void {
@@ -1454,6 +1466,7 @@ function restoreStoredDraft(core: StoreCore, sid: Sid): void {
   if (!draft) return;
   const { imageCount = 0, ...stored } = draft;
   Object.assign(session.composer, stored);
+  session.composer.homeStarter = stored.homeStarter;
   core.restoredDrafts.set(sid, { imageCount });
 }
 

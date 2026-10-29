@@ -90,15 +90,23 @@ describe("AssistantHistoryRow", () => {
     expect(other.get('[data-test="assistant-history-row"]').attributes("tabindex")).toBe("-1");
   });
 
-  it("says answering, and waiting for approval before it", () => {
+  it("keeps title and time on the first line and states the chat in words on the second", () => {
     const answering = setup({ activeTurn: true });
-    expect(answering.get('[data-test="assistant-history-row-state"]').text()).toBe("Answering…");
-    expect(answering.get('[data-test="assistant-history-row"]').text()).toMatch(/, Answering…$/);
+    expect(answering.get('[data-test="assistant-history-row-time"]').exists()).toBe(true);
+    const meta = answering.get('[data-test="assistant-history-row-meta"]');
+    expect(meta.get('[data-test="assistant-history-row-state"]').text()).toBe("Answering");
+    expect(answering.get('[data-test="assistant-history-row"]').text()).toMatch(/, Answering$/);
     document.body.innerHTML = "";
     const needs = setup({ activeTurn: true, pendingApproval: true });
     expect(needs.get('[data-test="assistant-history-row-state"]').text()).toBe(
-      "Waiting for your approval",
+      "Needs your approval",
     );
+    document.body.innerHTML = "";
+    const failed = setup({}, { status: "failed" });
+    expect(failed.get('[data-test="assistant-history-row-state"]').text()).toBe("Answer failed");
+    document.body.innerHTML = "";
+    const idle = setup();
+    expect(idle.find('[data-test="assistant-history-row-meta"]').exists()).toBe(false);
   });
 
   it("keeps the text tokens while a change is pending and disables the kebab with the reason", () => {

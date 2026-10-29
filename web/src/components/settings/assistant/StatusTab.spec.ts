@@ -128,7 +128,7 @@ describe("StatusTab", () => {
     await w.find('[data-test="settings-assistant-test-btn"]').trigger("click");
     await settle();
     const text = w.find('[data-test="settings-assistant-test-announce"]').text();
-    expect(text).toBe("Test failed: The assistant service didn't respond.");
+    expect(text).toBe("Test failed: The assistant didn't respond. Nothing was changed.");
     expect(assistant.capabilities).toHaveBeenCalledTimes(2);
   });
 

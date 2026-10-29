@@ -164,7 +164,7 @@ const capability = computed(() =>
 
 // The scope tags are read-only tray chips that open "What the assistant sees" (`70` §8).
 const tags = computed<ContextChip[]>(() => {
-  const { org, streamCount, timeRange, pageObject } = props.scope;
+  const { org, orgName, streamCount, timeRange, pageObject } = props.scope;
   const tag = (id: string, kind: ContextChip["kind"], label: I18nText): ContextChip => ({
     id,
     kind,
@@ -192,7 +192,8 @@ const tags = computed<ContextChip[]>(() => {
         t("assistant.welcome.scopeObject.dashboard", { name: raw(pageObject.name) }),
       ),
     );
-  if (org) list.push(tag("org", "field", t("assistant.welcome.scopeOrg", { org: raw(org) })));
+  if (org)
+    list.push(tag("org", "field", t("assistant.welcome.scopeOrg", { org: raw(orgName || org) })));
   if (streamCount !== null)
     list.push(
       tag("streams", "stream", t("assistant.welcome.streams", { count: streamCount }, streamCount)),

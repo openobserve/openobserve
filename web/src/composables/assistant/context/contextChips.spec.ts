@@ -27,7 +27,9 @@ import {
   chipStateOf,
   contextChipFor,
   ghostChipsOf,
+  isLongPaste,
   pageChipsOf,
+  pastedTextChip,
   seesRowsOf,
   shortLabelFor,
   timeChipOf,
@@ -69,6 +71,28 @@ function row(data: Record<string, unknown>): ContextChip {
     sent: "serialized",
   };
 }
+
+describe("long pastes (D4 §3.9)", () => {
+  it("chips a paste over 20 lines or 2,000 characters, and no shorter one", () => {
+    expect(isLongPaste("a\n".repeat(20).trimEnd())).toBe(false);
+    expect(isLongPaste("a\n".repeat(21).trimEnd())).toBe(true);
+    expect(isLongPaste("x".repeat(2_000))).toBe(false);
+    expect(isLongPaste("x".repeat(2_001))).toBe(true);
+  });
+
+  it("labels the chip by its lines and sends it as a serialized attachment", () => {
+    const text = "one\ntwo\nthree";
+    expect(pastedTextChip(text, "a")).toMatchObject({
+      id: "paste:a",
+      kind: "pasted_text",
+      label: "Pasted text · 3 lines",
+      data: text,
+      sizeBytes: byteSize(text),
+      provenance: "attach",
+      sent: "serialized",
+    });
+  });
+});
 
 describe("the context table", () => {
   it("marks exactly the agent whitelist as sent, everything else not read", () => {
@@ -248,6 +272,15 @@ describe("what the assistant sees", () => {
     ]);
     const notRead = rows.filter((r) => r.group === "not_read").map((r) => r.label);
     expect(notRead).toEqual(expect.arrayContaining(["Quick mode", "Interesting fields"]));
+  });
+
+  it("shows the organization by its display name when one is known", () => {
+    const rows = seesRowsOf(PAGE_CONTEXTS.logs, {
+      window,
+      timezone: "UTC",
+      orgName: (id) => (id === "acme-prod" ? "Acme Production" : id),
+    });
+    expect(String(rows.find((r) => r.label === "Organization")?.value)).toBe("Acme Production");
   });
 
   it("puts the trace query under not read (CT-04 AC 2)", () => {

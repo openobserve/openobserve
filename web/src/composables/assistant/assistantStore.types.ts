@@ -77,6 +77,8 @@ export interface ComposerState {
   replyStash?: string;
   /** One send per id, so an IME Enter cannot send twice. */
   sendId: string;
+  /** The text came from a Home starter; cleared when it is replaced or emptied (PO A26). */
+  homeStarter?: boolean;
 }
 
 /** Captured at `queued` and given back whole on a refusal (HT-03, constraint 13). */
@@ -88,6 +90,7 @@ export interface ComposerSnapshot {
   timeOverride: ComposerState["timeOverride"];
   /** The page fields removed at Send, so a retry sends what was on screen then. */
   removedPageKeys?: string[];
+  homeStarter?: boolean;
 }
 
 /** Token counters from `usage`/`complete.usage`; never credits (constraint 33). */
@@ -162,6 +165,8 @@ export interface BlockAnnotation {
   run?: QueryRunState;
   /** The page's window when the turn was asked, epoch ms. */
   window?: { from: number; to: number };
+  /** A Home launcher chat's first ask, sent over the default window (PO A26). */
+  homeDefaultWindow?: boolean;
 }
 
 /** Closed enum; the envelope test pins it (gap-2 §3.2). */
@@ -227,6 +232,7 @@ export interface OpenAssistantArgs {
     title?: I18nText;
     /** The helper hand-off's first message (`60` §4.6). */
     transcript?: { role: "assistant"; text: string }[];
+    homeStarter?: boolean;
   };
   /** RCA interactive mode (`60` §5.1), forwarded on `PromptRequest`. */
   mode?: "chat";
@@ -533,6 +539,8 @@ export interface AssistantError {
   traceId?: string;
   turnId?: string;
   sessionId?: string;
+  /** An approved change already ran in this turn, whatever the retry action became (D7 §3.2). */
+  afterChange?: boolean;
 }
 
 export interface AssistantSession {
@@ -665,7 +673,12 @@ export interface AssistantStoreApi {
 
   stage(
     sid: Sid,
-    payload: { chips?: ContextChip[]; text?: string; mode: "append" | "replace" },
+    payload: {
+      chips?: ContextChip[];
+      text?: string;
+      mode: "append" | "replace";
+      homeStarter?: boolean;
+    },
   ): void;
   setDraft(sid: Sid, patch: Partial<ComposerState>): void;
   /** After a refusal (constraint 13). */

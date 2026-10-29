@@ -21,6 +21,7 @@ import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectio
 import { fakeAssistant, fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantGateState, {
   SETUP_DOCS_URL,
+  gateLearnOpen,
   resetGateTelemetryForTests,
   type AssistantGateStateProps,
 } from "./AssistantGateState.vue";
@@ -134,13 +135,43 @@ describe("AssistantGateState", () => {
     );
   });
 
-  it("offers Reload with its hint on the locked panel", () => {
-    const wrapper = mountGate();
-    expect(wrapper.text()).toContain("If an admin just granted access, reload to check.");
-    expect(wrapper.find('[data-test="assistant-gate-reload"]').exists()).toBe(true);
-    expect(
-      mountGate({ size: "popover" }).find('[data-test="assistant-gate-reload"]').exists(),
-    ).toBe(false);
+  it("offers Check again with its hint, in the popover too (D7 §3.6)", () => {
+    for (const size of ["inline", "popover"] as const) {
+      const wrapper = mountGate({ size });
+      expect(wrapper.text()).toContain("Just got access?");
+      expect(wrapper.get('[data-test="assistant-gate-reload"]').text()).toBe("Check again");
+    }
+  });
+
+  it("gives the locked popover every action: Ask an admin first, then Learn what it does (D7 §3.6)", async () => {
+    const wrapper = mountGate({ size: "popover" });
+    const actions = wrapper.get('[data-test="assistant-gate-popover-actions"]');
+    expect(actions.findAll("button").map((b) => b.attributes("data-test"))).toEqual([
+      "assistant-gate-ask-admin",
+      "assistant-gate-learn-more",
+    ]);
+    expect(wrapper.find("h2").text()).toBe("O2 Assistant isn't available to your role");
+    gateLearnOpen.value = false;
+    await wrapper.get('[data-test="assistant-gate-learn-more"]').trigger("click");
+    expect(gateLearnOpen.value).toBe(true);
+    expect(wrapper.emitted("action")).toEqual([["learn_more"]]);
+    gateLearnOpen.value = false;
+  });
+
+  it("sends an admin of a turned-off org to the Access tab, a member to Ask an admin", async () => {
+    const admin = mountGate({ reason: "off_for_org", size: "popover", isAdmin: true });
+    const router = admin.vm.$router;
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    await admin.get('[data-test="assistant-gate-open-settings"]').trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "assistantSettings",
+      params: { tab: "access" },
+      query: { org_identifier: "acme" },
+    });
+    expect(admin.find('[data-test="assistant-gate-ask-admin"]').exists()).toBe(false);
+    const member = mountGate({ reason: "off_for_org", size: "popover" });
+    expect(member.find('[data-test="assistant-gate-ask-admin"]').exists()).toBe(true);
+    expect(member.find('[data-test="assistant-gate-open-settings"]').exists()).toBe(false);
   });
 
   it("reports ai_gate_blocked once per session per reason", () => {

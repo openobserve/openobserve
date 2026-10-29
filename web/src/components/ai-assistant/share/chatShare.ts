@@ -262,7 +262,6 @@ export const shareButtonState = (input: ShareButtonInput): ShareButtonState => {
     return { kind: "blocked", reason: "assistant.gate.noShare.tooltip" };
   }
   if (!input.hasTurn) return { kind: "blocked", reason: "assistant.share.nothingToShare" };
-  if (input.running) return { kind: "blocked", reason: "assistant.share.waitForAnswer" };
   if (input.notSaved) return { kind: "blocked", reason: "assistant.share.notSavedBlocked" };
   if (input.historyUnavailable) {
     return { kind: "blocked", reason: "assistant.share.historyUnavailable" };
@@ -272,6 +271,8 @@ export const shareButtonState = (input: ShareButtonInput): ShareButtonState => {
   if (input.hasAttachments && !input.redactAttachments) {
     return { kind: "review", tooltip: "assistant.share.reviewTooltip" };
   }
+  // A running answer can still be shared live; the popover holds the snapshot back until it ends.
+  if (input.running) return { kind: "quick", tooltip: "assistant.share.waitForAnswer" };
   return { kind: "quick", tooltip: "assistant.share.tooltip" };
 };
 

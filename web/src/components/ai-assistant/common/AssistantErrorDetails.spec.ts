@@ -55,6 +55,20 @@ describe("AssistantErrorDetails", () => {
     document.body.innerHTML = "";
   });
 
+  it("is a small link-styled Details trigger in the popover variant, for the outcome meta row", async () => {
+    const wrapper = mount(AssistantErrorDetails, {
+      props: { error: ERROR, at: 0, isAdmin: false, variant: "popover" },
+      attachTo: document.body,
+    });
+    const trigger = wrapper.get('[data-test="assistant-error-details-trigger"]');
+    expect(trigger.text()).toBe("Details");
+    await trigger.trigger("click");
+    await flushPromises();
+    expect(
+      document.body.querySelector('[data-test="assistant-error-details-code"]')?.textContent,
+    ).toContain("provider_error");
+  });
+
   it("is a collapsed Details disclosure holding the rows of `80` §1.4", async () => {
     const wrapper = mountDetails();
     expect(wrapper.text()).toContain("Details");

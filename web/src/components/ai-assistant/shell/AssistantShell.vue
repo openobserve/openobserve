@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="root"
     v-bind="landmark.attrs"
     data-assistant-root
+    data-assistant-surface
     data-dd-privacy="mask"
     :data-placement="placement"
     :data-sheet="sheet ? '' : undefined"
@@ -74,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantShareControl
             :sid="activeSid"
             variant="menu-item"
-            @manage="shareManagerOpen = true"
+            @settings="shareDrawerOpen = true"
           />
         </template>
       </AssistantThreadHeader>
@@ -206,7 +207,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The header region speaks only for sessions no container shows -->
     <AssistantStatusRegion ref="region" />
 
+    <AssistantHistoryList
+      v-if="chatsOpen"
+      mode="panel"
+      class="min-h-0 flex-1"
+      :current-sid="activeSid"
+      :container="container"
+      @opened="chatsOpen = false"
+      @new="newFromChats"
+      @close="closeChats"
+    >
+      <template v-if="capability.persistence && capability.canShare !== 'no'" #shares>
+        <OButton
+          variant="ghost"
+          size="sm"
+          class="max-md:min-h-11 pointer-coarse:min-h-11"
+          data-test="assistant-history-shared-links"
+          @click="shareManagerOpen = true"
+          >{{ t("assistant.history.sharedLinks") }}</OButton
+        >
+      </template>
+    </AssistantHistoryList>
     <div
+      v-show="!chatsOpen"
       :class="[
         'min-h-0 flex-1 max-md:min-h-20',
         state === 'conversation' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
@@ -286,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sid="activeSid ?? undefined"
           :density="density"
           @status-visible="(shown) => (statusRowVisible = shown)"
+          @answer-visible="(shown) => (latestAnswerVisible = shown)"
           @outcome-shown="onOutcomeShown"
         >
           <template #cards>
@@ -308,6 +332,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="approvalCard.id"
                   :card="approvalCard"
                   :org="decisions.org"
+                  :org-name="orgNameOf(decisions.org)"
+                  :multi-org="(vuex.state.organizations?.length ?? 0) > 1"
                   :sending="approvalSending"
                   :extendable="capability.approvalExtend === true"
                   @decide="onDecide"
@@ -341,6 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="state !== 'gate' && !isTerminalBody"
+      v-show="!chatsOpen"
       ref="lower"
       class="flex shrink-0 flex-col max-md:min-h-0 max-md:shrink max-md:overflow-y-auto"
       data-test="assistant-shell-lower"
@@ -401,6 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :turn="session.turn"
             :meta="session.turnMeta"
             :owned-by-this-tab="session.turnMeta.ownedByThisTab"
+            :answer="session.messages.at(-1)?.role === 'assistant' ? session.messages.at(-1) : null"
             class="min-w-0 flex-1"
             data-test="assistant-sticky-status"
           />
@@ -449,9 +477,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @retry="credits.retry()"
           />
         </div>
-      </slot>
-      <slot name="tray">
-        <AssistantContextTray :sid="activeSid" :collapsed="trayCollapsed" :visible="visible" />
       </slot>
       <!-- A refusal stored nothing, so it sits above the composer that holds the restored prompt (`30` §4.2) -->
       <div v-if="refusal" class="shrink-0 px-3 pt-1.5">
@@ -505,7 +530,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('assistant.composer.rateLimited')
                   : undefined
           "
-        />
+        >
+          <template #chips>
+            <slot name="tray">
+              <AssistantContextTray
+                :sid="activeSid"
+                :collapsed="trayCollapsed"
+                :visible="visible"
+                framed
+              />
+            </slot>
+          </template>
+        </AssistantComposer>
       </slot>
       <slot name="disclosure">
         <div class="flex shrink-0 flex-col gap-1.5 px-3 pb-2">
@@ -533,12 +569,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </slot>
     </div>
 
-    <AssistantShareManager
-      v-if="activeSid"
-      v-model:open="shareManagerOpen"
+    <AssistantShareControl
+      v-if="activeSid && state === 'conversation'"
+      v-model:open="shareDrawerOpen"
       :sid="activeSid"
-      initial-scope="chat"
+      variant="drawer"
+      @manage="shareManagerOpen = true"
     />
+    <AssistantShareManager v-model:open="shareManagerOpen" initial-scope="mine" />
 
     <ODialog
       :open="learnOpen"
@@ -616,6 +654,7 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantActionTimeline from "@/components/ai-assistant/approvals/AssistantActionTimeline.vue";
 import AssistantApprovalCard from "@/components/ai-assistant/approvals/AssistantApprovalCard.vue";
 import AssistantApprovalResult from "@/components/ai-assistant/approvals/AssistantApprovalResult.vue";
@@ -646,6 +685,7 @@ import AssistantThreadHeader, {
   assistantThreadHostKey,
 } from "@/components/ai-assistant/thread/AssistantThreadHeader.vue";
 import AssistantShareControl from "@/components/ai-assistant/share/AssistantShareControl.vue";
+import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
 import AssistantShareManager from "@/components/ai-assistant/share/AssistantShareManager.vue";
 import AssistantForkSource from "@/components/ai-assistant/thread/AssistantForkSource.vue";
 import AssistantTranscript from "@/components/ai-assistant/transcript/AssistantTranscript.vue";
@@ -669,6 +709,7 @@ import {
   queryRunOf,
   readHints,
   registerAssistantFocusTarget,
+  starterPayload,
   turnLockKey,
   useAssistantCapability,
   useAssistantCredits,
@@ -714,6 +755,9 @@ import AssistantContainerMenu from "./AssistantContainerMenu.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
 
+// Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
+provideAssistantSurface();
+
 const props = withDefaults(defineProps<AssistantShellProps>(), {
   sheet: false,
   host: undefined,
@@ -753,12 +797,14 @@ const decisionsEl = ref<HTMLElement | null>(null);
 const approvalCardEl = ref<InstanceType<typeof AssistantApprovalCard> | null>(null);
 const consentCardEl = ref<InstanceType<typeof AssistantConsentCard> | null>(null);
 const statusRowVisible = ref(true);
+const latestAnswerVisible = ref(true);
 const online = ref(typeof navigator === "undefined" || navigator.onLine !== false);
 const signedIn = ref(false);
 const popupBlocked = ref(false);
 const dismissedRefusal = shallowRef<unknown>(null);
 const learnOpen = ref(false);
 const shareManagerOpen = ref(false);
+const shareDrawerOpen = ref(false);
 const openedByUser = ref(false);
 const disclosureDismissed = ref(false);
 
@@ -811,7 +857,12 @@ const container = computed<Container>(() => {
 const headerDensity = computed(() =>
   props.placement === "docked" || props.sheet || !mdUp.value ? "dense" : "default",
 );
-provide(assistantThreadHostKey, { newChat });
+// The Chats view hides the chat instead of unmounting it, so its draft, scroll and stream carry on.
+const chatsOpen = ref(false);
+provide(assistantThreadHostKey, {
+  newChat,
+  chats: { open: chatsOpen, set: (open: boolean) => (chatsOpen.value = open) },
+});
 
 const historyUnavailable = computed(
   () => state.value === "conversation" && !!session.value?.record.historyUnavailable,
@@ -849,6 +900,10 @@ watch(
   },
   { immediate: true },
 );
+// Without the header there is no Back, so a gate or a terminal state closes the view.
+watch(showTitle, (shown) => {
+  if (!shown) chatsOpen.value = false;
+});
 watch(
   () => history.deletedNotice.value,
   (notice) => {
@@ -960,7 +1015,13 @@ const ghost = computed(() => {
   const first =
     state.value === "empty" ? welcome.value?.starters.value.find((s) => s.kind !== "recent") : null;
   return first
-    ? { label: first.label, text: first.prompt, chips: first.chips, kind: first.kind }
+    ? {
+        label: first.label,
+        text: first.prompt,
+        chips: first.chips,
+        kind: first.kind,
+        ...(first.home && { home: true }),
+      }
     : null;
 });
 
@@ -1048,7 +1109,9 @@ const strip = computed(() => {
   const jump = !current.ui.follow;
   // With no answer text there is nothing to go to; the outcome block is the latest content.
   const goToAnswer =
-    ["done", "stopped", "failed"].includes(current.turn.state) && hasAnswerText(current.messages);
+    !latestAnswerVisible.value &&
+    ["done", "stopped", "failed"].includes(current.turn.state) &&
+    hasAnswerText(current.messages);
   // The keyboard bridge to a pending card; it stays while the card does, so the strip never shifts under a click.
   const review =
     (!!approvalCard.value && !approvalSending.value) ||
@@ -1529,13 +1592,10 @@ function ensureSession(): string {
 
 function onStarter(starter: Starter): void {
   const sid = ensureSession();
-  if (composer.value) return composer.value.prefill({ text: starter.prompt, chips: starter.chips });
+  const payload = starterPayload(starter, org.value);
+  if (composer.value) return composer.value.prefill(payload);
   const draft = store.state.sessions[sid]?.composer.text.trim() ?? "";
-  store.stage(sid, {
-    chips: starter.chips,
-    text: starter.prompt,
-    mode: draft ? "append" : "replace",
-  });
+  store.stage(sid, { ...payload, mode: draft ? "append" : "replace" });
   focusEntry();
 }
 
@@ -1547,7 +1607,17 @@ function onOpenChat(target: { sid: Sid } | { chatId: number }): void {
   });
 }
 
-/** New from outside the header (the full view's rail): the header's guard and the shell's drafts still apply. */
+function newFromChats(): void {
+  chatsOpen.value = false;
+  askNew();
+}
+
+function closeChats(): void {
+  chatsOpen.value = false;
+  void nextTick(() => threadHeader.value?.focusChats());
+}
+
+/** New from outside the header (the full view's rail): the header's analytics and the shell's drafts still apply. */
 function askNew(): void {
   if (threadHeader.value) threadHeader.value.askNew();
   else newChat();
@@ -1561,9 +1631,6 @@ function newChat(): void {
   const previous = session.value;
   const { text = "", chips = [], images = [] } = previous?.composer ?? {};
   const drafted = !!text.trim() || chips.length > 0 || images.length > 0;
-  // A card the old chat still waits on is declined, so the new chat starts free.
-  if (previous?.pendingApproval)
-    void store.decideApproval(previous.sid, { approved: false, reason: "new_chat" });
   store.setActive(null);
   const sid = ensureSession();
   if (!previous || !drafted || previous.sid === sid) return;

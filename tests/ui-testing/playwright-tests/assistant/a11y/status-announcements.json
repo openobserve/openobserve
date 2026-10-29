@@ -13,7 +13,7 @@
     "done": { "turn": ["Sending…", "Writing the answer", "Done"] },
     "failed": { "turn": ["Sending…", "Failed. The AI provider failed: overloaded. Retry available."] },
     "stopped": { "turn": ["Sending…", "Stopping…", "Stopped"] },
-    "refused": { "turn": ["Sending…", "Not sent. Too many answers are running. Wait for one to finish. Retry available."] },
+    "refused": { "turn": ["Sending…", "Not sent. Too many answers are running. Your message wasn't sent. Retry available."] },
     "approval": {
       "turn": [
         "Sending…",

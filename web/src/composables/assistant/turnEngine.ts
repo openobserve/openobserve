@@ -37,6 +37,7 @@ import type {
   TurnInput,
   TurnMeta,
 } from "./assistantStore.types";
+import { timeWindowOf } from "./context/contextChips";
 import { contextUsedOf, transcriptOf } from "./context/serialize";
 import type { ClientContext, PageContext as AssistantPageContext } from "./context/types";
 import {
@@ -300,6 +301,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         out.turn.push(...first.effects);
       }
       session.turnMeta.lastFrameAt = deps.now();
+      session.turnMeta.lastByteAt = session.turnMeta.lastFrameAt;
       // A delete batch is proposed once the answer is complete, so its card still lands on that answer.
       const lateCard = frame.type === "confirmation_required" && session.turn.state === "done";
       if (acceptsFrames(session.turn) || lateCard) {
@@ -354,6 +356,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         resume();
         const session = sessionOf(rec.sid);
         if (session?.turn.state === "reconnecting") dispatch(rec, { type: "tail_caught_up" });
+        // Any data frame is real progress on the wire, a replayed one included; keepalives never are.
+        if (session) session.turnMeta.lastByteAt = deps.now();
         const fresh = session ? cursorFrame(rec, session.turnMeta, frame, id, tail) : frame;
         watchSilence(rec, true);
         if (!fresh) return;
@@ -449,7 +453,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     deps.capability().persistence() &&
     typeof sessionOf(rec.sid)?.turnMeta.lastSeq === "number";
 
-  // The 30 s stall line is derived from `lastFrameAt`; this timer only emits its event and starts reconnects.
+  // The 30 s stall line is derived from `lastByteAt`; keepalives keep the transport alive but never re-arm the stall.
   const watchSilence = (rec: TurnRecord, progress: boolean) => {
     const entry = runtime.get(rec.sid);
     if (!entry || rec.settled) return;
@@ -756,7 +760,13 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     rec.rawContext = await safePageContext(deps);
     rec.pageContext = whitelist(rec.rawContext, snapshot);
     const asked = noteSentWindow(sessionOf(rec.sid), rec);
-    if (asked) store.annotate(rec.sid, turnAnnotationKey(rec.turnId, "window"), { window: asked });
+    const windowKey = turnAnnotationKey(rec.turnId, "window");
+    const homeDefault = homeDefaultAsk(sessionOf(rec.sid), rec);
+    if (asked || homeDefault || sessionOf(rec.sid)?.annotations[windowKey]?.homeDefaultWindow)
+      store.annotate(rec.sid, windowKey, {
+        ...(asked && { window: asked }),
+        homeDefaultWindow: homeDefault || undefined,
+      });
     if (sessionOf(rec.sid)?.turn.state === "queued") await attempt(rec);
     return rec.promise;
   };
@@ -1053,6 +1063,7 @@ function queueTurn(
     timeOverride: null,
     recallIndex: -1,
     recallDraft: null,
+    homeStarter: undefined,
   });
   return { stream: [], turn: effects };
 }
@@ -1087,6 +1098,25 @@ function noteSentWindow(
   if (prompt?.role !== "user" || from === null || to === null || to <= from) return null;
   prompt.sentWindow = { from, to };
   return prompt.sentWindow;
+}
+
+// A Home starter's question, or a Home launcher chat's first ask, over the default window may offer a wider one (PO A26).
+function homeDefaultAsk(session: AssistantSession | undefined, rec: TurnRecord): boolean {
+  if (!session) return false;
+  // A regenerated answer keeps the question, and with it the question's provenance.
+  if (rec.source === "regenerate") {
+    const asked = session.messages[rec.userIndex]?.turnId ?? rec.turnId;
+    return !!session.annotations[turnAnnotationKey(asked, "window")]?.homeDefaultWindow;
+  }
+  const firstAsk =
+    session.messages.findIndex((message) => message.role === "user") === rec.userIndex;
+  const fromHome =
+    rec.snapshot.homeStarter === true || (session.origin.entryKind === "home_launcher" && firstAsk);
+  if (!fromHome) return false;
+  return (
+    timeWindowOf(rec.rawContext as PageContext | null, rec.snapshot.timeOverride).source ===
+    "default"
+  );
 }
 
 // The trail header's duration is the turn's own, kept beside its footer.
@@ -1192,6 +1222,8 @@ function freshMeta(turnId: string, now: number): TurnMeta {
     usage: null,
     contextUsed: null,
     lastFrameAt: now,
+    lastByteAt: now,
+    stateEnteredAt: now,
     pausedAt: null,
     pausedMs: 0,
     caughtUpAt: null,
@@ -1254,13 +1286,16 @@ function progressOf(stream: StreamState): { steps: number; partial: boolean } {
   return { steps: progress.steps, partial: progress.partial || card };
 }
 
+// The change is noted whatever the action is (Edit and resend too); only a plain Retry becomes Ask again.
 function askAgainIfMutated(turn: TurnState, stream: StreamState): TurnState {
-  if (turn.state !== "failed" || turn.error.action !== "retry") return turn;
+  if (turn.state !== "failed" || turn.error.code === "approval_expired") return turn;
   const last = stream.messages[stream.messages.length - 1];
   const mutated = last?.contentBlocks?.some(
     (block) => block.stepState === "done" && !!block.tool && MUTATING_TOOL.test(block.tool),
   );
-  return mutated ? { ...turn, error: { ...turn.error, action: "ask_again" } } : turn;
+  if (!mutated) return turn;
+  const action = turn.error.action === "retry" ? "ask_again" : turn.error.action;
+  return { ...turn, error: { ...turn.error, action, afterChange: true } };
 }
 
 function acceptsFrames(turn: TurnState): boolean {
@@ -1318,6 +1353,7 @@ function snapshotOf(composer: AssistantSession["composer"]): ComposerSnapshot {
     mentions: [],
     timeOverride: raw.timeOverride ? { ...raw.timeOverride } : null,
     removedPageKeys: [...raw.removedPageKeys],
+    ...(raw.homeStarter && { homeStarter: true }),
   };
 }
 

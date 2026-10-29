@@ -84,51 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OBanner>
 
     <div class="relative flex flex-col gap-1.5">
-      <ul v-if="images.length > 0" class="flex flex-wrap gap-1.5" data-test="assistant-image-strip">
-        <li v-for="image in images" :key="image.id ?? image.filename">
-          <AssistantChipPopover
-            :chip="imageChip(image)"
-            :image-src="dataUrl(image)"
-            :open="openImage === image.id"
-            @update:open="(open) => (openImage = open ? (image.id ?? null) : null)"
-            @remove="removeImage(image)"
-          >
-            <template #anchor>
-              <span
-                class="border-border-default rounded-default inline-flex items-center gap-0.5 border p-0.5"
-              >
-                <OButton
-                  variant="ghost"
-                  size="icon-md"
-                  class="p-0! max-md:size-11 pointer-coarse:size-11"
-                  :aria-label="image.filename"
-                  aria-haspopup="dialog"
-                  :aria-expanded="openImage === image.id"
-                  data-test="assistant-image-open"
-                  @click="openImage = image.id ?? null"
-                >
-                  <img
-                    :src="dataUrl(image)"
-                    :alt="image.filename"
-                    class="rounded-default size-10 object-cover"
-                  />
-                </OButton>
-                <OButton
-                  variant="ghost"
-                  size="icon-xs"
-                  class="max-md:size-11 pointer-coarse:size-11"
-                  :aria-label="t('assistant.composer.removeImage', { name: image.filename })"
-                  data-test="assistant-image-remove"
-                  @click="removeImage(image)"
-                >
-                  <OIcon :name="assistantGlyph.close" size="xs" />
-                </OButton>
-              </span>
-            </template>
-          </AssistantChipPopover>
-        </li>
-      </ul>
-
       <AssistantMentionMenu
         ref="mention"
         :open="mentionAt !== null"
@@ -138,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="pickMention"
         @close="closeMention"
       />
+      <!-- One frame holds the chips, the text and its controls, so the message reads as one control (D4 §3.1) -->
       <OTextarea
         ref="textbox"
         :model-value="text"
@@ -157,7 +113,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @paste="onPaste"
         @focus="refreshPageContext"
         @blur="onBlur"
-      />
+      >
+        <template v-if="$slots.chips || images.length > 0" #header>
+          <div
+            class="flex min-w-0 flex-col gap-1 px-1.5 pt-1.5"
+            data-test="assistant-composer-chips"
+          >
+            <slot name="chips" />
+            <ul
+              v-if="images.length > 0"
+              class="flex flex-wrap gap-1.5"
+              data-test="assistant-image-strip"
+            >
+              <li v-for="image in images" :key="image.id ?? image.filename">
+                <AssistantChipPopover
+                  :chip="imageChip(image)"
+                  :image-src="dataUrl(image)"
+                  :open="openImage === image.id"
+                  @update:open="(open) => (openImage = open ? (image.id ?? null) : null)"
+                  @remove="removeImage(image)"
+                >
+                  <template #anchor>
+                    <span
+                      class="border-border-default rounded-default inline-flex items-center gap-0.5 border p-0.5"
+                    >
+                      <OButton
+                        variant="ghost"
+                        size="icon-md"
+                        class="p-0! max-md:size-11 pointer-coarse:size-11"
+                        :aria-label="image.filename"
+                        aria-haspopup="dialog"
+                        :aria-expanded="openImage === image.id"
+                        data-test="assistant-image-open"
+                        @click="openImage = image.id ?? null"
+                      >
+                        <img
+                          :src="dataUrl(image)"
+                          :alt="image.filename"
+                          class="rounded-default size-10 object-cover"
+                        />
+                      </OButton>
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs"
+                        class="max-md:size-11 pointer-coarse:size-11"
+                        :aria-label="t('assistant.composer.removeImage', { name: image.filename })"
+                        data-test="assistant-image-remove"
+                        @click="removeImage(image)"
+                      >
+                        <OIcon :name="assistantGlyph.close" size="xs" />
+                      </OButton>
+                    </span>
+                  </template>
+                </AssistantChipPopover>
+              </li>
+            </ul>
+          </div>
+        </template>
+        <template #footer>
+          <div
+            class="flex items-center gap-1 px-1.5 pb-1.5"
+            data-test="assistant-composer-controls"
+          >
+            <AssistantAddContextMenu
+              v-if="!replying"
+              ref="addMenu"
+              :org="org"
+              @select="addOption"
+              @image="openPicker"
+            />
+            <AssistantIconButton
+              v-if="!mdUp && recallEntries.length > 0"
+              :label="t('assistant.composer.recentPrompts')"
+              :icon="assistantGlyph.history"
+              data-test="assistant-recall-open"
+              @click="recallOpen = true"
+            />
+            <span class="flex-1" />
+            <span class="grid">
+              <AssistantIconButton
+                v-if="showStop"
+                :variant="stalled ? 'secondary' : 'outline'"
+                :label="t('assistant.turn.stopLabel')"
+                :icon="assistantGlyph.stop"
+                :loading="state === 'stopping'"
+                class="hover:text-status-warning-text focus-visible:text-status-warning-text"
+                data-test="assistant-stop"
+                @click="stop"
+              />
+              <AssistantIconButton
+                v-else
+                variant="primary"
+                :label="t('assistant.turn.sendLabel')"
+                :icon="assistantGlyph.send"
+                :disabled="!canSend"
+                :disabled-reason="sendBlockedReason"
+                data-test="assistant-send"
+                @click="trySend"
+              />
+            </span>
+          </div>
+        </template>
+      </OTextarea>
       <span :id="ghostHintId" class="sr-only">{{ ghostHint }}</span>
       <OButton
         v-if="ghostShown && ghost"
@@ -169,46 +226,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("assistant.welcome.try", { prompt: ghost.label }) }}
       </OButton>
-
-      <div class="flex items-center gap-1">
-        <AssistantComposerHints v-if="mdUp" ref="hints" :labelled="density === 'roomy'" />
-        <AssistantIconButton
-          v-if="!mdUp && recallEntries.length > 0"
-          :label="t('assistant.composer.recentPrompts')"
-          :icon="assistantGlyph.history"
-          data-test="assistant-recall-open"
-          @click="recallOpen = true"
-        />
-        <span class="flex-1" />
-        <AssistantIconButton
-          :label="t('assistant.composer.attachImage')"
-          :icon="assistantGlyph.attachImage"
-          data-test="assistant-attach-image"
-          @click="openPicker"
-        />
-        <span class="grid">
-          <AssistantIconButton
-            v-if="showStop"
-            :variant="stalled ? 'secondary' : 'outline'"
-            :label="t('assistant.turn.stopLabel')"
-            :icon="assistantGlyph.stop"
-            :loading="state === 'stopping'"
-            class="hover:text-status-warning-text focus-visible:text-status-warning-text"
-            data-test="assistant-stop"
-            @click="stop"
-          />
-          <AssistantIconButton
-            v-else
-            variant="primary"
-            :label="t('assistant.turn.sendLabel')"
-            :icon="assistantGlyph.send"
-            :disabled="!canSend"
-            :disabled-reason="sendBlockedReason"
-            data-test="assistant-send"
-            @click="trySend"
-          />
-        </span>
-      </div>
     </div>
 
     <div v-if="helper" class="flex min-w-0 flex-wrap items-center gap-x-2">
@@ -230,6 +247,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="leaveReply"
       >
         {{ t("assistant.composer.replyCancel") }}
+      </OButton>
+      <OButton
+        v-if="pasteOffer && helper === pasteLine"
+        variant="ghost-primary"
+        size="xs"
+        :class="TOUCH_TARGET_CLASS"
+        data-test="assistant-composer-paste-inline"
+        @click="pasteInline"
+      >
+        {{ t("assistant.context.pasteInline") }}
       </OButton>
     </div>
     <OText
@@ -275,6 +302,8 @@ export interface ComposerGhost {
   text: string;
   chips: ContextChip[];
   kind?: StarterKind;
+  /** A Home starter, whose question may get the wider-window offer (PO A26). */
+  home?: boolean;
 }
 
 export interface AssistantComposerProps {
@@ -317,8 +346,10 @@ import {
   UNDO_WINDOW_MS,
   assistantFocusCard,
   assistantGoToAnswer,
+  isLongPaste,
   isRunning,
   markHintSeen,
+  pastedTextChip,
   periodMs,
   readHints,
   readRecall,
@@ -345,7 +376,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { formatBytes } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
-import AssistantComposerHints from "./AssistantComposerHints.vue";
+import AssistantAddContextMenu from "./AssistantAddContextMenu.vue";
 import AssistantRecallSheet from "./AssistantRecallSheet.vue";
 import {
   announceComposer,
@@ -371,7 +402,7 @@ const { mdUp } = useBreakpoint();
 const root = ref<HTMLElement | null>(null);
 const textbox = ref<InstanceType<typeof OTextarea> | null>(null);
 const file = ref<InstanceType<typeof OFile> | null>(null);
-const hints = ref<InstanceType<typeof AssistantComposerHints> | null>(null);
+const addMenu = ref<InstanceType<typeof AssistantAddContextMenu> | null>(null);
 const mention = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
 const uid = useId();
 const helperId = `assistant-composer-helper-${uid}`;
@@ -387,7 +418,11 @@ const recallEntries = ref<RecallEntry[]>([]);
 const openImage = ref<string | null>(null);
 const mentionAt = ref<number | null>(null);
 const mentionQuery = ref("");
-const prefillPending = ref<{ text: string; chips: ContextChip[] } | null>(null);
+const prefillPending = ref<{ text: string; chips: ContextChip[]; homeStarter?: boolean } | null>(
+  null,
+);
+// The last long paste, offered back as plain text until the next edit or send (D4 decision 10).
+const pasteOffer = ref<{ chipId: string; text: string; at: number } | null>(null);
 const now = ref(Date.now());
 let emphasisTimer: ReturnType<typeof setTimeout> | null = null;
 let emptyEnterSaid = false;
@@ -463,7 +498,7 @@ watch(
 );
 const stalled = computed(() => {
   const meta = session.value?.turnMeta;
-  const last = meta?.lastFrameAt ?? meta?.startedAt ?? null;
+  const last = meta?.lastByteAt ?? meta?.lastFrameAt ?? meta?.startedAt ?? null;
   return running.value && last !== null && clock.value - last >= STALL_MS;
 });
 const canSend = computed(
@@ -515,6 +550,7 @@ const helper = computed<I18nText | null>(() => {
   if (blockedLine.value) return blockedLine.value;
   const notice = liveSid.value ? store.entryNotice(liveSid.value) : null;
   if (notice) return t(notice);
+  if (pasteOffer.value) return pasteLine.value;
   if (droppedImages.value > 0)
     return t(
       "assistant.composer.imagesDropped",
@@ -526,6 +562,8 @@ const helper = computed<I18nText | null>(() => {
     return t("assistant.credits.predictedExhausted", { org: raw(org.value) });
   return recallHint.value;
 });
+
+const pasteLine = computed(() => t("assistant.context.pastedAsChip"));
 
 const cleared = computed(() => {
   const notice = ui.value.cleared;
@@ -610,6 +648,7 @@ function onInput(value: string): void {
   if (!id) return;
   blockedLine.value = null;
   droppedImages.value = 0;
+  pasteOffer.value = null;
   freshSendId(id);
   emptyEnterSaid = false;
   // Typing in the new chat ends the Undo offer, so Undo never replaces new work (U9).
@@ -677,11 +716,30 @@ function pickMention(option: MentionOption): void {
   // Only a caret inside the `@` token may edit; the pick replaces the whole token, never leaving its tail (V2, W1).
   if (text.value[at] !== "@" || caret <= at || caret > end) return;
   // A chip refused at the cap leaves the typed token in place, so the user loses neither.
+  if (!applyOption(id, option)) return;
+  store.setDraft(id, { text: text.value.slice(0, at) + text.value.slice(end) });
+  void nextTick(() => focusInput(at));
+}
+
+/** A pick from the `+` menu: the same chip or time as `@`, with the text left as typed. */
+function addOption(option: MentionOption): void {
+  const id = liveSid.value ?? ensureSid();
+  if (!id) return;
+  const mixed = mixedStreamType(option);
+  if (mixed) return capHit("type", t("assistant.context.mixedStreams", { type: raw(mixed) }));
+  applyOption(id, option);
+  void nextTick(() => focusInput("end"));
+}
+
+// Adds the option's chip or sets its time; false when a cap refused the chip.
+function applyOption(id: Sid, option: MentionOption): boolean {
   if (option.kind !== "time" && option.chip) {
     const result = store.addChip(id, option.chip);
-    if (!result.ok) return capHit(result.cap === "rows" ? "rows" : "bytes");
+    if (!result.ok) {
+      capHit(result.cap === "rows" ? "rows" : "bytes");
+      return false;
+    }
   }
-  store.setDraft(id, { text: text.value.slice(0, at) + text.value.slice(end) });
   if (option.kind === "time") {
     const period = option.period ?? null;
     store.setTimeOverride(
@@ -696,7 +754,7 @@ function pickMention(option: MentionOption): void {
     count: 1,
     bytes: option.chip?.sizeBytes ?? 0,
   });
-  void nextTick(() => focusInput(at));
+  return true;
 }
 
 // One stream type per request (F5): a stream of another type than the ones in context is refused in place.
@@ -838,6 +896,7 @@ function trySend(): void {
   if (usedSendIds.has(sendId)) return;
   usedSendIds.add(sendId);
   blockedLine.value = null;
+  pasteOffer.value = null;
   void store
     .send(id)
     .then((result) => onRefused(id, sendId, result))
@@ -936,7 +995,12 @@ function acceptGhost(): void {
   const id = ensureSid();
   const ghost = props.ghost;
   if (!id || !ghost) return;
-  store.stage(id, { text: ghost.text, chips: ghost.chips, mode: "replace" });
+  store.stage(id, {
+    text: ghost.text,
+    chips: ghost.chips,
+    mode: "replace",
+    ...(ghost.home && { homeStarter: true }),
+  });
   trackAssistant("ai_welcome_starter", {
     starter_kind: ghost.kind ?? "page",
     index: 0,
@@ -947,7 +1011,7 @@ function acceptGhost(): void {
 }
 
 /** A starter's prompt: replaces an empty draft, appends to a short one, asks over a long one (IW-06 AC 5). */
-function prefill(payload: { text: string; chips: ContextChip[] }): void {
+function prefill(payload: { text: string; chips: ContextChip[]; homeStarter?: boolean }): void {
   const id = ensureSid();
   if (!id) return;
   if (text.value.length > PREFILL_CHOICE_CHARS) {
@@ -1027,9 +1091,45 @@ function onPaste(event: ClipboardEvent): void {
   const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
     f.type.startsWith("image/"),
   );
-  if (files.length === 0) return;
+  if (files.length === 0) return void pasteLong(event);
   if (!event.clipboardData?.getData("text")) event.preventDefault();
   void addFiles(files, true);
+}
+
+// A long paste rides as a chip; one over the attached-data cap falls through to the textbox as typed text.
+function pasteLong(event: ClipboardEvent): void {
+  const pasted = event.clipboardData?.getData("text/plain") ?? "";
+  if (inertKind.value || replying.value || !isLongPaste(pasted)) return;
+  const id = ensureSid();
+  if (!id) return;
+  const chip = pastedTextChip(pasted, getUUIDv7(), t);
+  const result = store.addChip(id, chip);
+  if (!result.ok) return capHit(result.cap === "rows" ? "rows" : "bytes");
+  event.preventDefault();
+  pasteOffer.value = {
+    chipId: chip.id,
+    text: pasted,
+    at: el()?.selectionStart ?? text.value.length,
+  };
+  say(t("assistant.context.added", { label: chip.label }));
+  trackAssistant("ai_context_changed", {
+    action: "add",
+    kind: "pasted_text",
+    count: 1,
+    bytes: chip.sizeBytes,
+  });
+}
+
+/** "Paste into the message instead": the chip goes and its text lands where the caret was. */
+function pasteInline(): void {
+  const id = liveSid.value;
+  const offer = pasteOffer.value;
+  pasteOffer.value = null;
+  if (!id || !offer) return;
+  store.removeChip(id, offer.chipId);
+  const at = Math.min(offer.at, text.value.length);
+  store.setDraft(id, { text: text.value.slice(0, at) + offer.text + text.value.slice(at) });
+  void nextTick(() => focusInput(at + offer.text.length));
 }
 
 // Pasted shots share one browser name, so each gets the next free `pasted-image-{n}.png` of this draft (CT-10 AC 1).
@@ -1142,6 +1242,14 @@ watch(
     if (!ended) return;
     if (liveSid.value) freshSendId(liveSid.value);
     clearBlocked();
+  },
+);
+
+// The offer names one chip; once that chip is gone (removed in the tray, sent) there is nothing to paste back.
+watch(
+  () => composer.value?.chips.some((chip) => chip.id === pasteOffer.value?.chipId),
+  (present) => {
+    if (!present) pasteOffer.value = null;
   },
 );
 
@@ -1328,5 +1436,9 @@ onBeforeUnmount(() => {
   cancelDeferredClose?.();
 });
 
-defineExpose({ focusInput, prefill, closeOverlays: () => (closeMention(), hints.value?.close()) });
+defineExpose({
+  focusInput,
+  prefill,
+  closeOverlays: () => (closeMention(), addMenu.value?.close()),
+});
 </script>

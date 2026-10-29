@@ -23,6 +23,7 @@ import type { AssistantError, TurnMeta } from "./assistantStore.types";
 import { createSseParser } from "./sseParser";
 import {
   STALL_MS,
+  errorTitle,
   outcomeOf,
   stepLabel,
   turnReducer,
@@ -549,7 +550,7 @@ describe("turnReducer: every transition", () => {
     expect(overloaded.effects).toContainEqual(
       expect.objectContaining({
         key: "assistant.error.provider_error.title",
-        params: expect.objectContaining({ reason: "overloaded" }),
+        params: expect.objectContaining({ reason: "is overloaded" }),
       }),
     );
     const untyped = run(S.writing, { type: "error", category: "llm", message: "x" }, { copy });
@@ -557,7 +558,28 @@ describe("turnReducer: every transition", () => {
       expect.objectContaining({ key: "assistant.error.provider_error.titleNoReason" }),
     );
     expect(t("assistant.error.credits_exhausted.title", { org: "acme" })).toBe(
-      "AI credits are used up for acme.",
+      "AI credits are used up for acme. Your message wasn't sent.",
+    );
+  });
+
+  it("drops the no-change claim from the title once an approved change ran (D7 §3.2)", () => {
+    const failed = (code: "agent_unavailable" | "stream_dropped" | "approval_expired") => ({
+      code,
+      phase: "post_admission" as const,
+      retryable: true,
+      action: "ask_again" as const,
+    });
+    expect(errorTitle(failed("agent_unavailable")).key).toBe(
+      "assistant.error.agent_unavailable.titleAfterChange",
+    );
+    expect(errorTitle(failed("stream_dropped")).key).toBe(
+      "assistant.error.stream_dropped.titleAfterChange",
+    );
+    expect(errorTitle(failed("approval_expired")).key).toBe(
+      "assistant.error.approval_expired.title",
+    );
+    expect(errorTitle({ ...failed("agent_unavailable"), action: "retry" }).key).toBe(
+      "assistant.error.agent_unavailable.title",
     );
   });
 
@@ -719,7 +741,7 @@ describe("turnStatusText", () => {
   it("never stalls a turn that waits on the user, and pauses elapsed meanwhile (HT-01 AC 4)", () => {
     const paused = meta({ startedAt: 0, lastFrameAt: 0, pausedAt: 8_000, pausedMs: 0 });
     expect(turnStatusText(S.approval, paused, t, 60_000)).toEqual({
-      line: "Waiting for your approval · 8 s",
+      line: "Waiting for your approval · paused at 8 s",
       tone: "neutral",
     });
     const resumed = meta({ startedAt: 0, lastFrameAt: 60_000, pausedAt: null, pausedMs: 52_000 });
@@ -834,6 +856,21 @@ describe("turnReducer: WP-23 lifecycle frames", () => {
     expect(turnStatusText(S.thinking, meta({ compacting: true }), t, 1_000)?.line).toBe(
       "Condensing earlier messages",
     );
+  });
+
+  it("restarts the state clock on a new state and on each new step, never on a repeat (D3-b)", () => {
+    const entered = (effects: TurnEffect[]) =>
+      effects.filter((effect) => effect.kind === "meta" && "stateEnteredAt" in effect.patch);
+    const started = run(S.thinking, {
+      type: "tool_call",
+      tool: "SearchSQL",
+      call_id: "c1",
+    } as TurnEvent);
+    expect(entered(started.effects)).toHaveLength(1);
+    const next = run(S.tool, { type: "tool_call", tool: "SearchSQL", call_id: "c2" } as TurnEvent);
+    expect(entered(next.effects)).toHaveLength(1);
+    const same = run(S.writing, { type: "message_delta", content: "more" } as TurnEvent);
+    expect(entered(same.effects)).toHaveLength(0);
   });
 
   it("adds no lifecycle patch once the turn has ended", () => {

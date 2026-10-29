@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { gateLearnOpen } from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import type { AssistantCapability, GateCode } from "@/composables/assistant";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
@@ -159,6 +160,8 @@ describe("AssistantHeaderButton gates", () => {
       expect(document.body.querySelector('[data-test="assistant-header-gate-sheet"]')).toBeNull();
       expect(document.activeElement).toBe(button(wrapper).element);
     }
+    // Every header button binds the one learn dialog, so a stale one would answer the next test's open.
+    wrapper.unmount();
   });
 
   it("reserves the button's phone-sized slot while loading", () => {
@@ -170,14 +173,42 @@ describe("AssistantHeaderButton gates", () => {
     );
   });
 
-  it("is locked on G2 and opens the locked sidebar", async () => {
+  it("is locked on G2 and opens the gate popover, never an empty container (D7 decision 2)", async () => {
     const { wrapper } = setup("no_permission");
     const el = button(wrapper);
     expect(el.attributes("aria-label")).toBe("O2 Assistant, locked");
     expect(tooltip(wrapper)).toBe("Ask an admin for AI access");
     await el.trigger("click");
-    expect(useLockedPanel().value?.invoker).toBe(el.element);
+    await flushPromises();
+    const gate = document.body.querySelector('[data-test="assistant-gate-state"]');
+    expect(gate?.getAttribute("data-size")).toBe("popover");
+    expect(gate?.getAttribute("data-gate")).toBe("no_permission");
+    // The popover is teleported to body, so it must carry the assistant roles itself (`90` §2.2).
+    const ask = gate!.querySelector<HTMLElement>('[data-test="assistant-gate-ask-admin"]')!;
+    expect(ask.closest("[data-assistant-surface]")).not.toBeNull();
+    expect(button(wrapper).element.closest("[data-assistant-surface]")).toBeNull();
+    ask.click();
+    await flushPromises();
+    const request = document.body.querySelector('[data-test="assistant-ask-admin"]');
+    expect(request?.closest("[data-assistant-surface]")).not.toBeNull();
+    expect(useLockedPanel().value).toBeNull();
     expect(openAssistant).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("opens the locked gate as a sheet below md, and Learn what it does as a dialog", async () => {
+    lg.value = false;
+    const { wrapper } = setup("no_permission");
+    await button(wrapper).trigger("click");
+    await flushPromises();
+    const gate = document.body.querySelector('[data-test="assistant-gate-state"]');
+    expect(gate?.getAttribute("data-gate")).toBe("no_permission");
+    expect(gate?.getAttribute("data-size")).toBe("hero");
+    document.body.querySelector<HTMLElement>('[data-test="assistant-gate-learn-more"]')!.click();
+    await flushPromises();
+    expect(gateLearnOpen.value).toBe(true);
+    gateLearnOpen.value = false;
+    wrapper.unmount();
   });
 
   it("is muted with the unavailable name when the agent is down", () => {

@@ -17,10 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="open"
-    :class="[
-      'bg-dropdown-bg border-dropdown-border rounded-surface max-h-60 overflow-y-auto border p-1 shadow-md',
-      'md:absolute md:inset-x-0 md:bottom-full md:mb-1 md:max-w-96',
-    ]"
+    :class="
+      inline
+        ? 'max-h-72 overflow-y-auto'
+        : [
+            'bg-dropdown-bg border-dropdown-border rounded-surface max-h-60 overflow-y-auto border p-1 shadow-md',
+            'md:absolute md:inset-x-0 md:bottom-full md:mb-1 md:max-w-96',
+          ]
+    "
     data-test="assistant-mention-panel"
     data-dd-privacy="mask"
   >
@@ -114,11 +118,14 @@ export interface MentionOption {
   chip?: ContextChip;
   /** `null` is "Page time". */
   period?: string | null;
-  action?: "more" | "retry";
+  action?: MentionAction;
   groupId?: string;
   /** No access: shown, never chosen. */
   disabled?: boolean;
 }
+
+/** An action row of the menu: Show more and Retry act in place, Image hands over to the file picker. */
+export type MentionAction = "more" | "retry" | "image";
 
 export interface AssistantMentionMenuProps {
   open: boolean;
@@ -126,6 +133,10 @@ export interface AssistantMentionMenuProps {
   query: string;
   org: string;
   listboxId: string;
+  /** Inside the `+` popover: no panel chrome of its own (D4 §3.6). */
+  inline?: boolean;
+  /** The `+` menu adds an Image row after the groups (D4 §3.6). */
+  withImage?: boolean;
 }
 
 /** At most this many options per group before "Show more" (CT-05 AC 2). */
@@ -148,6 +159,7 @@ import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
 import { pipelinesQuery } from "@/services/pipelines.queries";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isInternalStreamName } from "@/utils/internalStreams";
 
 type GroupState = "loading" | "ready" | "forbidden" | "error";
 
@@ -161,7 +173,10 @@ interface Group {
   retry?: () => void;
 }
 
-const props = defineProps<AssistantMentionMenuProps>();
+const props = withDefaults(defineProps<AssistantMentionMenuProps>(), {
+  inline: false,
+  withImage: false,
+});
 
 const emit = defineEmits<{
   (e: "select", option: MentionOption): void;
@@ -195,9 +210,18 @@ watch(
   },
 );
 
-const needle = computed(() => props.query.trim().toLowerCase());
-const matches = (option: MentionOption) =>
-  !needle.value || `${option.label} ${option.secondary ?? ""}`.toLowerCase().includes(needle.value);
+// Every typed term must occur somewhere in the name, so `digests` and `cart err` find mid-name matches (BUG-015).
+const terms = computed(() =>
+  props.query
+    .trim()
+    .toLowerCase()
+    .split(/[\s_.-]+/)
+    .filter(Boolean),
+);
+const matches = (option: MentionOption) => {
+  const hay = `${option.label} ${option.secondary ?? ""}`.toLowerCase();
+  return terms.value.every((term) => hay.includes(term));
+};
 
 const timeOptions = computed<MentionOption[]>(() => [
   ...TIME_PERIODS.map((period) => ({
@@ -216,20 +240,22 @@ const timeOptions = computed<MentionOption[]>(() => [
 
 const streamOptions = computed<MentionOption[]>(() =>
   STREAM_TYPES.flatMap((type, index) =>
-    namesOf(streams[index].data.value).map((name) =>
-      option(
-        "stream",
-        `${type}:${name}`,
-        t("assistant.context.chip.stream", { name: raw(name) }),
-        raw(type),
-        {
-          id: name,
-          stream: name,
-          streamType: type,
-        },
-        name,
+    namesOf(streams[index].data.value)
+      .filter((name) => !isInternalStreamName(name))
+      .map((name) =>
+        option(
+          "stream",
+          `${type}:${name}`,
+          t("assistant.context.chip.stream", { name: raw(name) }),
+          raw(type),
+          {
+            id: name,
+            stream: name,
+            streamType: type,
+          },
+          name,
+        ),
       ),
-    ),
   ),
 );
 
@@ -325,14 +351,29 @@ const groups = computed<Group[]>(() =>
       pipelineOptions.value,
       () => void pipelines.refetch(),
     ),
+    ...(props.withImage ? [imageGroup()] : []),
   ].filter((g) => g.state !== "ready" || g.items.length > 0),
 );
 
 const flat = computed(() => groups.value.flatMap((g) => g.items.filter((item) => !item.disabled)));
-const results = computed(() => flat.value.filter((item) => !item.action).length);
+const results = computed(
+  () => flat.value.filter((item) => !item.action || item.action === "image").length,
+);
 const empty = computed(() => groups.value.every((g) => g.state === "ready") && results.value === 0);
 
-// Show more and Retry act in place; an option is handed to the composer.
+function imageGroup(): Group {
+  const label = t("assistant.composer.addImage");
+  const item: MentionOption = { id: "action:image", kind: "image", label, action: "image" };
+  return {
+    id: "attach",
+    title: t("assistant.composer.addGroupAttach"),
+    kind: label,
+    state: "ready",
+    items: terms.value.length === 0 || matches(item) ? [item] : [],
+  };
+}
+
+// Show more and Retry act in place; an option or the Image row is handed to the composer.
 function choose(item: MentionOption): void {
   if (item.disabled) return;
   if (item.action === "more" && item.groupId) {

@@ -180,17 +180,34 @@ describe("AssistantTranscript", () => {
     }
   });
 
+  it("puts the live line inside the running answer, never as a row between prompt and answer (D3-b)", async () => {
+    const session = liveSession([prompt("why?", "t1")], { state: "connecting" });
+    const { wrapper } = mountLive(session);
+    await flushPromises();
+    const answer = wrapper.get('[data-test="assistant-turn-t1"] [data-answer]');
+    expect(answer.find("[data-status-row]").exists()).toBe(true);
+    session.messages.push(reply("partial"));
+    session.turn = { state: "responding.writing" };
+    await flushPromises();
+    const rows = wrapper.findAll("[data-status-row]");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].element.closest("[data-answer]")).not.toBeNull();
+  });
+
   it("observes the status row of every running turn, not only the first (HT-01 AC 8)", async () => {
     const observed: Element[] = [];
     const callbacks: IntersectionObserverCallback[] = [];
     vi.stubGlobal(
       "IntersectionObserver",
       class {
+        cb: IntersectionObserverCallback;
         constructor(cb: IntersectionObserverCallback) {
-          callbacks.push(cb);
+          this.cb = cb;
         }
         observe(el: Element) {
+          if (!el.matches("[data-status-row]")) return;
           observed.push(el);
+          callbacks.push(this.cb);
         }
         disconnect() {}
       },
@@ -214,6 +231,42 @@ describe("AssistantTranscript", () => {
       {} as IntersectionObserver,
     );
     expect(wrapper.emitted("status-visible")?.at(-1)).toEqual([true]);
+    vi.unstubAllGlobals();
+  });
+
+  it("observes the latest answer and reports when it leaves the view, so Go to answer shows only then", async () => {
+    const observed: Element[] = [];
+    const callbacks: IntersectionObserverCallback[] = [];
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(cb: IntersectionObserverCallback) {
+          callbacks.push(cb);
+        }
+        observe(el: Element) {
+          observed.push(el);
+        }
+        disconnect() {}
+      },
+    );
+    const session = liveSession([prompt("one", "t1"), reply("first")], {
+      state: "done",
+      saved: "server",
+    });
+    const { wrapper } = mountLive(session);
+    await flushPromises();
+    session.messages.push(prompt("two", "t2"), reply("second"));
+    await flushPromises();
+    const latest = wrapper.get('[data-test="assistant-answer-t2"]').element;
+    expect(observed.at(-1)).toBe(latest);
+    const callback = callbacks.at(-1);
+    callback?.(
+      [{ isIntersecting: false } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+    expect(wrapper.emitted("answer-visible")?.at(-1)).toEqual([false]);
+    callback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+    expect(wrapper.emitted("answer-visible")?.at(-1)).toEqual([true]);
     vi.unstubAllGlobals();
   });
 
@@ -348,7 +401,7 @@ describe("AssistantTranscript", () => {
     expect(log(wrapper as never).attributes("data-readonly")).toBe("");
     expect(wrapper.find('[data-test^="actions-stub"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-turn-outcome"]').text()).toBe(
-      "Failed: The assistant service didn't respond.",
+      "Failed: The assistant didn't respond. Nothing was changed.",
     );
   });
 

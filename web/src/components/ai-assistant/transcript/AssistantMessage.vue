@@ -185,6 +185,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :numbers="claimMap"
           :available="claimAvailable"
           :label="claimLabel"
+          :step-of="claimStep"
+          :total="steps.length"
+          :openable="turn?.openable ?? true"
           :sid="turn?.sid ?? null"
           :readonly="readonly"
         />
@@ -244,6 +247,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :turn="turn"
       />
     </template>
+    <AssistantQueriesGroup
+      v-if="!live && message.role === 'assistant'"
+      :message="message"
+      :numbers="claimMap"
+      :readonly="readonly"
+      :turn="turn"
+    />
+    <slot name="status" />
     <slot name="after" />
     <component
       :is="footerRenderer"
@@ -380,6 +391,7 @@ import { chipGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import AssistantInlineClaims from "@/components/ai-assistant/evidence/AssistantInlineClaims.vue";
 import AssistantLinkCard from "@/components/ai-assistant/evidence/AssistantLinkCard.vue";
+import AssistantQueriesGroup from "@/components/ai-assistant/evidence/AssistantQueriesGroup.vue";
 import AssistantQueryBlock, {
   type QueryBlock,
 } from "@/components/ai-assistant/evidence/AssistantQueryBlock.vue";
@@ -396,6 +408,7 @@ import {
   stepsOf,
   toolLinksOf,
   type LinkTarget,
+  type StepFacts,
 } from "@/composables/assistant/pure";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -684,6 +697,11 @@ function sourceStepOf(block: QueryBlock): number | null {
 
 function claimAvailable(callId: string): boolean {
   return !props.turn?.hiddenByOwner && steps.value.some((step) => step.callId === callId);
+}
+
+function claimStep(callId: string): StepFacts | null {
+  if (props.turn?.hiddenByOwner) return null;
+  return steps.value.find((step) => step.callId === callId) ?? null;
 }
 
 function claimLabel(callId: string): I18nText {

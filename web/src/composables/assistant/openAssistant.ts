@@ -392,6 +392,7 @@ function stagePayload(
     chips: payload.chips,
     text: payload.text,
     mode: empty ? "replace" : "append",
+    ...(payload.homeStarter && { homeStarter: true }),
   });
   if (payload.title && fresh) store.setTitle(sid, payload.title, "object");
   const staged = store.state.sessions[sid].composer.chips.length - before;

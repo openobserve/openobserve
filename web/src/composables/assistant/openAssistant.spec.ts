@@ -324,6 +324,23 @@ describe("intent × thread", () => {
     expect(String(store.state.sessions[fresh.sid].title)).toBe("Database · orders-db");
   });
 
+  it("stages a Home starter's provenance with its text (PO A26)", async () => {
+    const { open, store } = setup();
+    const staged = ok(
+      await open(
+        explain({
+          intent: "stage",
+          thread: "new",
+          payload: { chips: [], text: "What needs attention?", homeStarter: true },
+        }),
+      ),
+    );
+    expect(store.state.sessions[staged.sid].composer).toMatchObject({
+      text: "What needs attention?",
+      homeStarter: true,
+    });
+  });
+
   it("send + auto with a stale chat starts a new one", async () => {
     const { open, clock, store } = setup();
     const { sid } = ok(await open(explain()));

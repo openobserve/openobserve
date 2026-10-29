@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// Sharing with the flag on: one-click snapshot, Manage link, the rebuilt shared pages and Continue in my chats.
+// Sharing with the flag on: the Share popover before any link, the link it creates, the shared pages and Continue in my chats.
 
 import { test, expect } from "@playwright/test";
 
@@ -23,6 +23,21 @@ test.describe("assistant sharing", () => {
   const sharedUrl = (token) => `${harness.ENV.appUrl}/ai/shared/${token}?org_identifier=${harness.ENV.org}`;
   const shareCreates = () => state.log.filter((line) => /^POST \/api\/[^/]+\/ai\/chats\/[^/]+\/shares/.test(line));
   const shareButton = () => assistant.container().locator('[data-test="assistant-thread-share"]');
+  const shareForm = (page) => page.locator('[data-test="assistant-share-settings"]').filter({ visible: true });
+  const postedShare = (page) =>
+    page.waitForRequest((r) => r.method() === "POST" && /\/ai\/chats\/[^/]+\/shares$/.test(r.url()));
+
+  // Share opens the popover only; the link exists once Create and copy link is pressed.
+  async function createLink(page) {
+    await shareButton().click();
+    const form = shareForm(page);
+    await expect(form).toBeVisible();
+    const posted = postedShare(page);
+    await form.locator('[data-test="assistant-share-create"]').click();
+    await posted;
+    await expect(shareButton()).toHaveText(/Shared/);
+    return form;
+  }
 
   // The suite signs in as root; a member needs the org-admin flag off as well as a non-admin role.
   const member = (overrides) => ({
@@ -47,9 +62,14 @@ test.describe("assistant sharing", () => {
     await expect(assistant.composer()).toBeVisible();
   }
 
+  // Share opens while an answer streams, so snapshot cases must wait for the done answer's footer first.
   async function answered(page, scenario = "complete") {
     await harness.nextScenario(page, scenario);
     await assistant.send("why 5xx?");
+    await expect(assistant.answer().locator('[data-test="assistant-turn-footer"]')).toBeVisible({ timeout: 30_000 });
+    await expect(assistant.status()).toHaveCount(0);
+    await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true");
+    await expect(assistant.container().locator('[data-test="assistant-stop"]')).toHaveCount(0);
   }
 
   async function pasteImage(page) {
@@ -62,7 +82,7 @@ test.describe("assistant sharing", () => {
     }, PNG_BASE64);
   }
 
-  test("SHARE-01 one click shares an org snapshot with tool data hidden and copies the link", { tag: ["@mock", "@stack-ee"] }, async ({
+  test("SHARE-01 Share opens the popover with the defaults, and only Create and copy link posts an org snapshot", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -70,17 +90,22 @@ test.describe("assistant sharing", () => {
     await openOnLogs(page);
     await answered(page);
     await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
-    const posted = page.waitForRequest((r) => r.method() === "POST" && /\/ai\/chats\/[^/]+\/shares$/.test(r.url()));
     await shareButton().click();
+    const form = shareForm(page);
+    await expect(form).toBeVisible();
+    await expect(form).toContainText("can read it.");
+    await expect(form).toContainText("Continuing it in their own chats also needs AI access.");
+    expect(shareCreates()).toHaveLength(0);
+    const posted = postedShare(page);
+    await form.locator('[data-test="assistant-share-create"]').click();
     const body = (await posted).postDataJSON();
     expect(body).toEqual({ mode: "snapshot", visibility: "org", redact_tools: true, expires_in_secs: NINETY_DAYS });
-    await expect(page.locator('[data-test="assistant-share-toast-settings"]')).toBeVisible();
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("/web/ai/shared/tok-new-");
-    await expect(assistant.container().locator('[data-test="assistant-thread-share-chip"]')).toHaveText(
-      "Shared · Org · Snapshot",
-    );
+    await expect(form.locator('[data-test="assistant-share-copy"]')).toBeVisible();
+    await expect(shareButton()).toHaveText(/Shared/);
+    await expect(assistant.container().locator('[data-test="assistant-thread-share-chip"]')).toHaveCount(0);
     expect(shareCreates()).toHaveLength(1);
-    await shareButton().click();
+    await form.locator('[data-test="assistant-share-see-all"]').click();
     await expect(page.locator('[data-test="assistant-share-manager"]')).toBeVisible();
     expect(shareCreates()).toHaveLength(1);
   });
@@ -90,43 +115,44 @@ test.describe("assistant sharing", () => {
     await openOnLogs(page);
     await answered(page);
     await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
-    await shareButton().click();
-    await expect(assistant.container().locator('[data-test="assistant-thread-share-chip"]')).toBeVisible();
-    await shareButton().click();
-    const manager = page.locator('[data-test="assistant-share-manager"]');
-    await manager.getByRole("button", { name: "New link" }).click();
-    await manager.locator('[data-test="assistant-share-visibility-public"]').click();
-    const redact = manager.locator('[data-test="assistant-share-redact-tools"]').getByRole("checkbox");
+    const form = await createLink(page);
+    await form.locator('[data-test="assistant-share-new-link"]').click();
+    await form.locator('[data-test="assistant-share-visibility-public"]').click();
+    const redact = form.locator('[data-test="assistant-share-redact-tools"]').getByRole("checkbox");
     await expect(redact).toBeChecked();
     await redact.click();
-    const confirm = manager.locator('[data-test="assistant-share-show-tools-confirm"]');
+    const confirm = form.locator('[data-test="assistant-share-show-tools-confirm"]');
     await expect(confirm).toHaveCount(1);
     await expect(confirm).toContainText("Show tool inputs and outputs to anyone with this link?");
     await confirm.locator('[data-test="assistant-share-show-tools-confirm-show"]').click();
     await expect(confirm).toHaveCount(0);
     await expect(redact).not.toBeChecked();
-    await manager.locator('[data-test="assistant-share-visibility-org"]').click();
+    await form.locator('[data-test="assistant-share-visibility-org"]').click();
     await expect(redact).not.toBeChecked();
     await expect(confirm).toHaveCount(0);
+    expect(shareCreates()).toHaveLength(1);
   });
 
-  test("SHARE-05 Update snapshot is blocked while an answer runs", { tag: ["@mock"] }, async ({ context, page }) => {
+  test("SHARE-05 a running answer keeps the link reachable but blocks Update snapshot", { tag: ["@mock"] }, async ({
+    context,
+    page,
+  }) => {
     await start(context, page);
     await openOnLogs(page);
     await answered(page);
     await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
-    await shareButton().click();
-    const chip = assistant.container().locator('[data-test="assistant-thread-share-chip"]');
-    await expect(chip).toBeVisible();
+    await createLink(page);
+    await page.keyboard.press("Escape");
     await harness.nextScenario(page, "slow");
     await assistant.send("and now?");
     await expect(assistant.container().locator('[data-test="assistant-stop"]')).toBeVisible();
-    await chip.click();
-    const update = page.locator('[data-test="assistant-share-update-snapshot"]');
-    await expect(update).toHaveAttribute("aria-disabled", "true");
-    await expect(page.locator('[data-test="assistant-share-settings"]')).toContainText(
-      "Finish or stop the answer first",
-    );
+    await expect(shareButton()).toBeEnabled();
+    await shareButton().click();
+    const form = shareForm(page);
+    await expect(form.locator('[data-test="assistant-share-copy"]')).toBeVisible();
+    await expect(form.locator('[data-test="assistant-share-revoke"]')).toBeVisible();
+    await expect(form.locator('[data-test="assistant-share-update-snapshot"]')).toHaveAttribute("aria-disabled", "true");
+    await expect(form).toContainText("Finish or stop the answer first");
   });
 
   test("SHARE-06 Continue in my chats forks under a continued title", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
@@ -231,14 +257,11 @@ test.describe("assistant sharing", () => {
     await openOnLogs(page);
     await answered(page);
     await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
-    await shareButton().click();
-    await expect(assistant.container().locator('[data-test="assistant-thread-share-chip"]')).toBeVisible();
-    await shareButton().click();
-    const manager = page.locator('[data-test="assistant-share-manager"]');
-    await manager.getByRole("button", { name: "New link" }).click();
-    await manager.locator('[data-test="assistant-share-visibility-public"]').click();
-    const posted = page.waitForRequest((r) => r.method() === "POST" && /\/ai\/chats\/[^/]+\/shares$/.test(r.url()));
-    await manager.locator('[data-test="assistant-share-create"]').click();
+    const form = await createLink(page);
+    await form.locator('[data-test="assistant-share-new-link"]').click();
+    await form.locator('[data-test="assistant-share-visibility-public"]').click();
+    const posted = postedShare(page);
+    await form.locator('[data-test="assistant-share-create"]').click();
     const body = (await posted).postDataJSON();
     expect(body.visibility).toBe("public");
     expect(body.redact_tools).toBe(true);

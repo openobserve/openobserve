@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <OPopover
           v-if="windows.length > 1"
+          privacy="mask"
           side="top"
           align="start"
           :aria-label="t('assistant.footer.windowsName')"
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="windows.length || !stopped" aria-hidden="true">·</span>
         <OPopover
           v-if="tokensLine"
+          privacy="mask"
           side="top"
           align="start"
           :aria-label="credits"
@@ -84,7 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tokensLine
           }}</OText>
         </OPopover>
-        <OPopover v-else side="top" align="start" :aria-label="credits" content-class="p-2 text-xs">
+        <OPopover
+          v-else
+          privacy="mask"
+          side="top"
+          align="start"
+          :aria-label="credits"
+          content-class="p-2 text-xs"
+        >
           <template #trigger>
             <OButton
               variant="ghost"
@@ -105,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="notSaved">
         <span aria-hidden="true">·</span>
         <OPopover
+          privacy="mask"
           side="top"
           align="start"
           :aria-label="t('assistant.footer.notSaved')"
@@ -161,6 +171,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="max-w-full"
       />
     </div>
+    <div
+      v-if="widerOffer"
+      class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
+      data-test="assistant-turn-empty-window"
+    >
+      <OText variant="meta">{{ t("assistant.footer.emptyWindow", { range: defaultRange }) }}</OText>
+      <OButton
+        variant="outline"
+        size="sm"
+        :disabled="!!rerunBlocked"
+        :focusable-unavailable="!!rerunBlocked"
+        :class="TOUCH_TARGET_CLASS"
+        data-test="assistant-rerun-wider"
+        @click="rerunWider"
+      >
+        {{ t("assistant.footer.tryWider", { duration: widerDuration }) }}
+        <template v-if="rerunBlocked" #unavailable-reason>{{ rerunBlocked }}</template>
+      </OButton>
+    </div>
   </div>
 </template>
 
@@ -169,16 +198,19 @@ import { computed, inject, ref } from "vue";
 
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import {
+  answerQueriesAllEmpty,
   assistantEvidenceHostKey,
   footerOf,
   isTerminal,
   queryCount,
   stepsOf,
+  turnAnnotationKey,
   turnLockKey,
   useTurnLock,
   windowsOf,
   type AssistantTurnView,
 } from "@/composables/assistant/pure";
+import { timeRangeText, timeWindowOf, widerPeriodText } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -239,6 +271,18 @@ const sessionIdle = computed(() => {
 const canRerun = computed(
   () => live.value && sessionIdle.value && windows.value.length > 0 && !!props.turn?.prompt,
 );
+// Only the click sends; the default range is never widened by itself (PO A26).
+const widerOffer = computed(() => {
+  const turn = props.turn;
+  if (!live.value || !turn?.sid || !turn.isLast || outcome.value !== "done") return false;
+  const session = evidence?.session(turn.sid);
+  const sent = session?.annotations[turnAnnotationKey(turn.turnId, "window")];
+  return (
+    !!sent?.homeDefaultWindow && sessionIdle.value && answerQueriesAllEmpty(props.message, turn.org)
+  );
+});
+const defaultRange = computed(() => timeRangeText(timeWindowOf(null, null), t));
+const widerDuration = computed(() => widerPeriodText());
 const variant = computed(() =>
   !windows.value.length
     ? "no_query"
@@ -300,6 +344,12 @@ function rerun(): void {
   const sid = props.turn?.sid;
   if (!sid || !evidence || rerunBlocked.value || !props.turn) return;
   void evidence.dispatch(sid, { kind: "rerun_now", turnId: props.turn.turnId });
+}
+
+function rerunWider(): void {
+  const sid = props.turn?.sid;
+  if (!sid || !evidence || rerunBlocked.value || !props.turn) return;
+  void evidence.dispatch(sid, { kind: "rerun_wider", turnId: props.turn.turnId });
 }
 
 async function openWindow(callId: string): Promise<void> {

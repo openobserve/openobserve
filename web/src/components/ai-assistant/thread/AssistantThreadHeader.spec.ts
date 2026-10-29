@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 
 import type { AssistantCapability } from "@/composables/assistant";
 import { registerHistoryTarget } from "@/composables/assistant/shortcuts";
@@ -29,7 +29,7 @@ import AssistantThreadHeader, {
   type AssistantThreadHeaderProps,
 } from "./AssistantThreadHeader.vue";
 
-const { fake, exporter, track } = vi.hoisted(() => ({
+const { fake, exporter, track, toast } = vi.hoisted(() => ({
   fake: { current: null as any },
   exporter: {
     exportChat: vi.fn(),
@@ -37,6 +37,7 @@ const { fake, exporter, track } = vi.hoisted(() => ({
     busy: { value: new Set<string>() },
   },
   track: vi.fn(),
+  toast: vi.fn(),
 }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
@@ -50,13 +51,7 @@ vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/assistantAnalytics")>()),
   trackAssistant: track,
 }));
-vi.mock("@/components/ai-assistant/history/AssistantHistoryList.vue", () => ({
-  default: {
-    name: "ListStub",
-    props: ["mode"],
-    template: '<div data-test="list-stub" :data-mode="mode" />',
-  },
-}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 
 async function setup(
   props: Partial<AssistantThreadHeaderProps> = {},
@@ -72,18 +67,20 @@ async function setup(
     store.setTitle(sid, raw(title), "generated");
   }
   const newChat = vi.fn();
+  const chatsOpen = ref(false);
+  const chats = { open: chatsOpen, set: vi.fn((open: boolean) => (chatsOpen.value = open)) };
   const wrapper = mount(AssistantThreadHeader, {
     props: { sid, placement: "sidebar", density: "default", container: "sidebar", ...props },
     slots: { "container-actions": '<button data-test="close-stub">×</button>' },
     global: {
       plugins: [fakeRouter(), fakeVuex()],
       stubs: historyStubs,
-      provide: { [assistantThreadHostKey as symbol]: { newChat } },
+      provide: { [assistantThreadHostKey as symbol]: { newChat, chats } },
     },
     attachTo: document.body,
   });
   await flushPromises();
-  return { wrapper, sid, newChat, ...fake.current };
+  return { wrapper, sid, newChat, chats, ...fake.current };
 }
 
 beforeEach(() => {
@@ -94,6 +91,7 @@ beforeEach(() => {
 afterEach(() => {
   document.body.innerHTML = "";
   track.mockClear();
+  toast.mockClear();
 });
 
 describe("AssistantThreadHeader", () => {
@@ -142,7 +140,10 @@ describe("AssistantThreadHeader", () => {
     const chats = wrapper.get(
       '[data-test="assistant-thread-history"] span.sr-only, [data-test="assistant-thread-history"] span[class*="sr-only"]',
     );
-    expect(chats.classes()).toContain("@max-[24rem]:sr-only");
+    expect(chats.classes()).toContain("@max-[32rem]:sr-only");
+    expect(wrapper.get('[data-test="assistant-thread-history"]').attributes("aria-label")).toBe(
+      "Chats",
+    );
   });
 
   it("renames inline: the title becomes sticky renamed, Escape restores without a request", async () => {
@@ -181,18 +182,24 @@ describe("AssistantThreadHeader", () => {
     expect(wrapper.text()).toContain("200/200");
   });
 
-  it("starts a new chat at once when idle, and asks first while an answer runs", async () => {
+  it("starts a new chat at once even while an answer runs, and says the old one keeps going", async () => {
     const { wrapper, newChat, store, sid } = await setup();
     await wrapper.get('[data-test="assistant-thread-new"]').trigger("click");
     expect(newChat).toHaveBeenCalledTimes(1);
+    expect(toast).not.toHaveBeenCalled();
+    newChat.mockImplementation(() => store.setActive(null));
+    store.setActive(sid);
     store.state.sessions[sid].turn = { state: "responding.writing" } as never;
     await nextTick();
     await wrapper.get('[data-test="assistant-thread-new"]').trigger("click");
-    const dialog = wrapper.get('[data-test="assistant-thread-new-dialog"]');
-    expect(dialog.get("h2").text()).toBe("Start a new chat?");
-    expect(dialog.text()).toContain("The current answer keeps running in the background.");
-    await dialog.get('[data-stub="primary"]').trigger("click");
+    expect(wrapper.find('[data-test="assistant-thread-new-dialog"]').exists()).toBe(false);
     expect(newChat).toHaveBeenCalledTimes(2);
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "“Checkout 5xx spike” keeps answering" }),
+    );
+    const open = vi.spyOn(store, "openSession").mockResolvedValue(undefined as never);
+    toast.mock.calls[0][0].action.handler();
+    expect(open).toHaveBeenCalledWith({ sid }, { focus: true });
   });
 
   it("orders Tab stops title, Chats, Download, New, overflow, then the shell controls", async () => {
@@ -223,10 +230,33 @@ describe("AssistantThreadHeader", () => {
     );
   });
 
-  it("opens the list as a popover from Chats", async () => {
-    const { wrapper } = await setup();
+  it("opens the Chats view from Chats, with Back and New in place of the title row", async () => {
+    const { wrapper, chats, newChat } = await setup();
     await wrapper.get('[data-test="assistant-thread-history"]').trigger("click");
-    expect(wrapper.get('[data-test="list-stub"]').attributes("data-mode")).toBe("popover");
+    expect(chats.set).toHaveBeenCalledWith(true);
+    await nextTick();
+    expect(wrapper.attributes("data-view")).toBe("chats");
+    expect(wrapper.get('[data-test="assistant-chats-title"]').text()).toBe("Chats");
+    expect(wrapper.get('[data-test="assistant-chats-back"]').attributes("aria-label")).toBe(
+      "Back to chat: Checkout 5xx spike",
+    );
+    expect(wrapper.find('[data-test="assistant-thread-title"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="close-stub"]').exists()).toBe(true);
+    await wrapper.get('[data-test="assistant-chats-new"]').trigger("click");
+    expect(chats.set).toHaveBeenLastCalledWith(false);
+    expect(newChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns focus to Chats when Back closes the view", async () => {
+    const { wrapper, chats } = await setup();
+    chats.open.value = true;
+    await nextTick();
+    await wrapper.get('[data-test="assistant-chats-back"]').trigger("click");
+    await flushPromises();
+    expect(chats.open.value).toBe(false);
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="assistant-thread-history"]').element,
+    );
   });
 
   it("hands Chats to the full view's rail instead of opening a second list", async () => {
@@ -234,11 +264,11 @@ describe("AssistantThreadHeader", () => {
     document.body.append(rail);
     const run = vi.fn();
     const off = registerHistoryTarget({ el: () => rail, priority: 2, run });
-    const { wrapper } = await setup();
+    const { wrapper, chats } = await setup();
     await wrapper.get('[data-test="assistant-thread-history"]').trigger("click");
     await flushPromises();
     expect(run).toHaveBeenCalledTimes(1);
-    expect(wrapper.find('[data-test="list-stub"]').exists()).toBe(false);
+    expect(chats.set).not.toHaveBeenCalled();
     off();
   });
 
@@ -256,13 +286,13 @@ describe("AssistantThreadHeader", () => {
     expect(String(store.state.sessions[sid].title)).toBe("日本");
   });
 
-  it("moves Chats and New into the overflow when dense, and opens the list as a drawer", async () => {
-    const { wrapper } = await setup({ density: "dense", placement: "docked" });
+  it("moves Chats and New into the overflow when dense, and opens the same Chats view", async () => {
+    const { wrapper, chats } = await setup({ density: "dense", placement: "docked" });
     expect(wrapper.find('[data-test="assistant-thread-history"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(false);
-    await wrapper.get('[data-test="assistant-thread-menu-history"]').trigger("click");
-    expect(wrapper.get('[data-test="list-stub"]').attributes("data-mode")).toBe("drawer");
     expect(wrapper.find('[data-test="assistant-thread-menu-new"]').exists()).toBe(true);
+    await wrapper.get('[data-test="assistant-thread-menu-history"]').trigger("click");
+    expect(chats.set).toHaveBeenCalledWith(true);
   });
 
   it("describes the heading by the not-saved tag", async () => {

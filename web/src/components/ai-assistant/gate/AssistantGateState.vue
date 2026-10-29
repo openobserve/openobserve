@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="content"
     ref="root"
     data-test="assistant-gate-state"
+    data-assistant-surface
     :data-gate="reason"
     :data-size="size"
     :class="size === 'hero' ? 'flex h-full min-h-0 flex-col' : ''"
@@ -94,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
           <p v-if="content.reload" class="text-text-secondary text-sm">
-            {{ t("assistant.gate.reloadHint") }}
+            {{ t("assistant.gate.checkAgainHint") }}
             <OButton
               variant="ghost-primary"
               size="xs"
@@ -102,35 +103,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="assistant-gate-reload"
               @click="onAction('reload')"
             >
-              {{ t("assistant.gate.reload") }}
+              {{ t("assistant.gate.checkAgain") }}
             </OButton>
           </p>
           <slot name="extra" />
         </div>
       </template>
     </OEmptyState>
-    <div v-else-if="size === 'popover'" class="flex max-w-80 flex-col gap-2 p-3">
+    <div
+      v-else-if="size === 'popover'"
+      class="flex w-[min(22rem,calc(100vw-1.5rem))] flex-col gap-2 p-3"
+      data-test="assistant-gate-popover"
+    >
       <h2 class="text-text-heading text-sm font-medium">{{ content.title }}</h2>
       <p v-if="content.body" class="text-text-secondary text-sm">{{ content.body }}</p>
-      <div v-if="content.actions[0]" class="flex">
-        <OButton
-          :ref="(el) => setPrimary(el, true)"
-          variant="primary"
-          size="sm"
-          class="max-md:min-h-11"
-          :data-test="content.actions[0].dataTest"
-          @click="onAction(content.actions[0].cta)"
-        >
-          {{ content.actions[0].label }}
-        </OButton>
+      <div
+        v-if="content.actions.length"
+        class="flex flex-wrap gap-2 max-md:flex-col"
+        data-test="assistant-gate-popover-actions"
+      >
+        <template v-for="action in content.actions" :key="action.cta">
+          <AssistantAskAdminPopover
+            v-if="action.cta === 'ask_admin'"
+            :kind="askKind"
+            :org="context?.org ?? ''"
+            @copied="track('ask_admin_copy')"
+            @emailed="track('ask_admin_email')"
+          >
+            <template #trigger>
+              <OButton
+                :ref="(el) => setPrimary(el, action.primary)"
+                :variant="action.primary ? 'primary' : 'outline'"
+                size="sm"
+                class="max-md:min-h-11 max-md:w-full"
+                :data-test="action.dataTest"
+                @click="onAction(action.cta)"
+              >
+                {{ action.label }}
+              </OButton>
+            </template>
+          </AssistantAskAdminPopover>
+          <OButton
+            v-else
+            :ref="(el) => setPrimary(el, action.primary)"
+            :variant="action.primary ? 'primary' : 'outline'"
+            size="sm"
+            class="max-md:min-h-11 max-md:w-full"
+            :data-test="action.dataTest"
+            @click="onAction(action.cta)"
+          >
+            {{ action.label }}
+          </OButton>
+        </template>
       </div>
+      <p v-if="content.reload" class="text-text-secondary text-xs">
+        {{ t("assistant.gate.checkAgainHint") }}
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          class="max-md:min-h-11"
+          data-test="assistant-gate-reload"
+          @click="onAction('reload')"
+        >
+          {{ t("assistant.gate.checkAgain") }}
+        </OButton>
+      </p>
     </div>
     <span v-else class="text-sm">{{ content.title }}</span>
   </div>
 </template>
 
 <script lang="ts">
-import type { ComponentPublicInstance } from "vue";
+import { shallowRef, type ComponentPublicInstance } from "vue";
 
 import type { GateReason } from "@/composables/assistant";
 
@@ -162,6 +206,9 @@ export interface AssistantGateStateEmits {
 /** The docs page for setting the agent up (`50` §5.1). */
 export const SETUP_DOCS_URL = "https://openobserve.ai/docs/enterprise-setup/sre-agent/";
 
+/** Set by a popover's Learn what it does; the header button owns the one dialog, since a popover closes on outside clicks. */
+export const gateLearnOpen = /* @__PURE__ */ shallowRef(false);
+
 // Once per page session per reason, however many containers render the same gate.
 const reported = new Set<GateReason>();
 
@@ -176,7 +223,9 @@ type ButtonInstance = ComponentPublicInstance & { $el: HTMLElement };
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { useAssistantCapability, useAssistantName } from "@/composables/assistant";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
@@ -203,6 +252,9 @@ interface GateContent {
   reload: boolean;
 }
 
+// Gates and requests render on any host page and teleport their popovers, so they bring the assistant roles themselves.
+provideAssistantSurface();
+
 const props = withDefaults(defineProps<AssistantGateStateProps>(), {
   context: undefined,
   focusOnMount: false,
@@ -217,6 +269,7 @@ const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const capability = useAssistantCapability();
 const upgrade = useEnterpriseUpgradeDialog();
+const router = useRouter();
 const root = ref<HTMLElement | null>(null);
 const primaryButton = ref<HTMLElement | null>(null);
 
@@ -234,7 +287,7 @@ const whereToGrant = computed(() =>
 const content = computed<GateContent | null>(() => contentFor(props.reason));
 
 const askKind = computed<AskAdminKind>(() => {
-  if (props.reason === "off_for_org") return "settings";
+  if (props.reason === "off_for_org") return "enable";
   return props.reason === "no_share_read" ? "share_read" : "access";
 });
 
@@ -287,16 +340,21 @@ function contentFor(reason: GateReason): GateContent | null {
         ...none,
         title: t("assistant.gate.offForOrg.title", name),
         body: t("assistant.gate.offForOrg.body"),
-        actions: props.isAdmin
-          ? []
-          : [
-              action(
+        actions: [
+          props.isAdmin
+            ? action(
+                "open_settings",
+                t("assistant.gate.openAccessSettings"),
+                "assistant-gate-open-settings",
+                true,
+              )
+            : action(
                 "ask_admin",
                 t("assistant.gate.noPermission.askAdmin"),
                 "assistant-gate-ask-admin",
                 true,
               ),
-            ],
+        ],
       };
     case "unhealthy":
       return {
@@ -321,7 +379,7 @@ function contentFor(reason: GateReason): GateContent | null {
           ),
           action("learn_more", t("assistant.gate.learnMore"), "assistant-gate-learn-more", false),
         ],
-        reload: props.size !== "popover",
+        reload: true,
       };
     case "no_share":
       return { ...none, title: t("assistant.gate.noShare.tooltip"), body: null };
@@ -362,6 +420,13 @@ function onAction(cta: GateCta): void {
   if (cta === "setup") window.open(SETUP_DOCS_URL, "_blank", "noopener,noreferrer");
   if (cta === "reload") reprobe();
   if (cta === "try_again") void capabilities.refetch();
+  if (cta === "learn_more" && props.size === "popover") gateLearnOpen.value = true;
+  if (cta === "open_settings")
+    void router?.push({
+      name: "assistantSettings",
+      params: { tab: "access" },
+      query: { org_identifier: props.context?.org },
+    });
   emit("action", cta);
 }
 

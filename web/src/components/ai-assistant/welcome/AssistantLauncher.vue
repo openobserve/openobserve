@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <section
     v-if="shown"
     :aria-labelledby="titleId"
-    class="max-w-[72rem] min-w-0"
+    class="w-full min-w-0"
     data-test="assistant-launcher"
+    data-assistant-surface
     data-dd-privacy="mask"
     :data-state="state"
   >
@@ -40,12 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="sm"
-          :icon-right="assistantGlyph.openSource"
+          :icon-right="assistantGlyph.goTo"
           class="max-md:min-h-11 pointer-coarse:min-h-11"
           data-test="assistant-launcher-open"
           @click="openFull"
         >
-          {{ t("assistant.welcome.launcher.open", { product }) }}
+          {{ t("assistant.welcome.launcher.openFull") }}
         </OButton>
       </div>
 
@@ -100,85 +101,123 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
 
-        <div class="flex min-w-0 flex-wrap items-center gap-1">
+        <div class="flex min-w-0 flex-wrap items-center gap-x-1">
           <OText :id="disclosureId" variant="meta" as="p" data-test="assistant-launcher-disclosure">
             {{ disclosure }}
           </OText>
+          <OText variant="meta" as="span" aria-hidden="true">·</OText>
           <AssistantContextSeesPopover :sid="null" align="start" icon-only>
             <template #trigger>
-              <AssistantIconButton
-                :label="t('assistant.context.title')"
-                :icon="assistantGlyph.info"
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                class="max-md:min-h-11 pointer-coarse:min-h-11"
                 data-test="assistant-launcher-sees"
-              />
+                >{{ t("assistant.welcome.launcher.whatItSees") }}</OButton
+              >
             </template>
           </AssistantContextSeesPopover>
         </div>
-
-        <div class="grid min-w-0 grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
-          <div class="flex min-w-0 flex-col gap-2">
-            <h3 class="sr-only">{{ t("assistant.welcome.suggestions") }}</h3>
-            <ul
-              v-if="state === 'loading'"
-              class="flex flex-col gap-2"
-              data-test="assistant-launcher-loading"
-            >
-              <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-8 w-full" /></li>
-            </ul>
-            <ul v-else class="flex flex-col gap-2">
-              <li v-for="(starter, index) in shownStarters" :key="starter.id" class="min-w-0">
-                <OButton
-                  variant="secondary"
-                  size="sm"
-                  block
-                  class="h-auto! min-h-8 justify-start! py-1.5 text-start whitespace-normal! max-md:min-h-11 pointer-coarse:min-h-11"
-                  :data-test="`assistant-launcher-starter-${index}`"
-                  @click="pickStarter(starter, index)"
-                >
-                  {{ starter.label }}
-                </OButton>
-              </li>
-            </ul>
-          </div>
-          <div class="flex min-w-0 flex-col gap-2">
-            <h3 class="sr-only">{{ t("assistant.welcome.launcher.recent") }}</h3>
-            <ul v-if="state === 'loading'" class="flex flex-col gap-2">
-              <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-8 w-full" /></li>
-            </ul>
-            <OEmptyState
-              v-else-if="recent.length === 0"
-              size="inline"
-              icon="history"
-              :backdrop="false"
-              :title="t('assistant.welcome.launcher.noRecent')"
-              :description="t('assistant.welcome.launcher.noRecentHint')"
-              data-test="assistant-launcher-recent-empty"
-            />
-            <ul v-else class="flex flex-col gap-1">
-              <li v-for="(row, index) in recent" :key="row.sid" class="min-w-0">
-                <OButton
-                  variant="ghost"
-                  size="sm"
-                  block
-                  class="h-auto! min-h-8 justify-start! gap-2 py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11"
-                  :data-test="`assistant-launcher-recent-${index}`"
-                  :data-running="row.running ? '' : undefined"
-                  @click="openChat(row.sid)"
-                >
-                  <AssistantStatusDot v-if="row.running" state="working" />
-                  <OTruncatedText class="text-text-body min-w-0 flex-1">{{
-                    row.title
-                  }}</OTruncatedText>
-                  <OText v-if="row.running" variant="meta" class="shrink-0">
-                    {{ t("assistant.welcome.launcher.running") }}
-                  </OText>
-                  <OText v-else-if="row.at" variant="meta" class="shrink-0">{{ row.at }}</OText>
-                </OButton>
-              </li>
-            </ul>
-          </div>
-        </div>
       </template>
+
+      <div
+        :class="['grid min-w-0 grid-cols-1 gap-x-6 gap-y-3', showSuggestions && 'md:grid-cols-2']"
+      >
+        <div
+          v-if="showSuggestions"
+          class="flex min-w-0 flex-col gap-2"
+          data-test="assistant-launcher-suggestions"
+        >
+          <h3 class="text-text-secondary text-xs font-medium">
+            {{ t("assistant.welcome.suggestions") }}
+          </h3>
+          <ul
+            v-if="state === 'loading'"
+            class="flex flex-col gap-2"
+            data-test="assistant-launcher-loading"
+          >
+            <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-8 w-full" /></li>
+          </ul>
+          <ul v-else class="flex flex-col gap-2">
+            <li v-for="(starter, index) in shownStarters" :key="starter.id" class="min-w-0">
+              <OButton
+                variant="secondary"
+                size="sm"
+                block
+                class="h-auto! min-h-8 justify-start! py-1.5 text-start whitespace-normal! max-md:min-h-11 pointer-coarse:min-h-11"
+                :data-test="`assistant-launcher-starter-${index}`"
+                @click="pickStarter(starter, index)"
+              >
+                {{ starter.label }}
+              </OButton>
+            </li>
+          </ul>
+        </div>
+        <!-- A chat that answers or waits outranks suggestions on a phone (PO A21). -->
+        <div
+          :class="['flex min-w-0 flex-col gap-2', hasInProgress && 'max-md:order-first']"
+          data-test="assistant-launcher-your-chats"
+        >
+          <div class="flex min-w-0 items-center gap-2">
+            <h3 class="text-text-secondary min-w-0 flex-1 text-xs font-medium">
+              {{ t("assistant.welcome.launcher.yourChats") }}
+            </h3>
+            <OButton
+              v-if="recent.length"
+              variant="ghost-primary"
+              size="sm"
+              class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
+              data-test="assistant-launcher-all-chats"
+              @click="openFull"
+              >{{ t("assistant.welcome.launcher.allChats") }}</OButton
+            >
+          </div>
+          <ul v-if="state === 'loading'" class="flex flex-col gap-2">
+            <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-8 w-full" /></li>
+          </ul>
+          <OEmptyState
+            v-else-if="recent.length === 0"
+            size="inline"
+            icon="history"
+            :backdrop="false"
+            :title="t('assistant.welcome.launcher.noRecent')"
+            :description="t('assistant.welcome.launcher.noRecentHint')"
+            data-test="assistant-launcher-recent-empty"
+          />
+          <ul v-else class="flex flex-col gap-1">
+            <li v-for="(row, index) in recent" :key="row.sid" class="min-w-0">
+              <OButton
+                variant="ghost"
+                size="sm"
+                block
+                class="h-auto! min-h-8 justify-start! gap-2 py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11"
+                :data-test="`assistant-launcher-recent-${index}`"
+                :data-status="row.status ?? undefined"
+                @click="openChat(row.sid)"
+              >
+                <AssistantStatusDot
+                  v-if="row.status"
+                  :state="CHAT_STATUS_SIGNAL[row.status]"
+                  placement="inline"
+                />
+                <OTruncatedText class="text-text-body min-w-0 flex-1">{{
+                  row.title
+                }}</OTruncatedText>
+                <span v-if="row.status || row.at" class="sr-only">, </span>
+                <OText
+                  v-if="row.status"
+                  variant="meta"
+                  class="text-text-body shrink-0"
+                  data-test="assistant-launcher-recent-status"
+                >
+                  {{ t(CHAT_STATUS_KEYS[row.status]) }}
+                </OText>
+                <OText v-else-if="row.at" variant="meta" class="shrink-0">{{ row.at }}</OText>
+              </OButton>
+            </li>
+          </ul>
+        </div>
+      </div>
     </OCard>
   </section>
 </template>
@@ -189,6 +228,9 @@ export const MAX_LAUNCHER_CHARS = 4_000;
 
 /** Rows of each column (`70` §2.1). */
 export const LAUNCHER_ROWS = 3;
+
+/** In-progress chats can sit below the latest ones, so Your chats looks this far down the list. */
+const RECENT_LOOKUP = 20;
 
 // G0 and G1 leave no gap on Home: the header carries the locked or muted button (DG-04 AC 3, DG-05 AC 1).
 const HIDDEN_GATES: ReadonlySet<string> = new Set([
@@ -211,18 +253,30 @@ import { computed, onMounted, ref, useId } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import {
+  CHAT_STATUS_KEYS,
+  CHAT_STATUS_SIGNAL,
+  chatStatusOf,
+  inProgressFirst,
+  isInProgress,
+} from "@/components/ai-assistant/history/chatStatus";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
   openAssistant,
+  starterPayload,
+  timeRangeText,
+  timeWindowOf,
   useAssistantCapability,
   useAssistantHistory,
   useAssistantName,
   useAssistantStarters,
+  useAssistantStore,
   type Starter,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -240,11 +294,15 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatRelative } from "@/utils/formatters";
 
+// Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
+provideAssistantSurface();
+
 const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const router = useRouter();
 const vuex = useStore();
 const capability = useAssistantCapability();
+const assistant = useAssistantStore();
 const { mdUp } = useBreakpoint();
 const { starters, loading, scope } = useAssistantStarters({ page: "home" });
 
@@ -261,23 +319,40 @@ const state = computed(() => {
 const shown = computed(() => state.value !== null);
 const creditsExhausted = computed(() => capability.value.creditMode === "exhausted");
 const shownStarters = computed(() => starters.value.slice(0, LAUNCHER_ROWS));
+// The sidebar's own welcome already lists the starters, so Home shows one set (D5 decision 10).
+const sidebarWelcome = computed(() => {
+  const shell = assistant.state.shell;
+  const sid = shell.activeSid;
+  return (
+    shell.placement.kind === "sidebar" && !(sid && assistant.state.sessions[sid]?.messages.length)
+  );
+});
+const showSuggestions = computed(() => state.value !== "gate" && !sidebarWelcome.value);
 
+// The full view sends what its own page shows; with no page range that is the default window.
 const disclosure = computed(() =>
-  scope.value.streamCount === 0
-    ? t("assistant.welcome.launcher.disclosureNoStreams")
-    : t("assistant.welcome.launcher.disclosure"),
+  t(
+    scope.value.streamCount === 0
+      ? "assistant.welcome.launcher.disclosureNoStreams"
+      : "assistant.welcome.launcher.disclosure",
+    { range: timeRangeText(timeWindowOf(null, null)) },
+  ),
 );
 
 const history = useAssistantHistory();
-const recentRows = history.recent(LAUNCHER_ROWS);
+const recentRows = history.recent(RECENT_LOOKUP);
 const recent = computed(() =>
-  recentRows.value.map((row) => ({
-    sid: row.sid,
-    title: row.title,
-    running: row.activeTurn,
-    at: row.updatedAt ? raw(formatRelative(row.updatedAt)) : null,
-  })),
+  inProgressFirst(
+    recentRows.value.map((row) => ({
+      sid: row.sid,
+      title: row.title,
+      status: chatStatusOf(row, assistant.state.sessions[row.sid]?.turn.state),
+      at: row.updatedAt ? raw(formatRelative(row.updatedAt)) : null,
+    })),
+    (row) => row.status,
+  ).slice(0, LAUNCHER_ROWS),
 );
+const hasInProgress = computed(() => recent.value.some((row) => isInProgress(row.status)));
 onMounted(() => history.ensureLoaded());
 
 function onKeydown(event: KeyboardEvent): void {
@@ -322,7 +397,7 @@ function pickStarter(starter: Starter, index: number): void {
     intent: "stage",
     thread: "new",
     container: "full",
-    payload: { text: starter.prompt, chips: starter.chips },
+    payload: starterPayload(starter, org.value),
   });
 }
 

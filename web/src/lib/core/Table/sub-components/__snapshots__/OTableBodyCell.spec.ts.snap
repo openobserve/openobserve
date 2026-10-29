@@ -4,7 +4,7 @@ exports[`OTableBodyCell default render > is byte-identical without focusToolbar 
 "<tbody data-test="o2-table-body">
   <!-- Spans every visible column: a heading is about the run below it, not
          about one column. -->
-  <tr data-v-5e072a9b="" data-test="o2-table-row-0" class="group/row transition-colors duration-150 hover:bg-table-row-hover-bg" style="height: var(--table-row-height, 2.25rem);">
+  <tr data-v-5e072a9b="" data-test="o2-table-row-0" class="group/row transition-[background-color] duration-(--duration-hover-out) hover:duration-(--duration-hover-in) hover:bg-table-row-hover-bg hover:[--color-text-secondary:var(--color-table-row-text-secondary-tinted)]" style="height: var(--table-row-height, 2.25rem);">
     <!-- Expand button cell -->
     <!--v-if-->
     <!-- Selection checkbox cell -->
@@ -40,7 +40,7 @@ exports[`OTableBodyCell default render > is byte-identical without focusToolbar 
   <!--v-if-->
   <!-- Spans every visible column: a heading is about the run below it, not
          about one column. -->
-  <tr data-v-5e072a9b="" data-test="o2-table-row-1" class="group/row transition-colors duration-150 hover:bg-table-row-hover-bg" style="height: var(--table-row-height, 2.25rem);">
+  <tr data-v-5e072a9b="" data-test="o2-table-row-1" class="group/row transition-[background-color] duration-(--duration-hover-out) hover:duration-(--duration-hover-in) hover:bg-table-row-hover-bg hover:[--color-text-secondary:var(--color-table-row-text-secondary-tinted)]" style="height: var(--table-row-height, 2.25rem);">
     <!-- Expand button cell -->
     <!--v-if-->
     <!-- Selection checkbox cell -->

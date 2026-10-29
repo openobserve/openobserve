@@ -19,6 +19,7 @@ import { trackAssistant, trackAssistantAdmitted } from "@/services/assistantAnal
 import { raw } from "@/types/i18n";
 
 import { toAssistantError } from "./assistantErrors";
+import { pastedTextChip } from "./context/contextChips";
 import {
   createAssistantStore,
   inertAssistantDeps,
@@ -31,11 +32,12 @@ import type {
   TurnEngine,
 } from "./assistantStore.types";
 import { createDraftStore } from "./drafts";
+import { turnAnnotationKey } from "./evidence";
 import type { AssistantFrame } from "./frames";
 import { resetPrefsForTests } from "./prefs";
 import { createSseParser } from "./sseParser";
 import { RECONNECT_DELAYS_MS, createTurnEngine } from "./turnEngine";
-import { STALL_MS, STOP_TIMEOUT_MS } from "./turnStateMachine";
+import { STALL_MS, STOP_TIMEOUT_MS, failedAfterChange, outcomeError } from "./turnStateMachine";
 import type { TurnTerminal } from "./turnStates";
 import { useAssistantClient } from "./useAssistantClient";
 import type {
@@ -248,6 +250,64 @@ describe("turnEngine: send", () => {
     },
   );
 
+  it("marks only a Home launcher chat's first ask over the default window (PO A26)", async () => {
+    const homeDefault = (h: ReturnType<typeof setup>) =>
+      h.session().annotations[turnAnnotationKey(h.session().turnMeta.turnId!, "window")]
+        ?.homeDefaultWindow;
+    const home = setup();
+    home.session().origin = { ...ORIGIN, entryKind: "home_launcher", container: "full" };
+    home.type("what needs attention?");
+    void home.store.send(home.current.sid);
+    await settle();
+    expect(homeDefault(home)).toBe(true);
+    home.feed({ type: "complete" } as AssistantFrame);
+    home.end();
+    await settle();
+    home.type("and yesterday?");
+    void home.store.send(home.current.sid);
+    await settle();
+    expect(home.sends).toHaveLength(2);
+    expect(homeDefault(home)).toBeUndefined();
+
+    const picked = setup();
+    picked.session().origin = { ...ORIGIN, entryKind: "home_launcher", container: "full" };
+    picked.type("what needs attention?");
+    picked.store.setDraft(picked.current.sid, { timeOverride: { from: 1, to: 3_600_001 } });
+    void picked.store.send(picked.current.sid);
+    await settle();
+    expect(homeDefault(picked)).toBeUndefined();
+
+    const sidebar = setup();
+    sidebar.type("what needs attention?");
+    void sidebar.store.send(sidebar.current.sid);
+    await settle();
+    expect(homeDefault(sidebar)).toBeUndefined();
+  });
+
+  it("marks a Home starter's question from the sidebar, whatever opened it, and its regenerated answer", async () => {
+    const homeDefault = (h: ReturnType<typeof setup>) =>
+      h.session().annotations[turnAnnotationKey(h.session().turnMeta.turnId!, "window")]
+        ?.homeDefaultWindow;
+    const h = setup();
+    h.store.stage(h.current.sid, {
+      text: "What needs attention?",
+      mode: "replace",
+      homeStarter: true,
+    });
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(h.session().origin.entryKind).toBe("header_button");
+    expect(homeDefault(h)).toBe(true);
+    expect(h.session().composer.homeStarter).toBeUndefined();
+    h.feed({ type: "complete" } as AssistantFrame);
+    h.end();
+    await settle();
+    void h.store.regenerate(h.current.sid);
+    await settle();
+    expect(h.sends).toHaveLength(2);
+    expect(homeDefault(h)).toBe(true);
+  });
+
   it("snapshots, appends the message, clears the composer and drafts, then sends", async () => {
     const h = setup();
     h.type("why is checkout failing?");
@@ -389,6 +449,26 @@ describe("turnEngine: send", () => {
     ]);
     expect(h.last().req.message.images?.map((i) => i.data)).toEqual(["NEW"]);
     expect(h.last().req.knownSeq).toBeUndefined();
+  });
+
+  it("carries a pasted text chip into the next turn's transcript on a browser-only chat", async () => {
+    const h = setup({ persistence: false });
+    const pasted = Array.from({ length: 25 }, (_, i) => `trace line ${i}`).join("\n");
+    h.type("what failed?");
+    h.store.addChip(h.current.sid, pastedTextChip(pasted, "p1"));
+    const first = h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "message_delta", content: "It was cart." }, { type: "complete" });
+    h.end();
+    await first;
+    h.type("and why?");
+    void h.store.send(h.current.sid);
+    await settle();
+    const [user, assistant] = h.last().req.transcript ?? [];
+    expect(user.role).toBe("user");
+    expect(user.content).toMatch(/^what failed\?\n\n--- Pasted text \[[a-z2-7]{8}\] ---\n/);
+    expect(user.content).toContain("trace line 24");
+    expect(assistant).toEqual({ role: "assistant", content: "It was cart." });
   });
 
   it("uses the request builder WP-05 installs", async () => {
@@ -1157,6 +1237,33 @@ describe("turnEngine: outcomes", () => {
     expect(h.session().turn.state).toBe("running_tool");
   });
 
+  it("stalls on keepalive-only traffic, which never advances the progress clock (R5)", async () => {
+    const h = setup();
+    await start(h);
+    h.feed({ type: "tool_call", tool: "SearchSQL", call_id: "c1" });
+    const framed = h.session().turnMeta.lastByteAt;
+    for (let beat = 0; beat < 2; beat++) {
+      clock += 15_000;
+      h.last().sink.onKeepalive();
+      await vi.advanceTimersByTimeAsync(15_000);
+    }
+    expect(tracked("ai_turn_state").map(([, props]) => props.state)).toContain("stall");
+    expect(h.session().turnMeta.lastByteAt).toBe(framed);
+  });
+
+  it("never stalls while data frames keep arriving, and each one advances the progress clock", async () => {
+    const h = setup();
+    await start(h);
+    h.feed({ type: "tool_call", tool: "SearchSQL", call_id: "c1" });
+    for (let beat = 0; beat < 6; beat++) {
+      clock += 15_000;
+      h.feed({ type: "message_delta", content: "a" });
+      await vi.advanceTimersByTimeAsync(15_000);
+    }
+    expect(tracked("ai_turn_state").map(([, props]) => props.state)).not.toContain("stall");
+    expect(h.session().turnMeta.lastByteAt).toBe(clock);
+  });
+
   it("expires an unanswered approval as approval_expired and cancels on the server", async () => {
     const h = setup();
     const { run } = await start(h);
@@ -1248,11 +1355,37 @@ describe("turnEngine: outcomes", () => {
     );
     const failed = (await run) as Extract<TurnTerminal, { state: "failed" }>;
     expect(failed.error.action).toBe("ask_again");
+    // The outcome then words it as after a change: no "Nothing was changed." (D7 §3.2).
+    expect(failed.error.code).toBe("provider_error");
+    expect(failedAfterChange(failed.error)).toBe(true);
     const firstTurn = h.last().req.turnId;
     void h.store.retry(h.current.sid);
     await settle();
     expect(h.last().req.turnId).not.toBe(firstTurn);
     expect(h.last().req.message.text).toBe("why?");
+  });
+
+  it("notes the change on an unrecoverable provider failure too, keeping Edit and resend", async () => {
+    const h = setup();
+    const { run } = await start(h);
+    h.feed(
+      { type: "tool_call", tool: "o2_UpdateAlert", call_id: "u1" },
+      { type: "tool_result", tool: "o2_UpdateAlert", call_id: "u1" },
+      { type: "error", error_type: "llm_context_length", message: "big", recoverable: false },
+    );
+    const failed = (await run) as Extract<TurnTerminal, { state: "failed" }>;
+    expect(failed.error).toMatchObject({
+      code: "provider_error",
+      action: "edit_resend",
+      afterChange: true,
+    });
+    expect(failedAfterChange(failed.error)).toBe(true);
+    const stored = h
+      .session()
+      .messages.at(-1)
+      ?.contentBlocks?.find((block) => block.type === "turn_outcome")?.outcome;
+    expect(stored).toMatchObject({ action: "edit_resend", afterChange: true });
+    expect(failedAfterChange(outcomeError(stored!))).toBe(true);
   });
 
   it("stages Continue with the previous chips and never sends (30 §8.4)", async () => {
@@ -1472,7 +1605,7 @@ describe("turnEngine: round 3 follow-ups", () => {
     expect(announce).toHaveBeenCalledWith(
       h.current.sid,
       "assistant.error.provider_error.title",
-      expect.objectContaining({ reason: "overloaded" }),
+      expect.objectContaining({ reason: "is overloaded" }),
     );
     const third = await begin(h);
     clock += 40_000;

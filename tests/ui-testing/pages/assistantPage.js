@@ -162,7 +162,7 @@ export class AssistantPage {
     return this.container().locator('[data-test="assistant-approval-result"]').last();
   }
 
-  /** The history list that is showing: the full view's rail, the header popover or the dense drawer. */
+  /** The history list that is showing: the full view's rail or the in-panel Chats view. */
   history() {
     return this.page.locator('[data-test="assistant-history"]').filter({ visible: true }).first();
   }

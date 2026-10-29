@@ -24,75 +24,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-thread-menu-share"
     @select="onMenuSelect"
     >{{
-      state.kind === "manage" ? t("assistant.share.manageLinks") : t("assistant.share.share")
+      t(
+        state.kind === "manage"
+          ? "assistant.thread.shareSettings"
+          : "assistant.share.shareEllipsis",
+      )
     }}</ODropdownItem
   >
+  <ODrawer
+    v-else-if="variant === 'drawer' && state.kind !== 'absent'"
+    v-model:open="open"
+    side="right"
+    size="md"
+    :width="mdUp ? undefined : 100"
+    :title="t('assistant.share.title')"
+    data-test="assistant-share-drawer"
+  >
+    <AssistantShareSettings
+      v-if="open"
+      ref="settings"
+      v-bind="settingsProps"
+      @created="onCreated"
+      @revoked="open = false"
+      @see-all="seeAll"
+      @new-link="newLink"
+      @cancel-new="cancelNew"
+      @announce="announce"
+    />
+  </ODrawer>
   <span
-    v-else-if="state.kind !== 'absent'"
+    v-else-if="variant === 'header' && state.kind !== 'absent'"
     ref="rootEl"
     class="inline-flex min-w-0 flex-wrap items-center gap-1"
     data-test="assistant-share-control"
   >
     <component :is="mdUp ? OPopover : ODrawer" v-model:open="open" v-bind="surfaceProps">
       <template v-if="mdUp" #anchor>
-        <span class="inline-flex min-w-0 flex-wrap items-center gap-1">
-          <AssistantShareChip :share="summary" @open="openSettings('copy')" />
-          <OButton
-            variant="ghost"
-            size="sm"
-            class="max-md:min-h-11 pointer-coarse:min-h-11"
-            :icon-left="assistantGlyph.share"
-            :disabled="state.kind === 'blocked' || creating"
-            :focusable-unavailable="state.kind === 'blocked'"
-            :loading="creating"
-            data-test="assistant-thread-share"
-            @click="onShare"
-          >
-            {{ t("assistant.share.share") }}
-            <template v-if="state.kind === 'blocked'" #unavailable-reason>{{
-              t(state.reason)
-            }}</template>
-            <OTooltip :content="t(state.kind === 'blocked' ? state.reason : state.tooltip)" />
-          </OButton>
-        </span>
+        <OButton
+          variant="ghost"
+          size="sm"
+          class="max-md:min-h-11 pointer-coarse:min-h-11"
+          :icon-left="shared ? assistantGlyph.shared : assistantGlyph.share"
+          :disabled="state.kind === 'blocked'"
+          :focusable-unavailable="state.kind === 'blocked'"
+          :aria-label="buttonName"
+          :aria-expanded="open ? 'true' : 'false'"
+          aria-haspopup="dialog"
+          :data-shared="shared ? '' : undefined"
+          data-test="assistant-thread-share"
+          @click="onShare"
+        >
+          <span class="@max-[32rem]:sr-only" data-test="assistant-thread-share-label">{{
+            buttonLabel
+          }}</span>
+          <template v-if="state.kind === 'blocked'" #unavailable-reason>{{
+            t(state.reason)
+          }}</template>
+          <OTooltip :content="t(state.kind === 'blocked' ? state.reason : state.tooltip)" />
+        </OButton>
       </template>
       <AssistantShareSettings
         v-if="open"
         ref="settings"
-        :org="org"
-        :sid="sid"
-        :share="current"
-        :running="running"
-        :public-links="capability.publicLinks"
-        :public-max-expiry-days="capability.publicMaxExpiryDays"
-        :redact-attachments="redactAttachments"
-        :has-attachments="attachments"
-        :link-count="shares.length"
+        v-bind="settingsProps"
         @created="onCreated"
         @revoked="open = false"
         @see-all="seeAll"
+        @new-link="newLink"
+        @cancel-new="cancelNew"
         @announce="announce"
       />
     </component>
-    <template v-if="!mdUp">
-      <AssistantShareChip :share="summary" @open="openSettings('copy')" />
-      <OButton
-        variant="ghost"
-        size="sm"
-        class="min-h-11"
-        :icon-left="assistantGlyph.share"
-        :disabled="state.kind === 'blocked' || creating"
-        :focusable-unavailable="state.kind === 'blocked'"
-        :loading="creating"
-        data-test="assistant-thread-share"
-        @click="onShare"
-      >
-        {{ t("assistant.share.share") }}
-        <template v-if="state.kind === 'blocked'" #unavailable-reason>{{
-          t(state.reason)
-        }}</template>
-      </OButton>
-    </template>
+    <OButton
+      v-if="!mdUp"
+      variant="ghost"
+      size="sm"
+      class="min-h-11"
+      :icon-left="shared ? assistantGlyph.shared : assistantGlyph.share"
+      :disabled="state.kind === 'blocked'"
+      :focusable-unavailable="state.kind === 'blocked'"
+      :aria-label="buttonName"
+      :data-shared="shared ? '' : undefined"
+      data-test="assistant-thread-share"
+      @click="onShare"
+    >
+      {{ buttonLabel }}
+      <template v-if="state.kind === 'blocked'" #unavailable-reason>{{ t(state.reason) }}</template>
+    </OButton>
   </span>
 </template>
 
@@ -101,12 +119,15 @@ import type { Sid } from "@/composables/assistant";
 
 export interface AssistantShareControlProps {
   sid: Sid;
-  variant: "header" | "menu-item";
+  /** `drawer` has no trigger of its own: More's Share opens it through `open`. */
+  variant: "header" | "menu-item" | "drawer";
 }
 
 export interface AssistantShareControlEmits {
-  /** The menu item's Manage links and review, and the popover's See all: the manager scoped to this chat. */
+  /** All shared links: the Shared links manager. */
   (e: "manage"): void;
+  /** More's Share item, which cannot hold a surface once its menu closes. */
+  (e: "settings"): void;
 }
 </script>
 
@@ -117,6 +138,7 @@ import { useStore } from "vuex";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import {
+  orgDisplayName,
   useAssistantCapability,
   useAssistantSession,
   useAssistantStore,
@@ -130,34 +152,32 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ShareView } from "@/services/ai_chat_share";
 import { chatSharesQuery } from "@/services/ai_chat_share.queries";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 
-import AssistantShareChip from "./AssistantShareChip.vue";
 import AssistantShareSettings from "./AssistantShareSettings.vue";
-import { checkAttachments, knownAttachments } from "./chatAttachments";
-import { canRedactAttachments, shareButtonState, summarizeShares } from "./chatShare";
-import { isShareDenied, useQuickShare } from "./useQuickShare";
+import { knownAttachments } from "./chatAttachments";
+import { canRedactAttachments, shareButtonState } from "./chatShare";
+import { isShareDenied } from "./useQuickShare";
 
 const props = defineProps<AssistantShareControlProps>();
 
 const emit = defineEmits<AssistantShareControlEmits>();
+
+const open = defineModel<boolean>("open", { default: false });
 
 const { t } = useI18nTyped();
 const vuex = useStore();
 const store = useAssistantStore();
 const capability = useAssistantCapability();
 const view = useAssistantSession(() => props.sid);
-const quickShare = useQuickShare();
 const { mdUp } = useBreakpoint();
 
-const open = ref(false);
-const creating = ref(false);
-const focusOnOpen = ref<"copy" | "field" | "link">("copy");
 const settings = ref<InstanceType<typeof AssistantShareSettings> | null>(null);
 const rootEl = ref<HTMLElement | null>(null);
 // A just-created link shows in the popover before the list re-reads.
 const created = ref<ShareView | null>(null);
+// Create mode beside an existing link, so a second audience never needs a revoke first.
+const anotherLink = ref(false);
 
 const org = computed(
   () => view.session.value?.org ?? vuex.state.selectedOrganization?.identifier ?? "",
@@ -173,10 +193,7 @@ const shares = computed<ShareView[]>(() => {
   return fresh && !list.some((item) => item.id === fresh.id) ? [fresh, ...list] : list;
 });
 const current = computed<ShareView | null>(() => shares.value[0] ?? null);
-const lastSeq = computed(
-  () => view.session.value?.record.cachedLastSeq ?? view.session.value?.turnMeta.lastSeq ?? null,
-);
-const summary = computed(() => summarizeShares(shares.value, lastSeq.value));
+const shared = computed(() => shares.value.length > 0);
 const running = computed(() => {
   const turn = view.turn.value;
   return !!turn && turn.state !== "idle" && !isTerminal(turn);
@@ -184,7 +201,7 @@ const running = computed(() => {
 const known = computed(() =>
   knownAttachments(org.value, props.sid, view.session.value ? view.messages.value : undefined),
 );
-// Unknown counts as present: a row's chat is checked before a one-click link leaves it.
+// Unknown counts as present until the stored chat has been read.
 const attachments = computed(() => known.value !== "no");
 const redactAttachments = computed(() => canRedactAttachments(vuex.state.zoConfig));
 
@@ -200,23 +217,47 @@ const state = computed(() => {
     running: running.value,
     notSaved: turn?.state === "done" && turn.saved === "not_saved",
     historyUnavailable: !!session?.record.historyUnavailable,
-    shared: shares.value.length > 0,
+    shared: shared.value,
     hasAttachments: attachments.value,
     redactAttachments: redactAttachments.value,
   });
 });
+
+const buttonLabel = computed(() =>
+  shared.value ? t("assistant.share.shared") : t("assistant.share.share"),
+);
+const buttonName = computed(() => {
+  const share = current.value;
+  if (!share) return undefined;
+  return t(
+    share.visibility === "public" ? "assistant.share.sharedPublic" : "assistant.share.sharedOrg",
+  );
+});
+
+const settingsProps = computed(() => ({
+  org: org.value,
+  orgName: orgDisplayName(org.value, vuex.state.selectedOrganization),
+  sid: props.sid,
+  share: anotherLink.value ? null : current.value,
+  cancelable: anotherLink.value,
+  running: running.value,
+  publicLinks: capability.value.publicLinks,
+  publicMaxExpiryDays: capability.value.publicMaxExpiryDays,
+  redactAttachments: redactAttachments.value,
+  hasAttachments: attachments.value,
+}));
 
 const surfaceProps = computed<Record<string, unknown>>(() =>
   mdUp.value
     ? {
         side: "bottom",
         align: "end",
-        ariaLabel: t("assistant.share.manage"),
+        ariaLabel: t("assistant.share.title"),
         contentClass: "w-96 max-w-[calc(100vw-1.5rem)] p-4",
       }
     : {
         width: 100,
-        title: t("assistant.share.manage"),
+        title: t("assistant.share.title"),
         anchor: rootEl.value?.closest<HTMLElement>("[data-assistant-root]") ?? null,
         returnFocusTo: () =>
           rootEl.value?.querySelector<HTMLElement>('[data-test="assistant-thread-share"]') ?? null,
@@ -224,14 +265,13 @@ const surfaceProps = computed<Record<string, unknown>>(() =>
 );
 
 watch(open, async (isOpen) => {
-  if (!isOpen) return;
+  if (!isOpen) {
+    anotherLink.value = false;
+    return;
+  }
   await nextTick();
-  // Reka focuses the first field on open; a link that exists is two clicks from the clipboard.
-  requestAnimationFrame(() => {
-    if (focusOnOpen.value === "field") settings.value?.focusFirstField();
-    else if (focusOnOpen.value === "link") settings.value?.focusLink();
-    else settings.value?.focusPrimary();
-  });
+  // Reka focuses the first field on open; the primary action is the one a sharer wants next.
+  requestAnimationFrame(() => settings.value?.focusPrimary());
 });
 
 watch(
@@ -243,56 +283,38 @@ watch(
   },
 );
 
-async function onShare(): Promise<void> {
+// Share never creates a link by itself: the popover shows what would be shared first (D5 decision 6).
+function onShare(): void {
   const kind = state.value.kind;
-  if (kind === "blocked" || kind === "absent" || creating.value) return;
-  if (kind === "manage") return emit("manage");
-  creating.value = true;
-  try {
-    if (kind === "review" && (await stillNeedsReview())) return openSettings("field");
-    await share(() => openSettings("field"));
-  } finally {
-    creating.value = false;
-  }
+  if (kind === "blocked" || kind === "absent") return;
+  open.value = true;
 }
 
-async function share(onSettings?: () => void): Promise<void> {
-  const result = await quickShare.create(org.value, props.sid, onSettings && { onSettings });
-  if (!result.ok) return;
-  created.value = result.share;
-  if (!result.copied && props.variant === "header") openSettings("link");
-}
-
-// Only an unknown answer is worth a read; a failed read refuses rather than share blind.
-async function stillNeedsReview(): Promise<boolean> {
-  if (known.value !== "unknown") return true;
-  try {
-    return await checkAttachments(org.value, props.sid);
-  } catch {
-    toast({ variant: "error", message: t("assistant.share.attachmentsCheckFailed") });
-    return true;
-  }
-}
-
-// The menu closes on select and unmounts this item, so anything after an await cannot emit.
+// The menu closes on select and unmounts this item, so the surface opens from the shell.
 function onMenuSelect(event: Event): void {
-  const kind = state.value.kind;
-  if (kind === "blocked") {
+  if (state.value.kind === "blocked") {
     event.preventDefault();
     return;
   }
-  if (kind === "manage" || kind === "review") emit("manage");
-  else if (kind === "quick") void share();
-}
-
-function openSettings(focus: "copy" | "field" | "link"): void {
-  focusOnOpen.value = focus;
-  open.value = true;
+  emit("settings");
 }
 
 function onCreated(share: ShareView, copied: boolean): void {
   created.value = share;
+  anotherLink.value = false;
   announce(copied ? "assistant.share.createdCopied" : "assistant.share.created");
+  // A blocked clipboard leaves the link selected for a manual copy.
+  void nextTick(() => (copied ? settings.value?.focusPrimary() : settings.value?.focusLink()));
+}
+
+function newLink(): void {
+  anotherLink.value = true;
+  void nextTick(() => settings.value?.focusFirstField());
+}
+
+function cancelNew(): void {
+  anotherLink.value = false;
+  void nextTick(() => settings.value?.focusPrimary());
 }
 
 function seeAll(): void {

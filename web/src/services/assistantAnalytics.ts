@@ -276,7 +276,7 @@ export interface AiEventProps {
     count: number;
     bytes: number;
   };
-  ai_context_inspected: { target: "sees" | "chip" | "hints"; kind?: ChipKind };
+  ai_context_inspected: { target: "sees" | "chip" | "add_context"; kind?: ChipKind };
   ai_composer_recall: { direction: "older" | "newer"; index: number };
   ai_composer_cap_hit: { cap: "images" | "rows" | "bytes" | "type" | "size" };
   ai_composer_enter_blocked: { reason: "running" | "inert" | "empty" | "elsewhere" };
@@ -342,6 +342,7 @@ export interface AiEventProps {
       | "add_dashboard"
       | "create_alert"
       | "rerun_now"
+      | "rerun_wider"
       | "open_claim_step"
       | "expand_step"
       | "open_step_logs"
@@ -419,7 +420,7 @@ export interface AiEventProps {
     to?: PlacementMode;
     count?: number;
   };
-  ai_history_open: { placement: "popover" | "rail" | "drawer" };
+  ai_history_open: { placement: "panel" | "rail" };
   ai_history_search: { length_bucket: LengthBucket; server: boolean };
   ai_share: {
     action: "create" | "update" | "revoke" | "copy_link" | "refresh";

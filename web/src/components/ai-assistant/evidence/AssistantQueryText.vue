@@ -16,27 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex min-w-0 flex-col gap-1">
-    <!-- An answer can hold 40 query blocks and one Monaco each breaks the transcript budget, so the text is a highlighted block that never wraps -->
+    <!-- One Monaco per query breaks the transcript budget; wrapped, since overlay scrollbars hide a sideways overflow -->
     <OCodeBlock
       :code="text"
       class="my-0!"
       :lang="lang"
       :copyable="false"
       :toolbar="false"
-      :wrap="false"
+      wrap
       :max-lines="MAX_LINES"
       contrast="aa"
       :scroll-label="label"
       :data-test="dataTest"
     />
-    <OText
-      v-if="hasLongLine"
-      variant="meta"
-      class="md:hidden"
-      data-test="assistant-query-scroll-hint"
-    >
-      {{ t("assistant.evidence.scrollHint") }}
-    </OText>
   </div>
 </template>
 
@@ -45,11 +37,9 @@ import { computed } from "vue";
 
 import type { QueryRef } from "@/composables/assistant/pure";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OText from "@/lib/core/Typography/OText.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import type { I18nText } from "@/types/i18n";
 
 const MAX_LINES = 12;
-const PHONE_LINE_CHARS = 40;
 
 const props = defineProps<{
   text: string;
@@ -59,10 +49,5 @@ const props = defineProps<{
   dataTest: string;
 }>();
 
-const { t } = useI18nTyped();
-
 const lang = computed(() => (props.language === "regex" ? "plaintext" : props.language));
-const hasLongLine = computed(() =>
-  props.text.split("\n").some((line) => line.length > PHONE_LINE_CHARS),
-);
 </script>

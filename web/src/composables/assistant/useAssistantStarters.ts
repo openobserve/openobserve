@@ -45,6 +45,12 @@ const PERIOD_UNITS: Record<string, Intl.NumberFormatOptions["unit"]> = {
 
 const STREAM_TYPES = ["logs", "metrics", "traces"] as const;
 
+/** Home starters ask about this window, and stage it with them so the answer covers it. */
+const HOME_PERIOD = "1h";
+
+/** Internal streams (`_o2_*`) are never counted or named (BUG-015). */
+const INTERNAL_STREAM = /^_o2_/;
+
 /** Model input stays English whatever the UI locale (`95` decision 6). */
 const PROMPT_LOCALE = "en-US";
 
@@ -59,12 +65,18 @@ export interface Starter {
   chatId?: number;
   /** `recent` only: the chat's session id, which opens it even when this browser never saved it. */
   sid?: Sid;
+  /** A relative window staged with the prompt, so the answer covers what the prompt names. */
+  period?: string;
+  /** Listed on Home, so an empty answer over the default window may offer the last 1 h (PO A26). */
+  home?: true;
   dataTest: `assistant-starter-${number}`;
 }
 
 /** What the welcome's scope line says the assistant sees (`70` §3.1). */
 export interface AssistantScope {
   org: string;
+  /** The org's display name; the identifier can be an opaque hash. */
+  orgName: string;
   /** `null` while no stream list is in the cache. */
   streamCount: number | null;
   timeRange: I18nText | null;
@@ -89,11 +101,16 @@ interface StarterDraft {
   chips?: ContextChip[];
   chatId?: number;
   sid?: Sid;
+  period?: string;
 }
 
 interface StarterFacts {
   org: string;
+  orgName: string;
   stream: string | null;
+  /** First non-internal stream of each type the org has, from the cached lists. */
+  logStream: string | null;
+  traceStream: string | null;
   metric: string | null;
   /** `label` is the scope tag ("last 15 min"); `period` ("15 min") exists for relative ranges only. */
   range: {
@@ -114,6 +131,7 @@ export function useAssistantStarters(input: AssistantStartersInput): {
 } {
   const runtime = getAssistantRuntime();
   const org = computed(() => runtime.context.value?.getOrg()?.identifier ?? "");
+  const orgName = computed(() => runtime.context.value?.getOrg()?.name || org.value);
   const lists = STREAM_TYPES.map((type) =>
     // Disabled observers read what the pages already fetched; the client is explicit because the welcome builds this lazily, outside setup.
     useQuery(
@@ -142,7 +160,9 @@ export function useAssistantStarters(input: AssistantStartersInput): {
   const names = (index: number): string[] | null => {
     const data = lists[index].data.value;
     return Array.isArray(data)
-      ? data.map((s: { name?: string }) => s?.name ?? "").filter(Boolean)
+      ? data
+          .map((s: { name?: string }) => s?.name ?? "")
+          .filter((name) => !!name && !INTERNAL_STREAM.test(name))
       : null;
   };
   const streamCount = computed(() => {
@@ -151,7 +171,10 @@ export function useAssistantStarters(input: AssistantStartersInput): {
   });
   const facts = computed<StarterFacts>(() => ({
     org: org.value,
+    orgName: orgName.value,
     stream: pageStream(pageContext.value) ?? names(0)?.[0] ?? null,
+    logStream: names(0)?.[0] ?? null,
+    traceStream: names(2)?.[0] ?? null,
     metric: names(1)?.[0] ?? null,
     range: rangeOf(pageContext.value),
     dashboard: stringField(pageContext.value, "dashboardName"),
@@ -164,16 +187,19 @@ export function useAssistantStarters(input: AssistantStartersInput): {
   );
 
   const starters = computed(() => {
-    if (streamCount.value === 0) return finish(ingestDrafts());
-    return finish(
-      fill(pageDrafts(toValue(input.page), input.host, facts.value), recentDraft(), org.value),
-    );
+    const page = toValue(input.page);
+    const home = page === "home" && !input.host;
+    if (streamCount.value === 0) return finish(ingestDrafts(), home);
+    // Home lists the user's chats beside its starters, so a Continue starter would repeat one.
+    const recent = page === "home" ? null : recentDraft();
+    return finish(fill(pageDrafts(page, input.host, facts.value), recent, orgName.value), home);
   });
 
   const scope = computed<AssistantScope>(() => {
     const dashboard = facts.value.dashboard;
     return {
       org: org.value,
+      orgName: orgName.value,
       streamCount: streamCount.value,
       timeRange: facts.value.range ? raw(facts.value.range.label) : null,
       ...(dashboard && { pageObject: { kind: "dashboard" as const, name: dashboard } }),
@@ -225,10 +251,7 @@ function pageTable(
   const r = range?.period;
   switch (page) {
     case "home":
-      return [
-        draft("assistant.welcome.starter.home.1", { org: facts.org }),
-        draft("assistant.welcome.starter.home.2"),
-      ];
+      return homeDrafts(facts);
     case "logs":
       return [
         stream && r
@@ -266,8 +289,32 @@ function pageTable(
         draft("assistant.welcome.starter.metrics.2"),
       ];
     default:
-      return [learnDraft(), draft("assistant.welcome.starter.home.2")];
+      return [learnDraft(), healthDraft(facts.orgName)];
   }
+}
+
+// Only streams the org has are named, each staged with the stream and the window its prompt asks about.
+function homeDrafts(facts: StarterFacts): StarterDraft[] {
+  const list = [healthDraft(facts.orgName)];
+  if (facts.logStream)
+    list.push({
+      ...draft("assistant.welcome.starter.home.errorsSummary", { stream: facts.logStream }, [
+        streamChip(facts.org, facts.logStream, "logs", "mention"),
+      ]),
+      period: HOME_PERIOD,
+    });
+  if (facts.traceStream)
+    list.push({
+      ...draft("assistant.welcome.starter.home.slowSpans", undefined, [
+        streamChip(facts.org, facts.traceStream, "traces", "mention"),
+      ]),
+      period: HOME_PERIOD,
+    });
+  return list;
+}
+
+function healthDraft(orgName: string): StarterDraft {
+  return draft("assistant.welcome.starter.home.attention", { org: orgName });
 }
 
 function hostDrafts(host: AssistantHostAdapter, facts: StarterFacts): StarterDraft[] {
@@ -329,14 +376,10 @@ function draft(
 }
 
 // Page starters first, then recent, then the generic ones, until three distinct remain.
-function fill(page: StarterDraft[], recent: StarterDraft | null, org: string): StarterDraft[] {
+function fill(page: StarterDraft[], recent: StarterDraft | null, orgName: string): StarterDraft[] {
   const picked: StarterDraft[] = [];
-  const generic = [
-    learnDraft(),
-    draft("assistant.welcome.starter.home.2"),
-    draft("assistant.welcome.starter.home.1", { org }),
-  ];
-  for (const candidate of [...page.slice(0, 2), recent, ...generic]) {
+  const generic = [learnDraft(), healthDraft(orgName)];
+  for (const candidate of [...page.slice(0, STARTER_COUNT), recent, ...generic]) {
     if (!candidate || picked.some((p) => p.key === candidate.key)) continue;
     picked.push(candidate);
     if (picked.length === STARTER_COUNT) break;
@@ -344,7 +387,7 @@ function fill(page: StarterDraft[], recent: StarterDraft | null, org: string): S
   return picked;
 }
 
-function finish(drafts: StarterDraft[]): Starter[] {
+function finish(drafts: StarterDraft[], home: boolean): Starter[] {
   return drafts.map((d, index) => ({
     id: `${d.key}:${index}`,
     kind: d.kind,
@@ -353,6 +396,8 @@ function finish(drafts: StarterDraft[]): Starter[] {
     chips: d.chips ?? [],
     ...(d.chatId !== undefined && { chatId: d.chatId }),
     ...(d.sid !== undefined && { sid: d.sid }),
+    ...(d.period !== undefined && { period: d.period }),
+    ...(home && { home: true as const }),
     dataTest: `assistant-starter-${index}`,
   }));
 }
@@ -376,23 +421,26 @@ function logChips(facts: StarterFacts): ContextChip[] {
       provenance: "page",
       sent: "whitelist",
     });
-  if (facts.stream)
-    chips.push({
-      id: `starter-stream-${facts.stream}`,
-      kind: "stream",
-      label: raw(facts.stream),
-      ref: {
-        type: "stream",
-        id: facts.stream,
-        org: facts.org,
-        stream: facts.stream,
-        streamType: "logs",
-      },
-      sizeBytes: facts.stream.length,
-      provenance: "page",
-      sent: "whitelist",
-    });
+  if (facts.stream) chips.push(streamChip(facts.org, facts.stream, "logs"));
   return chips;
+}
+
+// A Home starter's stream is the user's choice, not a copy of a page selection the full view lacks.
+function streamChip(
+  org: string,
+  stream: string,
+  streamType: string,
+  provenance: "page" | "mention" = "page",
+): ContextChip {
+  return {
+    id: `starter-stream-${stream}`,
+    kind: "stream",
+    label: raw(stream),
+    ref: { type: "stream", id: stream, org, stream, streamType },
+    sizeBytes: stream.length,
+    provenance,
+    sent: "whitelist",
+  };
 }
 
 function pageStream(context: PageContext | null): string | null {

@@ -140,6 +140,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span v-else />
           <OButton
+            v-if="chip.kind === 'pasted_text' && typeof chip.data === 'string'"
+            variant="ghost"
+            size="sm"
+            class="max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-chip-paste-inline"
+            @click="emit('paste-inline')"
+          >
+            {{ t("assistant.context.pasteInlineShort") }}
+          </OButton>
+          <OButton
             v-if="openLabel"
             variant="ghost"
             size="sm"
@@ -192,6 +202,8 @@ export interface AssistantChipPopoverEmits {
   (e: "tab-out"): void;
   /** Open in {page}: the tray opens it through the explorer applier. */
   (e: "open-source"): void;
+  /** A Pasted text chip goes back into the message as plain text (D4 §3.9). */
+  (e: "paste-inline"): void;
 }
 </script>
 

@@ -52,6 +52,7 @@ export type AssistantAction =
   | { kind: "create_alert_draft"; query: QueryRef; threshold?: unknown; turnId?: string }
   | { kind: "open_step"; callId: string }
   | { kind: "rerun_now"; turnId: string }
+  | { kind: "rerun_wider"; turnId: string }
   | { kind: "navigate"; target: RouteTarget; newTab?: boolean; label: I18nText }
   | { kind: "approval"; decision: ApprovalDecision; approvalId: string }
   | { kind: "undo"; ledgerId: string }

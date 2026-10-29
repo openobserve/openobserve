@@ -93,7 +93,9 @@ describe("AssistantOrgPolicyForm", () => {
     wrapper = await mountForm();
     const enabled = switchOf(wrapper, "settings-assistant-enabled-switch");
     const line = document.getElementById(enabled.attributes("aria-describedby")!);
-    expect(line?.textContent).toContain("Past chats stay readable.");
+    expect(line?.textContent?.trim()).toMatch(
+      /^Turning it off shows members '.+ is turned off for this organization'\. Past chats stay readable\.$/,
+    );
     expect(find(wrapper, "settings-assistant-tier-group").exists()).toBe(true);
     expect(find(wrapper, "settings-assistant-who").exists()).toBe(true);
     expect(find(wrapper, "settings-assistant-policy-save").exists()).toBe(true);
@@ -228,10 +230,42 @@ describe("AssistantOrgPolicyForm", () => {
     );
   });
 
+  it("states the saved assistant switch in words, unchanged by an unsaved flip", async () => {
+    wrapper = await mountForm();
+    expect(find(wrapper, "settings-assistant-enabled-value").text()).toBe(
+      "On in this organization",
+    );
+    await switchOf(wrapper, "settings-assistant-enabled-switch").trigger("click");
+    expect(find(wrapper, "settings-assistant-enabled-value").text()).toBe(
+      "On in this organization",
+    );
+  });
+
+  it("shows the switch as pending and disabled while the turn-off confirm is open", async () => {
+    let answer: (ok: boolean) => void = () => undefined;
+    confirm.mockImplementation(() => new Promise<boolean>((resolve) => (answer = resolve)));
+    wrapper = await mountForm();
+    await switchOf(wrapper, "settings-assistant-enabled-switch").trigger("click");
+    await find(wrapper, "settings-assistant-policy-form").trigger("submit");
+    await settle();
+    const pending = find(wrapper, "settings-assistant-enabled-pending");
+    expect(pending.text()).toBe("Turns off when you confirm");
+    const sw = switchOf(wrapper, "settings-assistant-enabled-switch");
+    expect(sw.attributes("disabled")).toBeDefined();
+    expect(sw.attributes("aria-describedby")).toContain(pending.attributes("id"));
+    expect(find(wrapper, "settings-assistant-enabled-value").exists()).toBe(false);
+    answer(false);
+    await settle();
+    expect(find(wrapper, "settings-assistant-enabled-pending").exists()).toBe(false);
+    expect(assistantSettings.update).not.toHaveBeenCalled();
+  });
+
   it("states each read-only switch value in words", async () => {
     vi.mocked(assistantSettings.get).mockResolvedValue(null);
     wrapper = await mountForm();
-    expect(find(wrapper, "settings-assistant-enabled-value").text()).toBe("On");
+    expect(find(wrapper, "settings-assistant-enabled-value").text()).toBe(
+      "On in this organization",
+    );
     expect(find(wrapper, "settings-assistant-enabled-value").attributes("aria-hidden")).toBe(
       "true",
     );

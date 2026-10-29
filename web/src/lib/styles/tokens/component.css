@@ -2409,6 +2409,26 @@
   --color-assistant-user-bg: var(--color-surface-subtle);
   --color-assistant-mark-bg: var(--color-surface-subtle);
   --color-assistant-mark-fg: var(--color-text-secondary);
+  /* Assistant link and primary roles (PO A10): a darker existing shade, since light primary-600 is under 4.5:1 on white. */
+  --color-assistant-link: var(--color-primary-700);
+  --color-assistant-link-hover: var(--color-primary-800);
+  --color-assistant-primary: var(--color-primary-700);
+  --color-assistant-primary-hover: var(--color-primary-800);
+  --color-assistant-primary-foreground: var(--color-button-primary-foreground);
+  --color-assistant-focus-ring: var(--color-focus-ring-accent);
+}
+
+/* Every assistant-owned root carries data-assistant-surface; nothing outside it changes (PO A10, A16). */
+[data-assistant-surface] {
+  --color-button-primary: var(--color-assistant-primary);
+  --color-button-primary-hover: var(--color-assistant-primary-hover);
+  --color-button-primary-foreground: var(--color-assistant-primary-foreground);
+  --color-button-ghost-primary-text: var(--color-assistant-link);
+  --color-text-link: var(--color-assistant-link);
+  --color-text-link-hover: var(--color-assistant-link-hover);
+  --color-focus-ring-accent: var(--color-assistant-focus-ring);
+  --color-button-outline-hover-border: var(--color-assistant-focus-ring);
+  --color-kbd-text: var(--color-text-body);
 }
 
 /* ── Trace thread view (LLM observability) owns its colours so the assistant's tokens can change alone ── */
@@ -2430,6 +2450,12 @@
   --color-assistant-user-bg: var(--color-assistant-user-bg);
   --color-assistant-mark-bg: var(--color-assistant-mark-bg);
   --color-assistant-mark-fg: var(--color-assistant-mark-fg);
+  --color-assistant-link: var(--color-assistant-link);
+  --color-assistant-link-hover: var(--color-assistant-link-hover);
+  --color-assistant-primary: var(--color-assistant-primary);
+  --color-assistant-primary-hover: var(--color-assistant-primary-hover);
+  --color-assistant-primary-foreground: var(--color-assistant-primary-foreground);
+  --color-assistant-focus-ring: var(--color-assistant-focus-ring);
   --color-trace-thread-model: var(--color-trace-thread-model);
   --color-trace-thread-model-strong: var(--color-trace-thread-model-strong);
   --color-trace-thread-avatar-wash: var(--color-trace-thread-avatar-wash);

@@ -58,6 +58,7 @@ describe("action registry", () => {
     ["add_to_dashboard_draft", { kind: "add_to_dashboard_draft", query }],
     ["create_alert_draft", { kind: "create_alert_draft", query }],
     ["rerun_now", { kind: "rerun_now", turnId: "t" }],
+    ["rerun_wider", { kind: "rerun_wider", turnId: "t" }],
     ["regenerate", { kind: "regenerate", turnId: "t" }],
   ])("refuses %s while the page is on another org than the session", async (kind, action) => {
     const { env, sid } = makeEnv();
@@ -96,18 +97,21 @@ describe("action registry", () => {
     ).resolves.toEqual({ ok: false, reason: "needs_host" });
   });
 
-  it("refuses a turn-starting action while the gate is closed, before its applier runs", async () => {
-    const { env } = makeEnv();
-    env.capability.mockReturnValue({ ...env.capability(), gate: "no_permission" });
-    const applier = vi.fn(() => ({ ok: true as const }));
-    registerApplier("rerun_now", applier);
-    createActionDispatcher(env);
-    await expect(applyAction("s", { kind: "rerun_now", turnId: "t" })).resolves.toEqual({
-      ok: false,
-      reason: "gated",
-    });
-    expect(applier).not.toHaveBeenCalled();
-  });
+  it.each(["rerun_now", "rerun_wider"] as const)(
+    "refuses %s while the gate is closed, before its applier runs",
+    async (kind) => {
+      const { env } = makeEnv();
+      env.capability.mockReturnValue({ ...env.capability(), gate: "no_permission" });
+      const applier = vi.fn(() => ({ ok: true as const }));
+      registerApplier(kind, applier);
+      createActionDispatcher(env);
+      await expect(applyAction("s", { kind, turnId: "t" })).resolves.toEqual({
+        ok: false,
+        reason: "gated",
+      });
+      expect(applier).not.toHaveBeenCalled();
+    },
+  );
 
   it("refuses a turn-starting action while another tab locks the chat, before its applier runs", async () => {
     const { env } = makeEnv();
@@ -142,17 +146,20 @@ describe("action registry", () => {
     registerApplier("open_in_explorer", () => ({ ok: true }));
     registerApplier("navigate", () => ({ ok: false, reason: "guard_declined" }));
     registerApplier("rerun_now", () => ({ ok: true }));
+    registerApplier("rerun_wider", () => ({ ok: true }));
     createActionDispatcher(makeEnv().env);
     await applyAction("s", { kind: "run_query", query, blockId: "b" });
     await applyAction("s", { kind: "open_in_explorer", query, explorer: "logs" });
     await applyAction("s", { kind: "navigate", target: { name: "logs" }, label: "x" as any });
     await applyAction("s", { kind: "rerun_now", turnId: "t" });
+    await applyAction("s", { kind: "rerun_wider", turnId: "t" });
     expect(track.mock.calls).toEqual([
       ["ai_evidence_action", { action: "run_inline", block_kind: "query", language: "sql" }],
       ["ai_navigation", { mode: "link_card", taken: true, blocked_unsaved: false }],
       ["ai_evidence_action", { action: "open_explorer", block_kind: "query", language: "sql" }],
       ["ai_navigation", { mode: "link_card", taken: false, blocked_unsaved: true }],
       ["ai_evidence_action", { action: "rerun_now", block_kind: "footer" }],
+      ["ai_evidence_action", { action: "rerun_wider", block_kind: "footer" }],
     ]);
     expect(JSON.stringify(track.mock.calls)).not.toContain("SELECT");
   });

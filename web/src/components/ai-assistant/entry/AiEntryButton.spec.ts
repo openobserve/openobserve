@@ -197,8 +197,11 @@ describe("AiEntryButton gate table (`60` §3.7)", () => {
       await flushPromises();
       expect(openAssistant).not.toHaveBeenCalled();
       expect(
-        document.body.querySelector('[data-test="assistant-gate-state"][data-size="popover"]'),
-      ).not.toBeNull();
+        document.body
+          .querySelector('[data-test="assistant-gate-state"][data-size="popover"]')
+          ?.closest("[data-o-popover-content]")
+          ?.getAttribute("data-dd-privacy"),
+      ).toBe("mask");
       expect(track).toHaveBeenCalledWith("ai_entry_clicked", {
         entry_kind: "object_verb",
         entry_verb: "explain",
@@ -207,6 +210,8 @@ describe("AiEntryButton gate table (`60` §3.7)", () => {
         gate,
         queued: false,
       });
+      // The open popover nests Ask an admin's own popover, which must unmount before the body is cleared.
+      wrapper.unmount();
     },
   );
 

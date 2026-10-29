@@ -100,6 +100,8 @@ export interface TurnOutcomeRecord {
   at?: number;
   /** How long the turn ran, for "Connection lost after {elapsed}". */
   elapsedMs?: number;
+  /** An approved change ran before the failure, so the block never says nothing changed. */
+  afterChange?: boolean;
 }
 
 // Image attachment for multimodal chat
