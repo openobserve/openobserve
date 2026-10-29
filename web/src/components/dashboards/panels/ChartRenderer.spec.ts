@@ -20,7 +20,13 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import { use as echartsUse } from "echarts/core";
-import { LineChart, PictorialBarChart, TreemapChart, SunburstChart } from "echarts/charts";
+import {
+  FunnelChart,
+  LineChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+} from "echarts/charts";
 import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
 import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
@@ -69,6 +75,7 @@ vi.mock("echarts/charts", () => ({
   PictorialBarChart: vi.fn(),
   TreemapChart: vi.fn(),
   SunburstChart: vi.fn(),
+  FunnelChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -133,6 +140,9 @@ describe("ChartRenderer series registration", () => {
   });
   it("registers the sunburst series", () => {
     expect(registeredAtImport).toContain(SunburstChart);
+  });
+  it("registers the funnel series", () => {
+    expect(registeredAtImport).toContain(FunnelChart);
   });
 });
 

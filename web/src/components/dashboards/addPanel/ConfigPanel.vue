@@ -855,6 +855,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
           @update:model-value="(value: any) => setDefaultOnFlag('sunburst_show_labels', value)"
         />
+        <template v-if="dashboardPanelData.data.type === 'funnel'">
+          <OSelect
+            v-show="isConfigOptionVisible('data', 'funnel-sort')"
+            :label="t('dashboard.funnelSort')"
+            v-model="funnelSortModel"
+            :options="funnelSortOptions"
+            data-test="dashboard-config-funnel_sort"
+          />
+          <OToggleGroup
+            v-show="isConfigOptionVisible('data', 'funnel-orient')"
+            type="single"
+            label-position="top"
+            :label="t('dashboard.barGaugeOrientation')"
+            v-model="funnelOrientModel"
+            data-test="dashboard-config-funnel_orient"
+            :data-test-selected-value="funnelOrientModel"
+          >
+            <OToggleGroupItem
+              v-for="opt in funnelOrientOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              data-test="dashboard-config-funnel_orient-option"
+              :data-test-label="opt.label"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <OSwitch
+            v-show="isConfigOptionVisible('data', 'funnel-show-percent')"
+            :model-value="dashboardPanelData.data.config.funnel_show_percent === true"
+            :label="t('dashboard.funnelShowPercent')"
+            data-test="dashboard-config-funnel_show_percent"
+            size="lg"
+            @update:model-value="(value: any) => setFlagConfig('funnel_show_percent', value)"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.funnelShowPercentTooltip')" max-width="15.625rem" />
+            </template>
+          </OSwitch>
+        </template>
 
         <OSwitch
           v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
@@ -3404,6 +3444,12 @@ import {
   DEFAULT_BAR_GAUGE_ORIENTATION,
 } from "@/utils/dashboard/convertBarGaugeData";
 import {
+  DEFAULT_FUNNEL_ORIENT,
+  DEFAULT_FUNNEL_SORT,
+  FUNNEL_ORIENTS,
+  FUNNEL_SORTS,
+} from "@/utils/dashboard/convertFunnelData";
+import {
   DISTRIBUTION_ROW_LIMIT,
   isRawValueChart,
   isRowTimeline,
@@ -3877,6 +3923,23 @@ export default defineComponent({
         { label: t("dashboard.barGaugeOrientationVertical"), value: "vertical" },
       ],
       DEFAULT_BAR_GAUGE_ORIENTATION,
+    );
+    const funnelSortModel = choiceModel("funnel_sort", FUNNEL_SORTS);
+    const funnelSortOptions = withDefault(
+      [
+        { label: t("dashboard.funnelSortDescending"), value: "descending" },
+        { label: t("dashboard.funnelSortAscending"), value: "ascending" },
+        { label: t("dashboard.funnelSortNone"), value: "none" },
+      ],
+      DEFAULT_FUNNEL_SORT,
+    );
+    const funnelOrientModel = choiceModel("funnel_orient", FUNNEL_ORIENTS);
+    const funnelOrientOptions = withDefault(
+      [
+        { label: t("dashboard.barGaugeOrientationVertical"), value: "vertical" },
+        { label: t("dashboard.barGaugeOrientationHorizontal"), value: "horizontal" },
+      ],
+      DEFAULT_FUNNEL_ORIENT,
     );
     // Absent, the converters label SQL slices by percent and PromQL slices by all three, so the picker starts there.
     const pieLabelContentDefault = () =>
@@ -4671,6 +4734,7 @@ export default defineComponent({
         "distribution",
         "treemap",
         "sunburst",
+        "funnel",
         "sankey",
         "hostmap",
       ].includes(dashboardPanelData.data.type);
@@ -5026,6 +5090,10 @@ export default defineComponent({
       barGaugeRangeModeOptions,
       barGaugeOrientationModel,
       barGaugeOrientationOptions,
+      funnelSortModel,
+      funnelSortOptions,
+      funnelOrientModel,
+      funnelOrientOptions,
       pieLabelContentModel,
       pieLabelContentIsDefault,
       pieLabelContentDefaultHint,

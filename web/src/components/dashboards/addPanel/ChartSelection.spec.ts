@@ -232,4 +232,21 @@ describe("ChartSelection", () => {
     expect(li.className.includes("cursor-not-allowed")).toBe(true);
     dashboardPanelData.data.queryType = previous;
   });
+  it("lists funnel with its own icon and selects it on click", async () => {
+    const item = wrapper.find("[data-test='selected-chart-funnel-item']");
+    expect(item.exists()).toBe(true);
+    expect(item.find("img").attributes("src")).toContain("charts/funnel.svg");
+    await item.trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["funnel"]);
+  });
+
+  it("in PromQL mode disables funnel", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    const li = wrapper.find("[data-test='selected-chart-funnel-item']").element.closest("li");
+    expect(li.className.includes("cursor-not-allowed")).toBe(true);
+    dashboardPanelData.data.queryType = previous;
+  });
 });

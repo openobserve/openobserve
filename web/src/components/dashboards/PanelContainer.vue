@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'bar-gauge',
               'treemap',
               'sunburst',
+              'funnel',
             ].includes(props.data.type)
           "
           variant="ghost"

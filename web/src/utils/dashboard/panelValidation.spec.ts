@@ -1211,3 +1211,76 @@ describe("validatePanel on a treemap", () => {
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+describe("validatePanel on funnel", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (type: string, fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one stage field and one value field", () => {
+    expect(run("funnel", { x: [field("stage")], y: [field("count")] })).toEqual([]);
+  });
+
+  it("rejects a funnel without a value field", () => {
+    expect(run("funnel", { x: [field("stage")], y: [] })).toHaveLength(1);
+  });
+
+  it("does not allow a funnel on PromQL", () => {
+    expect(run("funnel", {}, {}, "promql")).toContain(
+      gt("dashboard.utils.promqlChartTypeUnsupported"),
+    );
+  });
+
+  it("checks the allowed values of the funnel keys", () => {
+    const funnel = { x: [field("stage")], y: [field("v")] };
+    expect(run("funnel", funnel, { funnel_sort: "none", funnel_orient: "horizontal" })).toEqual([]);
+    expect(run("funnel", funnel, { funnel_sort: "random" })).toHaveLength(1);
+    expect(run("funnel", funnel, { funnel_orient: "diagonal" })).toHaveLength(1);
+  });
+
+  it("lists funnel as an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "funnel", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});

@@ -188,6 +188,8 @@ export const buildDefaultBuilderFields = (
   if (chartType === "treemap") return { x: [], y };
   // One ring segment per label, so a time bucket is not a useful default label.
   if (chartType === "sunburst") return { x: [], y };
+  // One stage per label, so a time bucket is not a useful default label.
+  if (chartType === "funnel") return { x: [], y };
   // A time bucket is not an entity; the user picks the entity field.
   if (chartType === "hostmap") return { x: [], y };
   return { x, y };

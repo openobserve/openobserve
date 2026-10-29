@@ -1617,6 +1617,22 @@ describe("useConfigPanel – sunburst options", () => {
     expect(shouldShowSeriesOverrides({ data: { type: "sunburst" } })).toBe(false);
   });
 });
+describe("useConfigPanel – funnel options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows each option on its own chart type only", () => {
+    for (const option of ["funnel-sort", "funnel-orient", "funnel-show-percent"]) {
+      expect(visible("funnel", "data", option), option).toBe(true);
+      expect(visible("pie", "data", option), option).toBe(false);
+    }
+  });
+
+  it("shows no thresholds or series overrides on a funnel", () => {
+    expect(shouldShowThresholds({ data: { type: "funnel", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "funnel" } })).toBe(false);
+  });
+});
 
 describe("useConfigPanel – sparkline search visibility", () => {
   it("drops the sparkline option for an all-instant PromQL metric only", async () => {
