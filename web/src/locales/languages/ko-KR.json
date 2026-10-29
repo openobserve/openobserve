@@ -26423,6 +26423,8 @@
     "cantCall": "이 번호는 전화를 걸 수 없습니다",
     "fromNumber": "발신 번호",
     "press4": "통화 키 (4 확인, 6 해결, 8 에스컬레이션)",
+    "press4Available": "사용 가능",
+    "press4NotAvailable": "사용 불가",
     "press4NotAvailableHint": "통화 시 문자에 포함된 링크에서 확인하도록 안내합니다.",
     "update": "업데이트",
     "disconnect": "연결 해제",

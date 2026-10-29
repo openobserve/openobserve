@@ -26423,6 +26423,8 @@
     "cantCall": "Ten numer nie może wykonywać połączeń",
     "fromNumber": "Numer nadawcy",
     "press4": "Klawisze połączenia (4 potwierdź, 6 rozwiąż, 8 eskaluj)",
+    "press4Available": "Dostępne",
+    "press4NotAvailable": "Niedostępne",
     "press4NotAvailableHint": "Połączenia proszą o potwierdzenie za pomocą linku w otrzymanej wiadomości.",
     "update": "Aktualizuj",
     "disconnect": "Rozłącz",

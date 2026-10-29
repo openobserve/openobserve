@@ -26423,6 +26423,8 @@
     "cantCall": "Số này không thể thực hiện cuộc gọi",
     "fromNumber": "Số gọi đi",
     "press4": "Phím gọi (4 xác nhận, 6 giải quyết, 8 chuyển cấp)",
+    "press4Available": "Khả dụng",
+    "press4NotAvailable": "Không khả dụng",
     "press4NotAvailableHint": "Cuộc gọi yêu cầu mọi người xác nhận từ liên kết trong tin nhắn của họ.",
     "update": "Cập nhật",
     "disconnect": "Ngắt kết nối",

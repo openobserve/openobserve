@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OBanner>
 
     <OBanner
-      v-if="status.data.value?.state === 'unavailable'"
+      v-if="live?.state === 'unavailable'"
       variant="warning"
       dense
       data-test="telephony-card-unchecked"
@@ -103,7 +103,13 @@ import { telephonyStatusQuery } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
 import { useI18nTyped } from "@/types/i18n";
 import TelephonyPress4Row from "./TelephonyPress4Row.vue";
-import { PROVIDER, telephonyHealth, telephonyRefusalText, type TelephonyHealth } from "./telephony";
+import {
+  PROVIDER,
+  liveTelephonyStatus,
+  telephonyHealth,
+  telephonyRefusalText,
+  type TelephonyHealth,
+} from "./telephony";
 
 const TAG_VARIANT: Record<TelephonyHealth, BadgeVariant> = {
   checking: "default-soft",
@@ -129,7 +135,8 @@ const orgId = computed<string>(() => store.state.selectedOrganization.identifier
 
 const status = useQuery(() => telephonyStatusQuery(orgId.value));
 const health = computed(() => telephonyHealth(status.data.value, status.error.value));
-const ok = computed(() => (status.data.value?.state === "ok" ? status.data.value : null));
+const live = computed(() => liveTelephonyStatus(status.data.value, status.error.value));
+const ok = computed(() => (live.value?.state === "ok" ? live.value : null));
 const callsMayWork = computed(() => health.value !== "broken" && ok.value?.can_call !== false);
 
 const tagLabel = computed<I18nText>(() => {
@@ -143,7 +150,7 @@ const tagLabel = computed<I18nText>(() => {
 });
 
 const problem = computed<I18nText | null>(() => {
-  const state = status.data.value?.state;
+  const state = live.value?.state;
   if (state === "account_rejected" || state === "from_not_on_account" || state === "unreadable") {
     return telephonyRefusalText(t, state);
   }

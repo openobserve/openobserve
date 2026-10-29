@@ -26423,6 +26423,8 @@
     "cantCall": "Bu numara arama yapamaz",
     "fromNumber": "Gönderen numara",
     "press4": "Arama tuşları (4 üstlen, 6 çöz, 8 eskalasyon)",
+    "press4Available": "Kullanılabilir",
+    "press4NotAvailable": "Kullanılamıyor",
     "press4NotAvailableHint": "Aramalar, kişilerden mesajlarındaki bağlantıdan onaylamalarını ister.",
     "update": "Güncelle",
     "disconnect": "Bağlantıyı kes",

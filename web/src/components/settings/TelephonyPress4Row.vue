@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :name="available ? 'check-circle' : 'info'"
       size="sm"
       :class="available ? 'text-status-positive' : 'text-text-secondary'"
+      :label="available ? t('telephony.press4Available') : t('telephony.press4NotAvailable')"
     />
     <span class="text-text-body">{{ t("telephony.press4") }}</span>
     <OText v-if="!available" variant="meta">{{ t("telephony.press4NotAvailableHint") }}</OText>

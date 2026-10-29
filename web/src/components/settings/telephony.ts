@@ -122,6 +122,14 @@ export function telephonyHealth(
   }
 }
 
+/** The status answer the card may show: none once a re-check failed, since the cached one is stale. [pure] */
+export function liveTelephonyStatus(
+  status: TelephonyStatus | null | undefined,
+  err: unknown,
+): TelephonyStatus | null {
+  return err ? null : (status ?? null);
+}
+
 /** An Account SID cut to its first and last four characters, as the connected card shows it. [pure] */
 export function shortSid(sid: string): string {
   return sid.length <= 8 ? sid : `${sid.slice(0, 4)}…${sid.slice(-4)}`;

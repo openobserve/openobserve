@@ -26423,6 +26423,8 @@
     "cantCall": "Este número no puede hacer llamadas",
     "fromNumber": "Número de origen",
     "press4": "Teclas de llamada (4 confirmar, 6 resolver, 8 escalar)",
+    "press4Available": "Disponible",
+    "press4NotAvailable": "No disponible",
     "press4NotAvailableHint": "Las llamadas piden a las personas que confirmen desde el enlace de su mensaje.",
     "update": "Actualizar",
     "disconnect": "Desconectar",

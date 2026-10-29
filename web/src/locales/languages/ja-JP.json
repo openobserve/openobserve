@@ -26423,6 +26423,8 @@
     "cantCall": "この番号は通話を発信できません",
     "fromNumber": "発信元番号",
     "press4": "通話キー（4: 確認、6: 解決、8: エスカレーション）",
+    "press4Available": "利用可能",
+    "press4NotAvailable": "利用不可",
     "press4NotAvailableHint": "通話では、SMS 内のリンクから確認するよう案内されます。",
     "update": "更新",
     "disconnect": "切断",

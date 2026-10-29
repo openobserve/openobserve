@@ -26423,6 +26423,8 @@
     "cantCall": "Questo numero non può effettuare chiamate",
     "fromNumber": "Numero mittente",
     "press4": "Tasti chiamata (4 prendere in carico, 6 risolvere, 8 escalare)",
+    "press4Available": "Disponibile",
+    "press4NotAvailable": "Non disponibile",
     "press4NotAvailableHint": "Le chiamate invitano a prendere in carico dal link nel messaggio.",
     "update": "Aggiorna",
     "disconnect": "Disconnetti",

@@ -26423,6 +26423,8 @@
     "cantCall": "Dit nummer kan niet bellen",
     "fromNumber": "Afzendernummer",
     "press4": "Gesprekstoetsen (4 accepteren, 6 oplossen, 8 escaleren)",
+    "press4Available": "Beschikbaar",
+    "press4NotAvailable": "Niet beschikbaar",
     "press4NotAvailableHint": "Gesprekken vragen mensen te erkennen via de link in hun sms.",
     "update": "Bijwerken",
     "disconnect": "Loskoppelen",

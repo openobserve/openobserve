@@ -26423,6 +26423,8 @@
     "cantCall": "Diese Nummer kann keine Anrufe tätigen",
     "fromNumber": "Absendernummer",
     "press4": "Anruftasten (4 bestätigen, 6 lösen, 8 eskalieren)",
+    "press4Available": "Verfügbar",
+    "press4NotAvailable": "Nicht verfügbar",
     "press4NotAvailableHint": "Anrufe bitten Personen, über den Link in ihrer SMS zu bestätigen.",
     "update": "Aktualisieren",
     "disconnect": "Trennen",

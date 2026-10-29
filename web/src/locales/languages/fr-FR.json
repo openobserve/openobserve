@@ -26423,6 +26423,8 @@
     "cantCall": "Ce numéro ne peut pas passer d'appels",
     "fromNumber": "Numéro expéditeur",
     "press4": "Touches d'appel (4 accuser réception, 6 résoudre, 8 escalader)",
+    "press4Available": "Disponible",
+    "press4NotAvailable": "Non disponible",
     "press4NotAvailableHint": "Les appels invitent les personnes à accuser réception depuis le lien dans leur SMS.",
     "update": "Mettre à jour",
     "disconnect": "Déconnecter",

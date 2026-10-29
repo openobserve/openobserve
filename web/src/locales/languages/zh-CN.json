@@ -26423,6 +26423,8 @@
     "cantCall": "此号码无法拨打电话",
     "fromNumber": "主叫号码",
     "press4": "通话按键（4 确认，6 解决，8 升级）",
+    "press4Available": "可用",
+    "press4NotAvailable": "不可用",
     "press4NotAvailableHint": "通话会要求人员通过短信中的链接进行确认。",
     "update": "更新",
     "disconnect": "断开连接",

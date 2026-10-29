@@ -26421,6 +26421,8 @@
     "cantCall": "This number can't make calls",
     "fromNumber": "From number",
     "press4": "Call keys (4 acknowledge, 6 resolve, 8 escalate)",
+    "press4Available": "Available",
+    "press4NotAvailable": "Not available",
     "press4NotAvailableHint": "Calls ask people to acknowledge from the link in their text.",
     "update": "Update",
     "disconnect": "Disconnect",

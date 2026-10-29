@@ -26418,6 +26418,8 @@
     "cantCall": "此號碼無法撥打電話",
     "fromNumber": "來源號碼",
     "press4": "通話按鍵 (4 確認、6 解決、8 升級)",
+    "press4Available": "可用",
+    "press4NotAvailable": "無法使用",
     "press4NotAvailableHint": "通話會請人員透過簡訊中的連結進行確認。",
     "update": "更新",
     "disconnect": "中斷連線",

@@ -136,6 +136,9 @@ describe("TelephonySettings", () => {
       expect(cardText("meta")).toBe("From +18335550100 · Account ACte…0001");
       expect(body).not.toContain(SID);
       expect(text("press4")).toBe(PRESS4);
+      expect(q("press4")?.querySelector('[role="img"]')?.getAttribute("aria-label")).toBe(
+        "Available",
+      );
       expect(q("update")).not.toBeNull();
       expect(q("disconnect")).not.toBeNull();
       expect(q("hero")).toBeNull();
@@ -144,6 +147,9 @@ describe("TelephonySettings", () => {
     it("5d: without a callback URL press 4 reads not available, with the link fallback", async () => {
       await render({ ...CONNECTED, press4_available: false });
       expect(text("press4")).toContain(PRESS4);
+      expect(q("press4")?.querySelector('[role="img"]')?.getAttribute("aria-label")).toBe(
+        "Not available",
+      );
       expect(text("press4")).toContain(
         "Calls ask people to acknowledge from the link in their text.",
       );
