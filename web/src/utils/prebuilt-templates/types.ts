@@ -17,7 +17,7 @@ import type { I18nKey, I18nText } from "@/types/i18n";
  * Prebuilt destination types
  */
 export type PrebuiltTypeId =
-  "slack" | "discord" | "msteams" | "pagerduty" | "servicenow" | "email" | "opsgenie";
+  "slack" | "discord" | "msteams" | "pagerduty" | "servicenow" | "email" | "opsgenie" | "jira";
 
 /** A tile in the destination type picker: every prebuilt type, plus the Slack app. */
 export type DestinationTileId = PrebuiltTypeId | "slack_app";
@@ -135,6 +135,8 @@ export interface TestResult {
   error?: string;
   statusCode?: number;
   responseBody?: string;
+  /** The test issue a Jira destination created. */
+  issue?: { key: string; url: string };
 }
 
 /**

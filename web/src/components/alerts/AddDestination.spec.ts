@@ -1672,6 +1672,25 @@ describe("AddDestination — email destinations", () => {
     );
   });
 
+  it("hides Additional Settings for Jira once it is ready to save", async () => {
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "jira");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {
+      deployment: "cloud",
+      connectedAs: "Alerts Bot",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("passes the entered recipients to the preview", async () => {
     wrapper = mountComp();
     await toPrebuiltEmail(wrapper);

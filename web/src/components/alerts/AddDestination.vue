@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Template selector for prebuilt destinations -->
               <div
-                v-if="dtVal && dtVal !== 'custom' && showPrebuiltAdvancedSettings"
+                v-if="dtVal && dtVal !== 'custom' && dtVal !== 'jira' && showPrebuiltAdvancedSettings"
                 class="w-1/2 py-1"
               >
                 <OFormSelect
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- None of these settings apply to email destinations -->
               <div
-                v-if="showPrebuiltAdvancedSettings && dtVal !== 'email'"
+                v-if="showPrebuiltAdvancedSettings && dtVal !== 'email' && dtVal !== 'jira'"
                 class="mt-3 w-full"
                 data-test="prebuilt-additional-settings"
               >
@@ -488,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("alerts.cancel") }}</OButton
             >
             <OButton
-              v-if="!isNewSlackDestination || showPrebuiltAdvancedSettings"
+              v-if="showPrebuiltAdvancedSettings"
               data-test="add-destination-submit-btn"
               variant="primary"
               size="sm-action"
@@ -554,6 +554,7 @@ import {
 } from "@/composables/usePrebuiltDestinations";
 import { detectPrebuiltType, getPrebuiltConfig } from "@/utils/prebuilt-templates";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
+import { jiraCredentialsFromMetadata } from "@/utils/prebuilt-templates/jira";
 import { PAGERDUTY_EU_EVENTS_URL } from "@/utils/prebuilt-templates/pagerduty";
 import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
@@ -863,7 +864,15 @@ const isSlackOAuthConnected = computed(() => {
     slackChannelId.value.trim().length > 0
   );
 });
+// Jira lists its projects and issue types only after Connect, so nothing past them shows before.
+const isJiraReady = computed(
+  () =>
+    !!prebuiltCredentials.value.connectedAs &&
+    !!prebuiltCredentials.value.projectKey &&
+    !!prebuiltCredentials.value.issueTypeId,
+);
 const showPrebuiltAdvancedSettings = computed(() => {
+  if (props.isAlerts && dtVal.value === "jira") return isJiraReady.value;
   if (isSlackOAuthFlow.value) return isSlackOAuthConnected.value;
   if (isSlackManifestFlow.value) return slackManifestReady.value;
   return true;
@@ -983,6 +992,7 @@ const getDestinationTypeIcon = (typeId: string) => {
     pagerduty: "warning",
     opsgenie: "notifications_active",
     servicenow: "support_agent",
+    jira: "assignment",
     custom: "settings",
   };
   return iconMap[typeId] || "webhook";
@@ -1085,6 +1095,8 @@ const setupDestinationData = () => {
           ? prebuiltDestinationDefaults(destType, extractPrebuiltCredentials(destType))
           : {},
     };
+    // Names the saved destination whose token the server reuses while the token stays empty.
+    if (destType === "jira") record.credentials.savedDestination = props.destination.name;
 
     // Only CUSTOM headers reach the UI array; system/prebuilt ones stay implicit.
     // When there are none, the default apiHeaders row is kept. Custom and
@@ -1146,6 +1158,7 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
           credentials.severity = value;
         }
       });
+      if (typeId === "jira") Object.assign(credentials, jiraCredentialsFromMetadata(metadata));
     } catch (e) {
       console.error("Failed to parse destination metadata:", e);
     }
@@ -1155,6 +1168,9 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
   // webhookUrl is stored in the url field for webhook-based destinations.
   if (props.destination.url) {
     credentials.webhookUrl = props.destination.url;
+  }
+  if (typeId === "jira") {
+    credentials.url = props.destination.url ?? "";
   }
   // For ServiceNow, instanceUrl is the base URL.
   if (typeId === "servicenow" && props.destination.url) {
