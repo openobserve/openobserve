@@ -117,7 +117,7 @@ export function fixTarget(id: DataHealthCheckId, stream: string, orgId: string):
     case "unpriced_models":
       return {
         kind: "route",
-        to: { name: "modelPricing", query: { tab: "unpriced", stream, org_identifier: orgId } },
+        to: pricingGapsRoute(stream, orgId),
       };
     case "missing_agent_identity":
       return { kind: "route", to: { name: "genAiAgentMapping", query: { org_identifier: orgId } } };
@@ -127,10 +127,10 @@ export function fixTarget(id: DataHealthCheckId, stream: string, orgId: string):
   }
 }
 
-/** Route to Model Pricing's Unpriced / approximate tab for `stream`. */
-export function unpricedTabRoute(stream: string, orgId: string) {
+/** Route to Model Pricing's Pricing gaps page for `stream`. */
+export function pricingGapsRoute(stream: string, orgId: string) {
   return {
-    name: "modelPricing",
-    query: { tab: "unpriced", stream, org_identifier: orgId },
+    name: "modelPricingGaps",
+    query: { stream, org_identifier: orgId },
   };
 }

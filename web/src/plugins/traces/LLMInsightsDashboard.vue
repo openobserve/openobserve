@@ -427,7 +427,7 @@ import LLMSchemaPanel from "./LLMSchemaPanel.vue";
 import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMDataHealthStrip from "./LLMDataHealthStrip.vue";
 import { useLLMDataHealth } from "./composables/useLLMDataHealth";
-import { costKind, unpricedSummary, unpricedTabRoute } from "./llmDataTrust.utils";
+import { costKind, unpricedSummary, pricingGapsRoute } from "./llmDataTrust.utils";
 import { formatTokens } from "@/utils/llmUtils";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -544,7 +544,7 @@ function loadDataHealth(refresh = false, start = props.startTime, end = props.en
 }
 function openUnpricedTab() {
   router.push(
-    unpricedTabRoute(effectiveStream.value, store.state.selectedOrganization?.identifier ?? ""),
+    pricingGapsRoute(effectiveStream.value, store.state.selectedOrganization?.identifier ?? ""),
   );
 }
 

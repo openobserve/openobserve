@@ -41,7 +41,7 @@ export function buildKeepPricesPayload(model: string, matched: PricingMatch): Ne
         Object.entries(tier.prices ?? {}).filter(([, price]) => Number.isFinite(price)),
       ),
     })),
-    description: `Prices copied from "${matched.name}" from the Unpriced tab.`,
+    description: `Prices copied from "${matched.name}" on Pricing gaps.`,
   };
 }
 
@@ -52,6 +52,6 @@ export function buildMutePayload(model: string): NewPricingDefinition {
     match_pattern: exactModelPattern(model),
     enabled: true,
     tiers: [{ name: "Default", condition: null, prices: { input: 0, output: 0 } }],
-    description: "Muted from the Unpriced tab: this model is treated as free.",
+    description: "Muted on Pricing gaps: this model is treated as free.",
   };
 }
