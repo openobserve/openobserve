@@ -786,6 +786,8 @@ export interface TeamRungSummary {
   nobody_after_micros?: number | null;
   /** A ladder that stops short of the whole team runs out of people. */
   ends_with_whole_team: boolean;
+  /** The channels this priority pages on. */
+  channels: Channel[];
 }
 
 export interface TeamPageStats {
@@ -1251,7 +1253,21 @@ export type TelephonyReason =
   | "token_required"
   | "no_master_key"
   | "account_rejected"
+  | "from_not_on_account"
+  | "unavailable"
   | "unreadable";
+
+/** `GET /telephony/status`: `none` means no account would page, so nothing was checked. */
+export type TelephonyState =
+  "ok" | "account_rejected" | "from_not_on_account" | "unavailable" | "unreadable" | "none";
+
+/** A live check of the account the org would page with; the capabilities are false unless `state` is `ok`. */
+export interface TelephonyStatus {
+  state: TelephonyState;
+  trial: boolean;
+  can_text: boolean;
+  can_call: boolean;
+}
 
 /** The 400 body of a refused telephony call; `message` is the English API text. */
 export interface TelephonyRefusalBody {
