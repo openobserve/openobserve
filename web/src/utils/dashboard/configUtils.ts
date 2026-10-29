@@ -5,11 +5,11 @@
 import { isRowTimeline } from "./chartTypeGroups";
 
 // These draw no axes and no legend.
-const NO_AXIS_TYPES: string[] = [];
+const NO_AXIS_TYPES: string[] = ["bar-gauge"];
 // One series per panel, so a legend has nothing to tell apart.
 const NO_LEGEND_TYPES: string[] = [...NO_AXIS_TYPES];
 // These lay out their own legend and axes, so the shared legend layout and axis width do not apply.
-const OWN_LAYOUT_TYPES: string[] = ["hostmap"];
+const OWN_LAYOUT_TYPES: string[] = ["bar-gauge", "hostmap"];
 
 interface PanelQueriesState {
   data: { queries?: Array<{ config?: { query_type?: string } } | null> };
@@ -210,7 +210,7 @@ export const shouldShowNoValueReplacement = (
 ): boolean => {
   const type = dashboardPanelData.data.type;
   // A host map cell with no data shows this text in both query modes.
-  if (["metric", "gauge", "table", "hostmap"].includes(type)) return true;
+  if (["metric", "gauge", "bar-gauge", "table", "hostmap"].includes(type)) return true;
   return ["area", "line", "area-stacked", "bar", "stacked"].includes(type) && !promqlMode;
 };
 

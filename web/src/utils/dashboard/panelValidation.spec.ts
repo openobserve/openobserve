@@ -862,3 +862,73 @@ describe("validatePanel bar width", () => {
     expect(run("stacked", "sql", -3)).toEqual([]);
   });
 });
+
+describe("validatePanel on bar gauge", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "bar-gauge",
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one value with or without a label field, and rejects no value", () => {
+    expect(run({ y: [field("count")] })).toEqual([]);
+    expect(run({ x: [field("service")], y: [field("count")] })).toEqual([]);
+    expect(run({ y: [] })).toHaveLength(1);
+  });
+
+  it("allows PromQL", () => {
+    expect(run({}, {}, "promql")).not.toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("checks the allowed mode and orientation values", () => {
+    const y = { y: [field("v")] };
+    expect(run(y, { bar_gauge_mode: "lcd", bar_gauge_orientation: "vertical" })).toEqual([]);
+    expect(run(y, { bar_gauge_mode: "neon" })).toHaveLength(1);
+    expect(run(y, { bar_gauge_orientation: "diagonal" })).toHaveLength(1);
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "bar-gauge", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});

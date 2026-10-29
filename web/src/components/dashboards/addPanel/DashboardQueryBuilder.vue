@@ -1183,6 +1183,7 @@ export default defineComponent({
         case "hostmap":
           return t("dashboard.oneFieldMessage");
         case "gauge":
+        case "bar-gauge":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
         default:
           return t("dashboard.maxtwofieldMessage");
@@ -1207,6 +1208,7 @@ export default defineComponent({
         case "pie":
         case "donut":
         case "gauge":
+        case "bar-gauge":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");

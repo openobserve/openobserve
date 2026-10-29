@@ -583,4 +583,21 @@ describe("usePanelFields", () => {
       expect(fields.promqlMode.value).toBe(true);
     });
   });
+
+  describe("bar gauge slots", () => {
+    const addMany = (axis: "x" | "y", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else fields.addYAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes one x and one y field", () => {
+      panelData.data.type = "bar-gauge";
+      expect(addMany("x", 3)).toBe(1);
+      expect(addMany("y", 3)).toBe(1);
+    });
+  });
 });

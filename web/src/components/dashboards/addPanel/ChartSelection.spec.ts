@@ -166,4 +166,22 @@ describe("ChartSelection", () => {
 
     filteredWrapper.unmount();
   });
+
+  it("lists bar gauge with its own icon", async () => {
+    const item = wrapper.find("[data-test='selected-chart-bar-gauge-item']");
+    expect(item.exists()).toBe(true);
+    expect(item.find("img").attributes("src")).toContain("charts/bar-gauge.svg");
+    await item.trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["bar-gauge"]);
+  });
+
+  it("in PromQL mode keeps bar gauge enabled", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    const li = wrapper.find("[data-test='selected-chart-bar-gauge-item']").element.closest("li");
+    expect(li.className.includes("cursor-not-allowed")).toBe(false);
+    dashboardPanelData.data.queryType = previous;
+  });
 });

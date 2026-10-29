@@ -161,6 +161,11 @@ export default defineComponent({
         id: "gauge",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/bar-gauge.svg"),
+        title: t("dashboard.chartSelection.barGauge"),
+        id: "bar-gauge",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.svg"),
         title: t("dashboard.chartSelection.html"),
         id: "html",
@@ -193,6 +198,7 @@ export default defineComponent({
       "area-stacked",
       "metric",
       "gauge",
+      "bar-gauge",
       "pie",
       "donut",
       "table",
