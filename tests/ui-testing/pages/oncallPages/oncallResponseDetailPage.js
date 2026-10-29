@@ -416,6 +416,11 @@ export class OnCallResponseDetailPage {
     await expect(this.page.locator(this.locators.teamLink)).toContainText(teamName, { timeout: 30000 });
   }
 
+  async expectTeamLinkTargets(teamId) {
+    await expect(this.page.locator(this.locators.teamLink))
+      .toHaveAttribute('href', new RegExp(`/oncall/teams/${teamId}(/|\\?|$)`), { timeout: 30000 });
+  }
+
 }
 
 export default OnCallResponseDetailPage;

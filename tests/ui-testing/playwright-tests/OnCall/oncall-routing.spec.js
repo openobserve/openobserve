@@ -67,6 +67,7 @@ const {
   deleteTeamExpectingStatus,
 } = require('../utils/oncall-seed-ext.js');
 const { getAuthHeaders } = require('../utils/cloud-auth.js');
+const { DEFAULT_TEAM_LOCK, acquireOrgLock } = require('../utils/oncall-org-lock.js');
 
 const PREFIX = 'e2e_oncall_routing';
 
@@ -143,7 +144,9 @@ test.describe('On-call routing rules', {
 
   test('the routing page loads with both tabs', {
     tag: ['@P0', '@smoke'],
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    // With no team the screen draws its "create a team" empty state instead of the tabs.
+    await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_smoke`) });
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.expectAvailable();
     await pm.oncallRoutingPage.expectPageVisible();
@@ -384,7 +387,7 @@ test.describe('On-call routing rules', {
    * endpoint validates, and weakening it to assert the 200 would pin the defect
    * as correct.
    */
-  test.fixme('TS-12.10 an ownership rule on a dimension outside the semantic group list is refused — W-03: POST /oncall/ownership accepts {"totally_made_up_dim":"x"} with 200, verified 15 Sep on :5090. o2-enterprise#2481.', {
+  test.fixme('TS-12.10 an ownership rule on a dimension outside the semantic group list is refused — the API stores it with 200. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const team = await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_w03`) });
@@ -591,6 +594,23 @@ test.describe('On-call routing rules', {
    * they are at least good citizens of the org they borrow.
    */
   test.describe.serial('org default team', () => {
+    let releaseLock = null;
+    let priorDefault = null;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+      releaseLock = await acquireOrgLock(DEFAULT_TEAM_LOCK, { testInfo });
+      priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
+    });
+
+    // Restored even when the test fails: a leaked nomination routes every other worker's unmatched page.
+    test.afterEach(async ({ page }) => {
+      try {
+        await setDefaultTeam(page, priorDefault);
+      } finally {
+        releaseLock?.();
+      }
+    });
+
     /**
      * TS-14.01 and TS-14.02 in ONE test, deliberately.
      *
@@ -701,15 +721,12 @@ test.describe('On-call routing rules', {
     test('TS-14.03 a signal that only defaulted is recorded as defaulted, and a claimed one is not recorded at all', {
       tag: ['@P1'],
     }, async ({ page }, testInfo) => {
-    // A real firing has to clear ingestion, the scheduler and the ladder; the
-    // 3-minute default is for screens, not for this.
-    test.setTimeout(900_000);
+      // A real firing clears ingestion, the scheduler and the ladder; added to, not set, so beforeEach's lock wait is kept.
+      test.setTimeout(testInfo.timeout - testInfo.project.timeout + 900_000);
       const f = await seedPageableFixture(page, testInfo, 'owned');
       await createOwnershipRule(page, { teamId: f.team.id, dimensions: { service: f.service } });
 
-      // Nominate a default so an unmatched signal has somewhere to land,
-      // remembering what was there so the org is handed back as it was found.
-      const priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
+      // Nominate a default so an unmatched signal has somewhere to land.
       await setDefaultTeam(page, f.team.id);
       await expect.poll(async () => (await getRoutingConfig(page))?.default_team_id,
         { timeout: 60000, intervals: [1000] }).toBe(f.team.id);
@@ -762,8 +779,6 @@ test.describe('On-call routing rules', {
         pm.oncallRoutingPage.getUnroutedFilterDefault(),
         'the screen must offer the defaulted-vs-unowned distinction, not just one undifferentiated queue',
       ).toBeVisible({ timeout: 30000 });
-
-      await setDefaultTeam(page, priorDefault).catch(() => {});
     });
 
     /**
@@ -791,7 +806,6 @@ test.describe('On-call routing rules', {
     }, async ({ page }, testInfo) => {
       const name = uniqueName(`${workerPrefix(testInfo)}_dflt`);
       const team = await createTeam(page, { name });
-      const priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
 
       await pm.oncallRoutingPage.goto(ORG);
       await pm.oncallRoutingPage.expectAvailable();
@@ -853,9 +867,6 @@ test.describe('On-call routing rules', {
       // And the screen still says which team is the catch-all.
       await pm.oncallRoutingPage.goto(ORG);
       await pm.oncallRoutingPage.expectDefaultTeamLabelNames(name);
-
-      // Leave the org as it was found: an org-wide nomination outlives this spec.
-      await setDefaultTeam(page, priorDefault).catch(() => {});
     });
   });
 });

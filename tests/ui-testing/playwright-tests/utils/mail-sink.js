@@ -76,7 +76,7 @@ async function list() {
     const d = await r.json();
     return (d.msgs || []).map((m) => ({ id: m.id, subject: m.subject, ts: Number(m.time) || 0 }));
   }
-  return [];
+  throw new Error(`cannot list mail: ${await unavailableReason()}`);
 }
 
 async function count() {

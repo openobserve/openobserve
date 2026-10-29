@@ -2,8 +2,8 @@
  * On-Call — Quick start actually writes a schedule (TS-06.07)
  *
  * Plan: docs/test_generator/test-plans/oncall-ui-test-plan.md, Tier 1 —
- *   TS-06.07 applying a preset must issue a real `PUT /teams/{id}/schedule`,
- *            and the stored schedule afterwards must be the preset's.
+ *   TS-06.07 applying a preset must issue a real `POST /teams/{id}/schedule/from-preset`,
+ *            and the primary rotation afterwards must hold the preset's shift rules.
  *
  * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
  *
@@ -16,16 +16,16 @@
  * and issues NOTHING looks exactly like success: the drawer disappears, no
  * error is shown, and the team's schedule is whatever it was before. So the
  * assertion is not "the drawer closed" — it is that the request went out AND
- * that what came back is the preset's shape. `attemptQuickStartSave()` watches
- * the network for precisely this reason.
+ * that what came back is the preset's shape. `confirmQuickStartReplace()` waits
+ * on the write itself for precisely this reason.
  *
  * WHAT IS DELIBERATELY *NOT* ASSERTED HERE:
  *   - The preset's exact restriction minutes. Those are the catalogue's
  *     business decision, read from `GET /oncall/schedule-presets` at runtime;
  *     pinning them here would make the test a copy of the catalogue rather than
  *     a check on it. What is asserted is that the two staffed groups became two
- *     rotations holding the people who were staffed into them, and that the
- *     rotations are no longer the auto-created `source: "default"` pair.
+ *     shift rules on the primary rotation holding the people staffed into them,
+ *     and that the rotation is no longer the auto-created `source: "default"` one.
  *
  * Self-cleaning, worker-scoped prefix.
  */
@@ -42,7 +42,6 @@ const {
   setTeamSchedule,
   rotation,
   createOwnershipRule,
-  listOwnershipRules,
   seedOnCallStream,
   waitForStreamSearchable,
   seedNotificationDestination,
@@ -51,13 +50,16 @@ const {
   orgId,
   uniqueName,
   deleteOnCallFixturesByPrefix,
+  deleteTeamById,
 } = require('../utils/oncall-seed.js');
 const {
   createOrgUsers,
-  getCoverageGaps,
   waitForMail,
+  requireMailSink,
   extractLinks,
 } = require('../utils/oncall-seed-ext.js');
+const { getAuthHeaders } = require('../utils/cloud-auth.js');
+const { withFreshOrg } = require('../utils/first-event-helpers.js');
 
 const PREFIX = 'e2e_oncall_onboarding';
 
@@ -107,22 +109,8 @@ test.describe('On-call onboarding', {
 
   // ------------------------------------------------------------------ TS-06.07
 
-  /**
-   * UNWIRED, and kept as a fixme with its real assertions intact.
-   *
-   * Reproduced on this build, 15 Sep: with the `weekday_weekend` preset chosen
-   * and both required groups staffed, Apply is ENABLED (`disabled: false`),
-   * clicking it issues NO request (`requestSeen: false`), and the screen says
-   * nothing about why (`error: null`, `invalidFields: 0`). A Quick start that
-   * validates, looks successful and writes nothing is indistinguishable from
-   * one that worked, which is the entire reason this case exists.
-   *
-   * The body asserts the CORRECT behaviour — the apply issues
-   * `PUT /teams/{id}/schedule` and the stored schedule is the preset's — so it
-   * flips green the moment the handler is wired, and weakening it to assert the
-   * no-op would pin the defect as correct.
-   */
-  test.fixme('applying a Quick start preset issues a real schedule write, not a silent no-op — not wired: Apply is enabled, issues no request and reports no error, verified 15 Sep on :5090. o2-enterprise#2481.', {
+  // Apply rewrites only the PRIMARY rotation's shift rules in place, so escalation steps that name it keep working.
+  test('applying a Quick start preset issues a real schedule write, not a silent no-op', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_preset`);
@@ -130,14 +118,15 @@ test.describe('On-call onboarding', {
     const team = await createTeam(page, { name: `${prefix}_team` });
     await addTeamMembers(page, team.id, emails);
 
-    // The auto-staffed starting point, so "the schedule changed" is a real
-    // before/after rather than an assumption about an empty team.
     const before = await getTeamSchedule(page, team.id);
     testLogger.info('TS-06.07 schedule before Quick start', {
       rotations: before.rotations.map((r) => ({ id: r.id, name: r.name, source: r.source })),
     });
+    expect(before.rotations.length, 'a staffed team starts with an auto-created rotation for Quick start to rewrite')
+      .toBeGreaterThan(0);
     expect(before.rotations.every((r) => r.source === 'default'),
       'a new team starts on auto-created rotations — that is what Quick start replaces').toBe(true);
+    const [primary, ...others] = before.rotations;
 
     await pm.oncallTeamDetailPage.goto(ORG, team.id, 'schedule');
     await pm.oncallTeamDetailPage.expectAvailable();
@@ -145,167 +134,137 @@ test.describe('On-call onboarding', {
     await pm.oncallTeamDetailPage.openQuickStart();
     await pm.oncallTeamDetailPage.chooseQuickStartTemplate(PRESET_ID);
 
-    // Two groups staffed with different people, so the stored rotations can be
-    // told apart afterwards.
     const staffing = {
       weekdays: [emails[0], emails[1]],
       weekend: [emails[2], emails[3]],
     };
-    // Only `members` is required on this preset — `name` is optional and takes
-    // a sensible default — so staffing is the whole of filling it in.
     for (const row of PRESET_ROWS) {
       await pm.oncallTeamDetailPage.setQuickStartRegionMembers(row, staffing[row]);
     }
 
-    // The network watch is the point: a Quick start that closes the drawer
-    // without issuing a PUT looks identical to one that worked.
-    const attempt = await pm.oncallTeamDetailPage.attemptQuickStartSave({ settleMs: 4000 });
-    testLogger.info('TS-06.07 apply attempt', attempt);
-    expect(attempt.disabled, 'a fully-filled Quick start must be applicable').toBe(false);
-    expect(attempt.requestSeen, 'applying a preset must issue PUT /teams/{id}/schedule — a silent no-op is the defect')
-      .toBe(true);
-    expect(attempt.error, 'a valid preset must not be refused').toBeNull();
+    await pm.oncallTeamDetailPage.applyQuickStart();
+    await expect(pm.oncallTeamDetailPage.getConfirmDialog(),
+      'rewriting a stored rotation is confirmed first, naming it').toContainText(primary.name, { timeout: 20000 });
+    const write = await pm.oncallTeamDetailPage.confirmQuickStartReplace();
+    expect(write.status(), `the preset write must be accepted: ${await write.text().catch(() => '')}`).toBe(200);
 
-    // And the stored schedule has to actually be the preset's.
     await expect.poll(
-      async () => (await getTeamSchedule(page, team.id)).rotations.some((r) => r.source !== 'default'),
-      { timeout: 60000, intervals: [1000], message: 'the schedule never left its auto-created state' },
-    ).toBe(true);
+      async () => (await getTeamSchedule(page, team.id)).rotations.find((r) => r.id === primary.id)?.source ?? 'gone',
+      { timeout: 60000, intervals: [1000], message: 'the primary rotation never left its auto-created state' },
+    ).not.toBe('default');
 
     const after = await getTeamSchedule(page, team.id);
     testLogger.info('TS-06.07 schedule after Quick start', {
       rotations: after.rotations.map((r) => ({
         id: r.id, name: r.name, source: r.source,
-        members: r.shift_rules?.[0]?.members,
+        rules: (r.shift_rules ?? []).map((rule) => ({ name: rule.name, members: rule.members })),
       })),
     });
-    expect(after.rotations.length, 'a two-group preset stores two rotations').toBe(PRESET_ROWS.length);
-
-    // Each staffed group became a rotation holding exactly the people put in it
-    // — the strongest available statement that the preset, not something else,
-    // is what got written.
-    const storedMembers = after.rotations.map((r) => [...(r.shift_rules?.[0]?.members ?? [])].sort());
+    const rewritten = after.rotations.find((r) => r.id === primary.id);
+    expect(rewritten, 'Quick start must rewrite the primary rotation in place, not delete or replace it').toBeTruthy();
+    expect(rewritten.name, 'the rewritten rotation keeps its name, so escalation steps still point at it')
+      .toBe(primary.name);
+    const storedMembers = (rewritten.shift_rules ?? []).map((rule) => [...(rule.members ?? [])].sort());
+    expect(storedMembers.length, 'a two-group preset writes one shift rule per group').toBe(PRESET_ROWS.length);
     for (const row of PRESET_ROWS) {
       expect(storedMembers, `the "${row}" group must be stored with the people staffed into it`)
         .toContainEqual([...staffing[row]].sort());
     }
+    expect(after.rotations.filter((r) => r.id !== primary.id),
+      'only the primary rotation is rewritten; every other rotation is left as it was').toEqual(others);
   });
 
-  /**
-   * TS-22.02 — the checklist is derived from live configuration, never
-   * remembered.
-   *
-   * A checklist that stored "done" would keep saying done after somebody
-   * deleted the destination it was about, and the first anybody would hear of
-   * it is a page that announced nowhere.
-   *
-   * ASSERTED IN BOTH DIRECTIONS, INCLUDING ABSENCE. The obvious shape for this
-   * test skips when the checklist is not drawn — and on any org that has been
-   * used, it never is, so the case would be permanently skipped and nobody
-   * would notice. But "not drawn" is itself derived: the component appears only
-   * while at least one step is outstanding. So a fully configured org must draw
-   * NOTHING, and that is just as much an assertion as a tick is. This computes
-   * what the four steps should say from the live configuration and holds the
-   * screen to it either way.
-   */
+  // Staged in an org of its own: in the shared org other workers' setup completes all four steps, so the checklist is never drawn there.
   test('TS-22.02 checklist state is derived from live configuration, including its absence', {
     tag: ['@P1'],
-  }, async ({ page }) => {
-    // What the product computes the four steps from, read independently.
-    const teams = (await listTeams(page)) ?? [];
-    const rules = (await listOwnershipRules(page)) ?? [];
-    const gaps = await getCoverageGaps(page);
-    const hasTeam = teams.length > 0;
-    const hasRouting = rules.length > 0;
-    // "Would any team page somebody": fewer teams in the gap list than exist.
-    const gapCount = Array.isArray(gaps) ? gaps.length : (gaps?.total ?? gaps?.teams?.length ?? 0);
-    const hasStaffedRotation = hasTeam && gapCount < teams.length;
-
-    await pm.oncallPagesListPage.goto(ORG);
-
-    const checklist = pm.oncallPagesListPage.getSetupChecklist();
-    await pm.oncallPagesListPage.expandSetupChecklist();
-
-    if (!(await checklist.count())) {
-      // Absence is derived too: the checklist withdraws only once nothing is
-      // outstanding.
-      //
-      // NARROWED ON PURPOSE. I first asserted all four steps were satisfied and
-      // it failed — because my re-derivation was wrong, not the product:
-      // `hasRouting` in OnCallResponses.vue is
-      // `rules.length > 0 || responses.some(r => !!r.team_id)`, so an org with
-      // no ownership rules but routed pages legitimately has that step done.
-      // Re-implementing the product's derivation only tests my copy of it. What
-      // is checkable without duplicating internals is the unambiguous subset:
-      // a withdrawn checklist must not be hiding an org with no teams, or one
-      // where no team would page anybody.
-      expect(
-        hasTeam,
-        'the checklist is not drawn, so the org must at least have a team — a checklist that hides an unconfigured org is remembering, not deriving',
-      ).toBe(true);
-      expect(
-        hasStaffedRotation,
-        'and at least one team must actually put somebody on call',
-      ).toBe(true);
-      testLogger.info('TS-22.02 checklist absent, and the configuration says it should be', {
-        teams: teams.length, rules: rules.length, gapCount,
-      });
-      return;
-    }
-
-    await expect(checklist).toBeVisible({ timeout: 30000 });
-
-    const stateOf = (key) => pm.oncallPagesListPage.readSetupStepState(key);
-
-    // Each step's rendered state must follow from the configuration, not from
-    // anything the component kept.
-    // The snapshot above was taken BEFORE the screen rendered, and the org is
-    // shared with every other worker — one of them creating a team between the
-    // two reads makes the checklist right and the snapshot stale. So each step is
-    // compared against a configuration re-read alongside it, bounded: the
-    // assertion still requires the rendered state to follow from the
-    // configuration, it just does not require the org to hold still.
-    const satisfiedNow = async (key) => {
-      const teamsNow = (await listTeams(page)) ?? [];
-      if (key === 'team') return teamsNow.length > 0;
-      if (key === 'routing') return ((await listOwnershipRules(page)) ?? []).length > 0;
-      const g = await getCoverageGaps(page);
-      const n = Array.isArray(g) ? g.length : (g?.total ?? g?.teams?.length ?? 0);
-      return teamsNow.length > 0 && n < teamsNow.length;
+  }, async ({ page }, testInfo) => {
+    // Opening a page needs a real alert firing in the staged org.
+    test.setTimeout(480_000);
+    const list = pm.oncallPagesListPage;
+    const checklist = list.getSetupChecklist();
+    const stateOf = (key) => list.readSetupStepState(key);
+    const expectSteps = async (expected, why) => {
+      for (const [key, done] of Object.entries(expected)) {
+        await expect.poll(async () => (await stateOf(key)) === 'done', {
+          timeout: 20000, intervals: [1000],
+          message: `${why}: the "${key}" step must read ${done ? 'done' : 'not done'}`,
+        }).toBe(done);
+      }
     };
 
-    for (const key of ['team', 'routing', 'rotation']) {
-      expect(await stateOf(key), `the "${key}" step must render its state as data, not only as a colour`)
-        .toBeTruthy();
-      await expect.poll(
-        async () => (await stateOf(key)) === 'done' === (await satisfiedNow(key)),
-        { timeout: 20000, intervals: [1000],
-          message: `the "${key}" step must read done exactly when the live configuration satisfies it` },
-      ).toBe(true);
-    }
+    await withFreshOrg(page, 'oncall_checklist', async (stagedOrg) => {
+      const sharedOrg = process.env.ORGNAME;
+      // Every seed helper reads its org from ORGNAME, and a worker runs one test at a time.
+      process.env.ORGNAME = stagedOrg;
+      let alertId = null;
+      try {
+        const prefix = uniqueName(`${workerPrefix(testInfo)}_chk`);
+        const reload = async () => {
+          await list.goto(stagedOrg);
+          await list.expandSetupChecklist();
+        };
 
-    // Nothing was clicked and nothing was stored, so a reload must recompute
-    // the same answer from the same configuration.
-    const before = await stateOf('team');
-    await pm.oncallPagesListPage.goto(ORG);
-    await pm.oncallPagesListPage.expandSetupChecklist();
-    await expect(checklist).toBeVisible({ timeout: 30000 });
-    expect(await stateOf('team'),
-      'a reload must recompute the same state — the checklist remembers nothing of its own')
-      .toBe(before);
+        await reload();
+        await expect(checklist, 'an org with nothing configured must be shown the checklist').toBeVisible({ timeout: 30000 });
+        await expectSteps({ team: false, rotation: false, routing: false, destinations: false }, 'an empty org');
+        await expect(list.getSetupCollapse(),
+          'with no pages the checklist is the whole screen, so it offers nothing to hide it behind').toHaveCount(0);
 
-    // "Hide for now" is a view state, and a checklist that stayed hidden would
-    // hide an unfinished setup for good.
-    const collapse = pm.oncallPagesListPage.getSetupCollapse();
-    if (await collapse.count()) {
-      await collapse.first().click();
-      await pm.oncallPagesListPage.goto(ORG);
-      const reappeared = (await pm.oncallPagesListPage.getSetupBanner().count())
-        + (await checklist.count());
-      expect(reappeared,
-        'hiding the checklist must not survive a reload while the setup is still unfinished')
-        .toBeGreaterThan(0);
-    }
+        const team = await createTeam(page, { name: `${prefix}_team` });
+        await reload();
+        await expectSteps({ team: true, rotation: false }, 'a team with nobody in it');
+
+        await deleteTeamById(page, team.id);
+        await expect.poll(async () => (await listTeams(page)).length, { timeout: 30000 }).toBe(0);
+        await reload();
+        await expectSteps({ team: false }, 'the only team was deleted, so a remembered tick would be stale');
+
+        const [member] = await createOrgUsers(page, prefix, 1);
+        const staffed = await createTeam(page, { name: `${prefix}_staffed` });
+        await addTeamMembers(page, staffed.id, [member]);
+        const destination = await seedNotificationDestination(page, prefix);
+        await reload();
+        await expectSteps({ team: true, rotation: true, routing: false, destinations: true },
+          'a staffed team and a destination, but nothing routed');
+
+        const stream = `${prefix}_stream`.toLowerCase();
+        await seedOnCallStream(page, stream);
+        const fired = await firePageAndWait(page, {
+          alertOptions: { name: `${prefix}_alert`, stream, teamId: staffed.id },
+        });
+        alertId = fired.alert.id;
+
+        // A page bound straight to a team completes routing without a rule, so all four steps are done.
+        await list.goto(stagedOrg);
+        await expect(list.getRowByIndex(0), 'the fired page must be on the list').toBeVisible({ timeout: 30000 });
+        await expect(checklist, 'a fully configured org must draw no checklist').toHaveCount(0);
+        await expect(list.getSetupBanner(), 'and no setup banner either').toHaveCount(0);
+
+        const deleted = await page.request.delete(
+          `${process.env.ZO_BASE_URL}/api/${stagedOrg}/alerts/destinations/${encodeURIComponent(destination)}`,
+          { headers: getAuthHeaders() },
+        );
+        expect(deleted.ok(), `deleting the destination must succeed: ${deleted.status()}`).toBe(true);
+        await list.goto(stagedOrg);
+        await expect(list.getSetupBanner(),
+          'the only destination is gone, so the setup is unfinished again and must say so over the live list')
+          .toBeVisible({ timeout: 30000 });
+        await list.expandSetupChecklist();
+        await expectSteps({ team: true, rotation: true, routing: true, destinations: false }, 'the destination was deleted');
+
+        await list.getSetupCollapse().click();
+        await expect(checklist, '"Hide for now" folds the checklist back into its banner').toHaveCount(0);
+        await list.goto(stagedOrg);
+        await expect(list.getSetupBanner(),
+          'hiding the checklist must not survive a reload while the setup is still unfinished').toBeVisible({ timeout: 30000 });
+      } finally {
+        if (alertId) {
+          await page.request.delete(`${process.env.ZO_BASE_URL}/api/v2/${stagedOrg}/alerts/${alertId}`,
+            { headers: getAuthHeaders() }).catch(() => {});
+        }
+        process.env.ORGNAME = sharedOrg;
+      }
+    });
   });
 
   /**
@@ -442,12 +401,13 @@ test.describe('On-call onboarding', {
    * declaration on the `h1` fixes it. Kept as a failing expectation so it goes
    * green when that lands.
    */
-  test.fixme('TS-16.06 the acknowledge landing page is usable at a phone viewport — not wired: the ack page h1 has no word-break, so a long record title overflows a 390px viewport by 159px and can push the Acknowledge button off screen (ack_confirm_page, request/oncall/mod.rs), verified 16 Sep on :5090. o2-enterprise#2481.', {
+  test.fixme('TS-16.06 the acknowledge landing page is usable at a phone viewport — a long title overflows it. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page, browser }, testInfo) => {
     // A real firing has to clear ingestion, the scheduler and the ladder; the
     // 3-minute default is for screens, not for this.
     test.setTimeout(480_000);
+    await requireMailSink(test);
     const prefix = uniqueName(`${workerPrefix(testInfo)}_ack`);
     const emails = await createOrgUsers(page, prefix, 1);
     const team = await createTeam(page, { name: `${prefix}_team` });
@@ -475,7 +435,7 @@ test.describe('On-call onboarding', {
     const mail = await waitForMail({
       to: emails[0], sinceMs: since, subject: /\[P\d\]/, timeout: 180000,
     });
-    test.skip(!mail, 'no mail sink is reachable on this deployment, so there is no ack link to open');
+    expect(mail, `a real firing must page ${emails[0]} by email`).not.toBeNull();
 
     const ackLink = extractLinks(mail).find((u) => /\/oncall\/ack\?/.test(u));
     expect(ackLink, 'a page email must carry an acknowledge link — that is its purpose').toBeTruthy();

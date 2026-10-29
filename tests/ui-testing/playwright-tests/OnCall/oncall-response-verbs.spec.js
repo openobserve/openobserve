@@ -69,6 +69,7 @@ const {
   promoteResponse,
   eventsOfKind,
   waitForMail,
+  requireMailSink,
   loginAs,
   RESOLUTION_CAUSES,
 } = require('../utils/oncall-seed-ext.js');
@@ -220,6 +221,7 @@ test.describe('On-call response verbs', {
   test('handing off to a person pages them, and is not settled until they answer', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
+    await requireMailSink(test);
     const f = await seedOpenPage(page, testInfo, 'hop', { delaysSeconds: [0, 600] });
     const id = f.record.id;
     const onCall = (await whoIsOnCall(page, f.team.id)).map((slot) => slot.user_email);
@@ -279,6 +281,7 @@ test.describe('On-call response verbs', {
   test('handing off to another team re-resolves from that team\'s own schedule', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
+    await requireMailSink(test);
     const a = await seedOpenPage(page, testInfo, 'hot', { delaysSeconds: [0, 600] });
     const id = a.record.id;
 
@@ -429,14 +432,12 @@ test.describe('On-call response verbs', {
   test('a viewer can work a page end to end, with no verb hidden or disabled', {
     tag: ['@P0'],
   }, async ({ browser, page }, testInfo) => {
-    const f = await seedOpenPage(page, testInfo, 'viewer', { delaysSeconds: [0, 600] });
-    const id = f.record.id;
-
     test.skip(
       !(await nonAdminRolesAvailable(page)),
-      'this deployment refuses non-admin roles (OpenFGA is off in the Playwright CI lane), '
-      + 'so a viewer cannot be created here; the RBAC contract itself is covered by the API suite',
+      'non-admin roles need OpenFGA, which the OnCall Playwright lane runs without; the API suite covers the viewer contract',
     );
+    const f = await seedOpenPage(page, testInfo, 'viewer', { delaysSeconds: [0, 600] });
+    const id = f.record.id;
 
     const viewerEmail = oncallUserEmail(uniqueName(`${workerPrefix(testInfo)}_v`), 'viewer');
     const viewer = await createOrgUser(page, { email: viewerEmail, role: 'viewer' });
@@ -737,40 +738,37 @@ test.describe('On-call response verbs', {
     expect(record.acked_by, 'the seeded record must carry who acknowledged it').toBeTruthy();
   });
 
-  /**
-   * The other half of TS-15.07: bulk resolve captures a cause.
-   *
-   * PARKED, because it is a real gap rather than a flaky assertion.
-   *
-   * Resolving ONE page forces a cause: `oncall-resolve-dialog` will not confirm
-   * without one of the eight, and the whole cause-analytics surface
-   * (`/oncall/analytics/causes`, the "this alert, before" card) is built on
-   * them. Resolving FIFTY captures nothing — `bulkResolve` in
-   * views/OnCall/OnCallResponses.vue calls
-   * `oncallService.resolveResponse({ org_identifier, response_id })` with no
-   * `cause` at all, and the server's `ResolveRequest.cause` is
-   * `#[serde(default)] Option<..>`, so the records close with a null cause and
-   * are skipped by `group_causes` forever.
-   *
-   * The bulk path is how a noisy morning gets cleaned up, so it is precisely
-   * the path whose causes would have been most worth having. Left as a failing
-   * expectation: it goes green when bulk resolve asks for a cause the way the
-   * single-record dialog does.
-   */
-  test.fixme('TS-15.07b bulk resolve captures a cause the way resolving one page does — not wired: OnCallResponses.vue bulkResolve calls resolveResponse with no cause, and ResolveRequest.cause is Option<_> with serde(default), so every bulk-resolved record stores a null cause and is dropped from cause analytics, verified 16 Sep on :5090. o2-enterprise#2481.', {
+  /** The other half of TS-15.07: bulk resolve records the chosen cause, so a noisy morning's clean-up still feeds cause analytics. */
+  test('TS-15.07b bulk resolve captures a cause the way resolving one page does', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
+    test.setTimeout(600_000);
     const f = await seedOpenPage(page, testInfo, 'bulkcause');
+    const cause = 'noisy_threshold';
+    expect(RESOLUTION_CAUSES, 'the cause this test picks must be one the product offers').toContain(cause);
 
     await pm.oncallPagesListPage.goto(ORG);
     await pm.oncallPagesListPage.filterByTeam(f.team.id);
+    await expect
+      .poll(async () => (await pm.oncallPagesListPage.readRowKeys()).length, {
+        timeout: 60000,
+        intervals: [1000],
+        message: 'the page this test fired never reached the list for its own team',
+      })
+      .toBeGreaterThan(0);
+
     await pm.oncallPagesListPage.getSelectAll().click();
-    await pm.oncallPagesListPage.getBulkResolve().click();
-    await pm.oncallPagesListPage.getConfirmOk().click();
+    await pm.oncallPagesListPage.bulkResolveWithCause(cause);
 
     await expect
-      .poll(async () => (await getResponseRecord(page, f.record.id))?.cause, { timeout: 60000 })
-      .toBeTruthy();
+      .poll(async () => (await getResponseRecord(page, f.record.id))?.state, {
+        timeout: 60000,
+        message: 'the bulk resolve never closed the selected page',
+      })
+      .toBe('resolved');
+    expect((await getResponseRecord(page, f.record.id))?.cause,
+      'a bulk-resolved page must carry the cause picked in the dialog, or cause analytics never sees it')
+      .toBe(cause);
   });
 
 });

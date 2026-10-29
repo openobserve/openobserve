@@ -166,6 +166,9 @@ async function nonAdminRolesAvailable(page) {
     email, password: SEED_USER_PASSWORD, first_name: 'RBAC', last_name: 'Probe',
     role: 'viewer', organization: orgId(),
   });
+  if (status >= 400 && !/already exist/i.test(text || '') && !/open-?fga/i.test(text || '')) {
+    throw new Error(`probing for non-admin roles failed: HTTP ${status} — ${String(text).slice(0, 200)}`);
+  }
   _nonAdminRoles = status === 200 || /already exist/i.test(text || '');
   if (_nonAdminRoles) await deleteOrgUser(page, email);
   testLogger.info('Non-admin roles probe', { available: _nonAdminRoles, status });
@@ -344,7 +347,8 @@ async function waitForResponseState(page, responseId, states, { timeout = 180_00
 async function simulateRouting(page, { dimensions, oncallTeam = undefined }) {
   const payload = { dimensions };
   if (oncallTeam !== undefined) payload.oncall_team = oncallTeam;
-  const { body } = await call(page, 'post', '/oncall/routing/preview', payload);
+  const { ok, status, body, text } = await call(page, 'post', '/oncall/routing/preview', payload);
+  if (!ok) throw new Error(`routing preview failed: HTTP ${status} — ${String(text).slice(0, 200)}`);
   return body;
 }
 
@@ -465,18 +469,38 @@ async function shortenPolicyForSpeed(page, teamId, priority, delaysSeconds, { ta
 
 const MAILPIT = process.env.MAILPIT_URL || 'http://localhost:8025';
 
+/** Why the on-call mail helpers cannot read mail here, or null when Mailpit answers. */
+async function mailSinkProblem() {
+  if ((await sink.backend()) === 'mailpit') return null;
+  return `the on-call mail helpers read Mailpit only and it is not reachable on ${MAILPIT}; `
+    + await sink.unavailableReason();
+}
+
+/** Throw rather than let a missing sink read as "no mail was sent". */
+async function assertMailSink() {
+  const problem = await mailSinkProblem();
+  if (problem) throw new Error(`cannot read mail: ${problem}`);
+}
+
 /**
- * One message, fully fetched.
+ * Call first in a test that reads mail: skips locally when no sink is up, throws in CI where that is a broken runner.
  *
- * `mail-sink.js` indexes messages (id, subject, timestamp) and can fetch the
- * NEWEST one, but a page fan-out puts several in the sink at once and the one a
- * case cares about is rarely the newest. This adds the per-id read on the
- * Mailpit backend only — the sink that exists on this environment — rather than
- * re-implementing the module's backend selection.
+ * @param {import('@playwright/test').TestType<any, any>} test
  */
+async function requireMailSink(test) {
+  const problem = await mailSinkProblem();
+  if (!problem) return;
+  if (process.env.CI) throw new Error(`this test reads mail and the CI runner has no mail sink: ${problem}`);
+  test.skip(true, problem);
+}
+
+/** One message by id, or null if it was deleted after it was listed; a fan-out's wanted message is rarely the newest. */
 async function fetchMessage(id) {
   const res = await fetch(`${MAILPIT}/api/v1/message/${id}`);
-  if (!res.ok) return null;
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`reading Mailpit message ${id} failed: HTTP ${res.status} — ${(await res.text()).slice(0, 200)}`);
+  }
   const m = await res.json();
   return {
     id,
@@ -489,14 +513,14 @@ async function fetchMessage(id) {
 }
 
 /**
- * Wait for a message matching `to` and/or `subject`, newest first.
+ * Wait for a message matching `to` and/or `subject`, newest first; null only when none arrived in time.
  *
  * `sinceMs` scopes to messages that arrived after a caller-recorded instant, so
  * a shared sink full of other workers' fixtures cannot satisfy the wait with
  * somebody else's page.
  */
 async function waitForMail({ to = null, subject = null, sinceMs = 0, timeout = 120_000, pollMs = 2000 } = {}) {
-  if (!(await sink.available())) return null;
+  await assertMailSink();
   const wantTo = to ? String(to).toLowerCase() : null;
   const deadline = Date.now() + timeout;
 
@@ -507,8 +531,7 @@ async function waitForMail({ to = null, subject = null, sinceMs = 0, timeout = 1
       : index;
     for (const row of [...candidates].sort((a, b) => b.ts - a.ts)) {
       const full = await fetchMessage(row.id);
-      if (!full) continue;
-      if (wantTo && !full.to.includes(wantTo)) continue;
+      if (!full || (wantTo && !full.to.includes(wantTo))) continue;
       return full;
     }
     await new Promise((r) => setTimeout(r, pollMs));
@@ -518,7 +541,7 @@ async function waitForMail({ to = null, subject = null, sinceMs = 0, timeout = 1
 
 /** Every message since an instant, fully fetched — for fan-out assertions. */
 async function mailSince(sinceMs) {
-  if (!(await sink.available())) return [];
+  await assertMailSink();
   const index = (await sink.list()).filter((m) => m.ts >= sinceMs);
   const out = [];
   for (const row of index) {
@@ -613,7 +636,10 @@ async function getTeamOverview(page, teamId) {
  */
 async function getTeamAttention(page, teamId) {
   const body = await read(page, `/oncall/teams/${encodeURIComponent(teamId)}/config-risks`);
-  return body?.risks ?? [];
+  if (!Array.isArray(body?.risks)) {
+    throw new Error(`config-risks answered no risks list: ${JSON.stringify(body).slice(0, 200)}`);
+  }
+  return body.risks;
 }
 
 /** Ownership-rule hit statistics, the numbers the rules table renders per row. */
@@ -686,6 +712,7 @@ module.exports = {
   deleteAbsence,
   deleteOwnershipRule,
   shortenPolicyForSpeed,
+  requireMailSink,
   waitForMail,
   mailSince,
   extractLinks,

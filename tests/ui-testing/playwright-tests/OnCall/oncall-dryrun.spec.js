@@ -67,6 +67,7 @@ const {
   simulateRouting,
   getEscalationPreview,
   getCauseAnalytics,
+  requireMailSink,
   waitForMail,
   extractLinks,
 } = require('../utils/oncall-seed-ext.js');
@@ -171,6 +172,7 @@ test.describe('On-call dry runs', {
     const destination = await seedNotificationDestination(page, f.prefix.toLowerCase());
     const { pages } = await firePageAndWait(page, {
       alertOptions: { name: `${f.prefix}_alert`, stream, destinations: [destination] },
+      expectTeamId: f.team.id,
     });
 
     // The prediction and the firing have to agree on the team AND on the person.
@@ -269,6 +271,7 @@ test.describe('On-call dry runs', {
   test('a test page reaches a real mailbox and leaves no record behind', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
+    await requireMailSink(test);
     const f = await seedRoutableTeam(page, testInfo, 'test');
 
     const recordsBefore = await listResponses(page, { teamId: f.team.id, includeResolved: true });
@@ -323,6 +326,7 @@ test.describe('On-call dry runs', {
   test('every link in a page email resolves to a route that renders its own screen', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
+    await requireMailSink(test);
     const f = await seedRoutableTeam(page, testInfo, 'links');
     const onCall = (await whoIsOnCall(page, f.team.id)).map((slot) => slot.user_email);
 
@@ -341,6 +345,7 @@ test.describe('On-call dry runs', {
     const pageSince = Date.now() - 2000;
     const { pages } = await firePageAndWait(page, {
       alertOptions: { name: `${f.prefix}_alert`, stream, destinations: [destination] },
+      expectTeamId: f.team.id,
     });
     const pageMail = await waitForMail({ to: onCall[0], sinceMs: pageSince, subject: /\[P\d\]/, timeout: 120000 });
     expect(pageMail, 'a fired page must produce a page email').not.toBeNull();

@@ -92,7 +92,6 @@ export class OnCallPagesListPage {
       // The data-test lands on the OCheckbox LABEL; the thing that toggles is the
       // inner `button[role="checkbox"]`, so that is what is clicked.
       selectAll: '[data-test="o2-table-select-all"] button[role="checkbox"]',
-      confirmOk: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
       whoIsOn: '[data-test="oncall-who-is-on"]',
       whoIsOnPrimaryReach: '[data-test="oncall-who-is-on-primary-reach"]',
       setupBanner: '[data-test="oncall-setup-banner"]',
@@ -143,7 +142,6 @@ export class OnCallPagesListPage {
   getSelectAll() { return this.page.locator(this.locators.selectAll).first(); }
   getBulkAck() { return this.page.locator(this.locators.bulkAck); }
   getBulkResolve() { return this.page.locator(this.locators.bulkResolve); }
-  getConfirmOk() { return this.page.locator(this.locators.confirmOk).first(); }
   getRowByIndex(index) { return this.page.locator(this.rowByIndex(index)); }
   getEscalationCell(responseId) { return this.page.locator(this.escalationCell(responseId)); }
   getWhoIsOn() { return this.page.locator(this.locators.whoIsOn); }
@@ -509,6 +507,22 @@ export class OnCallPagesListPage {
   async selectRow(index = null) {
     const target = index ?? (await this.readRowIndices())[0];
     await this.page.locator(this.rowSelect(target)).click();
+  }
+
+  /** Resolve every selected row through the bulk dialog, picking `cause` by its wire value. */
+  async bulkResolveWithCause(cause) {
+    await this.getBulkResolve().click();
+    const dialog = this.page.locator('[data-test="oncall-bulk-resolve-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 20000 });
+    const field = '[data-test="oncall-bulk-resolve-cause"]';
+    const trigger = this.page.locator(part(field, 'trigger')).first();
+    await trigger.waitFor({ state: 'visible', timeout: 20000 });
+    await trigger.click();
+    const option = this.page.locator(`${part(field, 'option')}[data-test-value="${cause}"]`).first();
+    await option.waitFor({ state: 'visible', timeout: 20000 });
+    await option.click();
+    await this.page.locator('[data-test="oncall-bulk-resolve-confirm"]').click();
+    await expect(dialog).toBeHidden({ timeout: 20000 });
   }
 
   async readBulkCount() {
