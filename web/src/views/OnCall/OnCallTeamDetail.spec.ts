@@ -193,7 +193,7 @@ describe("OnCallTeamDetail", () => {
     expect(service.teamOverview).toHaveBeenCalledTimes(2);
   });
 
-  // F4: a policy written while its channel failed leaves the drawer open, and the page re-reads the ladder behind it.
+  // A policy written while its channel failed leaves the drawer open, and the page re-reads the ladder behind it.
   it("re-reads the policy when the editor wrote it but stayed open", async () => {
     const wrapper = render();
     await flushPromises();
@@ -281,7 +281,7 @@ describe("OnCallTeamDetail", () => {
         .find((c: any) => c.props("title") === "Send a test page?")!;
     }
 
-    // F3: the first step by delay, and only the channels its people can receive, which is what the server sends.
+    // The first step by delay, and only the channels its people can receive, which is what the server sends.
     it("names the recipients and channels before sending anything", async () => {
       const confirm = await ask();
 
@@ -899,7 +899,7 @@ describe("OnCallTeamDetail", () => {
       // Named in the prompt: two rotations in one team routinely differ by one
       // word, and deleting the wrong one silently stops paging.
       expect(confirm!.props("open")).toBe(true);
-      // Owner: the title names the rotation; the body says who holds it now, by name.
+      // The title names the rotation; the body says who holds it now, by name.
       expect(document.body.textContent).toContain("Delete the Primary rotation?");
       expect(
         document.body.querySelector('[data-test="oncall-remove-rotation-body"]')?.textContent,
@@ -933,7 +933,7 @@ describe("OnCallTeamDetail", () => {
       expect(service.setSchedule).not.toHaveBeenCalled();
     });
 
-    // F1 (round 13): the lane menu's delete is a human save too, so what is kept loses the default marker.
+    // The lane menu's delete is a human save too, so what is kept loses the default marker.
     it("clears the default-staffing marker from the rotations a lane delete keeps", async () => {
       service.setSchedule.mockResolvedValue({ data: {} });
       service.getSchedule.mockResolvedValue({

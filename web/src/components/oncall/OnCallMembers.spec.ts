@@ -312,7 +312,7 @@ describe("OnCallMembers", () => {
       expect(oncall.getSchedule).toHaveBeenCalled();
       const shown = toast.mock.calls.at(-1)![0];
       expect(shown.variant).toBe("success");
-      // L4: a natural "and" join, no Oxford comma.
+      // A natural "and" join, no Oxford comma.
       expect(shown.message).toBe(
         "Bob joins the end of Primary and Secondary. Who is on call now is unchanged.",
       );
@@ -321,7 +321,7 @@ describe("OnCallMembers", () => {
       expect(wrapper.emitted("open-schedule")).toHaveLength(1);
     });
 
-    // F1: a team whose rotations the server cannot extend leaves the person on no rotation; say so and where to fix it.
+    // A team whose rotations the server cannot extend leaves the person on no rotation; say so and where to fix it.
     it("warns when the refreshed schedule has them on no rotation", async () => {
       const restricted = rotation("r1", "Primary", ["ana@o2.ai"]);
       await addBob([restricted], [restricted]);
@@ -386,7 +386,7 @@ describe("OnCallMembers", () => {
       );
     });
 
-    // F1 (round 7): before the team name loads, the title names the person alone rather than "from ?".
+    // Before the team name loads, the title names the person alone rather than "from ?".
     it("names only the person while the team name is unknown", async () => {
       const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
       await wrapper.setProps({ teamName: "" });
@@ -398,7 +398,7 @@ describe("OnCallMembers", () => {
       );
     });
 
-    // Owner: the title names the person and the team.
+    // The title names the person and the team.
     it("names the person and the team in the title", async () => {
       const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
       await flushPromises();
@@ -409,7 +409,7 @@ describe("OnCallMembers", () => {
       );
     });
 
-    // L5: the button says what it does.
+    // The button says what it does.
     it("confirms with a destructive Remove", async () => {
       const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
       await flushPromises();
@@ -420,7 +420,7 @@ describe("OnCallMembers", () => {
       expect(confirm.props("okVariant")).toBe("destructive");
     });
 
-    // L5: after the remove, who is on call now per rotation, read back from the server.
+    // After the remove, who is on call now per rotation, read back from the server.
     it("reports who is on call per rotation after the remove", async () => {
       oncall.removeMember.mockResolvedValue({ data: {} } as any);
       oncall.whoIsOnCall.mockResolvedValue({
@@ -447,7 +447,7 @@ describe("OnCallMembers", () => {
       );
     });
 
-    // F1 (round 3): a rotation the remove left empty is named, as a warning.
+    // A rotation the remove left empty is named, as a warning.
     it("names a rotation left with nobody on call", async () => {
       oncall.removeMember.mockResolvedValue({ data: {} } as any);
       oncall.whoIsOnCall.mockResolvedValue({
@@ -483,7 +483,7 @@ describe("OnCallMembers", () => {
       );
     });
 
-    // F2 (round 3): a failed re-read makes no claim about who is on call.
+    // A failed re-read makes no claim about who is on call.
     it("says only that the person was removed when the re-read fails", async () => {
       oncall.removeMember.mockResolvedValue({ data: {} } as any);
       oncall.whoIsOnCall.mockRejectedValue(new Error("boom"));
@@ -779,7 +779,7 @@ describe("OnCallMembers", () => {
     });
 
     // S5: the earliest shift across every rotation, named by its own rotation.
-    // L5: a roster edit keeps the rotation ids, so the next-shift column must follow the contents, not the ids.
+    // A roster edit keeps the rotation ids, so the next-shift column must follow the contents, not the ids.
     it("re-reads the next shifts when a rotation's roster changes under the same id", async () => {
       const rule = (members: string[]) => ({
         name: "Base",
@@ -1015,7 +1015,7 @@ describe("OnCallMembers", () => {
 
       const shown = wrapper.find('[data-test="oncall-channels-word-bob@o2.ai"]');
       expect(shown.text()).toBe(word);
-      // L2: the word takes its own line under the icons, so a narrow column cannot cut it.
+      // The word takes its own line under the icons, so a narrow column cannot cut it.
       expect(shown.classes()).toContain("basis-full");
       expect(shown.classes()).not.toContain("whitespace-nowrap");
     });

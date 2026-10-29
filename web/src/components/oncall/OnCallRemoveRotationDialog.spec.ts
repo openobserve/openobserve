@@ -69,7 +69,7 @@ const dialog = (wrapper: ReturnType<typeof render>) => wrapper.findComponent({ n
 
 // S11: removing a rotation says what it does to the escalation policy before it happens.
 describe("OnCallRemoveRotationDialog", () => {
-  // Owner: the title names the rotation; the body says, with names, who holds it and that nobody takes its shifts.
+  // The title names the rotation; the body says, with names, who holds it and that nobody takes its shifts.
   it("names the rotation in the title and the people in the body", () => {
     const wrapper = render(null);
 
@@ -166,7 +166,7 @@ describe("OnCallRemoveRotationDialog", () => {
     expect(wrapper.emitted("open-policy")).toHaveLength(1);
   });
 
-  // F7: an older server does not say how the ladder was made, so the dialog warns the remove may be refused.
+  // An older server does not say how the ladder was made, so the dialog warns the remove may be refused.
   it("warns, without blocking, when the server did not say how the ladder was made", async () => {
     const wrapper = render(pagesR2(undefined));
 

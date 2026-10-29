@@ -188,14 +188,14 @@ describe("OnCallEscalationLadder", () => {
     expect(wrapper.find('[data-test="oncall-ladder-priority-p3"]').exists()).toBe(true);
   });
 
-  // L3: Send test and Edit are one action group, so neither wraps away from the other.
+  // Send test and Edit are one action group, so neither wraps away from the other.
   it("keeps Send test and Edit together", () => {
     const wrapper = render({ canConfigure: true });
     const actions = wrapper.find('[data-test="oncall-ladder-actions"]');
 
     expect(actions.find('[data-test="oncall-ladder-send-test"]').exists()).toBe(true);
     expect(actions.find('[data-test="oncall-policy-edit"]').exists()).toBe(true);
-    // Owner: one line. Only the chip group may wrap; the strip itself never moves the buttons down.
+    // The strip stays on one line: only the chip group may wrap, so the buttons never move down.
     const strip = wrapper.find('[data-test="oncall-ladder-strip"]');
     const chips = wrapper.find('[data-test="oncall-ladder-priorities"]');
     expect(strip.classes()).not.toContain("flex-wrap");
@@ -204,7 +204,7 @@ describe("OnCallEscalationLadder", () => {
     expect(chips.find('[data-test="oncall-ladder-send-test"]').exists()).toBe(false);
   });
 
-  // AI review 4405957571: a first step that reaches nobody would send nothing, so Send test is not offered.
+  // A first step that reaches nobody would send nothing, so Send test is not offered.
   it("disables Send test while the first step reaches nobody", () => {
     const wrapper = render({
       canConfigure: true,
@@ -226,7 +226,7 @@ describe("OnCallEscalationLadder", () => {
     ).toBeDefined();
   });
 
-  // F2 (round 13): the confirm is built from the preview, so a preview still showing the last priority must not be sent from.
+  // The confirm is built from the preview, so a preview still showing the last priority must not be sent from.
   it("disables Send test while the preview is for another priority", () => {
     const wrapper = render({
       canConfigure: true,

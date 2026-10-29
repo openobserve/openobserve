@@ -265,7 +265,7 @@ describe("OnCallCoverageStrip", () => {
       expect(text).toContain("Nobody on call can be reached");
     });
 
-    // AI review 4405957534: a hole is every adjacent hole run, so "until" names when reachable cover really returns.
+    // A hole is every adjacent hole run, so "until" names when reachable cover really returns.
     it("treats an unreachable stretch running into a gap as one hole", () => {
       // Weekdays only, one unreachable person: unreachable on weekdays, nobody at weekends, so nothing reachable all window.
       const rotations = [

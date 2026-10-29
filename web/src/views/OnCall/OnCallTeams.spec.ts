@@ -506,7 +506,7 @@ describe("OnCallTeams", () => {
       expect(wrapper.find('[data-test="oncall-team-default-badge-team_1"]').exists()).toBe(false);
     });
 
-    // AI review 4405957586: the server refuses to delete the default team, so its row offers no Delete, as the phone menu already does.
+    // The server refuses to delete the default team, so its row offers no Delete, as the phone menu already does.
     it("offers no Delete on the default team's row", async () => {
       service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
       service.listTeams.mockResolvedValue({

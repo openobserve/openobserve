@@ -613,7 +613,7 @@ describe("OnCallPolicyEditor", () => {
       const wrapper = render();
       await flushPromises();
 
-      // F4: Use the policy's list is part of the draft, written by the one Save.
+      // "Use the policy's list" is part of the draft, written by the one Save.
       await wrapper.find('[data-test="oncall-team-channel-clear"]').trigger("click");
       await flushPromises();
       expect(service.setTeamChannel).not.toHaveBeenCalled();
@@ -698,7 +698,7 @@ describe("OnCallPolicyEditor", () => {
 
         expect(service.setPolicy).toHaveBeenCalledOnce();
         expect(wrapper.emitted("saved")).toBeUndefined();
-        // F4: the ladder behind the drawer is stale now, so the parent is told to re-read it.
+        // The ladder behind the drawer is stale now, so the parent is told to re-read it.
         expect(wrapper.emitted("policy-written")).toHaveLength(1);
         expect(toast).toHaveBeenLastCalledWith(
           expect.objectContaining({

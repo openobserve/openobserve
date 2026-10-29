@@ -765,7 +765,7 @@ describe("OnCallScheduleEditor", () => {
     expect(rows[0].shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
   });
 
-  // F2 (round 7): the row's icon button is named what the drawer button says.
+  // The row's icon button is named what the drawer button says.
   it("names the row delete button Delete rotation", async () => {
     const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await flushPromises();
@@ -777,7 +777,7 @@ describe("OnCallScheduleEditor", () => {
     ).toBe("Delete rotation");
   });
 
-  // A8: a schedule a human saved is no longer the untouched default, or the server keeps re-adding what they removed.
+  // A schedule a human saved is no longer the untouched default, or the server keeps re-adding what they removed.
   describe("the default-staffing marker", () => {
     const defaults = () =>
       schedule([

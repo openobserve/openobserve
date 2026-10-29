@@ -553,7 +553,7 @@ describe("OnCallPhoneCard", () => {
     expect(box().props("errorMessage")).toBe(
       "Start with + and your country code, e.g. +91 98765 43210",
     );
-    // L1: OInput draws the message only while `error` is set.
+    // OInput draws the message only while `error` is set.
     expect(box().props("error")).toBe(true);
 
     await find(w, "send").trigger("click");
@@ -564,7 +564,7 @@ describe("OnCallPhoneCard", () => {
     expect(box().props("errorMessage")).toBeFalsy();
   });
 
-  // L1: pressing Send code with a bad number shows the hint, never a silent no-op.
+  // Pressing Send code with a bad number shows the hint, never a silent no-op.
   it("shows the hint when Send code is pressed on a badly written number", async () => {
     const w = await render(contact());
     const box = () => w.findComponent({ name: "OInput" });
