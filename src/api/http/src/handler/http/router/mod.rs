@@ -29,10 +29,10 @@ use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
-    kv, metrics_usage, model_pricing, organization, public_dashboards, query_history,
-    rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status, status_pages,
-    stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
+    ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
+    query_history, rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status,
+    status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1335,6 +1335,9 @@ pub fn service_routes() -> Router {
         // NOTE: named routes MUST be registered before {model_id} or they match as a model ID
         .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
         .route("/{org_id}/llm/models/refresh-built-in", post(model_pricing::refresh_built_in))
+        .route("/{org_id}/llm/models/unpriced", get(model_pricing::list_unpriced))
+        // AI data health checks (LLM Insights strip, instrument skill)
+        .route("/{org_id}/gen_ai/data_health", get(gen_ai_health::get_data_health))
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 

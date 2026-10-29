@@ -27,6 +27,8 @@ const mockSortOrder = ref<"asc" | "desc">("desc");
 const mockSearchKeyword = ref("");
 const mockAgents = ref<any[]>([]);
 const mockAgentsLoaded = ref(false);
+const mockAgentsError = ref<"forbidden" | "failed" | null>(null);
+const mockAgentsOrg = ref<string | null>(null);
 const mockFetchPage = vi.fn();
 const mockCancelAll = vi.fn();
 const mockListAgents = vi.fn();
@@ -59,6 +61,8 @@ vi.mock("./composables/useSessions", () => ({
     sortOrder: mockSortOrder,
     agents: mockAgents,
     agentsLoaded: mockAgentsLoaded,
+    agentsError: mockAgentsError,
+    agentsOrg: mockAgentsOrg,
     fetchPage: mockFetchPage,
     cancelAll: mockCancelAll,
   })),
@@ -220,6 +224,9 @@ import { mount, flushPromises } from "@vue/test-utils";
 import SessionsList from "./SessionsList.vue";
 import AgentScopeCascade from "@/enterprise/components/AIObservability/AgentScopeCascade.vue";
 import config from "@/aws-exports";
+import { queryClient } from "@/composables/query/queryClient";
+import { SCOPE_MODE_CHOICE_LS_KEY } from "@/enterprise/composables/useAgentScope";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 
 const defaultProps = {
   streamName: "test-stream",
@@ -269,7 +276,11 @@ beforeEach(() => {
   mockSortOrder.value = "desc";
   mockAgents.value = [];
   mockAgentsLoaded.value = false;
+  mockAgentsError.value = null;
+  mockAgentsOrg.value = null;
   mockRouteQuery = {};
+  // The agents query is cached per window bucket; each test brings its own list.
+  queryClient.clear();
 
   // Default: streams load fine
   mockGetStreams.mockResolvedValue({
@@ -445,12 +456,53 @@ describe("SessionsList — sessions table", () => {
     expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
   });
 
-  it("should not load agents while refreshing when in stream mode", async () => {
+  it("loads the agents once per view in stream mode too (agent counts, no-identity banner)", async () => {
     mockRouteQuery = { type: "stream" };
+    const wrapper = await mountComponent();
+    // The parent's mount-time window replay (no force), possibly twice.
+    await (wrapper.vm as any).refresh(undefined, undefined, false);
+    await flushPromises();
+    await (wrapper.vm as any).refresh(undefined, undefined, false);
+    await flushPromises();
+
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+    expect(mockListAgents).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetches explicit Stream sessions while the agents request is still pending", async () => {
+    mockRouteQuery = { type: "stream" };
+    const agentsResult = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    mockListAgents.mockReturnValue(agentsResult.promise);
+    const wrapper = await mountComponent();
+    // Vue Test Utils omits the script-setup method from its public-instance type.
+    const vm = wrapper.vm as unknown as {
+      refresh: (start?: number, end?: number, force?: boolean) => Promise<void>;
+    };
+    const pending = vm.refresh(undefined, undefined, false);
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
+    agentsResult.resolve({ agents: [] });
+    await pending;
+  });
+
+  it("opens in Stream mode with the no-agent-identity banner when the window has no agents", async () => {
+    mockListAgents.mockResolvedValue({ agents: [] });
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
-    expect(mockListAgents).not.toHaveBeenCalled();
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+    expect(mockFetchPage.mock.calls.at(-1)?.[0]).toBe("test-stream");
+    expect(wrapper.find("[data-test='sessions-list-no-agent-identity']").exists()).toBe(true);
+  });
+
+  it("keeps a remembered explicit Agent choice when the window has no agents", async () => {
+    localStorage.setItem(SCOPE_MODE_CHOICE_LS_KEY, "agent");
+    mockListAgents.mockResolvedValue({ agents: [] });
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+    expect(wrapper.find("[data-test='sessions-list-no-agent-identity']").exists()).toBe(false);
   });
 
   it("renders session rows when sessions data is present", async () => {
@@ -562,6 +614,40 @@ describe("SessionsList — agent filter", () => {
     );
   });
 
+  it("opens on the agent, env and version in the URL (no type), not the first agent", async () => {
+    mockRouteQuery = { agent: "omp", env: "production", version: "2" };
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "s_prod", settings: { is_llm_stream: true } }],
+    });
+    const at = (name: string, id: string, stream: string, env: string, version: string) => ({
+      name,
+      id,
+      source_stream: stream,
+      source_stream_type: "traces",
+      env,
+      version,
+    });
+    mockListAgents.mockResolvedValue({
+      agents: [
+        at("a23ca1dd38a1ff350", "a23", "s_hash", "staging", "1"),
+        at("omp", "omp-staging", "s_staging", "staging", "2"),
+        at("omp", "omp-prod", "s_prod", "production", "2"),
+      ],
+    });
+
+    const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    await refreshComponent(wrapper);
+
+    const vm = wrapper.vm as any;
+    expect([vm.filterMode, vm.selectedEnv, vm.selectedAgentName, vm.selectedVersion]).toEqual([
+      "agent",
+      "production",
+      "omp",
+      "2",
+    ]);
+    expect(mockFetchPage.mock.calls.at(-1)?.[0]).toBe("s_prod");
+  });
+
   it("shows the no-agents state and skips session fetch when Agent mode has no agents", async () => {
     mockRouteQuery = { type: "agent" };
     mockGetStreams.mockResolvedValue({
@@ -642,6 +728,7 @@ describe("SessionsList — agent selection survives a back-navigation remount", 
     localStorage.setItem("sessionsList_versionFilter", "v1");
     mockAgents.value = [agentA, agentB];
     mockAgentsLoaded.value = true;
+    mockAgentsOrg.value = "test-org";
     mockHasLoadedOnce.value = true;
     mockLoadedOrg.value = "test-org";
     mockError.value = null;
@@ -666,6 +753,7 @@ describe("SessionsList — agent selection survives a back-navigation remount", 
     // first in the list, so a name-only restore would wrongly land on it.
     mockAgents.value = [agentA, agentB, agentBStaging];
     mockAgentsLoaded.value = true;
+    mockAgentsOrg.value = "test-org";
     mockHasLoadedOnce.value = true;
     mockLoadedOrg.value = "test-org";
     mockError.value = null;
@@ -677,6 +765,113 @@ describe("SessionsList — agent selection survives a back-navigation remount", 
     const cascadeProps = wrapper.findComponent(AgentScopeCascade).props();
     expect(cascadeProps.selectedAgentName).toBe("agent-b");
     expect(cascadeProps.selectedEnv).toBe("staging");
+  });
+});
+
+describe("SessionsList — auto mode is decided per org", () => {
+  const agentA = {
+    name: "agent-a",
+    id: "agent-a-id",
+    source_stream: "test-stream",
+    source_stream_type: "traces",
+  };
+
+  it("opens in Stream mode on an org without agents after one with agents", async () => {
+    // The module-scoped list still holds the previous org's agents (it decided
+    // Agent mode there); this org has none and the user never chose a mode.
+    mockAgents.value = [agentA];
+    mockAgentsLoaded.value = true;
+    mockAgentsOrg.value = "org-with-agents";
+    mockListAgents.mockResolvedValue({ agents: [] });
+
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    expect(mockListAgents).toHaveBeenCalledWith("test-org", 1000, 2000);
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+    expect(wrapper.find("[data-test='sessions-empty-no-agents']").exists()).toBe(false);
+    expect(mockFetchPage.mock.calls.at(-1)?.[0]).toBe("test-stream");
+  });
+
+  it("decides an auto mode again only when the user picks a window", async () => {
+    mockListAgents.mockResolvedValue({ agents: [agentA] });
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+
+    // A forced reload that is not a window pick keeps the decided mode.
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await (wrapper.vm as any).refresh(3000, 4000, true);
+    await flushPromises();
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+
+    await (wrapper.vm as any).refresh(5000, 6000, true, true);
+    await flushPromises();
+    expect(mockListAgents).toHaveBeenLastCalledWith("test-org", 5000, 6000);
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+  });
+
+  it("keeps an explicit Agent choice when the user picks a window with no agents", async () => {
+    mockRouteQuery = { type: "agent" };
+    mockListAgents.mockResolvedValue({ agents: [agentA] });
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await (wrapper.vm as any).refresh(5000, 6000, true, true);
+    await flushPromises();
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+  });
+
+  it("does not let a module-scoped list from another window settle the mode", async () => {
+    // A back-navigation remount: the module-scoped list (from an earlier window)
+    // holds agents and shows Agent mode, but the next load that runs decides
+    // from its own window's list.
+    mockAgents.value = [agentA];
+    mockAgentsLoaded.value = true;
+    mockAgentsOrg.value = "test-org";
+    mockListAgents.mockResolvedValue({ agents: [] });
+
+    const wrapper = await mountComponent();
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+    await refreshComponent(wrapper);
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+  });
+});
+
+describe("SessionsList — agents list fails to load", () => {
+  it("shows the load error with a retry, not Stream mode or the no-identity banner", async () => {
+    mockListAgents.mockRejectedValue(
+      Object.assign(new Error("boom"), { isAxiosError: true, response: { status: 500 } }),
+    );
+
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+    expect(wrapper.find("[data-test='sessions-list-no-agent-identity']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='sessions-empty-no-agents']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='sessions-empty-agents-error']").exists()).toBe(true);
+
+    // Retry: the list loads (empty), so the mode is decided now — Stream.
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await wrapper.find("[data-test='o2-empty-state-action-retry']").trigger("click");
+    await flushPromises();
+
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+    expect(wrapper.find("[data-test='sessions-empty-agents-error']").exists()).toBe(false);
+  });
+
+  it("shows the no-access state for a 403", async () => {
+    mockListAgents.mockRejectedValue(
+      Object.assign(new Error("Forbidden"), { isAxiosError: true, response: { status: 403 } }),
+    );
+
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    expect(wrapper.find("[data-test='sessions-empty-agents-forbidden']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='sessions-list-no-agent-identity']").exists()).toBe(false);
   });
 });
 
@@ -734,11 +929,14 @@ describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true
     expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(true);
   });
 
-  it("defaults to Agent mode on a cloud build, same as enterprise", async () => {
+  it("opens in Agent mode on a cloud build when the window has agents, same as enterprise", async () => {
     config.isEnterprise = "false";
     config.isCloud = "true";
+    mockListAgents.mockResolvedValue({
+      agents: [{ name: "a", id: "a", source_stream: "test-stream", source_stream_type: "traces" }],
+    });
     const wrapper = await mountComponent();
-    await flushPromises();
+    await refreshComponent(wrapper);
     expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(true);
   });
 });

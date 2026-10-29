@@ -133,6 +133,45 @@ pub(super) struct ValidatedLlmSchema {
     pub(super) has_cost_estimated_without_cache: bool,
     pub(super) has_cost_cache_read_savings: bool,
     pub(super) has_cost_net_cache_impact: bool,
+    /// `gen_ai_usage_cost_status` exists (ingest marks unpriced / approximate spans).
+    pub(super) has_cost_status: bool,
+}
+
+impl ValidatedLlmSchema {
+    /// Per-row unpriced token sum and unpriced model list; zero / absent when the stream
+    /// predates the cost marker.
+    pub(super) fn unpriced_selects(&self) -> String {
+        if !self.has_gen_ai || !self.has_cost_status {
+            return "0 as gen_ai_unpriced_tokens".to_string();
+        }
+        let tokens = if self.has_total_tokens {
+            "gen_ai_usage_total_tokens"
+        } else {
+            "COALESCE(gen_ai_usage_input_tokens, 0) + COALESCE(gen_ai_usage_output_tokens, 0)"
+        };
+        format!(
+            "COALESCE(sum(CASE WHEN gen_ai_usage_cost_status = 'unpriced' THEN {tokens} ELSE 0 END), 0) as gen_ai_unpriced_tokens, \
+             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_usage_cost_status = 'unpriced' \
+             AND gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_unpriced_models"
+        )
+    }
+}
+
+/// Reads the per-row unpriced fields [`ValidatedLlmSchema::unpriced_selects`] adds.
+pub(super) fn parse_unpriced(item: &config::utils::json::Value) -> (i64, Vec<String>) {
+    let tokens = item
+        .get("gen_ai_unpriced_tokens")
+        .map_or(0, config::utils::json::get_int_value);
+    let models = item
+        .get("gen_ai_unpriced_models")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|m| m.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    (tokens, models)
 }
 
 impl ValidatedLlmSchema {
@@ -158,6 +197,7 @@ impl ValidatedLlmSchema {
             has_cost_estimated_without_cache: false,
             has_cost_cache_read_savings: false,
             has_cost_net_cache_impact: false,
+            has_cost_status: false,
         }
     }
 }
@@ -239,6 +279,10 @@ pub(super) fn validate_llm_schema(
         has_cost_estimated_without_cache,
         has_cost_cache_read_savings,
         has_cost_net_cache_impact,
+        has_cost_status: has_gen_ai
+            && schema
+                .field_with_name(config::meta::model_pricing::COST_STATUS_COLUMN)
+                .is_ok(),
     })
 }
 
@@ -432,5 +476,37 @@ mod tests {
         let fallback = ValidatedLlmSchema::fallback(false);
         assert!(!fallback.has_gen_ai);
         assert_eq!(fallback.columns, LlmColumns::legacy());
+    }
+
+    #[test]
+    fn unpriced_selects_follow_the_cost_status_column() {
+        let base = [
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_cost",
+            "gen_ai_response_model",
+            "gen_ai_conversation_id",
+        ];
+        // A stream written before the marker: constant zero, no reference to the column.
+        let old = validate_llm_schema(&schema_with(&base), "s").unwrap();
+        assert!(!old.has_cost_status);
+        assert_eq!(old.unpriced_selects(), "0 as gen_ai_unpriced_tokens");
+
+        let mut fields = base.to_vec();
+        fields.push("gen_ai_usage_cost_status");
+        let new = validate_llm_schema(&schema_with(&fields), "s").unwrap();
+        assert!(new.has_cost_status);
+        let sql = new.unpriced_selects();
+        assert!(sql.contains("gen_ai_usage_cost_status = 'unpriced'"));
+        assert!(sql.contains("as gen_ai_unpriced_models"));
+
+        let (tokens, models) = parse_unpriced(&config::utils::json::json!({
+            "gen_ai_unpriced_tokens": 7, "gen_ai_unpriced_models": ["a", null]
+        }));
+        assert_eq!((tokens, models), (7, vec!["a".to_string()]));
+        assert_eq!(
+            parse_unpriced(&config::utils::json::json!({})),
+            (0, Vec::new())
+        );
     }
 }

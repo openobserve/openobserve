@@ -55,7 +55,7 @@
 //!     &resource_attributes,
 //!     Some("openai"),
 //!     &events,
-//!     &[], // pass org pricing entries here in production
+//!     Some(&[]), // org pricing entries in production; None when pricing is disabled
 //!     span_start_nanos, // span.start_time_unix_nano from OTLP payload
 //!     &GenAiAgentMappingConfig::default(),
 //! );
@@ -84,7 +84,7 @@
 //!     &resource_attrs,
 //!     Some("openai"),
 //!     &events,
-//!     &[],
+//!     Some(&[]),
 //!     0,
 //!     &GenAiAgentMappingConfig::default(),
 //! );

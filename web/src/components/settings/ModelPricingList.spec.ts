@@ -46,10 +46,12 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 // Router mock — capture push calls
 const routerPushMock = vi.fn();
+const routerReplaceMock = vi.fn();
 const currentRouteRef = { value: { query: {} as Record<string, any> } };
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: routerPushMock,
+    replace: routerReplaceMock,
     currentRoute: currentRouteRef,
   }),
 }));
@@ -309,6 +311,12 @@ const mockI18n = createI18n({
         localTimeHint: "In your timezone: {range}",
         tierAlwaysActive: "Always active (default)",
         tierDefaultName: "Default",
+        builtInStatus: {
+          seed: "seed {date}.",
+          neverSynced: "never synced",
+          lastSynced: "synced at {time}",
+        },
+        unpriced: { title: "Pricing gaps" },
       },
     },
   },
@@ -1623,5 +1631,69 @@ describe("list view state", () => {
       sortBy: "name",
       sortOrder: "desc",
     });
+  });
+});
+
+describe("Route tabs and header", () => {
+  let w: any;
+
+  beforeEach(() => {
+    vi.mocked(modelPricingService.list).mockResolvedValue({ data: mockModels } as any);
+  });
+
+  afterEach(() => {
+    w?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("switching tab writes it to the route query, keeping the other params", async () => {
+    w = mountComponent({ query: { tab: "all", org_identifier: "test-org" } });
+    await flushPromises();
+
+    w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "org");
+    await flushPromises();
+
+    expect(w.vm.selectedTab).toBe("org");
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      query: { tab: "org", org_identifier: "test-org" },
+    });
+  });
+
+  it("Pricing gaps opens its own page", async () => {
+    w = mountComponent();
+    await flushPromises();
+    await w.find('[data-test="model-pricing-gaps-btn"]').trigger("click");
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "modelPricingGaps",
+      query: { org_identifier: "test-org" },
+    });
+  });
+
+  it("reopens the tab named in the route query after a reload", async () => {
+    w = mountComponent({ query: { tab: "inherited" } });
+    await flushPromises();
+    expect(w.vm.selectedTab).toBe("inherited");
+  });
+
+  it("says online sync has not run when the built-in list was never synced", async () => {
+    vi.mocked(modelPricingService.getBuiltIn).mockResolvedValue({
+      data: { models: [], source_url: "", last_updated: 0, seed_date: "2026-10-14" },
+    } as any);
+    w = mountComponent();
+    await flushPromises();
+    const status = w.find('[data-test="model-pricing-built-in-status"]');
+    expect(status.text()).toContain("2026-10-14");
+    expect(status.text()).toContain("never synced");
+  });
+
+  it("gives the last online sync time once the built-in list has synced", async () => {
+    vi.mocked(modelPricingService.getBuiltIn).mockResolvedValue({
+      data: { models: [], source_url: "", last_updated: 1_798_000_000, seed_date: "2026-10-14" },
+    } as any);
+    w = mountComponent();
+    await flushPromises();
+    const status = w.find('[data-test="model-pricing-built-in-status"]');
+    expect(status.text()).toContain("synced at 2026-12-");
+    expect(status.text()).not.toContain("never synced");
   });
 });

@@ -105,10 +105,19 @@ const {
 
 async function onDateChange(value: any) {
   // Date state + URL sync is owned by useAiDateController; the page then re-fetches
-  // the dashboard with the resolved window.
+  // the dashboard with the resolved window. Only a user's own date pick forces and
+  // re-decides an auto mode for the new window; the window replay DateTime fires on
+  // mount must not bypass the caches (or the agents list would be fetched again on
+  // every entry).
   onDateStateChange(value);
   await nextTick();
-  dashboardRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+  const userPicked = value?.userChangedValue === true;
+  dashboardRef.value?.refresh?.(
+    timeRange.value.startTime,
+    timeRange.value.endTime,
+    userPicked,
+    userPicked,
+  );
 }
 
 onMounted(() => {

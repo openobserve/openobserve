@@ -170,6 +170,9 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   orgId: string;
   /** Resolved server-side from the pinned dataset; null when it was deleted. */
   datasetName: string | null;
+  /** What the pinned `datasetVersion` shows as — the dataset's write version.
+   *  Display this; `datasetVersion` is the pin key. */
+  datasetWriteVersion: number;
   scorers: PinnedExperimentScorer[];
   /** Consolidated execution + scoring lifecycle when summary data is available. */
   status: ExperimentStatus;
@@ -230,7 +233,7 @@ export interface ExperimentExecution {
 
 export interface ExperimentRowDetail {
   experimentId: string;
-  snapshot: { datasetId: string; datasetVersion: number };
+  snapshot: { datasetId: string; datasetVersion: number; datasetWriteVersion: number };
   navigation: {
     rowIndex: number;
     totalRows: number;
@@ -262,6 +265,8 @@ export interface ExperimentResultRow {
   output: unknown | null;
   scoreSummaries: ExperimentScoreSummary[];
   p50LatencyMs: number | null;
+  /** First line of the most common error across the row's failed trials. */
+  errorMessage: string | null;
   dispersion: ExperimentRowDispersion | null;
 }
 
@@ -350,6 +355,18 @@ export interface ExperimentAggregateSummary {
   incompleteTaskSlots: number;
   incompleteScoreDimensions: number;
   errorTaskSlots: number;
+  /** Errored slots grouped by kind (or first message line when kindless), largest first (top 3). */
+  failureCauses: ExperimentFailureCause[];
+  /** Distinct causes across every errored slot, including those beyond the top 3. */
+  failureCauseCount: number;
+}
+
+export interface ExperimentFailureCause {
+  /** Shared taxonomy (`provider_auth`, `timeout`, …); null when the producer did not classify the failure. */
+  kind: string | null;
+  /** First line of the error message. */
+  message: string;
+  slotCount: number;
 }
 
 export interface ExperimentProgress {
@@ -657,6 +674,7 @@ function normalizeExperiment(input: any): LlmExperiment {
     datasetId: value(input, "datasetId", "dataset_id", ""),
     datasetName: value(input, "datasetName", "dataset_name", null),
     datasetVersion: Number(value(input, "datasetVersion", "dataset_version", 0)),
+    datasetWriteVersion: Number(value(input, "datasetWriteVersion", "dataset_write_version", 0)),
     datasetFilter: value(input, "datasetFilter", "dataset_filter", null),
     task: input.task,
     scorers: (input.scorers ?? []).map((scorer: any) => ({
@@ -760,6 +778,16 @@ function normalizeAggregateSummary(aggregateSummary: any): ExperimentAggregateSu
       value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
     ),
     errorTaskSlots: Number(value(aggregateSummary, "errorTaskSlots", "error_task_slots", 0)),
+    failureCauses: (
+      value<any[]>(aggregateSummary, "failureCauses", "failure_causes", []) ?? []
+    ).map((cause) => ({
+      kind: value<string | null>(cause, "kind", "kind", null),
+      message: String(value(cause, "message", "message", "")),
+      slotCount: Number(value(cause, "slotCount", "slot_count", 0)),
+    })),
+    failureCauseCount: Number(
+      value(aggregateSummary, "failureCauseCount", "failure_cause_count", 0),
+    ),
   };
 }
 
@@ -951,6 +979,7 @@ export function normalizeExperimentResultRowPage(input: any): ExperimentResultRo
         normalizeScoreSummary,
       ),
       p50LatencyMs: numberOrNull(value(row, "p50LatencyMs", "p50_latency_ms", null)),
+      errorMessage: value<string | null>(row, "errorMessage", "error_message", null),
       dispersion: row?.dispersion ? normalizeRowDispersion(row.dispersion) : null,
     })),
     pagination: {
@@ -970,6 +999,9 @@ export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
     snapshot: {
       datasetId: value(snapshot, "datasetId", "dataset_id", ""),
       datasetVersion: Number(value(snapshot, "datasetVersion", "dataset_version", 0)),
+      datasetWriteVersion: Number(
+        value(snapshot, "datasetWriteVersion", "dataset_write_version", 0),
+      ),
     },
     navigation: {
       rowIndex: Number(value(navigation, "rowIndex", "row_index", 0)),

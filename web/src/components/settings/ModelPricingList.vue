@@ -43,6 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <template #actions-overflow>
+        <OButton variant="outline" size="sm" @click="openGaps" data-test="model-pricing-gaps-btn">
+          {{ t("modelPricing.unpriced.title") }}
+        </OButton>
         <OButton
           variant="outline"
           size="sm"
@@ -89,6 +92,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="model-pricing-add-draft-dot"
           />
         </OButton>
+      </template>
+      <template v-if="builtInStatus" #subnav>
+        <div
+          class="px-page-edge text-text-secondary flex items-center gap-1.5 py-1.5 text-xs"
+          data-test="model-pricing-built-in-status"
+        >
+          <OIcon name="info-outline" size="xs" class="shrink-0" />
+          <span>{{ builtInStatus }}</span>
+        </div>
       </template>
 
       <!-- List Table -->
@@ -693,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { useQuery } from "@tanstack/vue-query";
-import { modelPricingQuery } from "@/services/model_pricing.queries";
+import { builtInPricingQuery, modelPricingQuery } from "@/services/model_pricing.queries";
 import { modelPricingKeys } from "@/services/model_pricing.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
@@ -723,6 +735,7 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -764,6 +777,45 @@ const dropPricingDrafts = (ids: string[]) => {
     deleteEditorDraftsFor({ kind: "model_pricing", org, entityId: id, variant: `duplicate:${id}` });
   }
 };
+
+// ── Built-in price list status (header note) ────────────────────────────────
+const builtInQuery = useQuery(() =>
+  Object.assign(builtInPricingQuery(orgIdentifier.value, true), { enabled: !!orgIdentifier.value }),
+);
+
+/** How old the built-in prices are, and whether this server has synced them online. */
+const builtInStatus = computed(() => {
+  const info = builtInQuery.data.value;
+  if (!info?.seed_date) return "";
+  const seed = t("modelPricing.builtInStatus.seed", { date: info.seed_date });
+  const sync = info.last_updated
+    ? t("modelPricing.builtInStatus.lastSynced", {
+        time: timestampToTimezoneDate(
+          info.last_updated * 1000,
+          store.state.timezone || "UTC",
+          "yyyy-MM-dd HH:mm ZZZZ",
+        ),
+      })
+    : t("modelPricing.builtInStatus.neverSynced");
+  return raw(`${seed} ${sync}`);
+});
+
+const viewState = useListViewState("model-pricing", {
+  filterQuery: "",
+  selectedTab: "all",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const selectedTab = ref(viewState.selectedTab);
+
+/** `?tab=<tab>` reopens a tab after a reload. */
+function applyRouteTab() {
+  const { tab } = router.currentRoute.value.query;
+  if (typeof tab !== "string" || !tabOptions.value.some((o) => o.value === tab)) return;
+  selectedTab.value = tab;
+}
 
 const modelsQuery = useQuery(() =>
   Object.assign(modelPricingQuery(orgIdentifier.value), { enabled: !!orgIdentifier.value }),
@@ -826,14 +878,6 @@ const confirmDialogMeta = ref({
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
 };
-const viewState = useListViewState("model-pricing", {
-  filterQuery: "",
-  selectedTab: "all",
-  pageSize: 20,
-  currentPage: 1,
-  sortBy: "",
-  sortOrder: "asc" as "asc" | "desc",
-});
 const filterQuery = ref(viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const currentPage = ref(viewState.currentPage);
@@ -843,7 +887,6 @@ const showImportModelPricingPage = ref(false);
 const showTestMatchDialog = ref(false);
 const selectedIds = ref<string[]>([]);
 const bulkDeleteLoading = ref(false);
-const selectedTab = ref(viewState.selectedTab);
 
 watch([filterQuery, selectedTab, pageSize, currentPage, sortBy, sortOrder], () => {
   Object.assign(viewState, {
@@ -864,6 +907,7 @@ const tabOptions = computed(() => [
 
 function onTabChange() {
   selectedIds.value = [];
+  router.replace({ query: { ...router.currentRoute.value.query, tab: selectedTab.value } });
 }
 
 /** Flat list of all models (parents + children) for ID-based lookups. */
@@ -970,6 +1014,7 @@ const isFiltered = computed(() => !!filterQuery.value.trim() || selectedTab.valu
 function clearFilters() {
   filterQuery.value = "";
   selectedTab.value = "all";
+  onTabChange();
 }
 
 const filteredModels = computed(() => {
@@ -1107,6 +1152,10 @@ watch(modelsQuery.error, (e: any) => {
   if (e) notifyError(t("modelPricing.errLoadModels"), e);
 });
 
+function openGaps() {
+  router.push({ name: "modelPricingGaps", query: { org_identifier: orgIdentifier.value } });
+}
+
 function openEditor(model: any) {
   if (model) {
     router.push({
@@ -1196,7 +1245,7 @@ async function refreshBuiltIn() {
       variant: "success",
       message: t("modelPricing.builtInPricesSynced"),
     });
-    await fetchModels(true);
+    await Promise.all([fetchModels(true), builtInQuery.refetch()]);
   } catch (e: any) {
     notifyError(t("modelPricing.errSync"), e);
   } finally {
@@ -1277,6 +1326,7 @@ onBeforeMount(() => {
   if (router.currentRoute.value.query.action === "import") {
     showImportModelPricingPage.value = true;
   }
+  applyRouteTab();
 });
 
 onActivated(() => {
@@ -1284,6 +1334,7 @@ onActivated(() => {
   if (router.currentRoute.value.query.action === "import") {
     showImportModelPricingPage.value = true;
   }
+  applyRouteTab();
 });
 
 useShortcuts([

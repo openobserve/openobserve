@@ -242,6 +242,7 @@ mod m20261025_000004_create_slack_alert_messages;
 mod m20261025_000005_add_held_action_to_slack_link_requests;
 mod m20261026_000001_backfill_v1_rca_pointer;
 mod m20261028_000001_add_group_label_set_to_alert_states;
+mod m20261028_000001_add_llm_dataset_item_write_version;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
@@ -732,6 +733,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
             Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
             Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
+            Box::new(m20261028_000001_add_llm_dataset_item_write_version::Migration),
         ]
     }
 }
@@ -825,6 +827,7 @@ mod tests {
         ),
         (127, "m20261028_000001_add_group_label_set_to_alert_states"),
         (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
+        (129, "m20261028_000001_add_llm_dataset_item_write_version"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

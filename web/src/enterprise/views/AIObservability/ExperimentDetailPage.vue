@@ -80,7 +80,7 @@
         data-test="ai-experiment-detail-meta"
       >
         <div class="flex min-w-0 items-center gap-1.5">
-          <span class="text-2xs text-text-tertiary font-semibold">
+          <span class="text-2xs text-text-secondary font-semibold">
             {{ t("aiObservability.experiments.detail.metaLabels.dataset") }}
           </span>
           <OTruncatedText
@@ -94,7 +94,7 @@
         <OSeparator vertical class="h-4" />
 
         <div class="flex min-w-0 items-center gap-1.5">
-          <span class="text-2xs text-text-tertiary font-semibold">
+          <span class="text-2xs text-text-secondary font-semibold">
             {{ t("aiObservability.experiments.detail.metaLabels.task") }}
           </span>
           <span class="text-text-secondary truncate text-xs">
@@ -105,7 +105,7 @@
         <template v-if="taskModel">
           <OSeparator vertical class="h-4" />
           <div class="flex min-w-0 items-center gap-1.5">
-            <span class="text-2xs text-text-tertiary font-semibold">
+            <span class="text-2xs text-text-secondary font-semibold">
               {{ t("aiObservability.experiments.detail.metaLabels.model") }}
             </span>
             <OTruncatedText class="text-text-secondary text-xs">{{
@@ -117,7 +117,7 @@
         <OSeparator vertical class="h-4" />
 
         <div class="flex min-w-0 items-center gap-1.5">
-          <span class="text-2xs text-text-tertiary font-semibold">
+          <span class="text-2xs text-text-secondary font-semibold">
             {{ t("aiObservability.experiments.detail.metaLabels.run") }}
           </span>
           <span class="text-text-secondary truncate text-xs">{{ runSummary }}</span>
@@ -126,6 +126,51 @@
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
+      <OBanner
+        v-if="failureBanner"
+        variant="error-soft"
+        icon="error-outline"
+        inline-actions
+        class="mx-page-edge mt-2.5 shrink-0"
+        data-test="ai-experiment-detail-failure-banner"
+      >
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <span class="font-semibold" data-test="ai-experiment-detail-failure-title">
+            {{
+              t("aiObservability.experiments.detail.failureBanner.title", {
+                failed: failureBanner.failed,
+                total: failureBanner.total,
+                cause: failureBanner.kindLabel,
+              })
+            }}
+          </span>
+          <span class="text-xs break-words" data-test="ai-experiment-detail-failure-cause">
+            {{
+              t("aiObservability.experiments.detail.failureBanner.cause", {
+                count: failureBanner.count,
+                message: failureBanner.message,
+              })
+            }}
+            <template v-if="failureBanner.moreCauses > 0">
+              {{
+                t("aiObservability.experiments.detail.failureBanner.moreCauses", {
+                  count: failureBanner.moreCauses,
+                })
+              }}
+            </template>
+          </span>
+        </div>
+        <template v-if="failureBanner.providerTask" #actions>
+          <OButton
+            size="sm"
+            variant="outline"
+            data-test="ai-experiment-detail-failure-open-providers"
+            @click="router.push({ name: 'llmProviders' })"
+          >
+            {{ t("aiObservability.experiments.detail.failureBanner.openProviders") }}
+          </OButton>
+        </template>
+      </OBanner>
       <KpiCardRow v-if="metricCards.length" class="px-page-edge shrink-0 py-2.5">
         <KpiCard
           v-for="card in metricCards"
@@ -153,7 +198,7 @@
             </span>
           </template>
           <template v-if="card.footer" #footer>
-            <span class="text-3xs text-text-tertiary font-medium">{{ raw(card.footer) }}</span>
+            <span class="text-3xs text-text-secondary font-medium">{{ raw(card.footer) }}</span>
           </template>
         </KpiCard>
       </KpiCardRow>
@@ -266,6 +311,17 @@
             <span v-else class="text-text-secondary">{{ raw(row.dispersionLabel) }}</span>
           </template>
 
+          <template #cell-errorMessage="{ row }: { row: any }">
+            <OTruncatedText
+              v-if="row.errorMessage"
+              class="text-status-error-text text-xs"
+              :data-test="`ai-experiment-row-error-${row.rowKey}`"
+            >
+              {{ raw(row.errorMessage) }}
+            </OTruncatedText>
+            <span v-else class="text-text-secondary">{{ raw("—") }}</span>
+          </template>
+
           <template #cell-latency="{ row }: { row: any }">
             <span class="text-text-secondary">{{ raw(row.latency) }}</span>
           </template>
@@ -335,6 +391,7 @@ import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -348,7 +405,8 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
+import { type ScoreConfig } from "@/services/online-evals.service";
+import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
 import { healthyBooleanValue } from "@/enterprise/components/onlineEvals/utils/qualitySummary";
 import {
   cancelExperimentMutation,
@@ -384,6 +442,7 @@ import {
   formatDuration,
 } from "@/enterprise/components/AIObservability/experimentRowContent";
 import { experimentScoreSummaryValue, openExperimentTrace } from "./experimentResults";
+import { experimentCostDisplay } from "./experimentDiscovery";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIExperimentDetailPage" });
@@ -440,14 +499,13 @@ const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) >
  *  two score columns exactly like the dataset grouping on the list page. */
 const scorerIds = computed(() => (detail.value?.preview.pinnedScorers ?? []).map((s) => s.id));
 
-// Session-cached per org (see `scoreConfigs.listCached`) rather than a plain
-// `list()` — this page mounts fresh every time a different experiment is
-// opened, and Score Configs change far less often than that.
+// The shared per-org entry (`scoreConfigsQuery`): this page mounts fresh for
+// every experiment opened, and every Score Config write invalidates the entry.
 const scoreConfigs = ref<ScoreConfig[]>([]);
 async function loadScoreConfigs() {
   if (!orgId.value) return;
   try {
-    scoreConfigs.value = await onlineEvalsService.scoreConfigs.listCached(orgId.value);
+    scoreConfigs.value = await queryClient.fetchQuery(scoreConfigsQuery(orgId.value));
   } catch {
     // Non-fatal: without configs, boolean cells just render unhighlighted —
     // same as before this feature existed.
@@ -565,6 +623,39 @@ const failedSlotCount = computed(
   () => detail.value?.results.aggregateSummary?.incompleteTaskSlots ?? 0,
 );
 
+const hasRowErrors = computed(() => resultRows.value.some((row) => !!row.errorMessage));
+const FAILURE_KINDS = new Set([
+  "provider_auth",
+  "rate_limited",
+  "timeout",
+  "provider_5xx",
+  "parse_error",
+  "mapping_error",
+  "scorer_missing",
+  "execution_error",
+]);
+
+/** The run's top failure cause, so a failed run says why before any row is
+ *  opened. Causes are grouped server-side by error kind and the first line of
+ *  the message, over every slot rather than this page of rows. */
+const failureBanner = computed(() => {
+  const results = detail.value?.results;
+  const aggregate = results?.aggregateSummary;
+  const top = aggregate?.failureCauses?.[0];
+  if (!results || !aggregate || !top || aggregate.errorTaskSlots <= 0) return null;
+  const kind = top.kind && FAILURE_KINDS.has(top.kind) ? top.kind : "unknown";
+  const task = detail.value?.experiment.task;
+  return {
+    failed: aggregate.errorTaskSlots,
+    total: results.taskOutcomes?.total ?? results.taskProgress?.total ?? aggregate.errorTaskSlots,
+    kindLabel: t(`aiObservability.experiments.detail.failureKinds.${kind}`),
+    message: top.message || t("aiObservability.experiments.detail.failureBanner.noMessage"),
+    count: top.slotCount,
+    moreCauses: Math.max(0, aggregate.failureCauseCount - 1),
+    providerTask: task?.type === "inline_prompt" || task?.type === "prompt_ref",
+  };
+});
+
 function openManagedPrompt() {
   const task = detail.value?.experiment.task;
   if (task?.type !== "prompt_ref") return;
@@ -588,7 +679,7 @@ const datasetLabel = computed(() => {
   if (!experiment) return raw("");
   return t("aiObservability.experiments.detail.datasetVersion", {
     dataset: experiment.datasetName ?? experiment.datasetId,
-    version: experiment.datasetVersion,
+    version: experiment.datasetWriteVersion,
   });
 });
 
@@ -655,14 +746,14 @@ const metricCards = computed<MetricCard[]>(() => {
   cards.push({
     key: "cost",
     label: t("aiObservability.experiments.detail.totalCost"),
-    value: aggregate?.totalCost == null ? "—" : `$${aggregate.totalCost.toFixed(4)}`,
+    value: costValue(aggregate?.totalCost, aggregate?.costIncomplete),
     footer: t(
       aggregate?.costIncomplete
         ? "aiObservability.experiments.detail.partialCostBreakdown"
         : "aiObservability.experiments.detail.costBreakdown",
       {
-        task: formatCost(aggregate?.taskCost ?? aggregate?.totalCost),
-        scoring: formatCost(aggregate?.scoringCost),
+        task: formatCost(aggregate?.taskCost ?? aggregate?.totalCost, aggregate?.costIncomplete),
+        scoring: formatCost(aggregate?.scoringCost, aggregate?.costIncomplete),
       },
     ),
     icon: "payments" as IconName,
@@ -677,16 +768,21 @@ const metricCards = computed<MetricCard[]>(() => {
     dataTest: "ai-experiment-detail-dispersion",
   });
   if (task) {
+    // Succeeded over total: a failed slot is finished, not done, so counting
+    // it as completed showed 56/56 with a check on a run where nothing worked.
+    const failed = taskOutcomes?.failed ?? 0;
     cards.push({
       key: "progress",
       label: t("aiObservability.experiments.detail.tasks"),
-      value: `${task.completed}/${task.total}`,
+      value: taskOutcomes
+        ? `${taskOutcomes.succeeded}/${taskOutcomes.total}`
+        : `${task.completed}/${task.total}`,
       footer: taskOutcomes
         ? t("aiObservability.experiments.detail.taskDistribution", taskOutcomes)
         : task.skipped
           ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
           : undefined,
-      icon: "check-circle" as IconName,
+      icon: (failed > 0 ? "error-outline" : "check-circle") as IconName,
       dataTest: "ai-experiment-detail-progress",
     });
   }
@@ -707,8 +803,27 @@ const metricCards = computed<MetricCard[]>(() => {
   return cards;
 });
 
-function formatCost(cost: number | null | undefined): string {
-  return cost == null ? "—" : `$${cost.toFixed(4)}`;
+/** An unpriced task or judge call makes the total a floor; a zero floor is
+ *  unknown, not free. */
+function costValue(cost: number | null | undefined, incomplete: boolean | undefined): string {
+  const display = experimentCostDisplay(cost, incomplete);
+  switch (display.kind) {
+    case "none":
+      return "—";
+    case "exact":
+      return `$${display.value.toFixed(4)}`;
+    case "atLeast":
+      return t("aiObservability.experiments.costAtLeast", {
+        cost: `$${display.value.toFixed(4)}`,
+      });
+    case "unknown":
+      return t("aiObservability.experiments.costUnknown");
+  }
+}
+
+/** One side of the breakdown. A zero on an incomplete run is not a price. */
+function formatCost(cost: number | null | undefined, incomplete?: boolean): string {
+  return cost == null || (incomplete && cost === 0) ? "—" : `$${cost.toFixed(4)}`;
 }
 
 function isMetricCardActionable(card: MetricCard) {
@@ -784,6 +899,20 @@ const columns = computed<OTableColumnDef[]>(() => [
           sortable: true,
           size: 130,
           meta: { align: "left" as const },
+        },
+      ]
+    : []),
+  // The cause on every failed row, so filtering to Task Failed shows why
+  // without opening each drawer. Absent when nothing failed.
+  ...(hasRowErrors.value
+    ? [
+        {
+          id: "errorMessage",
+          header: t("aiObservability.experiments.detail.columns.error"),
+          accessorKey: "errorMessage",
+          sortable: true,
+          size: 240,
+          meta: { align: "left" as const, cellOverflowTooltip: false },
         },
       ]
     : []),

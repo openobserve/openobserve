@@ -36,8 +36,14 @@ const mockGetStreams = vi.fn().mockResolvedValue({
   ],
 });
 const mockRouterPush = vi.fn();
+const mockRouterReplace = vi.fn(() => Promise.resolve());
+const mockListAgents = vi.fn();
+// Mutable per test; the default (set in beforeEach) is `?type=stream`.
+const mockRouteQuery: Record<string, string> = {};
 
 import { reactive, ref } from "vue";
+import type { DataHealthResponse } from "@/services/gen-ai-data-health.service";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 
 const mockStoreState = reactive({ selectedOrganization: { identifier: "test-org" } });
 
@@ -64,6 +70,7 @@ const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
 const mockAvailableStreams = ref<string[]>([]);
 const mockStreamsLoaded = ref(false);
+const mockHealth = ref<DataHealthResponse | null>(null);
 
 vi.mock("./composables/useLLMInsights", () => ({
   useLLMInsights: () => ({
@@ -80,6 +87,19 @@ vi.mock("./composables/useLLMInsights", () => ({
   }),
 }));
 
+vi.mock("./composables/useLLMDataHealth", () => ({
+  useLLMDataHealth: () => ({
+    health: mockHealth,
+    loading: ref(false),
+    error: ref(false),
+    samples: ref(null),
+    samplesLoading: ref(false),
+    fetchHealth: vi.fn(),
+    fetchSamples: vi.fn(),
+    reset: vi.fn(),
+  }),
+}));
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
@@ -93,11 +113,17 @@ vi.mock("vue-i18n", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: mockRouterPush, replace: vi.fn(() => Promise.resolve()) }),
-  // This suite exercises the stream-mode paths. The dashboard now defaults to
-  // Agent scope and only `?type=stream` (NOT a saved preference) opts into
-  // Stream mode, so drive stream mode through the URL the way the component reads it.
-  useRoute: () => ({ query: { type: "stream" } }),
+  useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
+  // Most of this suite exercises the stream-mode paths, driven through the URL
+  // (`?type=stream`) the way the component reads it; scope tests override it.
+  useRoute: () => ({ query: mockRouteQuery }),
+}));
+
+vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
+  default: {
+    listAgents: (...args: any[]) => mockListAgents(...args),
+    listVersionsForCompare: vi.fn().mockResolvedValue([]),
+  },
 }));
 
 // Partial-mock vuex so `createStore` (used by `src/stores/index.ts`)
@@ -113,15 +139,24 @@ vi.mock("vuex", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, enableAutoUnmount } from "@vue/test-utils";
 import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
 import config from "@/aws-exports";
 // The KPI cache is a module singleton (survives remounts in the app); clear it
 // between tests so a warmed entry from one mount doesn't suppress the fetch in
 // the next.
 import { kpiCache } from "./llmInsightsCache";
+import { queryClient } from "@/composables/query/queryClient";
+import { SCOPE_MODE_CHOICE_LS_KEY } from "@/enterprise/composables/useAgentScope";
 
 const STREAM_LS_KEY = "llmInsights_streamFilter";
+
+// The stream each panel mount was given, in mount order — a remount (which
+// cancels the panel's in-flight query) shows up as a second entry.
+let panelMounts: string[] = [];
+
+// Earlier tests' dashboards would otherwise stay mounted and react to the shared mock refs.
+enableAutoUnmount(afterEach);
 
 /** Mount the dashboard with default props that satisfy the loadInsights guard. */
 function mountDashboard(
@@ -139,8 +174,15 @@ function mountDashboard(
         // Children — all stubbed so we don't try to render echarts /
         // sparkline math during dashboard-level tests.
         LLMSchemaPanel: { template: '<div data-test="llm-schema-panel" />' },
-        LLMErrorTable: { template: '<div data-test="llm-error-table" />' },
+        LLMErrorTable: {
+          props: ["streamName"],
+          template: '<div data-test="llm-error-table" />',
+          mounted(this: { streamName: string }) {
+            panelMounts.push(this.streamName);
+          },
+        },
         KpiSparkline: { template: '<div data-test="kpi-sparkline" />' },
+        LLMDataHealthStrip: { template: '<div data-test="llm-data-health-strip" />' },
         LLMInsightsSkeleton: { template: '<div data-test="llm-insights-skeleton" />' },
         OButton: {
           template: "<button @click=\"$emit('click')\"><slot /></button>",
@@ -155,6 +197,11 @@ beforeEach(() => {
   // Fresh mock state for every test.
   vi.clearAllMocks();
   kpiCache.clear();
+  queryClient.clear();
+  panelMounts = [];
+  for (const k of Object.keys(mockRouteQuery)) delete mockRouteQuery[k];
+  mockRouteQuery.type = "stream";
+  mockListAgents.mockResolvedValue({ agents: [] });
   mockStoreState.selectedOrganization = { identifier: "test-org" };
   mockKpi.value = {
     requestCount: 0,
@@ -177,6 +224,7 @@ beforeEach(() => {
   mockHasLoadedOnce.value = false;
   mockAvailableStreams.value = [];
   mockStreamsLoaded.value = false;
+  mockHealth.value = null;
   // Reset localStorage between tests so the dashboard's stream
   // initialisation doesn't bleed across cases.
   localStorage.clear();
@@ -533,6 +581,7 @@ describe("LLMInsightsDashboard — OSS builds (neither isEnterprise nor isCloud 
   it("keeps the Stream/Agent toggle (Agent locked) and hides the Compare entry — both need the enterprise-only agent-mapping API", async () => {
     config.isEnterprise = "false";
     const wrapper = mountDashboard();
+    await (wrapper.vm as any).refresh();
     await flushPromises();
     expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(true);
     expect(wrapper.find("[data-test='llm-insights-compare-entry']").exists()).toBe(false);
@@ -542,7 +591,326 @@ describe("LLMInsightsDashboard — OSS builds (neither isEnterprise nor isCloud 
     config.isEnterprise = "false";
     config.isCloud = "true";
     const wrapper = mountDashboard();
+    await (wrapper.vm as any).refresh();
     await flushPromises();
     expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(true);
+  });
+});
+
+// ===========================================================================
+// Scope: mode resolution (AIO-02/03), URL scope (AIO-08), one agents fetch (AIO-18)
+// ===========================================================================
+
+const agentAt = (name: string, stream: string, env: string, version: string) => ({
+  name,
+  id: `id-${name}`,
+  source_stream: stream,
+  source_stream_type: "traces",
+  env,
+  version,
+});
+
+/** Mount and run the parent's mount-time load (DateTime's window replay: no force). */
+async function mountAndEnter() {
+  const wrapper = mountDashboard();
+  await (wrapper.vm as any).refresh(undefined, undefined, false);
+  await flushPromises();
+  return wrapper;
+}
+
+// Agent mode needs the enterprise-only agent-mapping API, so these run as an
+// enterprise build regardless of the local `.env` (CI has none, so it is OSS).
+describe("LLMInsightsDashboard — scope resolution", () => {
+  const originalIsEnterprise = config.isEnterprise;
+
+  beforeEach(() => {
+    config.isEnterprise = "true";
+    delete mockRouteQuery.type;
+  });
+
+  afterEach(() => {
+    config.isEnterprise = originalIsEnterprise;
+  });
+
+  it("opens in Stream mode with the 'No agent identity found' banner when the window has no agents but an LLM stream exists", async () => {
+    mockListAgents.mockResolvedValue({ agents: [] });
+
+    const wrapper = await mountAndEnter();
+
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+    expect(mockFetchAll).toHaveBeenCalledWith(
+      "default",
+      1_700_000_000_000_000,
+      1_700_001_000_000_000,
+      null,
+    );
+    expect(wrapper.find("[data-test='llm-insights-no-agent-identity']").exists()).toBe(true);
+    // The auto-picked mode stays out of the URL, so a reload re-decides.
+    const lastQuery = (mockRouterReplace.mock.calls.at(-1) as any[])[0].query;
+    expect(lastQuery.type).toBeUndefined();
+    expect(lastQuery.stream).toBe("default");
+  });
+
+  it("opens in Agent mode when the window has agents", async () => {
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
+
+    const wrapper = await mountAndEnter();
+
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+    // The auto-picked agent stays out of the URL too, so a reload with no agents ends in Stream.
+    const lastQuery = (mockRouterReplace.mock.calls.at(-1) as any[])[0].query;
+    expect([lastQuery.type, lastQuery.agent, lastQuery.env, lastQuery.version]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(wrapper.find("[data-test='llm-insights-no-agent-identity']").exists()).toBe(false);
+  });
+
+  it("mounts the panels once, with the final scope — never the first agent then the linked one", async () => {
+    Object.assign(mockRouteQuery, { agent: "omp", env: "production", version: "2" });
+    mockListAgents.mockResolvedValue({
+      agents: [
+        agentAt("a23ca1dd38a1ff350", "s_hash", "staging", "1"),
+        agentAt("omp", "s_staging", "staging", "2"),
+        agentAt("omp", "s_prod", "production", "2"),
+      ],
+    });
+
+    const wrapper = await mountAndEnter();
+
+    const vm = wrapper.vm as any;
+    expect([vm.filterMode, vm.selectedEnv, vm.selectedAgentName, vm.selectedVersion]).toEqual([
+      "agent",
+      "production",
+      "omp",
+      "2",
+    ]);
+    expect(panelMounts).toEqual(["s_prod"]);
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a remembered explicit Agent choice even when the window has no agents", async () => {
+    localStorage.setItem(SCOPE_MODE_CHOICE_LS_KEY, "agent");
+    mockListAgents.mockResolvedValue({ agents: [] });
+
+    const wrapper = await mountAndEnter();
+
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+    expect(wrapper.find("[data-test='llm-insights-agent-empty']").exists()).toBe(true);
+  });
+
+  it("keeps the URL's explicit Stream choice even when the window has agents", async () => {
+    mockRouteQuery.type = "stream";
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
+
+    const wrapper = await mountAndEnter();
+
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+  });
+
+  it.each([{ env: "production" }, { version: "2" }])(
+    "keeps an env/version-only URL scope over the remembered Stream choice: %o",
+    async (query) => {
+      localStorage.setItem(SCOPE_MODE_CHOICE_LS_KEY, "stream");
+      Object.assign(mockRouteQuery, query);
+      mockListAgents.mockResolvedValue({
+        agents: [
+          agentAt("first", "s_staging", "staging", "1"),
+          agentAt("linked", "s_prod", "production", "2"),
+        ],
+      });
+      const wrapper = await mountAndEnter();
+      // Vue Test Utils omits script-setup state from its public-instance type.
+      const vm = wrapper.vm as unknown as {
+        filterMode: string;
+        selectedEnv: string;
+        selectedVersion: string;
+      };
+      expect([vm.filterMode, vm.selectedEnv, vm.selectedVersion]).toEqual([
+        "agent",
+        "production",
+        "2",
+      ]);
+      expect(panelMounts).toEqual(["s_prod"]);
+      expect(mockRouterReplace).toHaveBeenLastCalledWith({
+        query: expect.objectContaining(query),
+      });
+    },
+  );
+
+  it("shows explicit Stream panels while the agents registry is still pending", async () => {
+    mockRouteQuery.type = "stream";
+    const agentsResult = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    mockListAgents.mockReturnValue(agentsResult.promise);
+    const wrapper = mountDashboard();
+    // Vue Test Utils omits the script-setup method from its public-instance type.
+    const vm = wrapper.vm as unknown as {
+      refresh: (start?: number, end?: number, force?: boolean) => Promise<void>;
+    };
+    const pending = vm.refresh(undefined, undefined, false);
+    await flushPromises();
+    expect(panelMounts).toEqual(["default"]);
+    agentsResult.resolve({ agents: [agentAt("omp", "s1", "production", "1")] });
+    await pending;
+    await flushPromises();
+    expect(panelMounts).toEqual(["default"]);
+  });
+
+  it("remembers a toggle click as the explicit choice and writes it to the URL", async () => {
+    mockListAgents.mockResolvedValue({ agents: [] });
+    const wrapper = await mountAndEnter();
+
+    (wrapper.vm as any).onFilterModeChange("agent");
+    await flushPromises();
+
+    expect(localStorage.getItem(SCOPE_MODE_CHOICE_LS_KEY)).toBe("agent");
+    expect((mockRouterReplace.mock.calls.at(-1) as any[])[0].query.type).toBe("agent");
+  });
+
+  it("fetches gen_ai/agents once per view across mount replays and mode toggles", async () => {
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
+    const wrapper = mountDashboard();
+    const vm = wrapper.vm as any;
+    // DateTime may replay its window more than once on mount, concurrently.
+    await Promise.all([
+      vm.refresh(undefined, undefined, false),
+      vm.refresh(undefined, undefined, false),
+    ]);
+    await flushPromises();
+    vm.onFilterModeChange("stream");
+    await flushPromises();
+    vm.onFilterModeChange("agent");
+    await flushPromises();
+
+    expect(mockListAgents).toHaveBeenCalledTimes(1);
+  });
+
+  it("decides an auto mode again when the user picks a window with no agents", async () => {
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
+    const wrapper = await mountAndEnter();
+    const vm = wrapper.vm as any;
+    expect(vm.filterMode).toBe("agent");
+
+    // A mount-time replay of another window decides nothing.
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await vm.refresh(1_600_000_000_000_000, 1_600_001_000_000_000, false);
+    await flushPromises();
+    expect(vm.filterMode).toBe("agent");
+
+    // The user's own pick does: the new window has no agents, so Stream.
+    await vm.refresh(1_500_000_000_000_000, 1_500_001_000_000_000, true, true);
+    await flushPromises();
+    expect(vm.filterMode).toBe("stream");
+    expect(mockFetchAll.mock.calls.at(-1)).toEqual([
+      "default",
+      1_500_000_000_000_000,
+      1_500_001_000_000_000,
+      null,
+    ]);
+  });
+
+  it("keeps an explicit Agent choice when the user picks a window with no agents", async () => {
+    mockRouteQuery.type = "agent";
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
+    const wrapper = await mountAndEnter();
+    const vm = wrapper.vm as any;
+
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await vm.refresh(1_500_000_000_000_000, 1_500_001_000_000_000, true, true);
+    await flushPromises();
+    expect(vm.filterMode).toBe("agent");
+  });
+});
+
+describe("LLMInsightsDashboard — Total Cost tile", () => {
+  async function costTileText(cost: number, tokens: number, unpricedTokens: number) {
+    // A window with requests, so the tiles render rather than the empty state.
+    mockKpi.value = {
+      ...mockKpi.value,
+      requestCount: 10,
+      traceCount: 5,
+      totalCost: cost,
+      totalTokens: tokens,
+    };
+    mockHealth.value =
+      unpricedTokens > 0
+        ? {
+            checked_at: 1,
+            checks: [
+              {
+                id: "unpriced_models",
+                status: "warning",
+                affected: 3,
+                total: 10,
+                models: [{ model: "mystery-model", spans: 3, tokens: unpricedTokens }],
+              },
+            ],
+          }
+        : null;
+    mockHasLoadedOnce.value = true;
+    const wrapper = mountDashboard();
+    await (wrapper.vm as any).refresh(undefined, undefined, false);
+    await flushPromises();
+    return wrapper.find("[data-test='llm-insights-kpi-value']").text();
+  }
+
+  it("reads 'cost unknown' when none of the tokens were priced", async () => {
+    const text = await costTileText(0, 1000, 1000);
+    expect(text).toContain("llmDataTrust.cost.unknown");
+    expect(text).not.toContain("≥");
+    expect(text).not.toContain("0.00");
+  });
+
+  it("reads as a lower bound when some tokens were priced", async () => {
+    const text = await costTileText(1.5, 1000, 400);
+    expect(text).toContain("≥");
+    expect(text).toContain("1.50");
+  });
+
+  it("reads plain when every token was priced", async () => {
+    const text = await costTileText(1.5, 1000, 0);
+    expect(text).not.toContain("≥");
+    expect(text).toContain("1.50");
+  });
+
+  it("reads the server's uncapped unpriced tokens, not the sum of the listed models", async () => {
+    mockKpi.value = {
+      ...mockKpi.value,
+      requestCount: 10,
+      traceCount: 5,
+      totalCost: 1.5,
+      totalTokens: 1000,
+    };
+    // The listed top models hold 400 tokens; models past the list cap hold the other 600.
+    mockHealth.value = {
+      checked_at: 1,
+      checks: [
+        {
+          id: "unpriced_models",
+          status: "warning",
+          affected: 30,
+          total: 40,
+          models: [{ model: "mystery-model", spans: 3, tokens: 400 }],
+          model_count: 25,
+          unpriced_tokens: 1000,
+          models_truncated: true,
+        },
+      ],
+    };
+    mockHasLoadedOnce.value = true;
+    const wrapper = mountDashboard();
+    // Exposed by the component for tests; the cast names only the method used here.
+    const vm = wrapper.vm as unknown as { refresh: (...args: unknown[]) => Promise<void> };
+    await vm.refresh(undefined, undefined, false);
+    await flushPromises();
+    expect(wrapper.find("[data-test='llm-insights-kpi-value']").text()).toContain(
+      "llmDataTrust.cost.unknown",
+    );
+    // The tooltip names the listed models as the top ones of all 25.
+    const tooltip = wrapper.find("[data-test='llm-insights-cost-unpriced']").attributes("title");
+    expect(tooltip).toContain("llmDataTrust.topModels");
+    expect(tooltip).toContain('\\"shown\\":1,\\"total\\":\\"25\\"');
   });
 });

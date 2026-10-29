@@ -23,7 +23,7 @@ import ExperimentComparisonRowDrawer from "./ExperimentComparisonRowDrawer.vue";
 function detail(experimentId: string, output: string, score: number): ExperimentRowDetail {
   return {
     experimentId,
-    snapshot: { datasetId: "dataset", datasetVersion: 1 },
+    snapshot: { datasetId: "dataset", datasetVersion: 1, datasetWriteVersion: 1 },
     navigation: {
       rowIndex: 0,
       totalRows: 1,

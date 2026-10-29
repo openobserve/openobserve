@@ -11,13 +11,16 @@ use infra::{
     table::entity::{llm_dataset_items as dataset_items, llm_datasets as datasets},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{EvalDatasetMessage, Message, MessageType};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set,
+    TransactionTrait, sea_query::Expr,
+};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::EvalDatasetPut => {
             let EvalDatasetMessage::Put { dataset, items } = msg.try_into()?;
-            apply_put(dataset, items).await?;
+            apply_put(get_orm_client_rw().await, dataset, items).await?;
         }
         MessageType::EvalDatasetDelete => {
             let (org_id, dataset_id) =
@@ -36,7 +39,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     Ok(())
 }
 
-async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -> Result<()> {
+async fn apply_put<C: ConnectionTrait + TransactionTrait>(
+    db: &C,
+    dataset: datasets::Model,
+    items: Vec<dataset_items::Model>,
+) -> Result<()> {
     // Item messages carry the parent only as a version watermark. Dataset
     // metadata is authoritative only in a metadata-only snapshot, preventing
     // an item written from stale regional state from reverting a rename.
@@ -50,7 +57,6 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
         ));
     }
 
-    let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
     match datasets::Entity::find_by_id(&dataset.id).one(&txn).await? {
         Some(current) if current.org_id != dataset.org_id => {
@@ -81,10 +87,24 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
             .one(&txn)
             .await?
         {
-            if current != item {
+            // This region may hold the row without its display label (an older node's echo,
+            // or a row from before the column). Fill in that one column so MAX(write_version)
+            // and the snapshot pins agree with the origin region; a stored label stays.
+            let missing_label = item
+                .write_version
+                .filter(|_| current.write_version.is_none());
+            if !compatible_item_rows(current, &item) {
                 return Err(Error::Message(
                     "Dataset Item row ID contains conflicting data".to_string(),
                 ));
+            }
+            if let Some(label) = missing_label {
+                dataset_items::Entity::update_many()
+                    .col_expr(dataset_items::Column::WriteVersion, Expr::value(label))
+                    .filter(dataset_items::Column::RowId.eq(&item.row_id))
+                    .filter(dataset_items::Column::WriteVersion.is_null())
+                    .exec(&txn)
+                    .await?;
             }
             continue;
         }
@@ -107,6 +127,18 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
     Ok(())
 }
 
+/// Older nodes omit the display label when echoing an otherwise identical immutable row, so a
+/// missing label on either side is not a conflict; two different labels still are.
+fn compatible_item_rows(
+    mut current: dataset_items::Model,
+    incoming: &dataset_items::Model,
+) -> bool {
+    if current.write_version.is_none() || incoming.write_version.is_none() {
+        current.write_version = incoming.write_version;
+    }
+    current == *incoming
+}
+
 async fn apply_delete(org_id: &str, dataset_id: &str) -> Result<()> {
     let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
@@ -122,4 +154,116 @@ async fn apply_delete(org_id: &str, dataset_id: &str) -> Result<()> {
         .await?;
     txn.commit().await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ConnectOptions, Database, DatabaseConnection, Schema};
+
+    use super::*;
+
+    fn row(write_version: Option<i64>) -> dataset_items::Model {
+        serde_json::from_value(serde_json::json!({
+            "row_id": "row-1",
+            "logical_id": "item-1",
+            "org_id": "org-1",
+            "dataset_id": "dataset-1",
+            "input": "question",
+            "expected_output": "answer",
+            "global_version": 59,
+            "write_version": write_version,
+            "is_deleted": false,
+            "source": "telemetry",
+            "updated_by": "owner@example.com",
+            "updated_at": 100
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn an_older_node_can_echo_a_row_without_its_display_label() {
+        assert!(compatible_item_rows(row(Some(57)), &row(None)));
+        assert!(compatible_item_rows(row(None), &row(Some(57))));
+        assert!(compatible_item_rows(row(Some(57)), &row(Some(57))));
+        assert!(!compatible_item_rows(row(Some(57)), &row(Some(58))));
+    }
+
+    #[test]
+    fn missing_display_labels_do_not_hide_immutable_content_conflicts() {
+        let mut changed = row(None);
+        changed.input = serde_json::json!("different question");
+        assert!(!compatible_item_rows(row(Some(57)), &changed));
+        let mut changed = row(None);
+        changed.global_version = 60;
+        assert!(!compatible_item_rows(row(Some(57)), &changed));
+    }
+
+    // One connection: separate connections to `sqlite::memory:` get separate databases.
+    async fn db() -> DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(datasets::Entity),
+            schema.create_table_from_entity(dataset_items::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        db
+    }
+
+    fn dataset() -> datasets::Model {
+        datasets::Model {
+            id: "dataset-1".to_string(),
+            org_id: "org-1".to_string(),
+            name: "Golden set".to_string(),
+            description: None,
+            tags: None,
+            global_version: 59,
+            created_by: "owner@example.com".to_string(),
+            created_at: 1,
+            updated_by: "owner@example.com".to_string(),
+            updated_at: 1,
+        }
+    }
+
+    async fn stored(db: &DatabaseConnection) -> dataset_items::Model {
+        dataset_items::Entity::find_by_id("row-1")
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_replayed_label_reaches_a_row_stored_without_one() {
+        let db = db().await;
+        apply_put(&db, dataset(), vec![row(None)]).await.unwrap();
+        apply_put(&db, dataset(), vec![row(Some(57))])
+            .await
+            .unwrap();
+        assert_eq!(stored(&db).await, row(Some(57)));
+    }
+
+    #[tokio::test]
+    async fn an_unlabelled_echo_never_erases_a_stored_label() {
+        let db = db().await;
+        apply_put(&db, dataset(), vec![row(Some(57))])
+            .await
+            .unwrap();
+        apply_put(&db, dataset(), vec![row(None)]).await.unwrap();
+        assert_eq!(stored(&db).await.write_version, Some(57));
+    }
+
+    #[tokio::test]
+    async fn a_label_is_not_filled_in_beside_conflicting_content() {
+        let db = db().await;
+        apply_put(&db, dataset(), vec![row(None)]).await.unwrap();
+        let mut changed = row(Some(57));
+        changed.input = serde_json::json!("different question");
+        assert!(apply_put(&db, dataset(), vec![changed]).await.is_err());
+        assert_eq!(stored(&db).await, row(None));
+    }
 }

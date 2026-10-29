@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
 vi.mock("@/composables/useIngestion", () => ({
@@ -26,8 +26,15 @@ vi.mock("./content", () => ({
   },
 }));
 
+import { createMemoryHistory, createRouter } from "vue-router";
 import AIIntegrationDetail from "./AIIntegrationDetail.vue";
 import store from "@/test/unit/helpers/store";
+import { INSTRUMENT_SKILL_URL } from "./codingAgentPrompt";
+
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [{ path: "/", component: { template: "<div />" } }],
+});
 
 const CARD_STUB = {
   name: "AIIntegrationCard",
@@ -52,10 +59,14 @@ describe("AIIntegrationDetail", () => {
     mount(AIIntegrationDetail, {
       props,
       global: {
-        plugins: [store],
+        plugins: [store, router],
         stubs: { AIIntegrationCard: CARD_STUB, CredentialCodeBlock: COPY_STUB },
       },
     });
+
+  beforeEach(async () => {
+    await router.push({ path: "/", query: {} });
+  });
 
   afterEach(() => {
     wrapper?.unmount();
@@ -117,6 +128,44 @@ describe("AIIntegrationDetail", () => {
       });
       expect(wrapper.find("a").exists()).toBe(false);
       expect(wrapper.text()).toContain("Select an integration to view details.");
+    });
+  });
+
+  describe("setup tabs", () => {
+    const agentTab = '[data-test="ai-integration-tab-coding-agent"]';
+    const agentPanel = '[data-test="ai-coding-agent-setup"]';
+
+    it("opens on the step-by-step card by default", () => {
+      wrapper = mountDetail({ categorySlug: "frameworks", integrationSlug: "langchain" });
+      expect(wrapper.find('[data-test="ai-integration-card-stub"]').exists()).toBe(true);
+      expect(wrapper.find(agentPanel).exists()).toBe(false);
+    });
+
+    it("switches to the coding-agent prompt when its tab is clicked", async () => {
+      wrapper = mountDetail({ categorySlug: "frameworks", integrationSlug: "langchain" });
+      await wrapper.find(agentTab).trigger("mousedown", { button: 0 });
+      await wrapper.find(agentTab).trigger("click");
+      await flushPromises();
+      expect(wrapper.find(agentPanel).exists()).toBe(true);
+      expect(wrapper.find('[data-test="ai-integration-card-stub"]').exists()).toBe(false);
+    });
+
+    it("preselects the coding-agent tab from ?tab=agent and names the org and stream", async () => {
+      await router.push({ path: "/", query: { tab: "agent" } });
+      wrapper = mountDetail({ categorySlug: "frameworks", integrationSlug: "langchain" });
+      await flushPromises();
+      const prompt = wrapper.findComponent({ name: "OCodeBlock" }).props("code") as string;
+      const org = store.state.selectedOrganization.identifier;
+      expect(prompt).toContain(INSTRUMENT_SKILL_URL);
+      expect(prompt).toContain(`org ${org}, stream default.`);
+    });
+
+    it("follows a later ?tab change on the same integration", async () => {
+      wrapper = mountDetail({ categorySlug: "frameworks", integrationSlug: "langchain" });
+      expect(wrapper.find(agentPanel).exists()).toBe(false);
+      await router.push({ path: "/", query: { tab: "agent" } });
+      await flushPromises();
+      expect(wrapper.find(agentPanel).exists()).toBe(true);
     });
   });
 });
