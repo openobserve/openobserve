@@ -49,7 +49,10 @@ vi.mock("@/services/llm-datasets.service", async () => ({
   default: { list: vi.fn(), listItems: vi.fn() },
 }));
 vi.mock("@/services/online-evals.service", () => ({
-  default: { scorers: { list: vi.fn() }, providers: { list: vi.fn() } },
+  default: {
+    scorers: { list: vi.fn() },
+    providers: { list: vi.fn(), testConfig: vi.fn() },
+  },
 }));
 vi.mock("@/services/llm-prompts.service", () => ({
   default: { list: vi.fn(), resolve: vi.fn() },
@@ -176,6 +179,7 @@ describe("ExperimentForm drafts", () => {
     } as never);
     vi.mocked(onlineEvalsService.scorers.list).mockResolvedValue([scorer] as never);
     vi.mocked(onlineEvalsService.providers.list).mockResolvedValue([provider] as never);
+    vi.mocked(onlineEvalsService.providers.testConfig).mockResolvedValue("ok" as never);
     vi.mocked(llmExperimentsService.preview).mockResolvedValue(previewResult as never);
     vi.mocked(llmExperimentsService.create).mockResolvedValue({
       experiment: { id: "exp-1" },
