@@ -2712,6 +2712,7 @@
     "feature_logs": "로그",
     "feature_metrics": "메트릭",
     "feature_traces": "트레이스",
+    "feature_rum": "RUM",
     "feature_alerts": "알림",
     "feature_dashboards": "대시보드",
     "feature_reports": "보고서",

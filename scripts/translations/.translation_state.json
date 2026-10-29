@@ -245,6 +245,7 @@
     "feature_query_optimizer": "8f62247d1bac6ba5",
     "feature_rbac": "07526a1781a85582",
     "feature_reports": "dacca3cba3f346a4",
+    "feature_rum": "28aff5e3489eacae",
     "feature_sensitive_data_redaction": "aa6f6ea35bf2cd63",
     "feature_sso": "7f90d139fd82a1e3",
     "feature_support": "be91940b79f46910",
