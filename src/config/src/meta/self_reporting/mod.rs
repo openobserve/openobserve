@@ -49,6 +49,7 @@ pub enum ReportingData {
     Trigger(Box<TriggerData>),
     Error(Box<ErrorData>),
     Redaction(Box<RedactionEvidence>),
+    AutoInvestigateDecision(Box<crate::meta::alerts::auto_investigate::DecisionRow>),
 }
 
 /// Error type for enqueue operations with timeout
@@ -97,6 +98,7 @@ impl ReportingQueue {
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
             ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         log::trace!(
@@ -139,6 +141,7 @@ impl ReportingQueue {
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
             ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         match self
@@ -183,6 +186,7 @@ impl ReportingQueue {
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
             ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         log::trace!(
@@ -399,6 +403,10 @@ mod tests {
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
             trigger_source: None,
             triggered_by: None,
@@ -958,6 +966,10 @@ mod tests {
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
             trigger_source: None,
             triggered_by: None,
@@ -996,6 +1008,7 @@ mod tests {
                 ReportingData::Trigger(_) => trigger_count += 1,
                 ReportingData::Error(_) => error_count += 1,
                 ReportingData::Redaction(_) => redaction_count += 1,
+                ReportingData::AutoInvestigateDecision(_) => panic!("none was pushed"),
             }
         }
 
@@ -1048,6 +1061,10 @@ mod tests {
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
             trigger_source: None,
             triggered_by: None,
@@ -1123,6 +1140,10 @@ mod tests {
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
             trigger_source: None,
             triggered_by: None,

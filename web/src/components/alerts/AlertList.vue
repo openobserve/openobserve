@@ -246,6 +246,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
+                  <AckChip
+                    v-if="row.ack"
+                    :ack="row.ack"
+                    :data-test="`alert-list-${row.name}-acked`"
+                  />
                   <MutedChip
                     v-if="row.active_downtime"
                     :downtime="row.active_downtime"
@@ -507,6 +512,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`alert-list-${row.name}-last-outcome`"
                   />
                 </OTooltip>
+                <OTooltip v-else-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
+                  <OTag
+                    variant="default-soft"
+                    icon="person"
+                    size="sm"
+                    :label="t('alerts.ack.firingAcknowledged')"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
                 <OTooltip v-else-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
                   <OTag
                     type="alertState"
@@ -667,12 +681,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("common.move") }}
                     </ODropdownItem>
+                    <template v-if="canAcknowledgeRow(row)">
+                      <ODropdownSeparator />
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-acknowledge`"
+                        @select="acknowledgeRow(row)"
+                      >
+                        <template #icon-left>
+                          <OIcon name="check" size="sm" />
+                        </template>
+                        {{ t("alerts.ack.acknowledge") }}
+                      </ODropdownItem>
+                    </template>
                     <template v-if="downtimesEnabled">
                       <ODropdownSeparator />
+                      <template v-if="isAlertScopedMute(row) && row.active_downtime">
+                        <MuteMenuItems
+                          labels="extend"
+                          until-clear
+                          :data-test-prefix="`alert-list-${row.name}-extend`"
+                          @preset="(secs) => extendRow(row, { minutes: secs / 60 })"
+                          @until-clear="extendRow(row, { untilClear: true })"
+                          @until="openExtendUntil(row)"
+                        />
+                        <ODropdownItem
+                          variant="destructive"
+                          :data-test="`alert-list-${row.name}-end-mute`"
+                          @select="endRowMute(row)"
+                        >
+                          <template #icon-left>
+                            <OIcon name="notifications-active" size="sm" />
+                          </template>
+                          {{ t("alerts.downtimes.mute.endNow") }}
+                        </ODropdownItem>
+                      </template>
                       <MuteMenuItems
+                        v-else
                         :data-test-prefix="`alert-list-${row.name}-mute`"
-                        @preset="(secs) => muteAndRefresh([row], secs)"
-                        @until="openMuteDialog([row])"
+                        :until-clear="isAlertScopedMute(row)"
+                        @preset="(secs) => muteRowFor(row, secs)"
+                        @until-clear="muteRowUntilClear(row)"
+                        @until="openRowMuteDialog(row)"
                       />
                     </template>
                     <ODropdownSeparator />
@@ -804,8 +853,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <MuteMenuItems
                     data-test-prefix="alert-list-bulk-mute"
+                    :until-clear="!!bulkMuteAlert"
                     @preset="(secs) => muteAndRefresh(selectedAlerts, secs)"
-                    @until="openMuteDialog(selectedAlerts)"
+                    @until-clear="bulkMuteAlert && muteRowUntilClear(bulkMuteAlert)"
+                    @until="openBulkMuteDialog"
                   />
                 </ODropdown>
                 <OButton
@@ -938,7 +989,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="downtimesEnabled"
       v-model:open="muteDialogOpen"
       :selection="muteSelection"
+      :alert="muteAlertContext"
       @muted="refreshAlerts"
+    />
+    <AlertMuteUntilDialog
+      v-if="downtimesEnabled"
+      v-model:open="extendUntilOpen"
+      :target="extendUntilRow ? rowActionTarget(extendUntilRow) : null"
+      :downtime="extendUntilRow ? rowMuteRef(extendUntilRow) : null"
+      @done="refreshAlerts"
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"
@@ -1021,6 +1080,14 @@ import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import MutedChip from "./downtimes/MutedChip.vue";
+import AckChip from "./AckChip.vue";
+import AlertMuteUntilDialog from "./AlertMuteUntilDialog.vue";
+import {
+  useAlertActions,
+  type AlertActionTarget,
+  type AlertMuteRef,
+} from "@/composables/alerts/useAlertActions";
+import type { AlertMuteEnd, QuickMuteAlertContext } from "@/utils/downtimes/quickMute";
 import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
@@ -1066,6 +1133,8 @@ export default defineComponent({
   name: "AlertList",
   components: {
     MutedChip,
+    AckChip,
+    AlertMuteUntilDialog,
     MuteMenuItems,
     QuickMuteDialog,
     OPageLayout,
@@ -1146,7 +1215,8 @@ export default defineComponent({
       searchQuery: "",
       filterQuery: "",
       searchAcrossFolders: false,
-      stateFilter: null as "active" | "paused" | "failed" | "firing" | "recent" | null,
+      stateFilter: null as
+        "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent" | null,
       sortBy: "",
       sortOrder: "asc" as "asc" | "desc",
       perPage: 20,
@@ -1287,7 +1357,8 @@ export default defineComponent({
         params: { alert_id: row.alert_id },
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: row.folder_id || router.currentRoute.value.query.folder || "default",
+          // The row's own folder: a cross-folder search lists alerts of other folders.
+          folder: row.folder_name?.id,
           tab: activeTab.value,
         },
       });
@@ -1431,6 +1502,9 @@ export default defineComponent({
     const isFiringRow = (row: any): boolean =>
       showRunOutcome(row) && isFiringOutcome(row?.last_outcome);
 
+    // The list's ack exists only while it is in force, so it needs no firing check of its own.
+    const isAckedFiring = (row: any): boolean => isFiringRow(row) && !!row?.ack;
+
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
     const runOutcomeTooltip = (row: any) => {
@@ -1503,6 +1577,7 @@ export default defineComponent({
       let paused = 0;
       let failed = 0;
       let firing = 0;
+      let acknowledged = 0;
       let recent = 0;
       for (const r of rows) {
         // active = unpaused (enabled); paused = disabled. These two partition the
@@ -1513,9 +1588,10 @@ export default defineComponent({
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
           failed += 1;
         if (isFiringRow(r)) firing += 1;
+        if (isAckedFiring(r)) acknowledged += 1;
         if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
       }
-      return { active, paused, failed, firing, recent, total: rows.length };
+      return { active, paused, failed, firing, acknowledged, recent, total: rows.length };
     });
 
     // Stat tiles for the summary strip. `tone` is the single source of colour so
@@ -1547,6 +1623,15 @@ export default defineComponent({
           tone: "error",
           max: share,
           dataTest: "alert-summary-firing",
+        },
+        {
+          key: "acknowledged",
+          label: t("alerts.ack.tile"),
+          value: v(c.acknowledged),
+          icon: "person",
+          tone: "blue",
+          max: share,
+          dataTest: "alert-summary-acknowledged",
         },
         {
           key: "recent",
@@ -1593,14 +1678,15 @@ export default defineComponent({
     // Clicking a summary tile filters the table to that state (toggle); the
     // "total" tile clears it. Counts on the tiles stay full (from filteredResults)
     // so you always see the folder totals; only the table rows are filtered.
-    const stateFilter = ref<"active" | "paused" | "failed" | "firing" | "recent" | null>(
-      savedAlertListFilters.stateFilter,
-    );
+    const stateFilter = ref<
+      "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent" | null
+    >(savedAlertListFilters.stateFilter);
     const displayedAlerts = computed(() => {
       const rows = filteredResults.value || [];
       const f = stateFilter.value;
       if (!f) return rows;
       if (f === "firing") return rows.filter(isFiringRow);
+      if (f === "acknowledged") return rows.filter(isAckedFiring);
       if (f === "recent")
         return rows.filter((r: any) => recencyLevel(r.last_satisfied_at_raw) === "hot");
       if (f === "failed")
@@ -1619,7 +1705,7 @@ export default defineComponent({
       stateFilter.value =
         stateFilter.value === key
           ? null
-          : (key as "active" | "paused" | "failed" | "firing" | "recent");
+          : (key as "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent");
     };
 
     const activeFolderToMove = ref("default");
@@ -1687,7 +1773,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.status,
+          size: 176,
           minSize: 130,
           meta: { align: "left" },
         },
@@ -2128,6 +2214,7 @@ export default defineComponent({
             last_outcome_at: data.last_outcome_at ?? null,
             last_outcome_since: data.last_outcome_since ?? null,
             active_downtime: data.active_downtime ?? null,
+            ack: data.ack ?? null,
             selected: false,
             type: data.condition.type,
             // The SLO this alert belongs to (Feature 5, Phase 2). Read from the
@@ -2356,6 +2443,99 @@ export default defineComponent({
       const id = await muteRows(rows, seconds);
       if (id) await refreshAlerts();
       return id;
+    };
+
+    // ── Acknowledge and the alert's own mute (MK-3) ─────────────────────────
+    const alertActions = useAlertActions();
+    const extendUntilOpen = ref(false);
+    const extendUntilRow = ref<any>(null);
+
+    // Anomaly configs have no alert-scoped routes, so they keep the generic downtime mute.
+    const isAlertScopedMute = (row: any): boolean => row?.type !== "anomaly";
+
+    const rowActionTarget = (row: any): AlertActionTarget => ({
+      alertId: String(row.alert_id),
+      name: row.name,
+      folderId: row.folder_name?.id || undefined,
+    });
+
+    const rowMuteRef = (row: any): AlertMuteRef | null =>
+      row?.active_downtime
+        ? {
+            id: row.active_downtime.id,
+            ends_at: row.active_downtime.ends_at,
+            version: row.active_downtime.version,
+          }
+        : null;
+
+    // A multi-alert is offered Acknowledge while any firing group is still un-acked.
+    const canAcknowledgeRow = (row: any): boolean => {
+      if (!isAlertScopedMute(row) || !isFiringRow(row)) return false;
+      if (!row.ack) return true;
+      return !!row.multi_alert && (row.ack.groups_acked ?? 0) < (row.groups_firing ?? 0);
+    };
+
+    const refreshAfter = async (ok: boolean) => {
+      if (ok) await refreshAlerts();
+      return ok;
+    };
+
+    const acknowledgeRow = async (row: any) =>
+      refreshAfter(
+        await alertActions.acknowledge(
+          rowActionTarget(row),
+          row.multi_alert ? { allGroups: true } : {},
+        ),
+      );
+
+    const muteRowWith = async (row: any, end: AlertMuteEnd) =>
+      refreshAfter(await alertActions.mute(rowActionTarget(row), end));
+
+    const muteRowFor = async (row: any, seconds: number) =>
+      isAlertScopedMute(row)
+        ? muteRowWith(row, { minutes: Math.round(seconds / 60) })
+        : muteAndRefresh([row], seconds);
+
+    const muteRowUntilClear = (row: any) => muteRowWith(row, { untilClear: true });
+
+    const extendRow = async (row: any, end: AlertMuteEnd) => {
+      const downtime = rowMuteRef(row);
+      if (!downtime) return false;
+      return refreshAfter(await alertActions.extend(rowActionTarget(row), downtime, end));
+    };
+
+    const endRowMute = async (row: any) => {
+      const downtime = rowMuteRef(row);
+      if (!downtime) return false;
+      return refreshAfter(await alertActions.endMute(rowActionTarget(row), downtime.id));
+    };
+
+    // Until… for one alert opens the alert-scoped Quick Mute, so an on-call responder can use it.
+    const muteAlertContext = ref<QuickMuteAlertContext | null>(null);
+
+    const openRowMuteDialog = (row: any) => {
+      muteAlertContext.value = isAlertScopedMute(row) ? rowActionTarget(row) : null;
+      openMuteDialog([row]);
+    };
+
+    const bulkMuteAlert = computed(() =>
+      selectedAlerts.value.length === 1 && isAlertScopedMute(selectedAlerts.value[0])
+        ? selectedAlerts.value[0]
+        : null,
+    );
+
+    const openBulkMuteDialog = () => {
+      if (bulkMuteAlert.value) {
+        openRowMuteDialog(bulkMuteAlert.value);
+        return;
+      }
+      muteAlertContext.value = null;
+      openMuteDialog(selectedAlerts.value);
+    };
+
+    const openExtendUntil = (row: any) => {
+      extendUntilRow.value = row;
+      extendUntilOpen.value = true;
     };
 
     const refreshAlerts = async () => {
@@ -3957,6 +4137,23 @@ export default defineComponent({
       alertStateLoadingMap,
       showRunOutcome,
       isMutedFiring,
+      isAckedFiring,
+      canAcknowledgeRow,
+      acknowledgeRow,
+      isAlertScopedMute,
+      rowActionTarget,
+      rowMuteRef,
+      muteAlertContext,
+      openRowMuteDialog,
+      bulkMuteAlert,
+      openBulkMuteDialog,
+      muteRowFor,
+      muteRowUntilClear,
+      extendRow,
+      endRowMute,
+      openExtendUntil,
+      extendUntilOpen,
+      extendUntilRow,
       runOutcomeTooltip,
       toggleAlertState,
       templates,

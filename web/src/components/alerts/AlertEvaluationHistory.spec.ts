@@ -106,6 +106,15 @@ describe("AlertEvaluationHistory", () => {
     expect(wrapper.text()).toContain("231ms");
   });
 
+  it("reads a run an ack kept quiet as Acknowledged, the word Alert history uses", async () => {
+    wrapper = await mountComp({
+      hits: [makeEvaluation({ status: "suppressed", acked_by: "bob@acme.io" })],
+    });
+    expect(wrapper.find('[data-test="alerts-alertevaluationhistory-status"]').text()).toContain(
+      "Acknowledged",
+    );
+  });
+
   it("renders the retries count so retried deliveries are distinguishable from separate evaluations", async () => {
     wrapper = await mountComp({
       hits: [

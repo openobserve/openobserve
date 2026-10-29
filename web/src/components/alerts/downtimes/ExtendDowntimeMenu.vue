@@ -35,8 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <MuteMenuItems
       labels="extend"
       :data-test-prefix="dataTest"
+      :until-clear="untilClear"
       @preset="(secs) => emit('preset', secs)"
       @until="emit('until')"
+      @until-clear="emit('untilClear')"
     />
   </ODropdown>
   <OButton
@@ -64,13 +66,16 @@ withDefaults(
     /** An icon button for a table row; otherwise a labelled header button. */
     compact?: boolean;
     dataTest?: string;
+    /** Offer Until it clears first; only an alert's own mute can end on its clear. */
+    untilClear?: boolean;
   }>(),
-  { compact: false, dataTest: "downtime-extend" },
+  { compact: false, dataTest: "downtime-extend", untilClear: false },
 );
 
 const emit = defineEmits<{
   preset: [seconds: number];
   until: [];
+  untilClear: [];
 }>();
 
 const { t } = useI18nTyped();

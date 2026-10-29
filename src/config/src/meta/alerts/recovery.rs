@@ -20,8 +20,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::state::AlertState;
-use crate::meta::alerts::level::AlertLevel;
+use super::state::{AlertState, apply_outcome};
+use crate::meta::{alerts::level::AlertLevel, self_reporting::usage::RunOutcome};
 
 /// Microseconds in a second, for `keep_firing_for`.
 const MICROS_PER_SECOND: i64 = 1_000_000;
@@ -44,6 +44,9 @@ pub struct RecoveryEvent {
     pub emitted_at: i64,
     pub last_notified_level: Option<AlertLevel>,
     pub group_labels: Option<String>,
+    /// The firing cycle that ended, the key of its Slack messages.
+    #[serde(default)]
+    pub firing_started_at: Option<i64>,
 }
 
 impl RecoveryEvent {
@@ -87,6 +90,14 @@ pub struct ClosedEpisode {
     pub incident_id: Option<String>,
     pub opened_at: i64,
     pub recovered_at: i64,
+}
+
+/// A firing cycle (`firing_started_at` set → null) that one write ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FiringCycleClose {
+    pub firing_started_at: i64,
+    /// When the condition first cleared: a `keep_firing_for` hold's start, else the run's time.
+    pub cleared_at: i64,
 }
 
 /// `firing` is the RECORDED level's verdict, not the raw match, so a frozen evaluation stays firing
@@ -159,7 +170,62 @@ pub fn recovery_event(
         emitted_at,
         last_notified_level: state.last_notified_level,
         group_labels: state.group_labels.clone(),
+        firing_started_at: state.firing_started_at,
     }
+}
+
+/// `keep_firing_for` holds the firing cycle open exactly as long as it holds the episode (R-115).
+pub fn hold_firing_cycle(prev: Option<&AlertState>, state: &mut AlertState) {
+    // `apply_episode` leaves `recovering_since` set only while the hold is still open.
+    if state.recovering_since.is_some() && state.firing_started_at.is_none() {
+        state.firing_started_at = prev.and_then(|p| p.firing_started_at);
+    }
+}
+
+/// The firing cycle a write ends, if any: `prev` had one and `next` has none.
+pub fn closes_firing_cycle(
+    prev: Option<&AlertState>,
+    next: Option<&AlertState>,
+    now: i64,
+) -> Option<FiringCycleClose> {
+    let prev = prev?;
+    let firing_started_at = prev.firing_started_at?;
+    if next?.firing_started_at.is_some() {
+        return None;
+    }
+    Some(FiringCycleClose {
+        firing_started_at,
+        cleared_at: prev.recovering_since.unwrap_or(now),
+    })
+}
+
+/// What a single-row clear run closes, decided from the stored row before the run persists.
+pub fn single_row_clear(
+    prev: Option<&AlertState>,
+    level: Option<AlertLevel>,
+    keep_firing_for_secs: i64,
+    at: i64,
+) -> Option<FiringCycleClose> {
+    let prev_state = prev?;
+    let mut next = apply_outcome(
+        &prev_state.alert_id,
+        &prev_state.group_key,
+        prev,
+        RunOutcome::Normal,
+        level,
+        at,
+    )
+    .state?;
+    let firing = next.level.is_some_and(|l| l.is_firing());
+    apply_episode(
+        &mut next,
+        firing,
+        &EpisodeInput::undelivered(keep_firing_for_secs),
+        at,
+        String::new,
+    );
+    hold_firing_cycle(prev, &mut next);
+    closes_firing_cycle(prev, Some(&next), at)
 }
 
 #[cfg(test)]
@@ -327,5 +393,118 @@ mod tests {
         apply_episode(&mut s, true, &delivered(), 20, || "ep_2".into());
         assert_eq!(s.episode_id.as_deref(), Some("ep_2"));
         assert_eq!(s.episode_opened_at, Some(20));
+    }
+
+    const MIN: i64 = 60 * MICROS_PER_SECOND;
+
+    /// One single-row evaluation in the order the scheduler persists it.
+    fn evaluate(prev: Option<&AlertState>, firing: bool, hold_secs: i64, at: i64) -> AlertState {
+        let (outcome, level) = if firing {
+            (RunOutcome::Firing, AlertLevel::Critical)
+        } else {
+            (RunOutcome::Normal, AlertLevel::Ok)
+        };
+        let mut next = apply_outcome("alert_1", "", prev, outcome, Some(level), at)
+            .state
+            .unwrap();
+        let input = EpisodeInput {
+            delivered: firing,
+            keep_firing_for_secs: hold_secs,
+            ..EpisodeInput::undelivered(hold_secs)
+        };
+        apply_episode(&mut next, firing, &input, at, || "ep".into());
+        hold_firing_cycle(prev, &mut next);
+        next
+    }
+
+    /// AC-P2.1.3
+    #[test]
+    fn keep_firing_for_holds_the_firing_cycle_until_the_episode_closes() {
+        let hold = 300;
+        let mut s = evaluate(None, true, hold, 0);
+        assert_eq!(s.firing_started_at, Some(0));
+
+        // Normal for 2 minutes, then a re-fire inside the hold: the same firing.
+        for minute in [1, 2] {
+            let predicted = single_row_clear(Some(&s), Some(AlertLevel::Ok), hold, minute * MIN);
+            assert_eq!(predicted, None, "minute {minute} is inside the hold");
+            s = evaluate(Some(&s), false, hold, minute * MIN);
+            assert_eq!(s.firing_started_at, Some(0), "held at minute {minute}");
+        }
+        s = evaluate(Some(&s), true, hold, 3 * MIN);
+        assert_eq!(
+            s.firing_started_at,
+            Some(0),
+            "a re-fire inside the hold keeps it"
+        );
+
+        // Normal for 6 minutes: still set while held, cleared on the run that ends the hold.
+        for minute in 4..9 {
+            s = evaluate(Some(&s), false, hold, minute * MIN);
+            assert_eq!(s.firing_started_at, Some(0), "held at minute {minute}");
+        }
+        let predicted = single_row_clear(Some(&s), Some(AlertLevel::Ok), hold, 9 * MIN);
+        let next = evaluate(Some(&s), false, hold, 9 * MIN);
+        assert_eq!(next.firing_started_at, None);
+        let close = closes_firing_cycle(Some(&s), Some(&next), 9 * MIN);
+        assert_eq!(
+            close,
+            Some(FiringCycleClose {
+                firing_started_at: 0,
+                cleared_at: 4 * MIN,
+            }),
+            "the clear is dated to the first clear, not the end of the hold"
+        );
+        assert_eq!(
+            predicted, close,
+            "the pre-persist prediction matches the write"
+        );
+    }
+
+    #[test]
+    fn without_a_hold_the_first_normal_closes_the_cycle_at_the_run() {
+        let s = evaluate(None, true, 0, 0);
+        let next = evaluate(Some(&s), false, 0, MIN);
+        let close = Some(FiringCycleClose {
+            firing_started_at: 0,
+            cleared_at: MIN,
+        });
+        assert_eq!(closes_firing_cycle(Some(&s), Some(&next), MIN), close);
+        assert_eq!(
+            single_row_clear(Some(&s), Some(AlertLevel::Ok), 0, MIN),
+            close
+        );
+        assert_eq!(closes_firing_cycle(Some(&next), Some(&next), 2 * MIN), None);
+    }
+
+    #[test]
+    fn an_undelivered_firing_has_no_episode_to_hold_and_closes_at_once() {
+        let mut s = apply_outcome(
+            "alert_1",
+            "",
+            None,
+            RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            0,
+        )
+        .state
+        .unwrap();
+        apply_episode(&mut s, true, &EpisodeInput::undelivered(300), 0, || {
+            "x".into()
+        });
+        assert_eq!(
+            single_row_clear(Some(&s), Some(AlertLevel::Ok), 300, MIN),
+            Some(FiringCycleClose {
+                firing_started_at: 0,
+                cleared_at: MIN,
+            })
+        );
+    }
+
+    #[test]
+    fn a_frozen_clear_run_closes_nothing() {
+        let s = evaluate(None, true, 0, 0);
+        assert_eq!(single_row_clear(Some(&s), None, 0, MIN), None);
+        assert_eq!(single_row_clear(None, Some(AlertLevel::Ok), 0, MIN), None);
     }
 }
