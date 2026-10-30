@@ -86,6 +86,20 @@ pub async fn set_session(session_id: &str, val: &str) -> Option<()> {
     }
 }
 
+/// Creates a native-login session with an explicit absolute lifetime.
+/// Returns an opaque session identifier, never the underlying Basic credentials.
+pub async fn create_native_session(
+    access_token: &str,
+    lifetime_seconds: i64,
+) -> Result<String, anyhow::Error> {
+    let session_id = ider::uuid();
+    let expires_at = chrono::Utc::now()
+        .timestamp_micros()
+        .saturating_add(lifetime_seconds.max(1).saturating_mul(1_000_000));
+    db::session::set_with_expiry(&session_id, access_token, expires_at).await?;
+    Ok(session_id)
+}
+
 pub async fn remove_session(session_id: &str) {
     let _ = db::session::delete(session_id).await;
 }
