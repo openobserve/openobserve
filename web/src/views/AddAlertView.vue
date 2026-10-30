@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="h-full max-h-full overflow-hidden">
     <AddAlert
-      v-if="!isLoadingAlert"
+      v-if="!isLoadingAlert && !loadFailed"
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
@@ -41,6 +41,11 @@ import AddAlert from "@/components/alerts/AddAlert.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import {
+  dropDraftOfMissingAlert,
+  isNotFoundError,
+  type AlertSavedOptions,
+} from "@/utils/alerts/alertEditorDraft";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -65,6 +70,8 @@ export default defineComponent({
     // handed over by the list, so editing no longer has to route through it.
     const editedAlert = ref<Record<string, any> | undefined>(undefined);
     const isLoadingAlert = ref(false);
+    // Kept off screen while the view redirects, so an empty form never offers the new-alert draft.
+    const loadFailed = ref(false);
 
     /**
      * Fetch the alert being edited. The form takes its edit prefill from
@@ -82,10 +89,24 @@ export default defineComponent({
         );
         isUpdated.value = true;
       } catch (error) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.views.errorWhileLoadingAlert"),
-        });
+        loadFailed.value = true;
+        const draftDropped =
+          isNotFoundError(error) &&
+          dropDraftOfMissingAlert({
+            org: String(store.state.selectedOrganization?.identifier ?? ""),
+            entityId: alertId,
+            userEmail: String(store.state.userInfo?.email ?? ""),
+          });
+        toast(
+          draftDropped
+            ? {
+                variant: "info",
+                message: t("common.editorDraft.itemDeleted", {
+                  entity: t("common.editorDraft.entities.alert"),
+                }),
+              }
+            : { variant: "error", message: t("toastMessages.views.errorWhileLoadingAlert") },
+        );
         // Nothing to edit — send them somewhere that works rather than leaving
         // an empty form that would save as a NEW alert. Unless the user has
         // already moved on, in which case this page has no say in where they are.
@@ -124,7 +145,7 @@ export default defineComponent({
       await getDestinations();
     };
 
-    const handleUpdateList = (folderId?: string) => {
+    const handleUpdateList = (folderId?: string, options?: AlertSavedOptions) => {
       const resolvedFolder = folderId || (route.query.folder as string) || "default";
 
       // The prefill has been consumed into a saved alert — retiring it here
@@ -144,6 +165,9 @@ export default defineComponent({
         const { [resolvedFolder]: _, ...rest } = cached;
         store.dispatch("setAllAlertsListByFolderId", rest);
       }
+
+      // The leave dialog's Save is already on its way somewhere else.
+      if (options?.navigate === false) return;
 
       // Navigate back to alert list after successful save
       router.push({
@@ -180,6 +204,7 @@ export default defineComponent({
       isUpdated,
       editedAlert,
       isLoadingAlert,
+      loadFailed,
       getDestinations,
       refreshDestinations,
       handleUpdateList,

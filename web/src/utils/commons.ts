@@ -34,6 +34,7 @@ import commonService from "../services/common";
 import { gt, type TranslateFn } from "@/types/i18n";
 import { findPanelById } from "./dashboard/findPanel";
 import { deletePanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { toRaw, type Ref } from "vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { pruneAnnotationSourcePanels } from "@/utils/dashboard/pruneAnnotationSourcePanels";
@@ -921,6 +922,11 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
     org: store.state.selectedOrganization.identifier,
     dashboardId: String(dashboardId),
   });
+  deleteEditorDraftsFor({
+    kind: "dashboard_settings",
+    org: store.state.selectedOrganization.identifier,
+    entityId: String(dashboardId),
+  });
 
   const allDashboardData = store.state.organizationData.allDashboardData;
 
@@ -961,6 +967,11 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
     for (const id of ids) {
       void dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, id);
       deletePanelDraftsFor({ org: store.state.selectedOrganization.identifier, dashboardId: id });
+      deleteEditorDraftsFor({
+        kind: "dashboard_settings",
+        org: store.state.selectedOrganization.identifier,
+        entityId: id,
+      });
     }
 
     const cached = next[folderId];

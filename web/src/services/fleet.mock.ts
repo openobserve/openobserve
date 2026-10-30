@@ -797,19 +797,6 @@ export const fleetMock: FleetApi = {
     store.fleets = store.fleets.filter((f) => f.id !== id);
     return reply(undefined as unknown);
   },
-  moveCollectors: (_org, ids, to) => {
-    const fleet = store.fleets.find((f) => f.id === to);
-    if (!fleet) return fail(404, "fleet not found");
-    const stable = fleet.state?.stable;
-    for (const c of store.collectors) {
-      if (!ids.includes(c.id)) continue;
-      c.fleet = { id: fleet.id, name: fleet.name };
-      c.config = stable?.config ?? null;
-      c.config_version = stable?.version ?? null;
-      c.delivery = stable ? "assigned" : null;
-    }
-    return reply({ moved: ids.length });
-  },
   getFleetSettings: (_org, id) => {
     const f = store.fleets.find((x) => x.id === id);
     return f ? reply(f.settings) : fail(404, "fleet not found");

@@ -18,6 +18,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
 import { computeStepSeconds } from "@/utils/metrics/metricDefaults";
 import { promqlSeriesCap } from "@/utils/dashboard/convertStateTimelineData";
+import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
 import { parseSearchError } from "@/utils/query/searchError";
 import { gt } from "@/types/i18n";
@@ -303,10 +304,9 @@ export const usePanelPromQLExecutor = (ctx: {
                       ? panelStepValue
                       : (heatmapStepValue ?? "0"),
                   // A state timeline needs samples over time, so it ignores a stored instant setting.
-                  query_type:
-                    panelSchema.value?.type === "state-timeline"
-                      ? "range"
-                      : it.config.query_type || "range",
+                  query_type: isRowTimeline(panelSchema.value?.type)
+                    ? "range"
+                    : it.config.query_type || "range",
                 },
                 type: "promql" as const,
                 traceId: traceId,

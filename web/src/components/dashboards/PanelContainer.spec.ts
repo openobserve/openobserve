@@ -1075,6 +1075,18 @@ describe("PanelContainer", () => {
       expect(prefill.name).toBe("Alert_from_My_Panel");
     });
 
+    it("offers alert creation once a query ran, but never on an alert list", async () => {
+      wrapper = createWrapper({ data: { ...mockPanelData, type: "line" } });
+      expect(wrapper.vm.canCreateAlert).toBe(false);
+      await wrapper.vm.metaDataValue({ queries: [{ query: "SELECT 1", panelQueryIndex: 0 }] });
+      expect(wrapper.vm.canCreateAlert).toBe(true);
+
+      wrapper.unmount();
+      wrapper = createWrapper({ data: { ...mockPanelData, type: "alert-list" } });
+      await wrapper.vm.metaDataValue({ queries: [{ query: "", panelQueryIndex: 0 }] });
+      expect(wrapper.vm.canCreateAlert).toBe(false);
+    });
+
     it("uses the executed query, and lets the user pick between two queries", async () => {
       const twoQueries = {
         ...mockPanelData,
