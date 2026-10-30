@@ -206,9 +206,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ getPanelTitle(item) }}
                   </OTruncatedText>
                 </PanelBar>
-                <div class="min-h-0 flex-1 p-2">
-                  <OSkeleton class="h-full" />
-                </div>
               </div>
               <!-- Panel with Panel-Level Variables -->
               <div v-else class="panel-with-variables flex h-full flex-col">
@@ -405,7 +402,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import type { LayoutMode } from "@/components/dashboards/layoutMode";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 
 // Must match the cellHeight GridStack is initialised with below.
@@ -528,7 +524,6 @@ export default defineComponent({
     TabList,
     ODialog,
     OTruncatedText,
-    OSkeleton,
     PanelBar,
   },
   setup(props: any, { emit }) {
