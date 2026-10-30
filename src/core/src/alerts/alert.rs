@@ -4436,6 +4436,7 @@ async fn build_notification_context(
         stream_name: alert.stream_name.clone(),
         alert_name: alert.name.clone(),
         alert_id: alert.id.map(|id| id.to_string()).unwrap_or_default(),
+        incident_id: String::new(),
         alert_type: alert_type.to_string(),
         alert_period: alert.trigger_condition.period.to_string(),
         alert_operator: alert.trigger_condition.operator.to_string(),

@@ -689,10 +689,12 @@ fn context_value<'a>(ctx: &'a NotificationContext, key: &str) -> Option<&'a str>
 }
 
 fn issue_label(ctx: &NotificationContext) -> Option<String> {
-    match context_value(ctx, "incident_id") {
-        Some(incident_id) => Some(format!("openobserve-incident-{incident_id}")),
-        None if !ctx.alert_id.is_empty() => Some(format!("openobserve-alert-{}", ctx.alert_id)),
-        None => None,
+    if !ctx.incident_id.is_empty() {
+        Some(format!("openobserve-incident-{}", ctx.incident_id))
+    } else if !ctx.alert_id.is_empty() {
+        Some(format!("openobserve-alert-{}", ctx.alert_id))
+    } else {
+        None
     }
 }
 
@@ -715,7 +717,7 @@ fn utc(time: Option<chrono::DateTime<chrono::Utc>>) -> Option<String> {
 }
 
 fn summary(ctx: &NotificationContext) -> String {
-    let text = if context_value(ctx, "incident_id").is_some() {
+    let text = if !ctx.incident_id.is_empty() {
         let title = context_value(ctx, "incident_title").unwrap_or(&ctx.alert_name);
         format!("Incident: {title}")
     } else {
@@ -831,7 +833,7 @@ fn comment(ctx: &NotificationContext) -> String {
             format!(" {label}: {}", ctx.alert_url)
         }
     };
-    if context_value(ctx, "incident_id").is_some() {
+    if !ctx.incident_id.is_empty() {
         let event = context_value(ctx, "incident_event").unwrap_or_default();
         let severity = context_value(ctx, "incident_severity").unwrap_or_default();
         let what = match (event, severity) {
@@ -915,6 +917,7 @@ mod tests {
     fn incident_ctx(event: &str) -> NotificationContext {
         let mut ctx = alert_ctx();
         ctx.alert_name = "Payment latency".into();
+        ctx.incident_id = "inc-7".into();
         ctx.context_attributes = [
             ("incident_id", "inc-7"),
             ("incident_title", "Checkout degraded"),
@@ -1075,6 +1078,15 @@ mod tests {
             "openobserve-incident-inc-7"
         );
         assert_eq!(issue_label(&NotificationContext::default()), None);
+        let mut claims_incident = alert_ctx();
+        claims_incident.context_attributes =
+            incident_ctx("new_incident_created").context_attributes;
+        assert_eq!(
+            issue_label(&claims_incident).unwrap(),
+            "openobserve-alert-2nX8bQk3LpT0"
+        );
+        assert_eq!(summary(&claims_incident), "Checkout 5xx errors is firing");
+        assert!(comment(&claims_incident).starts_with("[OpenObserve] Still firing"));
         assert_eq!(
             jql("OPS", "openobserve-alert-2nX8bQk3LpT0"),
             r#"project = "OPS" AND labels = "openobserve-alert-2nX8bQk3LpT0" AND statusCategory != Done ORDER BY created DESC"#

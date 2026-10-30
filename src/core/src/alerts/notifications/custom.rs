@@ -563,6 +563,7 @@ mod golden {
             chart_url: None,
             chart_png: None,
             alert_id: String::new(),
+            incident_id: String::new(),
         }
     }
 

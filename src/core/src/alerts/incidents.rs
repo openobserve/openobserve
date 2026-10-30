@@ -525,6 +525,7 @@ fn apply_incident_to_context(
 ) {
     // The alert's own link points at its search; an incident notification must open the incident.
     ctx.alert_url = incident_url.to_string();
+    ctx.incident_id = incident_id.to_string();
     ctx.context_attributes.extend(
         [
             ("incident_id", incident_id),
@@ -4471,6 +4472,7 @@ mod tests {
             incident_url,
         );
         assert_eq!(ctx.alert_url, incident_url);
+        assert_eq!(ctx.incident_id, "inc-1");
 
         let content = resolve_content(
             &compiled_default_content(),

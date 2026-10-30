@@ -40,6 +40,8 @@ pub struct NotificationContext {
     pub alert_name: String,
     /// The composite's id for a composite alert; empty when no alert stands behind the send.
     pub alert_id: String,
+    /// Set only by the incident sender, so alert attributes cannot claim an incident's ticket.
+    pub incident_id: String,
     /// "realtime" | "scheduled"
     pub alert_type: String,
     pub alert_period: String,
