@@ -409,10 +409,14 @@ test.describe("Pre-Test Cleanup", () => {
       [
         /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
         /^trace_genai_parts_/,         // trace_genai_parts_* (GenAI v5 parts rendering test streams)
+        /^e2e_prof_trace_/,            // Profiles/profiles-navigation-entry.spec.js linked-span traces stream
       ],
       ['default'],                     // protect the default traces stream
       { streamType: 'traces' }
     );
+
+    // Profiles specs delete their e2e_prof_* streams in afterAll; this sweeps what a crashed run left behind.
+    await pm.apiCleanup.cleanupStreams([/^e2e_prof_/], ['default'], { streamType: 'profiles' });
 
     // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)
     // are created by pipeline-regression.spec.js for Issue #9901 regression tests.
