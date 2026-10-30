@@ -15,6 +15,7 @@
 
 mod duration;
 mod humanize;
+mod map;
 mod numeric;
 mod percentage;
 mod size;
@@ -141,6 +142,9 @@ fn format_modifier(input: &str, function: &str) -> Option<String> {
     }
     if let Some(args) = function.strip_prefix("formatTimestamp") {
         return timestamp::format(input, args, false);
+    }
+    if let Some(args) = function.strip_prefix("map") {
+        return map::format(input, args);
     }
     match function {
         "humanize" => humanize::format(input, false),
