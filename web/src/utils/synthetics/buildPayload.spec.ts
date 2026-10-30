@@ -115,3 +115,68 @@ describe("environments round-trip", () => {
     expect(mapped.environments).toEqual(["env-1"]);
   });
 });
+
+describe("browser config extras (UI-04)", () => {
+  const stored = {
+    name: "api made",
+    target: "https://app.test",
+    enabled: true,
+    tags: [],
+    locations: ["us-east"],
+    frequency: { type: "minutes", interval: 5, cron: "" },
+    config: {
+      steps: [],
+      timeout_ms: 90000,
+      journey_budget_ms: 120000,
+      test_id_attr: "data-qa",
+      runtime: "playwright-1.50",
+      capture: { screenshot: "always", trace: "on-fail", video: "on" },
+      headers: [{ name: "Authorization", value: "Bearer secret" }],
+      secret_blob: "do-not-spread",
+    },
+  };
+
+  it("uses defaults on create", () => {
+    const config = buildCreateBrowserTestPayload(check()).config as Record<string, any>;
+    expect(config.timeout_ms).toBe(30000);
+    expect(config.capture.video).toBe("off");
+    expect("journey_budget_ms" in config).toBe(false);
+    expect("test_id_attr" in config).toBe(false);
+    expect("runtime" in config).toBe(false);
+  });
+
+  it("preserves API-set fields across an unrelated name edit", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    const config = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" }).config as Record<
+      string,
+      any
+    >;
+    expect(config.timeout_ms).toBe(90000);
+    expect(config.journey_budget_ms).toBe(120000);
+    expect(config.test_id_attr).toBe("data-qa");
+    expect(config.runtime).toBe("playwright-1.50");
+    expect(config.capture.video).toBe("on");
+  });
+
+  it("does not leak unsupported config keys into the extras", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    expect(Object.keys(loaded.browserConfigExtras ?? {}).sort()).toEqual([
+      "journey_budget_ms",
+      "runtime",
+      "test_id_attr",
+      "timeout_ms",
+      "video",
+    ]);
+    expect(JSON.stringify(loaded.browserConfigExtras)).not.toContain("do-not-spread");
+  });
+
+  it("still applies intentional capture edits", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    const config = buildCreateBrowserTestPayload({
+      ...loaded,
+      capture: { screenshot: "off", trace: "off" },
+    }).config as Record<string, any>;
+    expect(config.capture.screenshot).toBe("off");
+    expect(config.capture.video).toBe("on");
+  });
+});

@@ -37,6 +37,11 @@ vi.mock("@/services/oncall", () => ({
   },
 }));
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  toast,
+}));
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({
@@ -627,9 +632,16 @@ describe("OnCallPolicyEditor", () => {
       const wrapper = render();
       await flushPromises();
 
+      // "Use the policy's list" is part of the draft, written by the one Save.
       await wrapper.find('[data-test="oncall-team-channel-clear"]').trigger("click");
       await flushPromises();
+      expect(service.setTeamChannel).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="oncall-team-channel-source"]').text()).toContain(
+        "from the policy",
+      );
 
+      await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+      await flushPromises();
       expect(service.setTeamChannel).toHaveBeenCalledWith(
         expect.objectContaining({ data: { destinations: null } }),
       );
@@ -642,6 +654,78 @@ describe("OnCallPolicyEditor", () => {
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-team-channel-silent"]').exists()).toBe(true);
+    });
+
+    // S13: an empty list inherited from the policy is not the team's choice, so it is not called one.
+    it("does not call an inherited empty list empty on purpose", async () => {
+      service.getTeamChannel.mockResolvedValue({
+        data: { team_id: "team_1", destinations: [], source: "policy" },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-team-channel-silent"]').exists()).toBe(false);
+    });
+
+    // S13: one Save in the drawer, writing the channel only when it changed.
+    describe("one Save", () => {
+      const channelSelect = (wrapper: any) =>
+        wrapper.findComponent('[data-test="oncall-team-channel-select"]');
+
+      it("has no second Save beside the channel", async () => {
+        const wrapper = render();
+        await flushPromises();
+        expect(wrapper.find('[data-test="oncall-team-channel-save"]').exists()).toBe(false);
+      });
+
+      it("writes the policy, then the changed channel", async () => {
+        service.setTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["slack-ops"], source: "team" },
+        } as any);
+        const wrapper = render();
+        await flushPromises();
+        channelSelect(wrapper).vm.$emit("update:modelValue", ["slack-ops"]);
+        await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+        await flushPromises();
+
+        expect(service.setPolicy).toHaveBeenCalledOnce();
+        expect(service.setTeamChannel).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { destinations: ["slack-ops"] } }),
+        );
+        expect(service.setPolicy.mock.invocationCallOrder[0]).toBeLessThan(
+          service.setTeamChannel.mock.invocationCallOrder[0],
+        );
+        expect(wrapper.emitted("saved")).toHaveLength(1);
+      });
+
+      it("leaves an untouched channel alone", async () => {
+        const wrapper = render();
+        await flushPromises();
+        await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+        await flushPromises();
+
+        expect(service.setPolicy).toHaveBeenCalledOnce();
+        expect(service.setTeamChannel).not.toHaveBeenCalled();
+      });
+
+      it("stays open and names the part that did not save", async () => {
+        service.setTeamChannel.mockRejectedValue(new Error("boom"));
+        const wrapper = render();
+        await flushPromises();
+        channelSelect(wrapper).vm.$emit("update:modelValue", ["slack-ops"]);
+        await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+        await flushPromises();
+
+        expect(service.setPolicy).toHaveBeenCalledOnce();
+        expect(wrapper.emitted("saved")).toBeUndefined();
+        // The ladder behind the drawer is stale now, so the parent is told to re-read it.
+        expect(wrapper.emitted("policy-written")).toHaveLength(1);
+        expect(toast).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            variant: "error",
+            message: "The policy saved, but the team channel did not. Save again to retry it.",
+          }),
+        );
+      });
     });
   });
 });

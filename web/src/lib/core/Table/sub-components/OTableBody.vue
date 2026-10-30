@@ -4,6 +4,8 @@
 import type { Row, Table } from "@tanstack/vue-table";
 import { computed, ref, watch, useSlots } from "vue";
 import OTableBodyRow from "./OTableBodyRow.vue";
+// Rows fade only when the body mounts, i.e. when they replace the skeleton or empty state, never on sort or paging.
+import { ENTER_FADE } from "@/lib/styles/motion";
 import { VueDraggableNext } from "vue-draggable-next";
 
 const props = defineProps<{
@@ -225,6 +227,7 @@ const headingColspan = computed(
     v-model="draggableModel"
     :item-key="rowKey || 'id'"
     tag="tbody"
+    :class="ENTER_FADE"
     handle="[data-test='o2-table-row-drag-handle']"
     :animation="200"
     ghost-class="table-drag-ghost"
@@ -284,7 +287,7 @@ const headingColspan = computed(
 
   <!-- Normal (non-virtual, non-draggable) body. One loop over heading-or-row
        items, so sectioned and unsectioned bodies share the row markup. -->
-  <tbody v-else-if="!isVirtual()" data-test="o2-table-body">
+  <tbody v-else-if="!isVirtual()" :class="ENTER_FADE" data-test="o2-table-body">
     <slot name="body-start" />
     <template v-for="item in plainBodyItems" :key="item.itemKey">
       <!-- Spans every visible column: a heading is about the run below it, not
@@ -351,7 +354,7 @@ const headingColspan = computed(
   <!-- Virtual scroll body: rows stay in flow; top/bottom spacer rows
        reserve the offset above first and below last visible row so cells
        inherit the parent table's column layout (same as non-virtual). -->
-  <tbody v-else data-test="o2-table-body">
+  <tbody v-else :class="ENTER_FADE" data-test="o2-table-body">
     <slot name="body-start" />
     <tr v-if="virtualRows && virtualRows.length && virtualRows[0].start > 0" aria-hidden="true">
       <td
