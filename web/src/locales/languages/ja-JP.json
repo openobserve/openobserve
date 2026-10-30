@@ -10001,8 +10001,8 @@
       "raiseThresholdDesc": "トリガー値を観測された定常状態から遠ざけます。",
       "lengthenEvaluationWindow": "評価ウィンドウを延長する",
       "lengthenEvaluationWindowDesc": "短時間のスパイクでアラートが作動しないよう、期間を広げます。",
-      "enableDeduplication": "重複排除を有効にする",
-      "enableDeduplicationDesc": "重複排除ウィンドウ内の繰り返し発火をまとめます。",
+      "enableDeduplication": "繰り返し通知の抑制をオンにする",
+      "enableDeduplicationDesc": "評価ごとではなく、状態変化ごとに1回通知します。",
       "reviewForDeletion": "削除を検討",
       "reviewForDeletionDesc": "アラートを廃止する前に、クエリが現状と一致しているか確認します。",
       "fixAlertQuery": "アラートクエリを修正",
@@ -10319,12 +10319,8 @@
     "organizationIdLabel": "組織ID",
     "alertCreationTitle": "アラートの作成",
     "noAlertsFound": "アラートが見つかりません",
-    "suppressedByDeduplication": "重複排除により抑制されました",
-    "occurrence": "{count} 件 | {count} 件",
     "groupedNotification": "グループ化された通知",
     "alertsBatchedTogether": "アラートが一括でバッチ処理されました",
-    "notificationSent": "通知が送信されました",
-    "occurrencesDeduplicated": "重複排除された発生",
     "alertExecutionDetails": "アラート実行の詳細",
     "evaluationTime": "評価時間",
     "queryTime": "クエリ時間",
@@ -10374,15 +10370,7 @@
     "serviceGraphTooltipTo": "終了: {time}",
     "serviceGraphTooltipTemporalCorrelation": "時間的相関",
     "serviceGraphTooltipServiceDependency": "サービス依存関係",
-    "totalAlerts": "合計アラート",
-    "usingDeduplication": "重複排除を使用中",
-    "deduplicationConfiguredTooltip": "重複排除が設定されたアラート",
-    "suppressionRate24h": "抑制率（24h）",
     "suppressed": "抑制済み /",
-    "total": "合計",
-    "passedLabel": "成功:",
-    "pendingBatches": "保留中のバッチ",
-    "pendingBatchesTooltip": "グループ化待ちのアラート",
     "historyTimeline": {
       "firing": "発火中",
       "ok": "OK",
@@ -10403,7 +10391,8 @@
     "endTime": "終了時刻",
     "duration": "期間",
     "retries": "再試行",
-    "dedup": "重複排除",
+    "suppression": "抑制",
+    "suppressedAsRepeat": "繰り返し通知として抑制",
     "validation": {
       "streamTypeRequired": "ストリームタイプは必須です。",
       "streamNameRequired": "ストリーム名は必須です。",
@@ -10595,15 +10584,6 @@
     "all": "すべて",
     "history": "アラート履歴",
     "searcHistory": "アラート名を入力",
-    "deduplication": {
-      "fingerprintFields": "類似アラートのグループ化基準",
-      "fingerprintFieldsHint": "アラートを類似とみなすためのフィールドを選択します（例: hostname、service）。空のままにすると、クエリに基づいて自動検出されます。",
-      "fingerprintFieldsTooltip": "アラートが重複とみなされるために一致する必要があるフィールドを選択します。たとえば 'hostname' を選択すると、同じホストからのアラートがまとめてグループ化されます。異なるアラートタイプ（例: High CPU と High Memory）は、同じホストからのものであってもグループ化されません。空のままにすると、クエリタイプに基づいて自動検出されます。",
-      "timeWindow": "同一とみなす期間",
-      "timeWindowHint": "類似アラートをグループ化する期間。空のままにすると、チェック間隔に合わせます。",
-      "timeWindowTooltip": "グループ化のために最近のアラートを記憶しておく期間。この期間内に類似のアラートが発生した場合、再送信されません。空のままにすると、アラートのチェック間隔が使用されます。",
-      "fingerprintFieldsHelp": "空のままにすると、クエリに基づいて自動検出されます（SQL: GROUP BY列、PromQL: ラベル、カスタム: 条件フィールド）"
-    },
     "summary": {
       "scrollToBottom": "最下部までスクロール",
       "title": "サマリー",
@@ -10651,38 +10631,15 @@
         "defaultConditions": "設定した条件が満たされたら通知を受け取る"
       }
     },
-    "correlation": {
-      "title": "アラート相関",
-      "description": "組織全体でアラートを相互に関連付けて重複排除する方法を設定します。フィンガープリント値が一致するアラートは 1 つのグループにまとめられます。",
-      "semanticFieldNote": "注:セマンティックフィールドマッピングは、サービス ID タブで設定されます。",
-      "enableOrgLevel": "組織レベルの重複排除を有効にする",
-      "enableOrgLevelTooltip": "この組織のすべてのアラートで重複排除機能と相関機能を有効にする",
-      "enableCrossAlert": "クロスアラート重複排除を有効にする",
-      "enableCrossAlertTooltip": "異なるアラートが同じフィンガープリントを共有している場合に相互に重複排除を許可する",
-      "fingerprintGroups": "クロスアラートフィンガープリントグループ",
-      "fingerprintGroupsTooltip": "クロスアラートフィンガープリンティングに使用するセマンティックグループを選択します。これらのディメンションで同じ値を共有するアラートは重複排除されます。",
-      "fingerprintGroupsHint": "クロスアラート重複排除の対象となるセマンティックグループを少なくとも 1 つ選択してください",
-      "fingerprintGroupsRequired": "少なくとも 1 つのセマンティックグループを選択する必要があります",
-      "defaultWindow": "デフォルト相関ウィンドウ (分)",
-      "defaultWindowTooltip": "セマンティックフィールドが一致しない場合、特定の期間のアラートとデータは関連していると見なされます",
-      "defaultWindowDescription": "セマンティックフィールドが一致しない場合、特定の期間のアラートとデータは関連していると見なされます",
-      "defaultWindowPlaceholder": "アラート期間をデフォルトで使用",
-      "cancelButton": "キャンセル",
-      "saveButton": "保存",
-      "settingsSaved": "組織の重複排除設定が正常に保存されました",
-      "settingsSaveError": "設定の保存に失敗しました"
-    },
     "placeholders": {
       "typeSomething": "何かを入力してください",
       "value": "値",
       "selectColumn": "列を選択",
       "savedFunctions": "保存済み関数",
-      "autoUsesCheckInterval": "自動 (チェック間隔を使用)",
       "addTag": "タグを追加してEnterを押してください"
     },
     "steps": {
       "compareWithPast": "過去と比較",
-      "deduplication": "重複排除",
       "advanced": "上級者向け"
     },
     "stepCaptions": {
@@ -10690,7 +10647,6 @@
       "conditions": "アラートをトリガーするもの",
       "compareWithPast": "現在の結果を別の期間のデータと比較する",
       "alertSettings": "アラートルールを設定し、通知方法を選択します。",
-      "deduplication": "類似のアラートをグループ化して、同じアラートを複数回送信しないようにします。",
       "advanced": "コンテキスト変数、説明、行テンプレート"
     },
     "failedToFetchHistory": "アラート履歴を取得できませんでした",
@@ -10713,8 +10669,6 @@
         "closeActions": "アクションを閉じる",
         "viewAlertHistory": "アラート履歴を表示",
         "actionsFor": "アクション対象:",
-        "configureDedup": "重複排除の設定",
-        "configureDedupTooltip": "このアラートの重複排除を設定",
         "editAlert": "アラートを編集",
         "editAlertTooltip": "アラート設定の編集",
         "viewHistory": "履歴を表示",
@@ -11494,6 +11448,8 @@
       "recoveryChatMessage": "新しい「解決済み」メッセージ",
       "keepFiringFor": "発火継続時間",
       "keepFiringForTooltip": "条件が解消してから復旧するまで、この時間だけ待機します。0 にすると即座に復旧します。",
+      "suppressRepeats": "繰り返し通知を抑制",
+      "suppressRepeatsTooltip": "アラートが発火し始めたときやレベルが変わったときに1回だけ通知し、評価ごとには通知しません。オフのままにすると、サイレンス期間の経過ごとにリマインダーを受け取り続けます。",
       "keepFiringForInvalid": "0 以上の秒数を入力してください",
       "keepFiringForTooLong": "最大 86400 秒（24 時間）を入力してください"
     },
@@ -13996,7 +13952,6 @@
       "identityConfigNoSets": "保存する前に、少なくとも1つのアイデンティティセットを構成してください。",
       "discoveredServicesTab": "検出されたサービス",
       "serviceDiscoveryTab": "検出ルール",
-      "alertCorrelationTab": "アラート相関",
       "fieldAliasesTab": "フィールドマッピング",
       "fieldAliasesSaved": "フィールドエイリアスが正常に保存されました",
       "fieldAliasesSaveError": "フィールドエイリアスの保存に失敗しました",
@@ -21661,7 +21616,6 @@
     "alerts": {
       "failedToNavigateToAlert": "アラートへの移動に失敗しました",
       "alertNotFound": "アラートが見つかりません",
-      "alertNotFoundInAlerts": "アラート \"{name}\" は {count} 件のアラート内に見つかりません",
       "failedToLoadAlerts": "アラートの読み込みに失敗しました",
       "alertsDeletedSuccessfully": "{count} 件のアラートが正常に削除されました | {count} 件のアラートが正常に削除されました",
       "failedToDeleteAlerts": "{count} 件のアラートの削除に失敗しました | {count} 件のアラートの削除に失敗しました",
@@ -21730,7 +21684,6 @@
       "pleaseWaitWhileLoadingTemplates": "テンプレートを読み込んでいます。お待ちください...",
       "alertSavedSuccessfully": "アラートが正常に保存されました。",
       "alertUpdatedSuccessfully": "アラートが正常に更新されました。",
-      "openingDedupConfig": "重複排除設定を開いています: {name}",
       "editingAlert": "アラートを編集中: {name}",
       "ack": {
         "acked": "{name} を確認応答しました",
@@ -26543,7 +26496,7 @@
       "logged": "記録済み"
     },
     "policy": {
-      "gateHint": "既存のアラートへの変更のうち、単独で適用されるのは重複排除のみで、以前の状態のスナップショットとレビュー期間が付きます。チェックに合格すれば保持され、失敗すればロールバックされます。それ以外はすべてワンクリック承認を待ちます。",
+      "gateHint": "既存アラートへの変更のうち、繰り返し通知の抑制をオンにする変更だけは、変更前の状態スナップショットとレビュー期間を伴って自動的に適用されます。チェックに合格すれば維持され、失敗すればロールバックされます。それ以外はすべてワンクリック承認を待ちます。",
       "off": "オフ",
       "suggest": "提案",
       "auto": "自動",
@@ -26562,7 +26515,7 @@
         "gateDesc": "調査が完了するまで最大2分間、呼び出しを保留します。フェイルオープン: トリアージがタイムアウトまたは失敗した場合は、そのまま呼び出し、調査がまだ実行中または失敗したことを伝え、原因はスレッドで続きます。"
       },
       "classes": {
-        "EnableDeduplication": "数分以内に繰り返すアラートの重複排除を有効にします。",
+        "EnableDeduplication": "評価ごとに通知するアラートの繰り返し通知の抑制をオンにします。",
         "CreateDetector": "サービスのリクエスト、エラー、レイテンシに対して異常検知を作成します。",
         "RaiseThreshold": "正常な日にも発火するしきい値を引き上げます。",
         "LengthenEvaluationWindow": "フラップするアラートの評価ウィンドウを延長します。",
@@ -27111,10 +27064,10 @@
           "on": "接続アラート"
         },
         "L-302": {
-          "done": "checkout レイテンシの 3 つのアラートを 1 つにグループ化しました",
-          "why": "94% の確率で同時に発火していたため、1 回の遅延で 3 回呼び出されていました。",
-          "from": "3 アラート",
-          "to": "1",
+          "done": "チェックアウトのレイテンシに関する3件のアラートで繰り返し通知の抑制をオンにしました",
+          "why": "発火し続けている間、評価のたびに通知していたため、1回の遅延で120回呼び出しが発生しました。",
+          "from": "評価ごと",
+          "to": "変化ごとに1回",
           "on": "checkout レイテンシ"
         },
         "L-303": {
@@ -27171,7 +27124,7 @@
         "checkoutPaged": "チェックアウトの支払い失敗についてオンコールを呼び出しました。",
         "recsHeld": "レコメンデーションの軽微な問題は、金曜のサマリーまで保留しました。",
         "diskApproved": "ingest-1 のディスクアラートを {to}% に引き上げることを承認しました。",
-        "latencyGrouped": "チェックアウトの遅延アラート3件を1つにまとめたので、1回の遅延で呼び出しは一度だけです。",
+        "latencyGrouped": "チェックアウトの遅延に関する3件のアラートで繰り返し通知の抑制をオンにしたため、1回の遅延で呼び出しは1回になりました。",
         "queueFixed": "orders のキューワーカーを追加しましたが、キューは増え続けたため元に戻し、オンコールを呼び出しました。",
         "loginPaged": "サインインの遅延についてオンコールを呼び出しました。",
         "queuePermission": "キュー ワーカーを最大8個まで自力で追加することを許可しました。",

@@ -10001,8 +10001,8 @@
       "raiseThresholdDesc": "Odsuń wartość wyzwalającą od obserwowanego stanu ustalonego.",
       "lengthenEvaluationWindow": "Wydłuż okno ewaluacji",
       "lengthenEvaluationWindowDesc": "Poszerz okres, aby krótki skok nie wyzwalał alertu.",
-      "enableDeduplication": "Włącz deduplikację",
-      "enableDeduplicationDesc": "Scal powtarzające się wyzwolenia w oknie deduplikacji.",
+      "enableDeduplication": "Włącz pomijanie powtórzeń",
+      "enableDeduplicationDesc": "Powiadamiaj raz na zmianę stanu zamiast przy każdej ocenie.",
       "reviewForDeletion": "Przejrzyj do usunięcia",
       "reviewForDeletionDesc": "Potwierdź, że zapytanie wciąż odpowiada rzeczywistości, zanim wycofasz alert.",
       "fixAlertQuery": "Napraw zapytanie alertu",
@@ -10319,12 +10319,8 @@
     "organizationIdLabel": "ID organizacji",
     "alertCreationTitle": "Tworzenie alertu",
     "noAlertsFound": "Nie znaleziono alertów",
-    "suppressedByDeduplication": "Pominięty przez deduplikację",
-    "occurrence": "{count} wystąpienie | wystąpienia: {count}",
     "groupedNotification": "Powiadomienie zgrupowane",
     "alertsBatchedTogether": "alerty zgrupowane razem",
-    "notificationSent": "Powiadomienie wysłano",
-    "occurrencesDeduplicated": "zdeduplikowane wystąpienia",
     "alertExecutionDetails": "Szczegóły wykonania alertu",
     "evaluationTime": "Czas oceny",
     "queryTime": "Czas zapytania",
@@ -10374,15 +10370,7 @@
     "serviceGraphTooltipTo": "Do: {time}",
     "serviceGraphTooltipTemporalCorrelation": "Korelacja czasowa",
     "serviceGraphTooltipServiceDependency": "Zależność usługi",
-    "totalAlerts": "Łączna liczba alertów",
-    "usingDeduplication": "Korzystające z deduplikacji",
-    "deduplicationConfiguredTooltip": "Alerty ze skonfigurowaną deduplikacją",
-    "suppressionRate24h": "Współczynnik tłumienia (24h)",
     "suppressed": "stłumione /",
-    "total": "łącznie",
-    "passedLabel": "Zaliczone:",
-    "pendingBatches": "Oczekujące partie",
-    "pendingBatchesTooltip": "Alerty oczekujące na zgrupowanie",
     "historyTimeline": {
       "firing": "Wyzwolony",
       "ok": "OK",
@@ -10403,7 +10391,8 @@
     "endTime": "Czas zakończenia",
     "duration": "Czas trwania",
     "retries": "Ponowne próby",
-    "dedup": "Deduplikacja",
+    "suppression": "Pomijanie powtórzeń",
+    "suppressedAsRepeat": "Pominięto jako powtórzenie",
     "validation": {
       "streamTypeRequired": "Typ strumienia jest wymagany.",
       "streamNameRequired": "Nazwa strumienia jest wymagana.",
@@ -10595,15 +10584,6 @@
     "all": "Wszystkie",
     "history": "Historia alertów",
     "searcHistory": "Wprowadź nazwę alertu",
-    "deduplication": {
-      "fingerprintFields": "Grupuj podobne alerty według",
-      "fingerprintFieldsHint": "Wybierz pola, które powodują podobieństwo alertów (np. nazwa hosta, usługa). Pozostaw puste, aby automatycznie wykryć na podstawie kwerendy.",
-      "fingerprintFieldsTooltip": "Wybierz pola, które muszą być zgodne, aby alerty były uznane za duplikaty. Na przykład wybranie 'hostname' oznacza, że alerty z tego samego hosta będą grupowane. Różne typy alertów (np. wysokie CPU vs wysoka pamięć) nigdy nie są grupowane, nawet jeśli pochodzą z tego samego hosta. Pozostaw puste, aby automatycznie wykryć na podstawie typu zapytania.",
-      "timeWindow": "Uznaj alerty za identyczne w ciągu",
-      "timeWindowHint": "Okres czasu do grupowania podobnych alertów. Pozostaw puste, aby dopasować do interwału sprawdzania.",
-      "timeWindowTooltip": "Jak długo pamiętać ostatnie alerty do grupowania. Jeśli podobny alert wystąpi w tym czasie, nie zostanie wysłany ponownie. Pozostaw puste, aby użyć interwału sprawdzania alertu.",
-      "fingerprintFieldsHelp": "Pozostaw puste, aby automatycznie wykryć na podstawie kwerendy (SQL: kolumny GROUP BY, PromQL: etykiety, niestandardowe: pola warunku)"
-    },
     "summary": {
       "scrollToBottom": "Przewiń do dołu",
       "title": "Podsumowanie",
@@ -10651,38 +10631,15 @@
         "defaultConditions": "Powiadom mnie, gdy skonfigurowane warunki są spełnione"
       }
     },
-    "correlation": {
-      "title": "Korelacja alertów",
-      "description": "Skonfiguruj, jak alerty są korelowane i deduplikowane w całej organizacji. Alerty z pasującymi wartościami odcisku palca będą grupowane razem.",
-      "semanticFieldNote": "Uwaga: Mapowania pól semantycznych są konfigurowane w zakładce Tożsamość usługi.",
-      "enableOrgLevel": "Włącz deduplikację na poziomie organizacji",
-      "enableOrgLevelTooltip": "Włącz funkcje deduplikacji i korelacji dla wszystkich alertów w tej organizacji",
-      "enableCrossAlert": "Włącz deduplikację między alertami",
-      "enableCrossAlertTooltip": "Pozwól różnym alertom deduplikować się nawzajem, gdy mają ten sam odcisk palca",
-      "fingerprintGroups": "Grupy odcisków palca między alertami",
-      "fingerprintGroupsTooltip": "Wybierz, które grupy semantyczne mają być używane do tworzenia odcisków palca między alertami. Alerty będą deduplikowane, jeśli mają te same wartości dla tych wymiarów.",
-      "fingerprintGroupsHint": "Wybierz co najmniej jedną grupę semantyczną do deduplikacji między alertami",
-      "fingerprintGroupsRequired": "Co najmniej jedna grupa semantyczna musi być wybrana",
-      "defaultWindow": "Domyślne okno korelacji (minuty)",
-      "defaultWindowTooltip": "W przypadku braku dopasowania pola semantycznego, alerty i dane z danego okresu są uważane za powiązane",
-      "defaultWindowDescription": "W przypadku braku dopasowania pola semantycznego, alerty i dane z danego okresu są uważane za powiązane",
-      "defaultWindowPlaceholder": "Użyj domyślnie okresu alertu",
-      "cancelButton": "Anuluj",
-      "saveButton": "Zapisz",
-      "settingsSaved": "Ustawienia deduplikacji organizacji zostały pomyślnie zapisane",
-      "settingsSaveError": "Nie udało się zapisać ustawień"
-    },
     "placeholders": {
       "typeSomething": "Wpisz coś",
       "value": "Wartość",
       "selectColumn": "Wybierz kolumnę",
       "savedFunctions": "Zapisane funkcje",
-      "autoUsesCheckInterval": "Auto (używa interwału sprawdzania)",
       "addTag": "Dodaj tag i naciśnij Enter"
     },
     "steps": {
       "compareWithPast": "Porównaj z przeszłością",
-      "deduplication": "Deduplikacja",
       "advanced": "Zaawansowane"
     },
     "stepCaptions": {
@@ -10690,7 +10647,6 @@
       "conditions": "Co powinno wyzwolić alert",
       "compareWithPast": "Porównaj bieżące wyniki z danymi z innego okresu",
       "alertSettings": "Ustaw reguły alertu i wybierz, jak chcesz być powiadamiany.",
-      "deduplication": "Unikaj wielokrotnego wysyłania tego samego alertu poprzez grupowanie podobnych alertów razem.",
       "advanced": "Zmienne kontekstowe, opis i szablon wiersza"
     },
     "failedToFetchHistory": "Nie udało się pobrać historii alertów",
@@ -10713,8 +10669,6 @@
         "closeActions": "Zamknij akcje",
         "viewAlertHistory": "Zobacz historię alertów",
         "actionsFor": "Akcje dla:",
-        "configureDedup": "Skonfiguruj deduplikację",
-        "configureDedupTooltip": "Skonfiguruj deduplikację dla tego alertu",
         "editAlert": "Edytuj alert",
         "editAlertTooltip": "Edytuj konfigurację alertu",
         "viewHistory": "Wyświetl historię",
@@ -11494,6 +11448,8 @@
       "recoveryChatMessage": "nowa wiadomość \"Rozwiązany\"",
       "keepFiringFor": "Utrzymuj stan alarmu przez",
       "keepFiringForTooltip": "Odczekaj tak długo po ustąpieniu warunku przed przywróceniem. 0 przywraca natychmiast.",
+      "suppressRepeats": "Pomijaj powtórzenia",
+      "suppressRepeatsTooltip": "Powiadamiaj raz, gdy alert zacznie być wyzwolony lub zmieni poziom, a nie przy każdej ocenie. Pozostaw wyłączone, aby nadal otrzymywać przypomnienia po każdym okresie wyciszenia.",
       "keepFiringForInvalid": "Wprowadź 0 lub więcej sekund",
       "keepFiringForTooLong": "Wprowadź maksymalnie 86400 sekund (24 godziny)"
     },
@@ -13996,7 +13952,6 @@
       "identityConfigNoSets": "Skonfiguruj co najmniej jeden zestaw tożsamości przed zapisaniem.",
       "discoveredServicesTab": "Odkryte usługi",
       "serviceDiscoveryTab": "Reguły wykrywania",
-      "alertCorrelationTab": "Grupowanie alertów",
       "fieldAliasesTab": "Mapowania pól",
       "fieldAliasesSaved": "Aliasy pól zostały zapisane pomyślnie",
       "fieldAliasesSaveError": "Nie udało się zapisać aliasów pól",
@@ -21661,7 +21616,6 @@
     "alerts": {
       "failedToNavigateToAlert": "Nie udało się przejść do alertu",
       "alertNotFound": "Nie znaleziono alertu",
-      "alertNotFoundInAlerts": "Nie znaleziono alertu \"{name}\" wśród alertów ({count}).",
       "failedToLoadAlerts": "Nie udało się załadować alertów",
       "alertsDeletedSuccessfully": "Pomyślnie usunięto {count} alert | Pomyślnie usunięto alerty: {count}",
       "failedToDeleteAlerts": "Nie udało się usunąć {count} alertu | Nie udało się usunąć {count} alertów",
@@ -21730,7 +21684,6 @@
       "pleaseWaitWhileLoadingTemplates": "Proszę czekać podczas ładowania szablonów...",
       "alertSavedSuccessfully": "Alert został zapisany.",
       "alertUpdatedSuccessfully": "Alert został zaktualizowany.",
-      "openingDedupConfig": "Otwieranie konfiguracji deduplikacji dla: {name}",
       "editingAlert": "Edytowanie alertu: {name}",
       "ack": {
         "acked": "Potwierdzono {name}",
@@ -26543,7 +26496,7 @@
       "logged": "Zarejestrowano"
     },
     "policy": {
-      "gateHint": "Spośród zmian w istniejących alertach tylko deduplikacja stosuje się samodzielnie, z migawką stanu poprzedniego i okresem przeglądu: utrzymana, jeśli testy przejdą, wycofana, jeśli nie. Wszystko inne czeka na zatwierdzenie jednym kliknięciem.",
+      "gateHint": "Spośród zmian w istniejących alertach tylko włączenie pomijania powtórzeń jest stosowane automatycznie, z migawką stanu sprzed zmiany i oknem weryfikacji: zachowywane, jeśli sprawdzenia zakończą się pomyślnie, wycofywane, jeśli nie. Wszystko inne czeka na zatwierdzenie jednym kliknięciem.",
       "off": "Wył.",
       "suggest": "Sugeruj",
       "auto": "Auto",
@@ -26562,7 +26515,7 @@
         "gateDesc": "Wstrzymuje wezwanie, aż analiza się zakończy, maksymalnie na 2 minuty. Przy awarii przepuszcza: jeśli triage przekroczy limit czasu lub zawiedzie, i tak wysyła wezwanie, informując, że analiza wciąż trwa lub nie powiodła się, a przyczyna pojawia się w wątku."
       },
       "classes": {
-        "EnableDeduplication": "Włącz deduplikację dla alertu, który powtarza się w ciągu kilku minut.",
+        "EnableDeduplication": "Włącz pomijanie powtórzeń dla alertu, który powiadamia przy każdej ocenie.",
         "CreateDetector": "Utwórz detektor anomalii dla żądań, błędów lub opóźnień usługi.",
         "RaiseThreshold": "Podnieś próg alertu, który wyzwala się w dniach, gdy wszystko działa poprawnie.",
         "LengthenEvaluationWindow": "Wydłuż okno alertu, który wielokrotnie zmienia stan.",
@@ -27111,10 +27064,10 @@
           "on": "alert połączenia"
         },
         "L-302": {
-          "done": "Pogrupowałem 3 alerty opóźnienia checkout w jeden",
-          "why": "Zadziałały razem w 94% przypadków, więc jedno spowolnienie wezwało Cię 3 razy.",
-          "from": "3 alerty",
-          "to": "1",
+          "done": "Włączono pomijanie powtórzeń dla 3 alertów opóźnień finalizacji zamówienia",
+          "why": "Powiadamiały przy każdej ocenie, dopóki pozostawały wyzwolone, więc jedno spowolnienie wywołało 120 wezwań.",
+          "from": "Każda ocena",
+          "to": "Raz na zmianę stanu",
           "on": "opóźnienie checkout"
         },
         "L-303": {
@@ -27171,7 +27124,7 @@
         "checkoutPaged": "Wezwałem dyżurnego w sprawie nieudanych płatności w checkout.",
         "recsHeld": "Odłożyłem drobny problem z recommendations na piątkowe podsumowanie.",
         "diskApproved": "Zatwierdziłeś podniesienie alertu dyskowego na ingest-1 do {to}%.",
-        "latencyGrouped": "Pogrupowałem trzy alerty o spowolnieniu checkout w jeden, dzięki czemu pojedyncze spowolnienie wzywa dyżurnego tylko raz.",
+        "latencyGrouped": "Włączyłem pomijanie powtórzeń dla trzech alertów spowolnienia finalizacji zamówienia, więc pojedyncze spowolnienie wywołuje jedno wezwanie.",
         "queueFixed": "Dodałem workery kolejki orders, ale kolejka nadal rosła, więc wycofałem tę zmianę i wezwałem dyżurnego.",
         "loginPaged": "Wezwałem dyżurnego w sprawie wolnego logowania.",
         "queuePermission": "Zezwoliłeś mi samodzielnie dodawać workery kolejek, maksymalnie do 8.",

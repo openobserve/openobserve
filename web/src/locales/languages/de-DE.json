@@ -10001,8 +10001,8 @@
       "raiseThresholdDesc": "Verschieben Sie den Auslösewert weg vom beobachteten stationären Zustand.",
       "lengthenEvaluationWindow": "Auswertungsfenster verlängern",
       "lengthenEvaluationWindowDesc": "Erweitern Sie den Zeitraum, damit ein kurzer Ausschlag den Alarm nicht mehr auslöst.",
-      "enableDeduplication": "Deduplizierung aktivieren",
-      "enableDeduplicationDesc": "Fassen Sie wiederholte Auslösungen innerhalb eines Deduplizierungsfensters zusammen.",
+      "enableDeduplication": "Wiederholungen unterdrücken aktivieren",
+      "enableDeduplicationDesc": "Einmal pro Statusänderung benachrichtigen statt bei jeder Auswertung.",
       "reviewForDeletion": "Zur Löschung prüfen",
       "reviewForDeletionDesc": "Bestätigen Sie, dass die Abfrage noch der Realität entspricht, bevor Sie den Alarm außer Betrieb nehmen.",
       "fixAlertQuery": "Alarmabfrage korrigieren",
@@ -10319,12 +10319,8 @@
     "organizationIdLabel": "Organisations-ID",
     "alertCreationTitle": "Alarmerstellung",
     "noAlertsFound": "Keine Alarme gefunden",
-    "suppressedByDeduplication": "Durch Deduplizierung unterdrückt",
-    "occurrence": "{count} Vorkommen | {count} Vorkommen",
     "groupedNotification": "Gruppierte Benachrichtigung",
     "alertsBatchedTogether": "Alarme zusammen gebündelt",
-    "notificationSent": "Benachrichtigung gesendet",
-    "occurrencesDeduplicated": "Vorkommen dedupliziert",
     "alertExecutionDetails": "Details zur Alarmausführung",
     "evaluationTime": "Auswertungszeit",
     "queryTime": "Abfragezeit",
@@ -10374,15 +10370,7 @@
     "serviceGraphTooltipTo": "Bis: {time}",
     "serviceGraphTooltipTemporalCorrelation": "Zeitliche Korrelation",
     "serviceGraphTooltipServiceDependency": "Service-Abhängigkeit",
-    "totalAlerts": "Alarme gesamt",
-    "usingDeduplication": "Mit Deduplizierung",
-    "deduplicationConfiguredTooltip": "Alarme mit konfigurierter Deduplizierung",
-    "suppressionRate24h": "Unterdrückungsrate (24h)",
     "suppressed": "unterdrückt /",
-    "total": "gesamt",
-    "passedLabel": "Bestanden:",
-    "pendingBatches": "Ausstehende Stapel",
-    "pendingBatchesTooltip": "Alarme, die darauf warten, gruppiert zu werden",
     "historyTimeline": {
       "firing": "Ausgelöst",
       "ok": "OK",
@@ -10403,7 +10391,8 @@
     "endTime": "Endzeit",
     "duration": "Dauer",
     "retries": "Wiederholungen",
-    "dedup": "Dedup",
+    "suppression": "Unterdrückung",
+    "suppressedAsRepeat": "Als Wiederholung unterdrückt",
     "validation": {
       "streamTypeRequired": "Stream-Typ ist erforderlich.",
       "streamNameRequired": "Stream-Name ist erforderlich.",
@@ -10595,15 +10584,6 @@
     "all": "Alle",
     "history": "Alarmverlauf",
     "searcHistory": "Alarmnamen eingeben",
-    "deduplication": {
-      "fingerprintFields": "Ähnliche Alarme gruppieren nach",
-      "fingerprintFieldsHint": "Wählen Sie Felder aus, die für die Deduplizierung verwendet werden sollen. Lassen Sie das Feld leer, um die automatische Erkennung anhand des Abfragetyps zu ermöglichen.",
-      "fingerprintFieldsTooltip": "Wählen Sie, welche Felder übereinstimmen müssen, damit Alarme als Duplikate gelten. Wenn Sie z. B. 'hostname' auswählen, werden Alarme vom selben Host gruppiert. Verschiedene Alarmtypen (z. B. hohe CPU-Auslastung und hoher Arbeitsspeicher) werden nie gruppiert, auch wenn sie vom selben Host stammen. Leer lassen für die automatische Erkennung anhand Ihres Abfragetyps.",
-      "timeWindow": "Zeitfenster (Minuten)",
-      "timeWindowHint": "Wie lange dauert es, die Fingerabdrücke von Alarmen zu verfolgen. Lassen Sie das Feld leer, um den Alarmzeitraum zu verwenden.",
-      "timeWindowTooltip": "Wie lange aktuelle Alarme für die Gruppierung gemerkt werden. Tritt innerhalb dieser Zeit ein ähnlicher Alarm auf, wird er nicht erneut gesendet. Leer lassen, um das Prüfintervall Ihres Alarms zu verwenden.",
-      "fingerprintFieldsHelp": "Leer lassen für automatische Erkennung basierend auf Abfrage (SQL: GROUP BY-Spalten, PromQL: Labels, Benutzerdefiniert: Bedingungsfelder)"
-    },
     "summary": {
       "scrollToBottom": "Nach unten scrollen",
       "title": "Zusammenfassung",
@@ -10651,38 +10631,15 @@
         "defaultConditions": "Mich benachrichtigen, wenn die konfigurierten Bedingungen erfüllt sind"
       }
     },
-    "correlation": {
-      "title": "Alarmkorrelation",
-      "description": "Konfigurieren Sie, wie Alarme in der gesamten Organisation korreliert und dedupliziert werden. Alarme mit übereinstimmenden Fingerabdruckwerten werden gruppiert.",
-      "semanticFieldNote": "Hinweis: Semantische Feldzuordnungen werden auf der Registerkarte Service Identity konfiguriert.",
-      "enableOrgLevel": "Deduplizierung auf Organisationsebene aktivieren",
-      "enableOrgLevelTooltip": "Deduplizierungs- und Korrelationsfunktionen für alle Alarme in dieser Organisation aktivieren",
-      "enableCrossAlert": "Alarmübergreifende Deduplizierung aktivieren",
-      "enableCrossAlertTooltip": "Erlauben Sie verschiedenen Benachrichtigungen, sich gegenseitig zu deduplizieren, wenn sie denselben Fingerabdruck verwenden",
-      "fingerprintGroups": "Alarmübergreifende Fingerabdruckgruppen",
-      "fingerprintGroupsTooltip": "Wählen Sie aus, welche semantischen Gruppen für alarmübergreifende Fingerabdrücke verwendet werden sollen. Alarme werden dedupliziert, wenn sie dieselben Werte für diese Dimensionen aufweisen.",
-      "fingerprintGroupsHint": "Wählen Sie mindestens eine semantische Gruppe für die alarmübergreifende Deduplizierung aus",
-      "fingerprintGroupsRequired": "Es muss mindestens eine semantische Gruppe ausgewählt werden",
-      "defaultWindow": "Standardkorrelationsfenster (Minuten)",
-      "defaultWindowTooltip": "Wenn kein semantisches Feld übereinstimmt, werden Alarme und Daten aus der angegebenen Dauer als zusammengehörig betrachtet.",
-      "defaultWindowDescription": "Wenn kein semantisches Feld übereinstimmt, werden Alarme und Daten aus der angegebenen Dauer als zusammengehörig betrachtet.",
-      "defaultWindowPlaceholder": "Standardmäßig den Alarmzeitraum verwenden",
-      "cancelButton": "Stornieren",
-      "saveButton": "Einstellungen speichern",
-      "settingsSaved": "Organisations-Deduplizierungseinstellungen erfolgreich gespeichert",
-      "settingsSaveError": "Einstellungen konnten nicht gespeichert werden"
-    },
     "placeholders": {
       "typeSomething": "Etwas eingeben",
       "value": "Wert",
       "selectColumn": "Wählen Sie eine Spalte",
       "savedFunctions": "Gespeicherte Funktionen",
-      "autoUsesCheckInterval": "Auto (verwendet Prüfintervall)",
       "addTag": "Tag hinzufügen und Enter drücken"
     },
     "steps": {
       "compareWithPast": "Mit der Vergangenheit vergleichen",
-      "deduplication": "Deduplizierung",
       "advanced": "Fortgeschritten"
     },
     "stepCaptions": {
@@ -10690,7 +10647,6 @@
       "conditions": "Was soll den Alarm auslösen?",
       "compareWithPast": "Aktuelle Ergebnisse mit Daten aus einem anderen Zeitraum vergleichen",
       "alertSettings": "Legen Sie Ihre Alarmregeln fest und wählen Sie aus, wie Sie benachrichtigt werden möchten.",
-      "deduplication": "Vermeiden Sie es, denselben Alarm mehrmals zu senden, indem Sie ähnliche Alarme zu Gruppen zusammenfassen.",
       "advanced": "Kontextvariablen, Beschreibung und Zeilenvorlage"
     },
     "failedToFetchHistory": "Der Alarmverlauf konnte nicht abgerufen werden",
@@ -10713,8 +10669,6 @@
         "closeActions": "Aktionen schließen",
         "viewAlertHistory": "Alarmverlauf anzeigen",
         "actionsFor": "Aktionen für:",
-        "configureDedup": "Dedup konfigurieren",
-        "configureDedupTooltip": "Deduplizierung für diesen Alarm konfigurieren",
         "editAlert": "Alarm bearbeiten",
         "editAlertTooltip": "Alarmkonfiguration bearbeiten",
         "viewHistory": "Verlauf ansehen",
@@ -11494,6 +11448,8 @@
       "recoveryChatMessage": "neue \"Behoben\"-Nachricht",
       "keepFiringFor": "Weiter auslösen für",
       "keepFiringForTooltip": "So lange warten, nachdem die Bedingung nicht mehr erfüllt ist, bevor die Wiederherstellung erfolgt. 0 stellt sofort wieder her.",
+      "suppressRepeats": "Wiederholungen unterdrücken",
+      "suppressRepeatsTooltip": "Einmal benachrichtigen, wenn der Alarm ausgelöst wird oder die Stufe wechselt, nicht bei jeder Auswertung. Lassen Sie es ausgeschaltet, um nach jeder Stummschaltung weiterhin Erinnerungen zu erhalten.",
       "keepFiringForInvalid": "Geben Sie 0 oder mehr Sekunden ein",
       "keepFiringForTooLong": "Geben Sie höchstens 86400 Sekunden (24 Stunden) ein"
     },
@@ -13996,7 +13952,6 @@
       "identityConfigNoSets": "Konfigurieren Sie mindestens einen Identitätssatz, bevor Sie speichern.",
       "discoveredServicesTab": "Entdeckte Dienste",
       "serviceDiscoveryTab": "Erkennungsregeln",
-      "alertCorrelationTab": "Alarmgruppierung",
       "fieldAliasesTab": "Feldzuordnungen",
       "fieldAliasesSaved": "Feldaliasse erfolgreich gespeichert",
       "fieldAliasesSaveError": "Feldaliasse konnten nicht gespeichert werden",
@@ -21661,7 +21616,6 @@
     "alerts": {
       "failedToNavigateToAlert": "Navigation zum Alarm fehlgeschlagen",
       "alertNotFound": "Alarm nicht gefunden",
-      "alertNotFoundInAlerts": "Alarm \"{name}\" nicht unter {count} Alarmen gefunden",
       "failedToLoadAlerts": "Alarme konnten nicht geladen werden",
       "alertsDeletedSuccessfully": "{count} Alarm erfolgreich gelöscht | {count} Alarme erfolgreich gelöscht",
       "failedToDeleteAlerts": "Fehler beim Löschen von {count} Alarm | Fehler beim Löschen von {count} Alarmen",
@@ -21730,7 +21684,6 @@
       "pleaseWaitWhileLoadingTemplates": "Bitte warten Sie, während die Vorlagen geladen werden...",
       "alertSavedSuccessfully": "Alarm erfolgreich gespeichert.",
       "alertUpdatedSuccessfully": "Alarm erfolgreich aktualisiert.",
-      "openingDedupConfig": "Dedup-Konfiguration für {name} wird geöffnet",
       "editingAlert": "Alarm bearbeiten: {name}",
       "ack": {
         "acked": "{name} bestätigt",
@@ -26543,7 +26496,7 @@
       "logged": "Protokolliert"
     },
     "policy": {
-      "gateHint": "Unter den Änderungen an bestehenden Alarmen wird nur die Deduplizierung von selbst angewendet, mit einem Snapshot des vorherigen Zustands und einem Prüfzeitraum: beibehalten, wenn die Prüfungen bestehen, zurückgerollt, wenn sie fehlschlagen. Alles andere wartet auf eine Genehmigung per Klick.",
+      "gateHint": "Bei Änderungen an bestehenden Alarmen wird nur das Aktivieren der Wiederholungsunterdrückung eigenständig angewendet, mit einem Snapshot des vorherigen Zustands und einem Überprüfungsfenster: beibehalten, wenn die Prüfungen bestehen, zurückgerollt, wenn sie fehlschlagen. Alles andere wartet auf eine Ein-Klick-Genehmigung.",
       "off": "Aus",
       "suggest": "Vorschlagen",
       "auto": "Auto",
@@ -26562,7 +26515,7 @@
         "gateDesc": "Hält die Alarmierung zurück, bis die Untersuchung vorliegt, für maximal 2 Minuten. Fail-open: Wenn die Triage in ein Timeout läuft oder fehlschlägt, alarmiert sie trotzdem, meldet, dass die Untersuchung noch läuft oder fehlgeschlagen ist, und die Ursache folgt im Thread."
       },
       "classes": {
-        "EnableDeduplication": "Deduplizierung für einen Alarm aktivieren, der sich innerhalb von Minuten wiederholt.",
+        "EnableDeduplication": "Wiederholungsunterdrückung für einen Alarm aktivieren, der bei jeder Auswertung benachrichtigt.",
         "CreateDetector": "Einen Anomalie-Detektor für die Anfragen, Fehler oder Latenz eines Dienstes erstellen.",
         "RaiseThreshold": "Einen Schwellenwert anheben, der an gesunden Tagen auslöst.",
         "LengthenEvaluationWindow": "Das Fenster eines Alarms verlängern, der flattert.",
@@ -27111,10 +27064,10 @@
           "on": "Verbindungsalarm"
         },
         "L-302": {
-          "done": "Die 3 Checkout-Latenzalarme zu einem zusammengefasst",
-          "why": "Sie wurden 94% der Zeit gemeinsam ausgelöst, sodass eine einzige Verlangsamung Ihnen dreimal einen Alarm schickte.",
-          "from": "3 Alarme",
-          "to": "1",
+          "done": "Wiederholungsunterdrückung für die 3 Checkout-Latenzalarme aktiviert",
+          "why": "Sie benachrichtigten bei jeder Auswertung, solange sie ausgelöst blieben, sodass eine einzige Verlangsamung Sie 120 Mal alarmierte.",
+          "from": "Jede Auswertung",
+          "to": "Einmal pro Änderung",
           "on": "Checkout-Latenz"
         },
         "L-303": {
@@ -27171,7 +27124,7 @@
         "checkoutPaged": "Ich habe On-Call benachrichtigt, weil bei checkout Zahlungen fehlschlagen.",
         "recsHeld": "Ich habe ein kleines Problem mit recommendations für die Zusammenfassung am Freitag zurückgehalten.",
         "diskApproved": "Sie haben genehmigt, den Festplattenalarm auf ingest-1 auf {to}% anzuheben.",
-        "latencyGrouped": "Ich habe die drei checkout-Langsamkeitsalarme zu einem zusammengefasst, sodass eine einzelne Verlangsamung nur einmal alarmiert.",
+        "latencyGrouped": "Ich habe die Wiederholungsunterdrückung für die drei Checkout-Verlangsamungsalarme aktiviert, sodass eine einzelne Verlangsamung nur einmal alarmiert.",
         "queueFixed": "Ich habe Worker für die orders-Warteschlange hinzugefügt, aber die Warteschlange wuchs weiter, also habe ich sie wieder entfernt und On-Call benachrichtigt.",
         "loginPaged": "Ich habe On-Call wegen der langsamen Anmeldung benachrichtigt.",
         "queuePermission": "Sie haben mir erlaubt, Warteschlangen-Worker selbstständig hinzuzufügen, bis zu 8.",

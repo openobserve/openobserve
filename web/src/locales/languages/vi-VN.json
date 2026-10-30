@@ -10001,8 +10001,8 @@
       "raiseThresholdDesc": "Dịch chuyển giá trị kích hoạt ra xa trạng thái ổn định quan sát được.",
       "lengthenEvaluationWindow": "Kéo dài cửa sổ đánh giá",
       "lengthenEvaluationWindowDesc": "Mở rộng khoảng thời gian để một đỉnh tăng ngắn không còn kích hoạt cảnh báo.",
-      "enableDeduplication": "Bật khử trùng lặp",
-      "enableDeduplicationDesc": "Gộp các lần kích hoạt lặp lại trong một cửa sổ khử trùng lặp.",
+      "enableDeduplication": "Bật chặn thông báo lặp lại",
+      "enableDeduplicationDesc": "Chỉ thông báo một lần mỗi khi trạng thái thay đổi thay vì mỗi lần đánh giá.",
       "reviewForDeletion": "Xem xét để xóa",
       "reviewForDeletionDesc": "Xác nhận truy vấn vẫn đúng với thực tế trước khi loại bỏ cảnh báo.",
       "fixAlertQuery": "Sửa truy vấn cảnh báo",
@@ -10319,12 +10319,8 @@
     "organizationIdLabel": "Mã tổ chức",
     "alertCreationTitle": "Tạo cảnh báo",
     "noAlertsFound": "Không tìm thấy cảnh báo nào",
-    "suppressedByDeduplication": "Bị ẩn do loại bỏ trùng lặp",
-    "occurrence": "{count} lần xuất hiện | {count} lần xuất hiện",
     "groupedNotification": "Thông báo nhóm",
     "alertsBatchedTogether": "các cảnh báo được gộp cùng nhau",
-    "notificationSent": "Đã gửi thông báo",
-    "occurrencesDeduplicated": "các lần xuất hiện đã loại bỏ trùng lặp",
     "alertExecutionDetails": "Chi tiết thực thi cảnh báo",
     "evaluationTime": "Thời gian đánh giá",
     "queryTime": "Thời gian truy vấn",
@@ -10374,15 +10370,7 @@
     "serviceGraphTooltipTo": "Đến: {time}",
     "serviceGraphTooltipTemporalCorrelation": "Tương quan thời gian",
     "serviceGraphTooltipServiceDependency": "Phụ thuộc dịch vụ",
-    "totalAlerts": "Tổng số cảnh báo",
-    "usingDeduplication": "Sử dụng Deduplication",
-    "deduplicationConfiguredTooltip": "Cảnh báo được cấu hình deduplication",
-    "suppressionRate24h": "Tỷ lệ ức chế (24h)",
     "suppressed": "đã ức chế /",
-    "total": "tổng",
-    "passedLabel": "Đã qua:",
-    "pendingBatches": "Lô đang chờ",
-    "pendingBatchesTooltip": "Cảnh báo đang chờ được nhóm lại",
     "historyTimeline": {
       "firing": "Đang kích hoạt",
       "ok": "OK",
@@ -10403,7 +10391,8 @@
     "endTime": "Thời gian kết thúc",
     "duration": "Thời lượng",
     "retries": "Số lần thử lại",
-    "dedup": "Dedup",
+    "suppression": "Chặn thông báo",
+    "suppressedAsRepeat": "Bị chặn do lặp lại",
     "validation": {
       "streamTypeRequired": "Loại stream là bắt buộc.",
       "streamNameRequired": "Tên stream là bắt buộc.",
@@ -10595,15 +10584,6 @@
     "all": "Tất cả",
     "history": "Lịch sử cảnh báo",
     "searcHistory": "Nhập tên cảnh báo",
-    "deduplication": {
-      "fingerprintFields": "Nhóm các cảnh báo tương tự theo",
-      "fingerprintFieldsHint": "Chọn các trường làm cho cảnh báo trở nên tương tự (ví dụ: hostname, service). Để trống để tự động phát hiện dựa trên truy vấn của bạn.",
-      "fingerprintFieldsTooltip": "Chọn trường nào phải khớp để cảnh báo được coi là trùng lặp. Ví dụ: chọn 'hostname' có nghĩa là các cảnh báo từ cùng một máy chủ sẽ được nhóm lại với nhau. Các loại cảnh báo khác nhau (ví dụ: CPU cao so với Bộ nhớ cao) không bao giờ được nhóm, ngay cả khi chúng đến từ cùng một máy chủ. Để trống để tự động phát hiện dựa trên loại truy vấn của bạn.",
-      "timeWindow": "Coi các cảnh báo là giống hệt nhau trong vòng",
-      "timeWindowHint": "Khoảng thời gian để nhóm các cảnh báo tương tự. Để trống để khớp với khoảng kiểm tra của bạn.",
-      "timeWindowTooltip": "Thời gian nhớ các cảnh báo gần đây để nhóm. Nếu một cảnh báo tương tự xảy ra trong khoảng thời gian này, nó sẽ không được gửi lại. Để trống để sử dụng khoảng kiểm tra cảnh báo của bạn.",
-      "fingerprintFieldsHelp": "Để trống để tự động phát hiện dựa trên truy vấn (SQL: cột GROUP BY, PromQL: nhãn, Tùy chỉnh: trường điều kiện)"
-    },
     "summary": {
       "scrollToBottom": "Cuộn xuống cuối",
       "title": "Tóm tắt",
@@ -10651,38 +10631,15 @@
         "defaultConditions": "Cảnh báo tôi khi các điều kiện đã cấu hình được đáp ứng"
       }
     },
-    "correlation": {
-      "title": "Tương quan cảnh báo",
-      "description": "Cấu hình cách các cảnh báo được tương quan và loại bỏ trùng lặp trong toàn tổ chức. Các cảnh báo có giá trị dấu vân tay khớp nhau sẽ được nhóm lại với nhau.",
-      "semanticFieldNote": "Lưu ý: Ánh xạ trường ngữ nghĩa được cấu hình trong tab Danh tính Dịch vụ.",
-      "enableOrgLevel": "Bật loại bỏ trùng lặp cấp tổ chức",
-      "enableOrgLevelTooltip": "Bật các tính năng loại bỏ trùng lặp và tương quan cho tất cả cảnh báo trong tổ chức này",
-      "enableCrossAlert": "Bật loại bỏ trùng lặp chéo giữa các cảnh báo",
-      "enableCrossAlertTooltip": "Cho phép các cảnh báo khác nhau loại bỏ trùng lặp lẫn nhau khi chúng có cùng dấu vân tay",
-      "fingerprintGroups": "Nhóm dấu vân tay chéo giữa các cảnh báo",
-      "fingerprintGroupsTooltip": "Chọn các nhóm ngữ nghĩa để sử dụng cho việc tạo dấu vân tay chéo giữa các cảnh báo. Các cảnh báo sẽ bị loại bỏ trùng lặp nếu chúng có cùng giá trị cho các chiều này.",
-      "fingerprintGroupsHint": "Chọn ít nhất một nhóm ngữ nghĩa cho việc loại bỏ trùng lặp chéo giữa các cảnh báo",
-      "fingerprintGroupsRequired": "Phải chọn ít nhất một nhóm ngữ nghĩa",
-      "defaultWindow": "Cửa sổ tương quan mặc định (phút)",
-      "defaultWindowTooltip": "Khi không có khớp trường ngữ nghĩa, các cảnh báo và dữ liệu trong khoảng thời gian nhất định được coi là có liên quan",
-      "defaultWindowDescription": "Khi không có khớp trường ngữ nghĩa, các cảnh báo và dữ liệu trong khoảng thời gian nhất định được coi là có liên quan",
-      "defaultWindowPlaceholder": "Sử dụng khoảng thời gian cảnh báo mặc định",
-      "cancelButton": "Hủy",
-      "saveButton": "Lưu",
-      "settingsSaved": "Đã lưu cài đặt loại bỏ trùng lặp tổ chức thành công",
-      "settingsSaveError": "Không thể lưu cài đặt"
-    },
     "placeholders": {
       "typeSomething": "Nhập gì đó",
       "value": "Giá trị",
       "selectColumn": "Chọn cột",
       "savedFunctions": "Các hàm đã lưu",
-      "autoUsesCheckInterval": "Tự động (sử dụng khoảng kiểm tra)",
       "addTag": "Thêm thẻ và nhấn Enter"
     },
     "steps": {
       "compareWithPast": "So sánh với quá khứ",
-      "deduplication": "Loại bỏ trùng lặp",
       "advanced": "Nâng cao"
     },
     "stepCaptions": {
@@ -10690,7 +10647,6 @@
       "conditions": "Điều gì sẽ kích hoạt cảnh báo",
       "compareWithPast": "So sánh kết quả hiện tại với dữ liệu từ một khoảng thời gian khác",
       "alertSettings": "Đặt quy tắc cảnh báo và chọn cách bạn muốn được thông báo.",
-      "deduplication": "Tránh gửi cùng một cảnh báo nhiều lần bằng cách nhóm các cảnh báo tương tự lại với nhau.",
       "advanced": "Biến ngữ cảnh, mô tả và mẫu hàng"
     },
     "failedToFetchHistory": "Không thể lấy lịch sử cảnh báo",
@@ -10713,8 +10669,6 @@
         "closeActions": "Đóng hành động",
         "viewAlertHistory": "Xem lịch sử cảnh báo",
         "actionsFor": "Hành động cho:",
-        "configureDedup": "Cấu hình loại bỏ trùng lặp",
-        "configureDedupTooltip": "Cấu hình loại bỏ trùng lặp cho cảnh báo này",
         "editAlert": "Chỉnh sửa cảnh báo",
         "editAlertTooltip": "Chỉnh sửa cấu hình cảnh báo",
         "viewHistory": "Xem lịch sử",
@@ -11494,6 +11448,8 @@
       "recoveryChatMessage": "thông báo \"Đã giải quyết\" mới",
       "keepFiringFor": "Tiếp tục kích hoạt trong",
       "keepFiringForTooltip": "Chờ khoảng thời gian này sau khi điều kiện không còn đúng trước khi khôi phục. 0 sẽ khôi phục ngay lập tức.",
+      "suppressRepeats": "Chặn thông báo lặp lại",
+      "suppressRepeatsTooltip": "Chỉ thông báo một lần khi cảnh báo bắt đầu kích hoạt hoặc thay đổi mức độ, không phải ở mỗi lần đánh giá. Giữ tùy chọn này ở trạng thái tắt để tiếp tục nhận nhắc nhở sau mỗi khoảng thời gian im lặng.",
       "keepFiringForInvalid": "Nhập 0 giây hoặc nhiều hơn",
       "keepFiringForTooLong": "Nhập tối đa 86400 giây (24 giờ)"
     },
@@ -13996,7 +13952,6 @@
       "identityConfigNoSets": "Cấu hình ít nhất một bộ danh tính trước khi lưu.",
       "discoveredServicesTab": "Dịch vụ được phát hiện",
       "serviceDiscoveryTab": "Quy tắc phát hiện",
-      "alertCorrelationTab": "Nhóm cảnh báo",
       "fieldAliasesTab": "Ánh xạ trường",
       "fieldAliasesSaved": "Bí danh trường đã được lưu thành công",
       "fieldAliasesSaveError": "Không thể lưu bí danh trường",
@@ -21661,7 +21616,6 @@
     "alerts": {
       "failedToNavigateToAlert": "Không thể điều hướng đến cảnh báo",
       "alertNotFound": "Không tìm thấy cảnh báo",
-      "alertNotFoundInAlerts": "Không tìm thấy cảnh báo \"{name}\" trong số {count} cảnh báo",
       "failedToLoadAlerts": "Không thể tải danh sách cảnh báo",
       "alertsDeletedSuccessfully": "Đã xóa thành công {count} cảnh báo | Đã xóa thành công {count} cảnh báo",
       "failedToDeleteAlerts": "Không thể xóa {count} cảnh báo | Không thể xóa {count} cảnh báo",
@@ -21730,7 +21684,6 @@
       "pleaseWaitWhileLoadingTemplates": "Vui lòng đợi trong khi tải các mẫu...",
       "alertSavedSuccessfully": "Đã lưu cảnh báo thành công.",
       "alertUpdatedSuccessfully": "Đã cập nhật cảnh báo thành công.",
-      "openingDedupConfig": "Đang mở cấu hình khử trùng lặp cho: {name}",
       "editingAlert": "Đang chỉnh sửa cảnh báo: {name}",
       "ack": {
         "acked": "Đã xác nhận {name}",
@@ -26543,7 +26496,7 @@
       "logged": "Đã ghi nhận"
     },
     "policy": {
-      "gateHint": "Trong số các thay đổi đối với cảnh báo hiện có, chỉ khử trùng lặp tự áp dụng, kèm ảnh chụp trạng thái trước và thời hạn xem xét: giữ lại nếu các kiểm tra đạt, hoàn nguyên nếu không đạt. Mọi thứ khác đều chờ phê duyệt bằng một cú nhấp.",
+      "gateHint": "Trong số các thay đổi đối với cảnh báo hiện có, chỉ việc bật chặn thông báo lặp lại được tự động áp dụng, kèm ảnh chụp trạng thái trước đó và một khoảng thời gian xem xét: được giữ nếu các kiểm tra đạt, hoặc hoàn tác nếu chúng thất bại. Mọi thay đổi khác đều chờ phê duyệt bằng một cú nhấp.",
       "off": "Tắt",
       "suggest": "Đề xuất",
       "auto": "Tự động",
@@ -26562,7 +26515,7 @@
         "gateDesc": "Giữ thông báo gọi trực cho đến khi có kết quả điều tra, tối đa 2 phút. Mở khi lỗi: nếu triage hết thời gian hoặc thất bại, hệ thống vẫn gọi trực, báo rằng quá trình điều tra vẫn đang chạy hoặc đã thất bại, và nguyên nhân được gửi tiếp trong luồng."
       },
       "classes": {
-        "EnableDeduplication": "Bật khử trùng lặp cho cảnh báo lặp lại trong vài phút.",
+        "EnableDeduplication": "Bật chặn thông báo lặp lại cho cảnh báo đang thông báo ở mỗi lần đánh giá.",
         "CreateDetector": "Tạo bộ phát hiện bất thường trên yêu cầu, lỗi hoặc độ trễ của một dịch vụ.",
         "RaiseThreshold": "Nâng ngưỡng đang kích hoạt cả vào những ngày bình thường.",
         "LengthenEvaluationWindow": "Kéo dài cửa sổ của một cảnh báo hay dao động.",
@@ -27111,10 +27064,10 @@
           "on": "cảnh báo kết nối"
         },
         "L-302": {
-          "done": "Đã gộp 3 cảnh báo độ trễ checkout thành một",
-          "why": "Chúng cùng kích hoạt 94% thời gian, nên một lần chậm đã gọi bạn 3 lần.",
-          "from": "3 cảnh báo",
-          "to": "1",
+          "done": "Đã bật chặn thông báo lặp lại cho 3 cảnh báo độ trễ thanh toán",
+          "why": "Chúng thông báo ở mỗi lần đánh giá khi vẫn ở trạng thái kích hoạt, nên chỉ một lần chậm đã gọi trực bạn 120 lần.",
+          "from": "Mỗi lần đánh giá",
+          "to": "Một lần cho mỗi thay đổi",
           "on": "độ trễ checkout"
         },
         "L-303": {
@@ -27171,7 +27124,7 @@
         "checkoutPaged": "Tôi đã gọi trực về việc checkout lỗi thanh toán.",
         "recsHeld": "Tôi đã giữ lại một vấn đề nhỏ với recommendations cho bản tổng kết thứ Sáu.",
         "diskApproved": "Bạn đã phê duyệt việc nâng cảnh báo dung lượng đĩa trên ingest-1 lên {to}%.",
-        "latencyGrouped": "Tôi đã gộp ba cảnh báo chậm của checkout thành một, để một lần chậm chỉ gọi trực một lần.",
+        "latencyGrouped": "Tôi đã bật chặn thông báo lặp lại cho ba cảnh báo chậm thanh toán, vì vậy một lần chậm sẽ chỉ gọi trực một lần.",
         "queueFixed": "Tôi đã thêm worker cho hàng đợi orders, nhưng hàng đợi vẫn tiếp tục tăng, nên tôi đã hoàn nguyên và gọi trực.",
         "loginPaged": "Tôi đã gọi trực về việc đăng nhập chậm.",
         "queuePermission": "Bạn đã cho phép tôi tự thêm worker cho hàng đợi, tối đa 8.",

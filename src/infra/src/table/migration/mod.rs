@@ -244,6 +244,7 @@ mod m20261026_000001_backfill_v1_rca_pointer;
 mod m20261027_000001_alter_query_history;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
+mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
 mod m20261030_000002_create_org_domain_ownership_req_table;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
@@ -750,6 +751,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
             Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
             Box::new(m20261027_000001_alter_query_history::Migration),
+            Box::new(m20261030_000001_add_suppress_repeats_to_alerts::Migration),
             Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
             Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
         ]
@@ -849,7 +851,7 @@ mod tests {
         (
             130,
             "m20261030_000002_create_org_domain_ownership_req_table",
-        ),
+        )
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
