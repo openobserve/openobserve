@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title-data-test="add-template-title"
     :back="{
       label: t('alert_templates.header'),
-      onClick: () => emit('cancel:hideform'),
+      onClick: closeEditor,
     }"
     bleed
   >
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               :disabled="isSubmitting"
-              @click="$emit('cancel:hideform')"
+              @click="closeEditor"
               data-test="add-template-cancel-btn"
               >{{ t("alerts.cancel") }}</OButton
             >
@@ -290,13 +290,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
+    <EditorDraftDialogs :draft="templateDraft" />
   </OPageLayout>
 </template>
 <script lang="ts" setup>
 import { saveTemplateMutation } from "@/services/alert_templates.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
-import { ref, onActivated, computed, watch, defineAsyncComponent } from "vue";
+import { ref, onActivated, onMounted, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 
@@ -335,6 +336,14 @@ import {
   serializeContentSpec,
   type ContentSpec,
 } from "./template-content/contentSpec";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+
+interface TemplateDraftData {
+  values: AddTemplateForm;
+  contentSpec: ContentSpec;
+  customBodyStash: string | null;
+}
 
 const props = withDefaults(
   defineProps<{
@@ -345,8 +354,10 @@ const props = withDefaults(
      * "Copy of X" is created instead of overwriting X).
      */
     isClone?: boolean;
+    /** The template a clone was copied from; keys the clone's own draft slot. */
+    cloneSource?: string | null;
   }>(),
-  { isClone: false },
+  { isClone: false, cloneSource: null },
 );
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 
@@ -664,6 +675,72 @@ const applyTemplateData = () => {
 watch(() => props.template, applyTemplateData, { immediate: true });
 onActivated(() => applyTemplateData());
 
+// Drafts belong to the templates page; any other host keeps the plain editor.
+const draftsActive = router.currentRoute.value.name === "alertTemplates";
+const formValues = form.useStore((s: { values: AddTemplateForm }) => s.values);
+// Set while the leave dialog's Save runs, so a successful save neither closes the editor nor reloads the list.
+let leaveSave: { saved: boolean } | null = null;
+
+const serverTemplate = () =>
+  isUpdatingTemplate.value && props.template
+    ? {
+        name: props.template.name,
+        body: String(props.template.body ?? ""),
+        type: props.template.type ?? "",
+        title: String(props.template.title ?? ""),
+        kind: props.template.kind ?? "",
+      }
+    : null;
+
+const templateDraft = useEditorDraft<TemplateDraftData>({
+  kind: "alert_template",
+  entityLabel: () => t("common.editorDraft.entities.alert_template"),
+  entityId: () => (isUpdatingTemplate.value ? (props.template?.name ?? null) : null),
+  newVariant: () =>
+    props.isClone && props.template ? `clone:${props.cloneSource ?? props.template.name}` : null,
+  snapshot: () => ({
+    values: { ...formValues.value },
+    contentSpec: contentSpec.value,
+    customBodyStash: customBodyStash.value,
+  }),
+  apply: (data) => {
+    contentSpec.value = data.contentSpec;
+    customBodyStash.value = data.customBodyStash;
+    isSeededTemplate.value =
+      isSeededTemplate.value &&
+      serializeContentSpec(data.contentSpec) === serializeContentSpec(starterContentSpec());
+    // A saved template's name is locked, so the draft can never rename it.
+    form.reset({
+      ...data.values,
+      name: isUpdatingTemplate.value ? form.state.values.name : data.values.name,
+    });
+  },
+  base: serverTemplate,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await handleSave();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  leaveOnRouteUpdate: (to, from) =>
+    to.path !== from.path ||
+    to.query.action !== from.query.action ||
+    to.query.name !== from.query.name ||
+    to.query.clone !== from.query.clone,
+});
+
+onMounted(async () => {
+  if (draftsActive) await templateDraft.start();
+});
+
+const closeEditor = async () => {
+  if (await templateDraft.confirmLeave()) emit("cancel:hideform");
+};
+
 // http bodies must be valid JSON (with template placeholders). This stays a
 // submit-time toast side-effect — NOT a schema rule — to preserve the exact
 // pre-migration behaviour (Rule ④).
@@ -746,8 +823,13 @@ async function saveTemplate(value: AddTemplateForm) {
 
   const onSuccess = () => {
     dismiss();
-    emit("get:templates");
-    emit("cancel:hideform");
+    if (leaveSave) {
+      leaveSave.saved = true;
+    } else {
+      templateDraft.markSaved();
+      emit("get:templates");
+      emit("cancel:hideform");
+    }
     toast({
       variant: "success",
       message: t("alert_templates.savedSuccessfully"),

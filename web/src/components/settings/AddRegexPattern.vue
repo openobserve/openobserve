@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     :secondary-button-label="t('regex_patterns.cancel')"
     form-id="add-regex-pattern-form"
+    :close-guard="guardClose"
     @click:secondary="handleClose"
     data-test="add-regex-pattern-drawer"
   >
@@ -238,11 +239,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
+    <EditorDraftDialogs :draft="regexDraft" />
   </ODrawer>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed } from "vue";
+import { defineComponent, ref, watch, computed, nextTick } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -263,6 +265,10 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { makeAddRegexPatternSchema, type AddRegexPatternForm } from "./AddRegexPattern.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+
+type RegexPatternDraftData = Omit<AddRegexPatternForm, "outputString">;
 
 export default defineComponent({
   name: "AddRegexPattern",
@@ -294,6 +300,7 @@ export default defineComponent({
     OForm,
     OFormInput,
     OFormTextarea,
+    EditorDraftDialogs,
   },
   setup(props, { emit }) {
     const { t } = useI18nTyped();
@@ -355,11 +362,20 @@ export default defineComponent({
     // testString/outputString). Used by the Test button + highlight + output display.
     const testStringValue = ref<string>(addRegexPatternDefaults.value.testString ?? "");
     const outputStringValue = ref<string>("");
+    const formValues = ref<AddRegexPatternForm>({ ...addRegexPatternDefaults.value });
     watch(
       () => addRegexPatternForm.value,
       (formRef) => {
         const f = formRef?.form;
         if (!f) return;
+        const liveValues = f.useStore((s: { values: AddRegexPatternForm }) => s.values);
+        watch(
+          liveValues,
+          (v: AddRegexPatternForm) => {
+            formValues.value = { ...v };
+          },
+          { immediate: true },
+        );
         const livePattern = f.useStore((s: any) => s.values.pattern ?? "");
         watch(
           livePattern,
@@ -384,6 +400,64 @@ export default defineComponent({
           },
           { immediate: true },
         );
+      },
+      { immediate: true },
+    );
+
+    // Set while the leave dialog's Save runs, so a successful save does not close the drawer itself.
+    let leaveSave: { saved: boolean } | null = null;
+
+    const regexDraft = useEditorDraft<RegexPatternDraftData>({
+      kind: "regex_pattern",
+      entityLabel: () => t("common.editorDraft.entities.regex_pattern"),
+      entityId: () => (props.isEdit ? (props.data?.id ?? null) : null),
+      // The test output is a server result, not the user's work.
+      snapshot: () => ({
+        name: formValues.value.name ?? "",
+        pattern: formValues.value.pattern ?? "",
+        description: formValues.value.description ?? "",
+        testString: formValues.value.testString ?? "",
+      }),
+      apply: (data) => {
+        const f = addRegexPatternForm.value?.form;
+        if (!f) return;
+        // A saved pattern's name and description are locked, so the draft can never change them.
+        f.reset({
+          ...data,
+          name: props.isEdit ? f.state.values.name : data.name,
+          description: props.isEdit ? f.state.values.description : data.description,
+          outputString: "",
+        });
+      },
+      base: () =>
+        props.isEdit
+          ? {
+              name: props.data?.name ?? "",
+              pattern: props.data?.pattern ?? "",
+              description: props.data?.description ?? "",
+            }
+          : null,
+      // The editor stays mounted while the drawer is shut; only an open drawer holds work.
+      hasChanges: () => props.open,
+      save: async () => {
+        const run = { saved: false };
+        leaveSave = run;
+        try {
+          await addRegexPatternForm.value?.form?.handleSubmit();
+        } finally {
+          leaveSave = null;
+        }
+        return run.saved;
+      },
+    });
+
+    // Each open mounts a fresh form, which starts its own draft session.
+    watch(
+      () => (props.open ? addRegexPatternForm.value : null),
+      async (formRef) => {
+        if (!formRef) return;
+        await nextTick();
+        await regexDraft.start();
       },
       { immediate: true },
     );
@@ -462,8 +536,13 @@ export default defineComponent({
               : t("settings.addRegexPattern.createSuccess"),
             variant: "success",
           });
-          emit("close");
           emit("update:list");
+          if (leaveSave) {
+            leaveSave.saved = true;
+            return;
+          }
+          regexDraft.markSaved();
+          emit("close");
         }
       } catch (error) {
         const e = error as { response: { status: number; data?: { message?: string } } };
@@ -511,9 +590,22 @@ export default defineComponent({
       emit("close");
     };
 
-    const handleClose = () => {
+    const handleClose = async () => {
+      if (!(await regexDraft.confirmLeave())) return;
       emit("update:open", false);
       emit("close");
+    };
+
+    // The close button, Escape and an outside click ask first when the drawer holds unsaved work.
+    const guardClose = () => {
+      if (!regexDraft.hasUnsavedChanges()) {
+        regexDraft.discard();
+        return true;
+      }
+      void regexDraft.confirmLeave().then((allowed) => {
+        if (allowed) emit("update:open", false);
+      });
+      return false;
     };
 
     return {
@@ -539,6 +631,8 @@ export default defineComponent({
       inputContext,
       closeAddRegexPatternDialog,
       handleClose,
+      guardClose,
+      regexDraft,
       // Form wiring — MUST be returned so the Options-API template can resolve
       // them (a module import alone is out of the template's scope).
       addRegexPatternForm,

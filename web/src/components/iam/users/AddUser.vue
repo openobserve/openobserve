@@ -265,12 +265,8 @@ import { useRouter } from "vue-router";
 import userServiece from "@/services/users";
 import { userKeys } from "@/services/users.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import {
-  getImageURL,
-  useLocalCurrentUser,
-  useLocalUserInfo,
-  invalidateLoginData,
-} from "@/utils/zincutils";
+import { getImageURL } from "@/utils/zincutils";
+import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -754,7 +750,6 @@ export default defineComponent({
       logout_confirm,
       loggedInUserEmail,
       filterdOption,
-      invalidateLoginData,
       config,
       filterFn(val: any, update: any) {
         if (val === "") {
@@ -775,15 +770,8 @@ export default defineComponent({
   },
   methods: {
     signout() {
-      // Always call backend logout to clear auth cookies
-      this.invalidateLoginData();
-
-      this.store.dispatch("logout");
-
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      this.$router.push("/logout");
+      // The user's own password changed, so the old session is over whatever an open editor answers.
+      void signOutThroughLeaveGuards(this.$router, this.store, { forced: true });
     },
   },
   computed: {

@@ -21,7 +21,13 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
 import ReportList from "./ReportList.vue";
+import { reportDraftId } from "./reportDraft";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
 
@@ -937,5 +943,158 @@ describe("ReportList view state persistence", () => {
     await flushPromises();
 
     expect(vm.currentPage).toBe(1);
+  });
+});
+
+describe("ReportList editor drafts", () => {
+  let wrapper: VueWrapper;
+  const draftScope = (name: string | null, userEmail = "me@x.io"): EditorDraftScope => ({
+    kind: "report",
+    org: "test-org",
+    entityId: name === null ? null : reportDraftId("default", name),
+    userEmail,
+  });
+  const seed = (scope: EditorDraftScope) => writeEditorDraft(scope, { data: {} });
+  type ReportRow = typeof REPORT_SCHEDULED | typeof REPORT_CACHED;
+  interface DraftListVm {
+    confirmDeleteReport: (row: ReportRow) => void;
+    deleteReport: () => Promise<void>;
+    bulkDeleteReports: () => Promise<void>;
+    staticReportsList: ReportRow[];
+    selectedReports: ReportRow[];
+  }
+  const listVm = () => wrapper.vm as unknown as DraftListVm;
+
+  beforeEach(async () => {
+    localStorage.clear();
+    resetListViewState();
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
+      data: [REPORT_SCHEDULED, REPORT_CACHED],
+    } as never);
+    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.userInfo = { ...store.state.userInfo, email: "me@x.io" };
+    store.state.organizationData.allReportsListByFolderId = {};
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("dots the rows and the Add button that have this user's drafts", async () => {
+    seed(draftScope(REPORT_SCHEDULED.name));
+    seed(draftScope(REPORT_CACHED.name, "other@x.io"));
+    seed(draftScope(null));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+
+    const dot = wrapper.get(`[data-test="report-list-${REPORT_SCHEDULED.name}-draft-dot"]`);
+    expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
+    // Spaced by its row's gap like every other list's dot, not a margin of its own.
+    expect(dot.classes()).not.toContain("ms-2");
+    const nameRow = dot.element.closest(".gap-2");
+    expect(
+      nameRow?.querySelector(`[data-test="report-list-name-cell-${REPORT_SCHEDULED.name}"]`),
+    ).not.toBeNull();
+    expect(wrapper.find(`[data-test="report-list-${REPORT_CACHED.name}-draft-dot"]`).exists()).toBe(
+      false,
+    );
+    const addButton = wrapper.get('[data-test="report-list-add-report-btn"]');
+    expect(addButton.attributes("aria-label")).toMatch(/unsaved draft$/);
+    expect(addButton.find('[data-test="report-list-add-report-draft-dot"]').exists()).toBe(true);
+  });
+
+  it("dots a row only for the draft of its own folder", async () => {
+    const inOtherFolder = {
+      ...REPORT_SCHEDULED,
+      report_id: "uuid-other",
+      name: "Other Report",
+      folder_id: "folder-2",
+    };
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
+      data: [REPORT_SCHEDULED, inOtherFolder],
+    } as never);
+    const scoped = (folder: string, name: string) => ({
+      ...draftScope(null),
+      entityId: reportDraftId(folder, name),
+    });
+    seed(scoped("folder-2", REPORT_SCHEDULED.name));
+    seed(scoped("default", inOtherFolder.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+
+    const dot = (name: string) => wrapper.find(`[data-test="report-list-${name}-draft-dot"]`);
+    expect(dot(REPORT_SCHEDULED.name).exists()).toBe(false);
+    expect(dot(inOtherFolder.name).exists()).toBe(false);
+
+    seed(scoped("folder-2", inOtherFolder.name));
+    await flushPromises();
+    expect(dot(inOtherFolder.name).exists()).toBe(true);
+  });
+
+  it("drops every user's draft of a deleted report", async () => {
+    seed(draftScope(REPORT_SCHEDULED.name));
+    seed(draftScope(REPORT_SCHEDULED.name, "other@x.io"));
+    seed(draftScope(REPORT_CACHED.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = listVm();
+    vi.mocked(reports.deleteReportById).mockResolvedValueOnce({} as never);
+    vm.confirmDeleteReport(REPORT_SCHEDULED);
+    await vm.deleteReport();
+    await flushPromises();
+
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name))).toBeNull();
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name, "other@x.io"))).toBeNull();
+    expect(readEditorDraft(draftScope(REPORT_CACHED.name))).not.toBeNull();
+  });
+
+  it("drops the deleted report's draft of its own folder only", async () => {
+    const inOtherFolder = { ...REPORT_SCHEDULED, folder_id: "folder-2" };
+    const own = { ...draftScope(null), entityId: reportDraftId("folder-2", inOtherFolder.name) };
+    seed(own);
+    seed(draftScope(REPORT_SCHEDULED.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = listVm();
+    vi.mocked(reports.deleteReportById).mockResolvedValueOnce({} as never);
+    vm.confirmDeleteReport(inOtherFolder);
+    await vm.deleteReport();
+    await flushPromises();
+
+    expect(readEditorDraft(own)).toBeNull();
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name))).not.toBeNull();
+  });
+
+  it("keeps the draft when the delete fails", async () => {
+    seed(draftScope(REPORT_SCHEDULED.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = listVm();
+    vi.mocked(reports.deleteReportById).mockRejectedValueOnce({ response: { status: 500 } });
+    vm.confirmDeleteReport(REPORT_SCHEDULED);
+    await vm.deleteReport();
+    await flushPromises();
+
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name))).not.toBeNull();
+  });
+
+  it("drops drafts only of the reports a bulk delete removed", async () => {
+    seed(draftScope(REPORT_SCHEDULED.name));
+    seed(draftScope(REPORT_CACHED.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = listVm();
+    vm.staticReportsList = [{ ...REPORT_SCHEDULED }, { ...REPORT_CACHED }];
+    vm.selectedReports = [REPORT_SCHEDULED, REPORT_CACHED];
+    vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({
+      data: { successful: [REPORT_SCHEDULED.report_id], unsuccessful: [REPORT_CACHED.report_id] },
+    } as never);
+    await vm.bulkDeleteReports();
+    await flushPromises();
+
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name))).toBeNull();
+    expect(readEditorDraft(draftScope(REPORT_CACHED.name))).not.toBeNull();
   });
 });
