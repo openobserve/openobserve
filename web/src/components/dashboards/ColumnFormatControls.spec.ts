@@ -73,3 +73,20 @@ describe("ColumnFormatControls – Locale Format in the Unit dropdown", () => {
     );
   });
 });
+
+describe("ColumnFormatControls – cell display field types", () => {
+  it("offers bar gauge, sparkline and JSON next to the type choices", () => {
+    const col = reactive({ ...emptyColumnOverride("latency") });
+    const wrapper = mount(ColumnFormatControls, {
+      props: { col, isNumeric: true },
+      global: { plugins: [i18n] },
+    });
+    for (const type of ["auto", "num", "text", "bar_gauge", "sparkline", "json"]) {
+      expect(
+        wrapper.find(`[data-test="o2-format-field-type-${type}-latency"]`).exists(),
+        type,
+      ).toBe(true);
+    }
+    wrapper.unmount();
+  });
+});

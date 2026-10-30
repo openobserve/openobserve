@@ -76,6 +76,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             chartMax,
             store.state.theme,
             config?.color?.colorBySeries,
+            config,
           );
         } catch (error) {
           console.warn("Failed to get series color:", error);
