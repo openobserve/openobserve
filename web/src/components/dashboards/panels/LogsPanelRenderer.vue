@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #expansion="{ row }">
         <JsonPreview
           v-if="prettify"
-          :value="row"
+          :value="previewValue(row)"
           mode="expanded"
           class="px-2 py-1.5"
           hide-view-related
@@ -205,6 +205,12 @@ const expandedIds = ref<string[]>([]);
 watch(rows, () => {
   if (expandedIds.value.length) expandedIds.value = [];
 });
+
+// JsonPreview fetches the Original tab from the logs page's stream, not the panel's, so the row must not offer it.
+const previewValue = (row: Record<string, unknown>) => {
+  const { _o2_id: _omitted, ...rest } = row;
+  return rest;
+};
 
 const copyRow = (value: unknown) =>
   copyToClipboard(typeof value === "string" ? value : JSON.stringify(value, null, 2), t);

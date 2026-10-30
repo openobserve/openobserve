@@ -71,8 +71,8 @@ afterEach(() => {
   wrapper = undefined;
 });
 
-const mountPanel = async (config: Record<string, unknown> = {}) => {
-  const data = convertLogsPanelData(schema(config), [rows], {
+const mountPanel = async (config: Record<string, unknown> = {}, panelRows = rows) => {
+  const data = convertLogsPanelData(schema(config), [panelRows], {
     state: { timezone: "UTC", zoConfig: {} },
   });
   wrapper = mount(LogsPanelRenderer, {
@@ -109,6 +109,12 @@ describe("LogsPanelRenderer", () => {
     const error = { level: "error", source: "field", field: "level", notFetched: false } as const;
     expect(color(data[1])).toBe(severityIndicatorColor(error));
     expect(color(data[1])).not.toBe(color(data[0]));
+  });
+
+  it("keeps the logs page's Original tab out of the expanded row", async () => {
+    await mountPanel({}, [{ ...rows[0], _o2_id: 7 }]);
+    await expandFirst();
+    expect(wrapper!.findComponent(JsonPreview).props("value")).not.toHaveProperty("_o2_id");
   });
 
   it("expands a row into the logs page's read-only JSON preview", async () => {
