@@ -19159,6 +19159,7 @@
       "probeError": "Erreur de sonde"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "clic",
       "actionType": "saisie",
       "all": "Tous",
@@ -19874,6 +19875,13 @@
       "attemptN": "Attempt {n}",
       "detailAction": "Action",
       "detailSelector": "Sélecteur",
+      "detailStepId": "ID de l'étape",
+      "detailTargetUrl": "URL cible",
+      "detailStatus": "Statut",
+      "detailSkipReason": "Raison de l'omission",
+      "stepStatusSkipped": "Ignoré",
+      "stepStatusUnknown": "Inconnu",
+      "skippedCount": "{n} ignorés",
       "downloadTrace": "Télécharger {filename}",
       "errorFullscreenTitle": "Étape {id} : {action} - Erreur",
       "failedAtStartLoad": "Échec de l'ouverture de l'URL de départ",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "Maximum {max}. Les nouvelles tentatives s'exécutent dans le même travail, donc toute la séquence doit tenir dans le budget de vérification.",
       "retriesMaxBrowserHint": "Maximum {max} pour les vérifications de navigateur. Chaque tentative relance le parcours sur chaque appareil, donc un nombre plus élevé dépasserait le délai de la sonde et signalerait une défaillance que votre site n'a jamais connue.",
       "retryDelay": "Attendre",
-      "retryDelaySuffix": "ms entre deux tentatives.",
+      "retryDelaySuffix": "secondes entre les tentatives.",
       "schedule": "Programmation",
       "scheduleLater": "Planifier plus tard",
       "scheduleLaterTooltip": "Choisissez une date et une heure futures pour activer le chèque.",
@@ -20247,6 +20255,8 @@
         "restartConfig": "Redémarrer la configuration — copiez la commande d'installation de cet agent pour relancer l'installation / le redémarrage Docker (par exemple après une rotation de jeton).",
         "noAgents": "Aucun agent ne s'est encore enregistré pour cet emplacement.",
         "agentsUnavailable": "Les agents de cet emplacement sont enregistrés auprès d'un autre cluster et ne sont pas visibles ici.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Vérifications en cours depuis cet emplacement",
         "checkName": "Nom",
         "noChecks": "Aucune vérification n'est encore assignée à cet emplacement.",
@@ -21137,6 +21147,7 @@
         "system": "système"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Actif",
         "passed": "Réussi",
         "healthy": "Sain",

@@ -19159,6 +19159,7 @@
       "probeError": "Probe-Fehler"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "Klicken",
       "actionType": "Eingabe",
       "all": "Alle",
@@ -19874,6 +19875,13 @@
       "attemptN": "Versuch {n}",
       "detailAction": "Aktion",
       "detailSelector": "Selektor",
+      "detailStepId": "Schritt-ID",
+      "detailTargetUrl": "Ziel-URL",
+      "detailStatus": "Status",
+      "detailSkipReason": "Grund für Überspringen",
+      "stepStatusSkipped": "Übersprungen",
+      "stepStatusUnknown": "Unbekannt",
+      "skippedCount": "{n} übersprungen",
       "downloadTrace": "{filename} herunterladen",
       "errorFullscreenTitle": "Schritt {id}: {action} - Fehler",
       "failedAtStartLoad": "Öffnen der Start-URL fehlgeschlagen",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "Maximum {max}. Wiederholungen laufen im selben Job, daher muss die gesamte Sequenz in das Check-Budget passen.",
       "retriesMaxBrowserHint": "Maximum {max} für Browser-Checks. Jeder Versuch führt den Durchlauf auf jedem Gerät erneut aus, daher würde eine höhere Anzahl das Probe-Timeout überschreiten und einen Fehler melden, den Ihre Website nie hatte.",
       "retryDelay": "Zwischen den Wiederholungsversuchen",
-      "retryDelaySuffix": "ms warten.",
+      "retryDelaySuffix": "Sekunden zwischen den Wiederholungsversuchen.",
       "schedule": "Zeitplan",
       "scheduleLater": "Später planen",
       "scheduleLaterTooltip": "Wählen Sie ein Datum und eine Uhrzeit in der Zukunft, um den Scheck zu aktivieren.",
@@ -20247,6 +20255,8 @@
         "restartConfig": "Neustartkonfiguration – kopieren Sie den Setup-Befehl dieses Agenten, um die Installation / den Docker-Neustart erneut auszuführen (z. B. nach einer Token-Rotation).",
         "noAgents": "Es haben sich noch keine Agenten für diesen Standort registriert.",
         "agentsUnavailable": "Die Agenten dieses Standorts sind bei einem anderen Cluster registriert und hier nicht sichtbar.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Von diesem Standort ausgeführte Prüfungen",
         "checkName": "Name",
         "noChecks": "Diesem Standort sind noch keine Prüfungen zugewiesen.",
@@ -21137,6 +21147,7 @@
         "system": "System"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Verfügbar",
         "passed": "Bestanden",
         "healthy": "Gesund",

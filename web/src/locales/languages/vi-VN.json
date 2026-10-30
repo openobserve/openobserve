@@ -19159,6 +19159,7 @@
       "probeError": "Lỗi đầu dò"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "nhấp",
       "actionType": "gõ",
       "all": "Tất cả",
@@ -19874,6 +19875,13 @@
       "attemptN": "Lần thử {n}",
       "detailAction": "Hành động",
       "detailSelector": "Bộ chọn",
+      "detailStepId": "ID bước",
+      "detailTargetUrl": "URL đích",
+      "detailStatus": "Trạng thái",
+      "detailSkipReason": "Lý do bỏ qua",
+      "stepStatusSkipped": "Đã bỏ qua",
+      "stepStatusUnknown": "Không xác định",
+      "skippedCount": "Đã bỏ qua {n}",
       "downloadTrace": "Tải xuống {filename}",
       "errorFullscreenTitle": "Bước {id}: {action} - Lỗi",
       "failedAtStartLoad": "Không mở được URL bắt đầu",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "Tối đa {max}. Các lần thử lại chạy trong cùng một công việc, vì vậy toàn bộ chuỗi phải nằm trong ngân sách kiểm tra.",
       "retriesMaxBrowserHint": "Tối đa {max} cho kiểm tra trình duyệt. Mỗi lần thử sẽ chạy lại hành trình trên mọi thiết bị, nên nếu tăng thêm sẽ vượt quá thời gian chờ của probe và báo lỗi mà trang web của bạn không hề gặp phải.",
       "retryDelay": "Chờ",
-      "retryDelaySuffix": "ms giữa các lần thử lại.",
+      "retryDelaySuffix": "giây giữa các lần thử lại.",
       "schedule": "Lịch trình",
       "scheduleLater": "Lên lịch sau",
       "scheduleLaterTooltip": "Chọn ngày và giờ trong tương lai để kích hoạt kiểm tra.",
@@ -20247,6 +20255,8 @@
         "restartConfig": "Cấu hình khởi động lại — sao chép lệnh thiết lập của agent này để chạy lại cài đặt / khởi động lại docker (ví dụ sau khi xoay vòng token)",
         "noAgents": "Chưa có agent nào đăng ký cho vị trí này.",
         "agentsUnavailable": "Các agent của vị trí này đã đăng ký với một cụm khác và không hiển thị ở đây.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Các kiểm tra đang chạy từ vị trí này",
         "checkName": "Tên",
         "noChecks": "Chưa có kiểm tra nào được gán cho vị trí này.",
@@ -21137,6 +21147,7 @@
         "system": "hệ thống"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Hoạt động",
         "passed": "Đạt",
         "healthy": "Khỏe mạnh",

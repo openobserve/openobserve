@@ -19159,6 +19159,7 @@
       "probeError": "Błąd sondy"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "kliknij",
       "actionType": "wpisz",
       "all": "Wszystkie",
@@ -19874,6 +19875,13 @@
       "attemptN": "Próba {n}",
       "detailAction": "Akcja",
       "detailSelector": "Selektor",
+      "detailStepId": "ID kroku",
+      "detailTargetUrl": "Docelowy URL",
+      "detailStatus": "Status",
+      "detailSkipReason": "Powód pominięcia",
+      "stepStatusSkipped": "Pominięty",
+      "stepStatusUnknown": "Nieznany",
+      "skippedCount": "Pominięte: {n}",
       "downloadTrace": "Pobierz {filename}",
       "errorFullscreenTitle": "Krok {id}: {action} - Błąd",
       "failedAtStartLoad": "Nie udało się otworzyć początkowego URL",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "Maksimum {max}. Ponowienia są uruchamiane w ramach tego samego zadania, więc cała sekwencja musi zmieścić się w budżecie kontroli.",
       "retriesMaxBrowserHint": "Maksimum {max} dla kontroli przeglądarki. Każda próba ponownie uruchamia podróż na każdym urządzeniu, więc więcej przekroczyłoby limit czasu sondy i zgłosiło awarię, której Twoja witryna nigdy nie miała.",
       "retryDelay": "Poczekaj",
-      "retryDelaySuffix": "ms między ponownymi próbami.",
+      "retryDelaySuffix": "sekund między ponownymi próbami.",
       "schedule": "Harmonogram",
       "scheduleLater": "Zaplanuj później",
       "scheduleLaterTooltip": "Wybierz przyszłą datę i godzinę, aby aktywować sprawdzenie.",
@@ -20247,6 +20255,8 @@
         "restartConfig": "Konfiguracja restartu — skopiuj polecenie konfiguracji tego agenta, aby ponownie uruchomić instalację / restart dockera (np. po rotacji tokenu)",
         "noAgents": "Żaden agent nie zarejestrował się jeszcze dla tej lokalizacji.",
         "agentsUnavailable": "Agenci tej lokalizacji zarejestrowali się w innym klastrze i nie są tutaj widoczni.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Kontrole uruchamiane z tej lokalizacji",
         "checkName": "Nazwa",
         "noChecks": "Żadne kontrole nie zostały jeszcze przypisane do tej lokalizacji.",
@@ -21137,6 +21147,7 @@
         "system": "system"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Dostępny",
         "passed": "Zaliczony",
         "healthy": "Zdrowy",

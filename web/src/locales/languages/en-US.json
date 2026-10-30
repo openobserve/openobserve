@@ -19157,6 +19157,7 @@
       "probeError": "Probe error"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "click",
       "actionType": "type",
       "all": "All",
@@ -19872,6 +19873,13 @@
       "attemptN": "Attempt {n}",
       "detailAction": "Action",
       "detailSelector": "Selector",
+      "detailStepId": "Step ID",
+      "detailTargetUrl": "Target URL",
+      "detailStatus": "Status",
+      "detailSkipReason": "Skip reason",
+      "stepStatusSkipped": "Skipped",
+      "stepStatusUnknown": "Unknown",
+      "skippedCount": "{n} skipped",
       "downloadTrace": "Download {filename}",
       "errorFullscreenTitle": "Step {id}: {action} - Error",
       "failedAtStartLoad": "Failed opening Starting URL",
@@ -20021,7 +20029,7 @@
       "retriesMaxHint": "Maximum {max}. Retries run inside the same job, so the whole sequence must fit the check budget.",
       "retriesMaxBrowserHint": "Maximum {max} for browser checks. Each attempt reruns the journey on every device, so more would outrun the probe timeout and report a failure your site never had.",
       "retryDelay": "Wait for",
-      "retryDelaySuffix": "ms in between retries.",
+      "retryDelaySuffix": "seconds in between retries.",
       "schedule": "Schedule",
       "scheduleLater": "Schedule later",
       "scheduleLaterTooltip": "Choose a future date and time to activate the check.",
@@ -20245,6 +20253,8 @@
         "restartConfig": "Restart config — copy this agent's setup command to re-run install / docker restart (e.g. after a token rotation)",
         "noAgents": "No agents have registered for this location yet.",
         "agentsUnavailable": "This location's agents registered with another cluster and are not visible here.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Checks running from this location",
         "checkName": "Name",
         "noChecks": "No checks are assigned to this location yet.",
@@ -21135,6 +21145,7 @@
         "system": "system"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Up",
         "passed": "Passed",
         "healthy": "Healthy",

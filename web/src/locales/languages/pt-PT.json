@@ -19159,6 +19159,7 @@
       "probeError": "Erro de sonda"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "clique",
       "actionType": "introduzir",
       "all": "Todos",
@@ -19874,6 +19875,13 @@
       "attemptN": "Tentativa {n}",
       "detailAction": "Ação",
       "detailSelector": "Seletor",
+      "detailStepId": "ID do passo",
+      "detailTargetUrl": "URL de destino",
+      "detailStatus": "Estado",
+      "detailSkipReason": "Motivo da omissão",
+      "stepStatusSkipped": "Ignorado",
+      "stepStatusUnknown": "Desconhecido",
+      "skippedCount": "{n} ignorados",
       "downloadTrace": "Transferir {filename}",
       "errorFullscreenTitle": "Etapa {id}: {action} - Erro",
       "failedAtStartLoad": "Falha ao abrir o URL inicial",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "Máximo {max}. As tentativas são executadas no mesmo job, portanto toda a sequência deve caber no orçamento da verificação.",
       "retriesMaxBrowserHint": "Máximo {max} para verificações de navegador. Cada tentativa reexecuta a jornada em todos os dispositivos, por isso mais tentativas excederiam o tempo limite da sonda e reportariam uma falha que o seu site nunca teve.",
       "retryDelay": "Aguarde",
-      "retryDelaySuffix": "ms entre as novas tentativas.",
+      "retryDelaySuffix": "segundos entre tentativas.",
       "schedule": "Agendamento",
       "scheduleLater": "Agende mais tarde",
       "scheduleLaterTooltip": "Escolha uma data e hora futuras para ativar a verificação.",
@@ -20247,6 +20255,8 @@
         "restartConfig": "Configuração de reinício — copie o comando de configuração deste agente para reexecutar a instalação / reinício do docker (por exemplo, após uma rotação de token)",
         "noAgents": "Nenhum agente se registou para este local ainda.",
         "agentsUnavailable": "Os agentes deste local registaram-se noutro cluster e não estão visíveis aqui.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Verificações em execução a partir deste local",
         "checkName": "Nome",
         "noChecks": "Nenhuma verificação está atribuída a este local ainda.",
@@ -21137,6 +21147,7 @@
         "system": "sistema"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Ativo",
         "passed": "Aprovado",
         "healthy": "Saudável",

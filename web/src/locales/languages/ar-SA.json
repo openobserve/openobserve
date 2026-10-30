@@ -19159,6 +19159,7 @@
       "probeError": "خطأ في المجس"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "نقر",
       "actionType": "النوع",
       "all": "الجميع",
@@ -19874,6 +19875,13 @@
       "attemptN": "محاولة {n}",
       "detailAction": "الحدث",
       "detailSelector": "المختار",
+      "detailStepId": "معرّف الخطوة",
+      "detailTargetUrl": "عنوان URL الهدف",
+      "detailStatus": "الحالة",
+      "detailSkipReason": "سبب التخطي",
+      "stepStatusSkipped": "تم التخطي",
+      "stepStatusUnknown": "غير معروف",
+      "skippedCount": "تم تخطي {n}",
       "downloadTrace": "تحميل {filename}",
       "errorFullscreenTitle": "الخطوة {id}: {action} - خطأ",
       "failedAtStartLoad": "فشل فتح عنوان URL الابتدائي",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "أقصى {max}. إعادة المحاولات تتم داخل نفس المهمة، لذا يجب أن يتناسب التسلسل كله مع ميزانية الفحص.",
       "retriesMaxBrowserHint": "أقصى {max} لفحص المتصفح. كل محاولة تعيد تشغيل الرحلة على كل جهاز، لذا سيتجاوز عدد الأجهزة مهلة الاستطلاع ويبلغ عن فشل لم يحدث في موقعك.",
       "retryDelay": "انتظر",
-      "retryDelaySuffix": "MS بين محاولات.",
+      "retryDelaySuffix": "ثوانٍ بين كل إعادة محاولة.",
       "schedule": "الجدول الزمني",
       "scheduleLater": "الجدول لاحقا",
       "scheduleLaterTooltip": "اختر تاريخا ووقتا مستقبليا لتفعيل الفحص.",
@@ -20247,6 +20255,8 @@
         "restartConfig": "إعادة تشغيل الإعدادات — انسخ أمر إعداد هذا الوكيل لإعادة تشغيل التثبيت / إعادة تشغيل docker (مثلا بعد تدوير الرموز)",
         "noAgents": "لم يسجل أي وكلاء في هذا الموقع حتى الآن.",
         "agentsUnavailable": "وكلاء هذا الموقع مسجلون في مجموعة أخرى ولا يظهرون هنا.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "فحوصات تجري من هذا الموقع",
         "checkName": "الاسم",
         "noChecks": "لم يتم تعيين أي فحوصات لهذا الموقع حتى الآن.",
@@ -21137,6 +21147,7 @@
         "system": "النظام"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "إلى الأعلى",
         "passed": "تم النجاح",
         "healthy": "سليم",

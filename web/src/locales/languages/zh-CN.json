@@ -19159,6 +19159,7 @@
       "probeError": "探针错误"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "点击",
       "actionType": "输入",
       "all": "全部",
@@ -19874,6 +19875,13 @@
       "attemptN": "Attempt {n}",
       "detailAction": "操作",
       "detailSelector": "选择器",
+      "detailStepId": "步骤 ID",
+      "detailTargetUrl": "目标 URL",
+      "detailStatus": "状态",
+      "detailSkipReason": "跳过原因",
+      "stepStatusSkipped": "已跳过",
+      "stepStatusUnknown": "未知",
+      "skippedCount": "已跳过 {n} 个",
       "downloadTrace": "下载 {filename}",
       "errorFullscreenTitle": "步骤 {id}: {action} - 错误",
       "failedAtStartLoad": "打开起始 URL 失败",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "最大值为 {max}。重试在同一作业内运行，因此整个序列必须符合检查预算。",
       "retriesMaxBrowserHint": "浏览器检查的最大值为 {max}。每次尝试都会在每个设备上重新运行测试流程，因此更多尝试会超出探测超时，并报告您的网站从未发生过的故障。",
       "retryDelay": "等待",
-      "retryDelaySuffix": "ms 在两次重试之间。",
+      "retryDelaySuffix": "重试之间的秒数。",
       "schedule": "计划",
       "scheduleLater": "稍后安排",
       "scheduleLaterTooltip": "选择未来的日期和时间来激活支票。",
@@ -20247,6 +20255,8 @@
         "restartConfig": "重启配置 — 复制此代理的设置命令以重新运行安装 / docker 重启（例如在令牌轮换后）",
         "noAgents": "尚无代理为此位置注册。",
         "agentsUnavailable": "此位置的代理已注册到另一个集群，因此在此处不可见。",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "从此位置运行的检查",
         "checkName": "名称",
         "noChecks": "尚未为此位置分配任何检查。",
@@ -21137,6 +21147,7 @@
         "system": "系统"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "正常",
         "passed": "通过",
         "healthy": "健康",

@@ -19159,6 +19159,7 @@
       "probeError": "Prob hatası"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "tıklama",
       "actionType": "yazma",
       "all": "Tümü",
@@ -19874,6 +19875,13 @@
       "attemptN": "Deneme {n}",
       "detailAction": "Eylem",
       "detailSelector": "Seçici",
+      "detailStepId": "Adım kimliği",
+      "detailTargetUrl": "Hedef URL",
+      "detailStatus": "Durum",
+      "detailSkipReason": "Atlanma nedeni",
+      "stepStatusSkipped": "Atlandı",
+      "stepStatusUnknown": "Bilinmiyor",
+      "skippedCount": "{n} atlandı",
       "downloadTrace": "{filename} indir",
       "errorFullscreenTitle": "Adım {id}: {action} - Hata",
       "failedAtStartLoad": "Başlangıç URL'si açılamadı",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "Maksimum {max}. Yeniden denemeler aynı iş içinde çalışır, bu nedenle tüm sıra kontrol bütçesine sığmalıdır.",
       "retriesMaxBrowserHint": "Tarayıcı kontrolleri için maksimum {max}. Her deneme, her cihazda yolculuğu yeniden çalıştırır; bu nedenle daha fazlası denetim zaman aşımını aşar ve sitenizin hiç yaşamadığı bir hatayı raporlar.",
       "retryDelay": "Bekle",
-      "retryDelaySuffix": "Tekrar denemeler arasında ms.",
+      "retryDelaySuffix": "yeniden denemeler arasındaki saniye.",
       "schedule": "Zamanlama",
       "scheduleLater": "Daha sonra planlayın",
       "scheduleLaterTooltip": "Çeki etkinleştirmek için gelecekteki bir tarih ve saat seçin.",
@@ -20247,6 +20255,8 @@
         "restartConfig": "Yeniden başlatma yapılandırması — bu aracının kurulum komutunu kopyalayarak kurulumu / docker yeniden başlatmayı tekrar çalıştırın (ör. bir token yenilemesinden sonra)",
         "noAgents": "Bu konum için henüz hiçbir agent kaydolmadı.",
         "agentsUnavailable": "Bu konumdaki ajanlar başka bir kümeye kayıtlı ve burada görünmüyorlar.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "Bu konumdan çalışan kontroller",
         "checkName": "Ad",
         "noChecks": "Bu konuma henüz hiçbir kontrol atanmadı.",
@@ -21137,6 +21147,7 @@
         "system": "sistem"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "Aktif",
         "passed": "Geçti",
         "healthy": "Sağlıklı",

@@ -19159,6 +19159,7 @@
       "probeError": "프로브 오류"
     },
     "filters": {
+      "error": "Error",
       "actionClick": "클릭",
       "actionType": "입력",
       "all": "모두",
@@ -19874,6 +19875,13 @@
       "attemptN": "시도 {n}",
       "detailAction": "작업",
       "detailSelector": "선택기",
+      "detailStepId": "단계 ID",
+      "detailTargetUrl": "대상 URL",
+      "detailStatus": "상태",
+      "detailSkipReason": "건너뛴 이유",
+      "stepStatusSkipped": "건너뜀",
+      "stepStatusUnknown": "알 수 없음",
+      "skippedCount": "{n}개 건너뜀",
       "downloadTrace": "{filename} 다운로드",
       "errorFullscreenTitle": "단계 {id}: {action} - 오류",
       "failedAtStartLoad": "시작 URL을 여는 데 실패했습니다",
@@ -20023,7 +20031,7 @@
       "retriesMaxHint": "최대 {max}. 재시도는 동일한 작업 내에서 실행되므로 전체 시퀀스가 검사 예산에 맞아야 합니다.",
       "retriesMaxBrowserHint": "브라우저 검사의 최대값은 {max}입니다. 각 시도는 모든 기기에서 여정을 다시 실행하므로, 더 많으면 프로브 시간 초과를 초과하여 사이트에 실제로 없던 실패를 보고하게 됩니다.",
       "retryDelay": "대기 시간",
-      "retryDelaySuffix": "재시도 간격 (ms)",
+      "retryDelaySuffix": "재시도 간격(초).",
       "schedule": "일정",
       "scheduleLater": "나중에 예약",
       "scheduleLaterTooltip": "확인을 활성화할 미래 날짜 및 시간을 선택합니다.",
@@ -20247,6 +20255,8 @@
         "restartConfig": "구성 재시작 — 이 에이전트의 설정 명령을 복사하여 설치 / docker 재시작을 다시 실행합니다 (예: 토큰 회전 후)",
         "noAgents": "이 위치에 등록된 에이전트가 아직 없습니다.",
         "agentsUnavailable": "이 위치의 에이전트는 다른 클러스터에 등록되어 있으므로 여기서 볼 수 없습니다.",
+        "loadFailed": "Could not load this location. Check your connection and try again.",
+        "retry": "Retry",
         "checksTitle": "이 위치에서 실행 중인 검사",
         "checkName": "이름",
         "noChecks": "이 위치에 할당된 검사가 아직 없습니다.",
@@ -21137,6 +21147,7 @@
         "system": "시스템"
       },
       "serviceStatus": {
+        "error": "Error",
         "up": "정상",
         "passed": "통과",
         "healthy": "정상",
