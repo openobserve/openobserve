@@ -18,11 +18,8 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use axum::{
-    Json, http,
-    response::{IntoResponse, Response as HttpResponse},
-};
-use bytes::{Bytes, BytesMut};
+use axum::{http, response::Response as HttpResponse};
+use bytes::Bytes;
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
@@ -60,8 +57,7 @@ use super::{
 };
 use crate::{
     common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        otlp::{otlp_error_response, otlp_rejection_response},
+        otlp::{otlp_error_response, otlp_export_response, otlp_rejection_response},
         stream::SchemaRecords,
     },
     ingestion::{
@@ -1361,23 +1357,7 @@ fn format_response(
         ExportMetricsServiceResponse::default()
     };
 
-    match req_type {
-        OtlpRequestType::HttpJson => Ok(if partial {
-            (http::StatusCode::PARTIAL_CONTENT, Json(res)).into_response()
-        } else {
-            MetaHttpResponse::json(res)
-        }),
-        _ => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            Ok((
-                http::StatusCode::OK,
-                [(http::header::CONTENT_TYPE, "application/x-protobuf")],
-                out.to_vec(),
-            )
-                .into_response())
-        }
-    }
+    Ok(otlp_export_response(&res, req_type))
 }
 
 #[cfg(test)]
@@ -2241,18 +2221,54 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_format_response() {
+    #[tokio::test]
+    async fn test_format_response() {
         let partial_success = ExportMetricsPartialSuccess {
             rejected_data_points: 5,
             error_message: "Some data points were rejected".to_string(),
         };
 
-        let response = format_response(partial_success, OtlpRequestType::HttpJson);
-        assert!(response.is_ok());
+        let response = format_response(partial_success, OtlpRequestType::HttpJson).unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert_eq!(
+            response.headers()[http::header::CONTENT_TYPE],
+            crate::common::meta::http::CONTENT_TYPE_JSON
+        );
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: json::Value = json::from_slice(&body).unwrap();
+        assert_eq!(
+            body,
+            json::json!({
+                "partialSuccess": {
+                    "rejectedDataPoints": "5",
+                    "errorMessage": "Some data points were rejected"
+                }
+            })
+        );
+    }
 
-        let http_response = response.unwrap();
-        assert_eq!(http_response.status(), http::StatusCode::PARTIAL_CONTENT);
+    #[tokio::test]
+    async fn test_format_response_json_partial_success_default_message() {
+        let partial_success = ExportMetricsPartialSuccess {
+            rejected_data_points: 3,
+            error_message: String::new(),
+        };
+
+        let response = format_response(partial_success, OtlpRequestType::HttpJson).unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: json::Value = json::from_slice(&body).unwrap();
+        assert_eq!(body["partialSuccess"]["rejectedDataPoints"], "3");
+        assert!(
+            body["partialSuccess"]["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains("retention period")
+        );
     }
 
     #[test]
