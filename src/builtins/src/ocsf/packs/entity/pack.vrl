@@ -26,45 +26,42 @@ for_each(["host", "hostname", "computer", "computer_name", "host_name"]) -> |_in
   }
 }
 
-level_text = null
-for_each(["level", "log_level", "loglevel", "severity", "severity_text"]) -> |_index, key| {
-  value = get(., [key]) ?? null
-  if level_text == null && is_string(value) {
-    level_text = downcase(strip_whitespace(string(value) ?? ""))
-  }
-}
-
-outcome_text = null
-for_each(["outcome", "result", "event_outcome", "action_result"]) -> |_index, key| {
-  value = get(., [key]) ?? null
-  if outcome_text == null && is_string(value) {
-    outcome_text = downcase(strip_whitespace(string(value) ?? ""))
-  }
-}
-
 severity_ids = {"debug": 1, "trace": 1, "info": 1, "notice": 2, "warn": 3, "warning": 3, "error": 4, "err": 4, "critical": 5, "crit": 5, "alert": 5, "emergency": 6, "emerg": 6, "fatal": 6}
-severity_names = ["Unknown", "Informational", "Low", "Medium", "High", "Critical", "Fatal"]
-severity_id = 1
-if is_string(level_text) {
-  severity_id = int(get(severity_ids, [string(level_text) ?? ""]) ?? null) ?? 1
-}
+severity_names = {"0": "Unknown", "1": "Informational", "2": "Low", "3": "Medium", "4": "High", "5": "Critical", "6": "Fatal", "99": "Other"}
 
-status_id = 0
-if includes(["success", "succeeded", "ok", "allow", "allowed"], outcome_text) {
-  status_id = 1
-} else if includes(["failure", "failed", "fail", "deny", "denied", "error"], outcome_text) {
-  status_id = 2
+# The first recognised value wins; empty, unknown and numeric values do not stop the scan.
+severity_id = null
+for_each(["level", "log_level", "loglevel", "severity", "severity_text"]) -> |_index, key| {
+  text = downcase(strip_whitespace(string(get(., [key]) ?? null) ?? ""))
+  mapped = get(severity_ids, [text]) ?? null
+  if severity_id == null && is_integer(mapped) {
+    severity_id = mapped
+  }
 }
+if severity_id == null { severity_id = 1 }
 
+status_id = null
+for_each(["outcome", "result", "event_outcome", "action_result"]) -> |_index, key| {
+  text = downcase(strip_whitespace(string(get(., [key]) ?? null) ?? ""))
+  if status_id == null && includes(["success", "succeeded", "ok", "allow", "allowed"], text) {
+    status_id = 1
+  } else if status_id == null && includes(["failure", "failed", "fail", "deny", "denied", "error"], text) {
+    status_id = 2
+  }
+}
+if status_id == null { status_id = 0 }
+
+# Derived columns and names follow the event's final ids, which may be its own.
 if !exists(.class_uid) { .class_uid = 0 }
-if !exists(.class_name) { .class_name = "Base Event" }
-if !exists(.category_uid) { .category_uid = 0 }
-if !exists(.category_name) { .category_name = "Uncategorized" }
 if !exists(.activity_id) { .activity_id = 0 }
-if !exists(.activity_name) { .activity_name = "Unknown" }
-if !exists(.type_uid) { .type_uid = 0 }
+if !exists(.category_uid) && is_integer(.class_uid) { .category_uid = to_int(floor((int(.class_uid) ?? 0) / 1000)) }
+if !exists(.type_uid) && is_integer(.class_uid) && is_integer(.activity_id) { .type_uid = (int(.class_uid) ?? 0) * 100 + (int(.activity_id) ?? 0) }
+if !exists(.class_name) && .class_uid == 0 { .class_name = "Base Event" }
+if !exists(.category_name) && .category_uid == 0 { .category_name = "Uncategorized" }
+if !exists(.activity_name) && .activity_id == 0 { .activity_name = "Unknown" }
 if !exists(.severity_id) { .severity_id = severity_id }
-if !exists(.severity) { .severity = get(severity_names, [severity_id]) ?? "Informational" }
+severity_name = get(severity_names, [to_string(int(.severity_id) ?? -1)]) ?? null
+if !exists(.severity) && is_string(severity_name) { .severity = severity_name }
 if !exists(.status_id) { .status_id = status_id }
 if !exists(.time) { .time = to_unix_timestamp(now(), unit: "milliseconds") }
 

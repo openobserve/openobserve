@@ -14,5 +14,6 @@
   "severity": "Low",
   "status_id": 0,
   "actor": "system",
-  "src_endpoint_ip": "203.0.113.9"
+  "src_endpoint_ip": "203.0.113.9",
+  "actor_user_name": null
 }

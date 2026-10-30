@@ -271,7 +271,9 @@ mod tests {
         for run in fixture_runs() {
             let expected = expected(&run);
             for (key, value) in expected.as_object().unwrap() {
-                assert_eq!(run.output.get(key), Some(value), "{} {key}", run.name);
+                // flattening drops nulls, so an expected null means the column is absent
+                let want = (!value.is_null()).then_some(value);
+                assert_eq!(run.output.get(key), want, "{} {key}", run.name);
             }
         }
     }
