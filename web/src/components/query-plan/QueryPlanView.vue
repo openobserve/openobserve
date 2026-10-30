@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <QueryPlanLayout :selected-id="selectedId" data-test="query-plan-view">
+  <QueryPlanLayout data-test="query-plan-view">
     <template #summary>
       <PlanSummaryPanel :model="model" :summary="summary" @analyze="emit('analyze')" />
     </template>
@@ -26,42 +26,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         scope="sum"
         :selected-id="selectedId"
         :left-inset="leftInset"
-        @select="selectedId = $event"
+        @select="pick"
       />
     </template>
     <template #detail>
-      <PlanDetailPanel :model="model" :op-id="selectedId" @select="selectedId = $event" />
+      <PlanDetailPanel :model="model" :op-id="selectedId" @select="pick" />
     </template>
   </QueryPlanLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import {
-  buildProfileModel,
-  layoutProfile,
-  summarizePlan,
-  type QueryProfile,
-} from "@/utils/queryProfile";
+import { layoutProfile, summarizePlan, type ProfileModel } from "@/utils/queryProfile";
 import PlanDetailPanel from "./PlanDetailPanel.vue";
 import PlanSummaryPanel from "./PlanSummaryPanel.vue";
 import ProfileCanvas from "./ProfileCanvas.vue";
-import QueryPlanLayout from "./QueryPlanLayout.vue";
+import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
 
 const props = defineProps<{
-  profile: QueryProfile;
+  model: ProfileModel;
 }>();
 
 const emit = defineEmits<{ analyze: [] }>();
 
 const selectedId = ref<string | null>(null);
 
-const model = computed(() => buildProfileModel(props.profile, [], { planOnly: true }));
-const layout = computed(() => layoutProfile(model.value));
-const summary = computed(() => summarizePlan(model.value));
+const layout = computed(() => layoutProfile(props.model));
+const summary = computed(() => summarizePlan(props.model));
+
+function pick(id: string) {
+  selectedId.value = id;
+  revealDetail();
+}
 
 watch(
-  model,
+  () => props.model,
   (m) => {
     selectedId.value = summary.value.scans[0]?.opId ?? m.rootId;
   },

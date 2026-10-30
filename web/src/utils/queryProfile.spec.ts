@@ -540,6 +540,17 @@ describe("fallback when a remote node has no structured plan", () => {
 });
 
 describe("parseSearchStream / extractProfile", () => {
+  it("keeps the message of an error event, falling back to its detail", () => {
+    const err = (body: unknown) => `event: error\ndata: ${JSON.stringify(body)}\n\n`;
+    expect(parseSearchStream(err({ code: 500, message: "out of memory" }))?.error).toBe(
+      "out of memory",
+    );
+    expect(parseSearchStream(err({ code: 500, message: "", error_detail: "detail" }))?.error).toBe(
+      "detail",
+    );
+    expect(parseSearchStream(err({ code: 500 }))?.error).toBe("");
+  });
+
   it("merges hits across events and keeps took_detail from the metadata event", () => {
     const meta = {
       results: {

@@ -30,7 +30,7 @@ function opId(name: string, index = 0) {
 
 function mountView() {
   return mount(QueryPlanView, {
-    props: { profile },
+    props: { model },
     global: { plugins: [store, i18n] },
     attachTo: document.body,
   });

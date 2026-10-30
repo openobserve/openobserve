@@ -118,6 +118,8 @@ export interface PlanHit {
 
 export interface SearchStreamResult {
   hits: PlanHit[];
+  /** The query failed; the stream reports this in an `error` event of a 200 response. */
+  error?: string;
   took?: number;
   took_detail?: TookDetail;
   scan_size?: number;
@@ -568,9 +570,19 @@ export function parseSearchStream(sseText: string): SearchStreamResult | null {
     }
     if (!trimmed.startsWith("data:") || currentEvent === "progress") continue;
     const parsed = parseJson(trimmed.substring(5).trim());
+    if (currentEvent === "error") {
+      merged.error = streamErrorMessage(parsed);
+      found = true;
+      continue;
+    }
     if (parsed && typeof parsed === "object") found = mergeStreamEvent(merged, parsed) || found;
   }
   return found ? merged : null;
+}
+
+function streamErrorMessage(event: Record<string, unknown> | null): string {
+  const text = [event?.message, event?.error_detail].find((v) => typeof v === "string" && v);
+  return (text as string | undefined) ?? "";
 }
 
 function parseJson(text: string): Record<string, unknown> | null {

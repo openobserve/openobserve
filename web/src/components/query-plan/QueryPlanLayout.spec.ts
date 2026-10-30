@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { computed, ref } from "vue";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
-import QueryPlanLayout from "./QueryPlanLayout.vue";
+import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
 
 const desktop = ref(true);
 vi.mock("@/composables/useBreakpoint", () => ({
@@ -26,9 +26,8 @@ vi.mock("@/composables/useBreakpoint", () => ({
 
 let wrapper: VueWrapper;
 
-function mountLayout(selectedId: string | null = "op") {
+function mountLayout() {
   return mount(QueryPlanLayout, {
-    props: { selectedId },
     slots: {
       summary: '<div data-test="summary-content">summary</div>',
       canvas:
@@ -73,10 +72,12 @@ describe("QueryPlanLayout", () => {
     expect(wrapper.find('[data-test="query-plan-show-detail"]').exists()).toBe(true);
   });
 
-  it("brings the detail panel back when another operator is picked", async () => {
-    wrapper = mountLayout("a");
+  it("brings the detail panel back only when an operator is picked", async () => {
+    wrapper = mountLayout();
     await wrapper.find('[data-test="query-plan-hide-detail"]').trigger("click");
-    await wrapper.setProps({ selectedId: "b" });
+    expect(visible("query-plan-detail-panel")).toBe(false);
+    revealDetail();
+    await wrapper.vm.$nextTick();
     expect(visible("query-plan-detail-panel")).toBe(true);
   });
 

@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <QueryPlanLayout :selected-id="selectedId" data-test="query-profile-view">
+  <QueryPlanLayout data-test="query-profile-view">
     <template #summary>
       <ProfileSummaryPanel
         :model="model"
         :summary="summary"
         :scope="scope"
         :selected-id="selectedId"
-        @select="selectedId = $event"
+        @select="pick"
         @scope="scope = $event"
       />
     </template>
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :scope="scope"
         :selected-id="selectedId"
         :left-inset="leftInset"
-        @select="selectedId = $event"
+        @select="pick"
       >
         <template v-if="model.stages.length" #toolbar>
           <div
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model="model"
         :op-id="selectedId"
         :scope="scope"
-        @select="selectedId = $event"
+        @select="pick"
         @scope="scope = $event"
       />
     </template>
@@ -92,24 +92,23 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
-  buildProfileModel,
   clusterNodes,
   layoutProfile,
   nodeScope,
   scopeNodeKey,
   summarizeProfile,
-  type QueryProfile,
+  type ProfileModel,
   type SearchStreamResult,
   type StageScope,
 } from "@/utils/queryProfile";
 import ProfileCanvas from "./ProfileCanvas.vue";
 import ProfileDetailPanel from "./ProfileDetailPanel.vue";
 import ProfileSummaryPanel from "./ProfileSummaryPanel.vue";
-import QueryPlanLayout from "./QueryPlanLayout.vue";
+import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
 import { roleLabel } from "./profileText";
 
 const props = defineProps<{
-  profile: QueryProfile;
+  model: ProfileModel;
   stream?: Partial<SearchStreamResult> | null;
 }>();
 
@@ -118,12 +117,11 @@ const { t } = useI18nTyped();
 const scope = ref<StageScope>("sum");
 const selectedId = ref<string | null>(null);
 
-const model = computed(() => buildProfileModel(props.profile, props.stream?.hits ?? []));
-const layout = computed(() => layoutProfile(model.value));
-const summary = computed(() => summarizeProfile(model.value, props.stream ?? {}));
+const layout = computed(() => layoutProfile(props.model));
+const summary = computed(() => summarizeProfile(props.model, props.stream ?? {}));
 
 const nodeOptions = computed(() =>
-  clusterNodes(model.value).map((n) => {
+  clusterNodes(props.model).map((n) => {
     const role = roleLabel(t, n.role);
     return { label: raw(role ? `${n.name} · ${role}` : n.name), value: n.key };
   }),
@@ -131,6 +129,11 @@ const nodeOptions = computed(() =>
 
 const selectedNode = computed(() => scopeNodeKey(scope.value));
 const toggleValue = computed(() => (selectedNode.value ? "" : scope.value));
+
+function pick(id: string) {
+  selectedId.value = id;
+  revealDetail();
+}
 
 function onToggle(value: unknown) {
   if (value === "sum" || value === "max") scope.value = value;
@@ -141,7 +144,7 @@ function onNodeSelect(value: SelectModelValue) {
 }
 
 watch(
-  model,
+  () => props.model,
   (m) => {
     selectedId.value = summary.value.hotspots[0] ?? m.rootId;
     scope.value = "sum";

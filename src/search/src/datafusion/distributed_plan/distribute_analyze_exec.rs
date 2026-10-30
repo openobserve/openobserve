@@ -165,6 +165,8 @@ impl ExecutionPlan for DistributeAnalyzeExec {
             while let Some(batch) = stream.next().await.transpose()? {
                 total_rows += batch.num_rows();
             }
+            // remote decoders record each node's end time and fetch/decode time when dropped
+            drop(stream);
 
             let duration = std::time::Instant::now() - start;
             create_output_batch(
