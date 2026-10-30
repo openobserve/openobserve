@@ -9183,21 +9183,14 @@
     "scrollLeft": "Scroll services left",
     "scrollRight": "Scroll services right",
     "untitledIncident": "Untitled Incident",
-    "allClear": "All systems clear",
-    "allClearDesc": "No active anomalies, incidents, or degraded services in the selected time window. Your infrastructure looks healthy.",
-    "allClearDescScoped": "No open incidents, anomalies or degraded services in the selected time range.",
     "notMonitoredTitle": "Nothing is watched yet",
     "notMonitoredDesc": "Your data is arriving, but no alert or anomaly check runs on it. Add one and Overview lists anything that needs attention.",
     "notMonitoredAlert": "Create an alert",
     "notMonitoredAlertDesc": "Get notified when a query crosses a threshold",
     "notMonitoredAnomaly": "Set up anomaly detection",
     "notMonitoredAnomalyDesc": "Flag unusual volume without picking a threshold",
-    "emptyActionAlerts": "View alert rules",
-    "emptyActionAlertsDesc": "Review configured alerts and thresholds",
     "emptyActionLogs": "Explore logs",
     "emptyActionLogsDesc": "Search and filter your log streams",
-    "emptyActionTraces": "Explore traces",
-    "emptyActionTracesDesc": "Inspect distributed traces and service latency",
     "anomalyDetectedTitle": "Anomaly detected — {name}",
     "anomalyDetectedDescription": "Stream: {stream} · {count} anomalous point(s)",
     "secondsAgo": "{count}s ago",
@@ -9206,10 +9199,13 @@
     "daysAgo": "{count}d ago",
     "cards": {
       "firingAlerts": "Firing alerts",
+      "firingCritical": "{count} critical",
+      "firingOldest": "oldest {age}",
       "failingRules": "Failing rules",
       "openIncidents": "Open incidents",
       "pipelineErrors": "Pipeline errors",
       "pipelinesOf": "of {enabled} enabled",
+      "quietStreams": "Quiet streams",
       "streams": "Streams"
     },
     "state": {
@@ -9217,37 +9213,92 @@
       "tileLocked": "Locked",
       "tileError": "Unavailable"
     },
+    "time": {
+      "minutes": "{minutes}m",
+      "hoursMinutes": "{hours}h {minutes}m",
+      "daysHours": "{days}d {hours}h"
+    },
+    "level": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "ok": "Normal",
+      "no_data": "No data",
+      "unclassified": "Unclassified"
+    },
     "sections": {
       "alerts": "Alerts",
       "dataHealth": "Data health",
       "streams": "Streams",
       "topStreams": "Largest streams by ingested data",
-      "ingestLimit": "Ingest limit"
+      "ingestLimit": "Ingest limit",
+      "storage": "Storage"
     },
     "alerts": {
-      "firing": "Firing",
-      "pending": "Pending",
+      "criticalLevel": "Critical level",
+      "warningLevel": "Warning level",
       "failing": "Failing rules",
+      "firingNow": "Firing now, oldest first",
+      "firingFor": "Firing for",
+      "showMore": "Show {count} more firing alert | Show {count} more firing alerts",
+      "allClear": "No alerts are firing right now.",
       "emptyTitle": "No alert rules yet",
       "emptyAction": "Open alerts"
     },
     "dataHealth": {
+      "viewPipelines": "View pipelines",
+      "noPipelines": "No pipelines yet.",
       "pipelinesErrored": "Pipelines with errors",
-      "errorCount": "{errored} of {enabled} enabled",
-      "allHealthy": "No errors",
-      "noPipelines": "No pipelines yet."
+      "pipelinesNote": "Enabled pipelines with an error",
+      "quiet": "Streams gone quiet",
+      "quietNote": "Stopped writing between an hour and 7 days ago",
+      "failing": "Alert rules failing to evaluate",
+      "failingNote": "Rules whose last evaluation errored",
+      "delivery": "Alert delivery failures",
+      "deliveryNote": "Alerts that fired but could not notify",
+      "schema": "Schema changes in 24h",
+      "schemaNote": "New schema versions across your streams",
+      "status": {
+        "needsAction": "Needs action",
+        "warning": "Warning",
+        "healthy": "Healthy",
+        "info": "For information"
+      }
     },
     "streams": {
       "viewStreams": "View streams",
       "emptyTitle": "No streams yet",
       "emptyDesc": "Streams appear here once data starts arriving.",
       "startIngesting": "Start ingesting",
-      "typeSummary": "{count} stream | {count} streams"
+      "typeSummary": "{count} stream | {count} streams",
+      "shareOfTotal": "{percent}% of total",
+      "compactionPending": "{count} compaction job pending | {count} compaction jobs pending",
+      "compactionNone": "No compaction jobs pending"
+    },
+    "signals": {
+      "open": "Open",
+      "logs": "Logs",
+      "metrics": "Metrics",
+      "traces": "Traces",
+      "streams": "Streams",
+      "events": "Events",
+      "samples": "Samples",
+      "spans": "Spans",
+      "stored": "Stored"
+    },
+    "storage": {
+      "used": "Storage used",
+      "bySignal": "Storage by signal",
+      "splitNote": "The split covers logs, metrics and traces only.",
+      "emptyTitle": "No stored data yet"
     },
     "limit": {
       "used": "Ingested today (UTC)",
+      "ofLimit": "{used} of {limit}",
+      "noLimit": "No daily limit",
+      "resets": "Resets at 00:00 UTC, in {countdown}",
       "scope": "Across the whole deployment, not just this organization.",
       "daysOver": "Days over the limit this month",
+      "daysOverOf": "{days} of {allowed} allowed",
       "license": "License",
       "expired": "Expired",
       "valid": "Valid",
@@ -9256,6 +9307,16 @@
       "blockNote": "Search is blocked once the days over the limit pass the number your license allows.",
       "overLimit": "Over limit",
       "lockedMessage": "Track ingestion against your license limit with an enterprise license."
+    },
+    "empty": {
+      "incidents": "No open incidents in the selected time range",
+      "anomalies": "No anomalies detected in the selected time range",
+      "services": "No service data yet. Services appear once traces arrive",
+      "recentEvents": "No alert or pipeline events in the selected time range"
+    },
+    "stale": {
+      "message": "Showing data from {time}. Refresh failed.",
+      "retry": "Retry"
     },
     "freshness": "Alerts, pipelines, streams and limits show the current state, not the selected time range. Updated {time}. Incidents and recent events follow their own scope."
   },

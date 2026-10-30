@@ -15,14 +15,21 @@
 
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import type {
-  OrgOverview,
+  SegmentedBarSegment,
+  SegmentedBarVariant,
+} from "@/lib/data/SegmentedBar/OSegmentedBar.types";
+import type {
+  OverviewAlertLevel,
   OverviewAlertsData,
+  OverviewFiringAlert,
   OverviewSection,
   OverviewStreamTypeSummary,
   OverviewTopStream,
 } from "@/ts/interfaces/overview";
 
 export type OverviewView = "loading" | "error" | "forbidden" | "locked" | "empty" | "ok";
+
+export type OverviewDestination = "alerts" | "pipelines" | "streams";
 
 export const TOP_STREAMS_LIMIT = 5;
 
@@ -58,14 +65,6 @@ export function firingCount(alerts: OverviewAlertsData | undefined): number {
   return (alerts?.by_state.firing ?? 0) + (alerts?.by_state.notify_failed ?? 0);
 }
 
-export function overviewHasProblem(overview: OrgOverview): boolean {
-  return (
-    firingCount(overview.alerts.data) > 0 ||
-    (overview.alerts.data?.failed_evaluation ?? 0) > 0 ||
-    (overview.pipelines.data?.errored ?? 0) > 0
-  );
-}
-
 export function percentToFraction(percent: number): number {
   return Math.min(1, Math.max(0, percent / 100));
 }
@@ -87,4 +86,108 @@ export function mergeTopStreams(
 export function sizeShare(sizeMb: number, rows: TopStreamRow[]): number {
   const max = Math.max(0, ...rows.map((r) => r.storage_size_mb));
   return max > 0 ? sizeMb / max : 0;
+}
+
+export type OverviewSignal = "logs" | "metrics" | "traces";
+
+export const OVERVIEW_SIGNALS: OverviewSignal[] = ["logs", "metrics", "traces"];
+
+// the split bar, its legend and the top-stream swatch share one colour per signal
+export const SIGNAL_VARIANT: Record<OverviewSignal, SegmentedBarVariant> = {
+  logs: "default",
+  metrics: "info",
+  traces: "neutral",
+};
+
+export function isSignal(streamType: string): streamType is OverviewSignal {
+  return (OVERVIEW_SIGNALS as string[]).includes(streamType);
+}
+
+export function signalVariant(streamType: string): SegmentedBarVariant {
+  return isSignal(streamType) ? SIGNAL_VARIANT[streamType] : "muted";
+}
+
+// whole percent, 0 when there is nothing to divide by
+export function percentOf(part: number, total: number): number {
+  return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+export interface SignalSplitRow {
+  signal: OverviewSignal;
+  sizeMb: number;
+  percent: number;
+  segment: SegmentedBarSegment;
+}
+
+// enrichment, metadata and index streams stay out of the split: only the three signals are compared
+export function signalSplit(byType: OverviewStreamTypeSummary[]): SignalSplitRow[] {
+  const sizes = OVERVIEW_SIGNALS.map((signal) => ({
+    signal,
+    sizeMb: byType.find((x) => x.stream_type === signal)?.storage_size_mb ?? 0,
+  }));
+  const total = sizes.reduce((sum, x) => sum + x.sizeMb, 0);
+  return sizes.map(({ signal, sizeMb }) => ({
+    signal,
+    sizeMb,
+    percent: percentOf(sizeMb, total),
+    segment: {
+      id: signal,
+      pct: total > 0 ? (sizeMb / total) * 100 : 0,
+      variant: SIGNAL_VARIANT[signal],
+    },
+  }));
+}
+
+export interface Elapsed {
+  days: number;
+  hours: number;
+  minutes: number;
+}
+
+export const MS_PER_MINUTE = 60_000;
+
+// whole minutes, never negative: a clock slightly behind the server must not print "-1m"
+export function elapsedParts(ms: number): Elapsed {
+  const total = Math.max(0, Math.floor(ms / MS_PER_MINUTE));
+  return {
+    days: Math.floor(total / 1440),
+    hours: Math.floor((total % 1440) / 60),
+    minutes: total % 60,
+  };
+}
+
+export function microsToMs(micros: number): number {
+  return Math.floor(micros / 1000);
+}
+
+export const ALERT_LEVELS: OverviewAlertLevel[] = [
+  "critical",
+  "warning",
+  "ok",
+  "no_data",
+  "unclassified",
+];
+
+export function levelCount(
+  alerts: OverviewAlertsData | undefined,
+  level: OverviewAlertLevel,
+): number {
+  return alerts?.firing_by_level?.[level] ?? 0;
+}
+
+export function firingRows(alerts: OverviewAlertsData | undefined): OverviewFiringAlert[] {
+  return alerts?.firing ?? [];
+}
+
+// firing_by_level counts every firing rule, so it is the total the capped list is cut from
+export function firingTotal(alerts: OverviewAlertsData | undefined): number {
+  if (!alerts?.firing_by_level) return firingCount(alerts);
+  return ALERT_LEVELS.reduce((sum, level) => sum + levelCount(alerts, level), 0);
+}
+
+export function levelTone(level: OverviewAlertLevel): "error" | "warning" | "success" | "neutral" {
+  if (level === "critical") return "error";
+  if (level === "warning") return "warning";
+  if (level === "ok") return "success";
+  return "neutral";
 }

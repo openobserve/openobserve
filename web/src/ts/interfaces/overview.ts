@@ -37,10 +37,29 @@ export interface OverviewStreamTypeSummary {
   top: OverviewTopStream[];
 }
 
+export interface OverviewQuietStream {
+  name: string;
+  stream_type: string;
+  last_write: number;
+}
+
 export interface OverviewStreamsData {
   total_streams: number;
   total_storage_size_mb: number;
   by_type: OverviewStreamTypeSummary[];
+  quiet_count: number;
+  quiet: OverviewQuietStream[];
+  schema_changes_24h: number;
+  compaction_pending: number | null;
+}
+
+export type OverviewAlertLevel = "ok" | "warning" | "critical" | "no_data" | "unclassified";
+
+export interface OverviewFiringAlert {
+  name: string;
+  stream: string;
+  level: OverviewAlertLevel;
+  since: number;
 }
 
 export interface OverviewAlertsData {
@@ -50,6 +69,8 @@ export interface OverviewAlertsData {
   by_state: Record<string, number>;
   by_level: Record<string, number>;
   failed_evaluation: number;
+  firing: OverviewFiringAlert[];
+  firing_by_level: Record<OverviewAlertLevel, number>;
 }
 
 export interface OverviewPipelinesData {
@@ -64,6 +85,10 @@ export interface OverviewLimitsData {
   ingestion_used_percent: number;
   expired: boolean;
   days_over_limit: number;
+  used_today_gb: number | null;
+  limit_today_gb: number | null;
+  allowed_days: number | null;
+  resets_at: number;
 }
 
 export interface OrgOverview {

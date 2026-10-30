@@ -48,6 +48,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("overview.freshness", { time: generatedAtLabel }) }}
     </p>
 
+    <OBanner
+      v-if="showOverviewCards && overviewRefreshFailed"
+      variant="warning"
+      inline-actions
+      class="mb-3"
+      data-test="overview-stale-notice"
+    >
+      {{ t("overview.stale.message", { time: generatedAtLabel }) }}
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="refresh"
+          data-test="overview-stale-retry-btn"
+          @click="() => loadOverview(true)"
+        >
+          {{ t("overview.stale.retry") }}
+        </OButton>
+      </template>
+    </OBanner>
+
     <OverviewHeadlineStrip
       v-if="showOverviewCards"
       class="mb-5"
@@ -70,17 +91,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pending="overviewPending"
         :failed="overviewFailed"
         :forbidden="overviewForbidden"
+        :incidents-state="incidentsTile"
+        :incidents-total="incidentsTotal"
         @retry="() => loadOverview(true)"
         @open="goToAlertList"
       />
       <OverviewDataHealthCard
         class="self-start"
-        :section="overview?.pipelines"
+        :overview="overview"
         :pending="overviewPending"
         :failed="overviewFailed"
         :forbidden="overviewForbidden"
         @retry="() => loadOverview(true)"
-        @open="goToPipelines"
+        @open="onHealthOpen"
       />
     </div>
 
@@ -170,6 +193,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeIncidents')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('incidents')"
+      section="incidents"
+      kind="forbidden"
+      :title="t('overview.activeIncidents')"
+    />
 
     <!-- Locked: no license to unlock Incidents, shown instead of omitted so
          the capability is discoverable from a build that can't enable it. -->
@@ -191,6 +220,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
       </div>
     </section>
+
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('incidents')"
+      section="incidents"
+      kind="empty"
+      :title="t('overview.activeIncidents')"
+    />
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
     <section
@@ -353,6 +389,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.services')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('services')"
+      section="services"
+      kind="forbidden"
+      :title="t('overview.services')"
+    />
 
     <!-- Locked: Services shares the Incidents license gate — same bundle, no
          separate upsell story of its own. -->
@@ -370,6 +412,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
       </div>
     </section>
+
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('services')"
+      section="services"
+      kind="empty"
+      :title="t('overview.services')"
+    />
 
     <!-- Service node side panel (latency / RED charts) -->
     <template v-if="incidentsAccess.allowed && selectedService">
@@ -445,6 +494,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeAnomalies')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('anomalies')"
+      section="anomalies"
+      kind="forbidden"
+      :title="t('overview.activeAnomalies')"
+    />
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('anomalies')"
+      section="anomalies"
+      kind="empty"
+      :title="t('overview.activeAnomalies')"
+    />
 
     <!-- RECENT EVENTS (alert firing feed) -->
     <section v-if="recentEvents.length > 0" class="mb-5" data-test="overview-recent-events-section">
@@ -494,6 +555,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.recentEvents')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('recentEvents')"
+      section="recentEvents"
+      kind="forbidden"
+      :title="t('overview.recentEvents')"
+    />
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('recentEvents')"
+      section="recentEvents"
+      kind="empty"
+      :title="t('overview.recentEvents')"
+    />
+
+    <OverviewSignalCards
+      v-if="showOverviewCards"
+      class="mb-5"
+      :section="overview?.streams"
+      :pending="overviewPending"
+      :failed="overviewFailed"
+      :forbidden="overviewForbidden"
+      @open="onSignalOpen"
+    />
 
     <div
       v-if="showOverviewCards"
@@ -509,15 +592,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @open="goToStreams"
         @start-ingesting="goToIngestion"
       />
-      <OverviewLimitCard
-        class="self-start"
-        :section="overview?.limits"
-        :pending="overviewPending"
-        :failed="overviewFailed"
-        :forbidden="overviewForbidden"
-        @retry="() => loadOverview(true)"
-        @unlock="openUpgradeDialog"
-      />
+      <div class="flex flex-col gap-3 self-start">
+        <OverviewLimitCard
+          :section="overview?.limits"
+          :pending="overviewPending"
+          :failed="overviewFailed"
+          :forbidden="overviewForbidden"
+          @retry="() => loadOverview(true)"
+          @unlock="openUpgradeDialog"
+        />
+        <OverviewStorageCard
+          :section="overview?.streams"
+          :pending="overviewPending"
+          :failed="overviewFailed"
+          :forbidden="overviewForbidden"
+          @retry="() => loadOverview(true)"
+        />
+      </div>
     </div>
 
     <OEmptyState
@@ -581,103 +672,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <HomeNoDataState v-else-if="pageState === 'no-data'" tab="overview" flag-off />
 
-    <!-- Empty state — everything is healthy or no data yet -->
-    <OEmptyState
-      v-else-if="pageState === 'all-clear' && overviewAllClear"
-      illustration="check"
-      size="hero"
-      :hide-action="true"
-      data-test="overview-all-clear-empty-state"
-    >
-      <template #title>{{ t("overview.allClear") }}</template>
-      <template #description>{{
-        flagOn ? t("overview.allClearDescScoped") : t("overview.allClearDesc")
-      }}</template>
-      <template #actions>
-        <!-- View alerts -->
-        <button
-          v-if="showAlertsCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-alerts-card"
-          @click="goToAlertList"
-        >
-          <span
-            class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="notifications" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionAlerts")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionAlertsDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
-          />
-        </button>
-        <!-- Explore logs -->
-        <button
-          v-if="showLogsCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-logs-card"
-          @click="goToLogs"
-        >
-          <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="search" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionLogs")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionLogsDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
-          />
-        </button>
-        <!-- Explore traces -->
-        <button
-          v-if="showTracesCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-traces-card"
-          @click="goToTraces"
-        >
-          <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="account-tree" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionTraces")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionTracesDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
-          />
-        </button>
-      </template>
-    </OEmptyState>
-
     <!-- Alert History Drawer — opened from anomaly Investigate button -->
     <AlertHistoryDrawer
       v-model:open="showAlertHistoryDrawer"
@@ -717,6 +711,7 @@ import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OverviewSectionError from "./OverviewSectionError.vue";
+import OverviewSectionEmpty from "./OverviewSectionEmpty.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -728,9 +723,12 @@ import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
 import OverviewStreamsCard from "./overview/OverviewStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
+import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
+import OverviewStorageCard from "./overview/OverviewStorageCard.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
-import { overviewHasProblem } from "./overview/overviewFormat";
+import { type OverviewDestination, type OverviewSignal } from "./overview/overviewFormat";
 import { overviewKeys } from "@/services/overview.querykeys";
 import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -871,18 +869,13 @@ const overviewState = reactive({ loading: false });
 let overviewSeq = 0;
 let overviewOrg = "";
 const overviewForbidden = ref(false);
+// a failed refresh keeps the last good snapshot on screen instead of blanking every card
+const overviewRefreshFailed = ref(false);
 const generatedAtLabel = computed(() => {
   if (!overview.value) return "";
   const zone = store.state.timezone || "UTC";
   const time = formatTimestampInTimezone(overview.value.generated_at, "YYYY-MM-DD HH:mm", zone);
   return `${time} (${zone})`;
-});
-// the all-clear hero may only show once the cards loaded and found nothing wrong
-const overviewAllClear = computed(() => {
-  const o = overview.value;
-  if (!o || overviewFailed.value || overviewState.loading) return false;
-  if (o.alerts.status === "error" || o.pipelines.status === "error") return false;
-  return !overviewHasProblem(o);
 });
 const showOverviewCards = computed(
   () => !["forbidden", "no-data", "not-monitored"].includes(pageState.value),
@@ -931,8 +924,28 @@ const pageState = computed<PageState>(() => {
   }
   return "all-clear";
 });
+const pageShowsSections = computed(
+  () => pageState.value !== "error" && pageState.value !== "forbidden",
+);
+// an edition without the service graph refuses it with 403, which is no outage
+const isDenied = (key: SectionKey) => isForbidden(sectionFailure[key]);
 const showSectionError = (key: SectionKey) =>
-  isFailed(key) && pageState.value !== "error" && pageState.value !== "forbidden";
+  isFailed(key) && !isDenied(key) && pageShowsSections.value;
+const showSectionForbidden = (key: SectionKey) =>
+  isFailed(key) && isDenied(key) && pageShowsSections.value;
+const sectionApplies = (key: SectionKey) => {
+  if (key === "incidents") return isIncidentsEnabled.value;
+  if (key === "anomalies") return anomalyEnabled.value;
+  if (key === "services") return incidentsAccess.value.allowed;
+  return true;
+};
+// an empty message needs a settled, successful, applicable section on a page that shows the cards
+const showSectionEmpty = (key: SectionKey) =>
+  showOverviewCards.value &&
+  pageShowsSections.value &&
+  sectionState[key].loaded &&
+  !isFailed(key) &&
+  sectionApplies(key);
 
 /* Wraps a loader with its section's state. The loaders swallow their own errors,
    and `finally` also covers the early `return` in the enterprise-gated ones, so
@@ -1008,6 +1021,7 @@ const loadOverview = async (force = false) => {
     overview.value = null;
     overviewFailed.value = false;
     overviewForbidden.value = false;
+    overviewRefreshFailed.value = false;
   }
   overviewState.loading = true;
   try {
@@ -1022,10 +1036,16 @@ const loadOverview = async (force = false) => {
     overview.value = res;
     overviewFailed.value = false;
     overviewForbidden.value = false;
+    overviewRefreshFailed.value = false;
   } catch (err) {
     if (seq !== overviewSeq) return;
-    overview.value = null;
     overviewForbidden.value = isForbidden(err);
+    if (overview.value && !overviewForbidden.value) {
+      overviewRefreshFailed.value = true;
+      return;
+    }
+    overview.value = null;
+    overviewRefreshFailed.value = false;
     overviewFailed.value = !overviewForbidden.value;
   } finally {
     if (seq === overviewSeq) {
@@ -1507,7 +1527,6 @@ const goToIncident = (inc: any) => {
 // ever offering a card the user has no way to actually land on.
 const showAlertsCard = computed(() => router.hasRoute("alertList"));
 const showLogsCard = computed(() => router.hasRoute("logs"));
-const showTracesCard = computed(() => router.hasRoute("traces"));
 
 const goToAlertList = () => {
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
@@ -1529,10 +1548,20 @@ const goToIngestion = () => {
   router.push({ name: "ingestion", query: { org_identifier: orgId.value } });
 };
 
+const onHealthOpen = (destination: OverviewDestination) => {
+  if (destination === "alerts") goToAlertList();
+  else if (destination === "pipelines") goToPipelines();
+  else goToStreams();
+};
+
+const onSignalOpen = (signal: OverviewSignal) => {
+  router.push({ name: signal, query: { org_identifier: orgId.value } });
+};
+
 const onHeadlineSelect = (target: OverviewTarget) => {
   if (target === "firing" || target === "failing") goToAlertList();
   else if (target === "pipelines") goToPipelines();
-  else if (target === "streams") goToStreams();
+  else if (target === "streams" || target === "quiet") goToStreams();
   else if (incidentsTile.value === "locked") openUpgradeDialog();
   else goToIncidentList();
 };
@@ -1550,10 +1579,6 @@ const goToAnomalies = () => {
 
 const goToLogs = () => {
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
-};
-
-const goToTraces = () => {
-  router.push({ name: "traces", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {

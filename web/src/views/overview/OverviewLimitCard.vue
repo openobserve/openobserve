@@ -32,8 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="overview-limit-status"
             >{{ status.label }}</OTag
           >
-          <span class="text-text-heading text-sm font-medium" data-test="overview-limit-percent">{{
-            raw(`${percent.toFixed(1)}%`)
+          <span class="text-text-heading text-sm font-medium" data-test="overview-limit-usage">{{
+            usageLabel
           }}</span>
         </span>
       </div>
@@ -41,17 +41,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("overview.limit.scope") }}
       </p>
       <OProgressBar
+        v-if="hasLimit"
         :value="percentToFraction(percent)"
         :variant="percentVariant(percent)"
+        :aria-label="t('overview.limit.used')"
         data-test="overview-limit-bar"
       />
+      <p v-else class="text-text-secondary text-xs" data-test="overview-limit-no-limit">
+        {{ t("overview.limit.noLimit") }}
+      </p>
+      <p v-if="resetsLabel" class="text-text-secondary text-xs" data-test="overview-limit-resets">
+        {{ resetsLabel }}
+      </p>
       <div class="flex items-center justify-between gap-3">
         <span class="text-text-secondary text-sm">{{ t("overview.limit.daysOver") }}</span>
         <OTag
           type="countChip"
           :value="daysOver > 0 ? 'warning' : 'neutral'"
           data-test="overview-limit-days-over"
-          >{{ daysOver }}</OTag
+          >{{ daysOverLabel }}</OTag
         >
       </div>
       <p class="text-text-secondary text-xs" data-test="overview-limit-block-note">
@@ -75,9 +83,11 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { formatSizeFromMB } from "@/utils/formatters";
 import type { OverviewLimitsData, OverviewSection } from "@/ts/interfaces/overview";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import { limitLevel, percentToFraction, percentVariant, sectionView } from "./overviewFormat";
+import { useOverviewTime } from "./useOverviewTime";
 
 const props = defineProps<{
   section?: OverviewSection<OverviewLimitsData>;
@@ -89,6 +99,7 @@ const props = defineProps<{
 const emit = defineEmits<{ retry: []; unlock: [] }>();
 
 const { t } = useI18nTyped();
+const { formatCountdown } = useOverviewTime();
 
 const view = computed(() => sectionView(props.section, props));
 const percent = computed(() => props.section?.data?.ingestion_used_percent ?? 0);
@@ -100,5 +111,32 @@ const status = computed(() => {
   return null;
 });
 const daysOver = computed(() => props.section?.data?.days_over_limit ?? 0);
+const hasLimit = computed(() => props.section?.data?.limit_today_gb != null);
+
+const gb = (value: number) => raw(formatSizeFromMB(value * 1024));
+
+const usageLabel = computed(() => {
+  const data = props.section?.data;
+  const percentText = raw(`${percent.value.toFixed(1)}%`);
+  if (data?.used_today_gb == null) return percentText;
+  if (data.limit_today_gb == null) return gb(data.used_today_gb);
+  return t("overview.limit.ofLimit", {
+    used: gb(data.used_today_gb),
+    limit: gb(data.limit_today_gb),
+  });
+});
+
+// the countdown reads the clock when a new snapshot arrives, so it is as fresh as the data
+const resetsLabel = computed(() => {
+  const resetsAt = props.section?.data?.resets_at;
+  if (!resetsAt) return null;
+  return t("overview.limit.resets", { countdown: formatCountdown(resetsAt, Date.now()) });
+});
+
+const daysOverLabel = computed(() => {
+  const allowed = props.section?.data?.allowed_days;
+  if (allowed == null) return raw(daysOver.value);
+  return t("overview.limit.daysOverOf", { days: daysOver.value, allowed });
+});
 const expired = computed(() => props.section?.data?.expired === true);
 </script>
