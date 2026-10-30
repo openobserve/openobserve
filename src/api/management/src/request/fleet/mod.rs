@@ -251,6 +251,7 @@ pub async fn delete_collector(
         (status = 202, description = "Queued", content_type = "application/json", body = config::meta::fleet::RestartQueued),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "The collector does not accept restart commands", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn restart_collector(
