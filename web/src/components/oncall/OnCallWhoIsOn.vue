@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="closed ? 'text-text-secondary' : 'text-status-error-text'"
         data-test="oncall-who-is-on-nobody"
       >
-        {{ closed ? t("oncall.nobodyWasOnCall") : t("oncall.nobodyOnCall") }}
+        {{ nobodyLine }}
       </p>
 
       <template v-else>
@@ -179,6 +179,8 @@ const props = withDefaults(
     ackedBy?: string | null;
     /** Whether `positions` reflects a call still in flight, for the empty-roster skeleton. */
     loading?: boolean;
+    /** The team is gone, so the empty roster points at a handoff rather than at adding a rotation. */
+    teamDeleted?: boolean;
   }>(),
   {
     positions: () => [],
@@ -188,6 +190,7 @@ const props = withDefaults(
     closedAt: null,
     ackedBy: null,
     loading: false,
+    teamDeleted: false,
   },
 );
 
@@ -195,6 +198,11 @@ const { t } = useI18nTyped();
 const nowMicros = useOnCallClock();
 
 const closed = computed(() => Boolean(props.closedAt));
+
+const nobodyLine = computed(() => {
+  if (closed.value) return t("oncall.nobodyWasOnCall");
+  return props.teamDeleted ? t("oncall.nobodyOnCallTeamDeleted") : t("oncall.nobodyOnCall");
+});
 
 /// The first rotation the team staffs. Not a special one: the response is
 /// ordered by the schedule, so this is "the position listed first" rather than

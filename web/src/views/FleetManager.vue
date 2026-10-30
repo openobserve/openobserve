@@ -29,9 +29,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         :data-test="`fleet-manager-create-${activeTab}`"
+        :aria-label="
+          showNewConfigDot ? t('common.editorDraft.newDot', { label: createLabel }) : undefined
+        "
         @click="onCreate"
       >
         {{ createLabel }}
+        <EditorDraftDot
+          v-if="showNewConfigDot"
+          :saved-at="configDrafts.savedAt(null)"
+          corner
+          data-test="fleet-manager-create-configurations-draft-dot"
+        />
       </OButton>
     </template>
 
@@ -77,6 +86,8 @@ import FleetConfigurations from "@/components/fleet/FleetConfigurations.vue";
 import FleetSettings from "@/components/fleet/FleetSettings.vue";
 import FleetAudit from "@/components/fleet/FleetAudit.vue";
 import { fleetLocation, resolveFleetTab, type FleetTab } from "@/components/fleet/fleetRoute";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -93,6 +104,10 @@ const tabs = computed<{ name: FleetTab; label: I18nText; icon: IconName }[]>(() 
 ]);
 
 const activeTab = computed(() => resolveFleetTab(route.query));
+const configDrafts = useEditorDraftIds("fleet_config");
+const showNewConfigDot = computed(
+  () => activeTab.value === "configurations" && configDrafts.hasNew,
+);
 
 const createLabel = computed<I18nText | null>(() => {
   switch (activeTab.value) {

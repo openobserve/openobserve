@@ -402,12 +402,14 @@ import {
 } from "@/composables/dashboard/useColumnFormatting";
 import {
   parseOverrideConfigs,
+  resolveIsNumber,
   applyColumnOverrides,
   buildValueMappingCache,
   formatNumericValue,
 } from "@/utils/dashboard/tableConfigUtils";
 
 import SeriesAddMenu from "./SeriesAddMenu.vue";
+import { applyTableOptions } from "@/utils/dashboard/tableOptions";
 import { lineThicknessOf } from "@/utils/dashboard/promqlChartSeriesProps";
 import SeriesFormatControls from "./SeriesFormatControls.vue";
 import { valueMappingPatternErrors } from "./addPanel/valueMappingErrors";
@@ -604,11 +606,7 @@ export default defineComponent({
     };
 
     const isNumericColumn = (col: ColumnOverrideUI): boolean =>
-      col.fieldType === "num"
-        ? true
-        : col.fieldType === "text"
-          ? false
-          : detectedNumeric(col.field);
+      resolveIsNumber(detectedNumeric(col.field), col.fieldType);
 
     watch(
       () => columnOverrides.value.map((c) => `${c.field}|${c.fieldType}`),
@@ -678,7 +676,10 @@ export default defineComponent({
       const dataKey = String(baseColumn.field ?? baseColumn.alias ?? baseColumn.name ?? col.field);
       const rows = base?.rows?.length ? base.rows : makeDummyRows(dataKey, isNumeric);
       const previewCol = buildPreviewColumn(baseColumn, col, isNumeric);
-      return { rows, columns: [previewCol] };
+      const preview = { rows, columns: [previewCol] };
+      const entry = serializeColumnOverride(col);
+      applyTableOptions(preview, { config: { override_config: entry ? [entry] : [] } });
+      return preview;
     };
 
     const selectedPreview = computed(() => {
