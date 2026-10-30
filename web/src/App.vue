@@ -27,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { onMounted, watch } from "vue";
+import { onMounted, onUnmounted, watch } from "vue";
+import { expireSession } from "@/utils/sessionServices";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import { getLocale, isRtlLocale } from "@/locales";
 import { ConfigProvider } from "reka-ui";
@@ -52,6 +53,31 @@ export default {
     if (creds) {
       router.push("/logs");
     }
+
+    // Client-side defense in depth. Server-side enforcement is required separately.
+    const idleLimitMs = 30 * 60 * 1000;
+    let lastInteraction = Date.now();
+    let idleCheck: ReturnType<typeof setInterval> | undefined;
+    const markInteraction = () => {
+      if (document.visibilityState === "visible") lastInteraction = Date.now();
+    };
+    const interactionEvents = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
+    onMounted(() => {
+      interactionEvents.forEach((event) =>
+        window.addEventListener(event, markInteraction, { passive: true }),
+      );
+      idleCheck = setInterval(() => {
+        if (store.state.loginState && Date.now() - lastInteraction >= idleLimitMs) {
+          expireSession(store);
+        }
+      }, 15_000);
+    });
+    onUnmounted(() => {
+      interactionEvents.forEach((event) =>
+        window.removeEventListener(event, markInteraction),
+      );
+      if (idleCheck) clearInterval(idleCheck);
+    });
 
     // Initialize theme colors on app mount
     // This runs once when the app loads and applies the correct theme colors
