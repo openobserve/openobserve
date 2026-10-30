@@ -50,8 +50,9 @@ describe("QueryProfileView", () => {
 
   afterEach(() => wrapper?.unmount());
 
-  it("draws every operator once, one box per stage and a label per plan shape", () => {
+  it("draws every operator once, one box per stage and a label per plan shape", async () => {
     wrapper = mountView();
+    await wrapper.find('[data-test="query-profile-fold-plumbing"]').trigger("click");
     const model = buildProfileModel(joinProfile());
     expect(wrapper.findAll('[data-test^="query-profile-card-"][role="button"]')).toHaveLength(
       model.order.length,
@@ -127,5 +128,67 @@ describe("QueryProfileView", () => {
     const table = wrapper.find('[data-test="query-profile-op-nodes"]');
     expect(table.text()).toContain("Files");
     expect(table.text()).not.toContain("Cache");
+  });
+
+  describe("folding", () => {
+    const model = buildProfileModel(joinProfile());
+    const join = model.order.find((id) => model.operators[id].name === "HashJoinExec")!;
+    const repartition = model.order.find((id) => model.operators[id].name === "RepartitionExec")!;
+    const cards = () => wrapper.findAll('[data-test^="query-profile-card-"][role="button"]');
+    const find = (test: string) => wrapper.find(`[data-test="${test}"]`);
+
+    it("collapses a branch from the card toggle and opens it from the fold card", async () => {
+      wrapper = mountView();
+      const before = cards().length;
+      await find(`query-profile-card-${join}-branch`).trigger("click");
+      expect(cards().length).toBeLessThan(before);
+      expect(find(`query-profile-fold-branch-${join}`).text()).toContain("operators hidden");
+      await find(`query-profile-fold-branch-${join}`).trigger("click");
+      expect(cards()).toHaveLength(before);
+    });
+
+    it("opens a folded operator from its edge and folds it back from the card", async () => {
+      wrapper = mountView();
+      await find(`query-profile-chip-${repartition}`).trigger("click");
+      expect(find(`query-profile-card-${repartition}`).exists()).toBe(true);
+      await find(`query-profile-card-${repartition}-refold`).trigger("click");
+      expect(find(`query-profile-card-${repartition}`).exists()).toBe(false);
+      expect(find(`query-profile-chip-${repartition}`).exists()).toBe(true);
+    });
+
+    it("collapses a stage into a summary card that names it", async () => {
+      wrapper = mountView();
+      const stage = model.stages[1];
+      await find(`query-profile-collapse-stage-${stage.id}`).trigger("click");
+      expect(find(`query-profile-stage-${stage.id}`).exists()).toBe(false);
+      expect(find(`query-profile-fold-stage-${stage.id}`).text()).toContain("Stage 2");
+    });
+
+    it("moves the selection up when a fold hides the selected operator", async () => {
+      wrapper = mountView();
+      expect(find("query-profile-detail").text()).toContain("DataSource");
+      await find(`query-profile-card-${join}-branch`).trigger("click");
+      await flushPromises();
+      expect(find("query-profile-detail").text()).toContain("HashJoin");
+    });
+
+    it("focuses one branch from the detail panel and shows the whole plan from the notice", async () => {
+      wrapper = mountView();
+      await find("query-profile-detail-focus").trigger("click");
+      expect(find("query-profile-fold-notice").text()).toContain("Showing only the branch through");
+      expect(wrapper.findAll('[data-test^="query-profile-fold-group-"]').length).toBeGreaterThan(0);
+      await find("query-profile-fold-notice-action").trigger("click");
+      expect(find("query-profile-fold-notice").exists()).toBe(false);
+      expect(wrapper.findAll('[data-test^="query-profile-fold-group-"]')).toHaveLength(0);
+    });
+
+    it("expands everything and keeps hotspots open on the hot path", async () => {
+      wrapper = mountView();
+      await find(`query-profile-card-${join}-branch`).trigger("click");
+      await find("query-profile-expand-all").trigger("click");
+      expect(find(`query-profile-fold-branch-${join}`).exists()).toBe(false);
+      await find("query-profile-hot-path").trigger("click");
+      expect(find("query-profile-fold-notice").text()).toContain("top hotspots");
+    });
   });
 });

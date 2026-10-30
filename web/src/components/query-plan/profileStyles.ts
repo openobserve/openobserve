@@ -52,6 +52,11 @@ export interface AnalyzeFact {
   sub?: I18nText;
 }
 
+export interface FoldNotice {
+  text: I18nText;
+  action: I18nText;
+}
+
 export interface AnalyzeNotice {
   variant: "info" | "error";
   text: I18nText;

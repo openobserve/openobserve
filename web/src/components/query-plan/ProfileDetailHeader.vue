@@ -23,7 +23,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="rounded-default grid size-6 shrink-0 place-items-center" :class="style.chip">
         <OIcon :name="style.icon" size="sm" />
       </span>
-      <OTruncatedText class="text-text-heading text-lg font-semibold">{{ label }}</OTruncatedText>
+      <OTruncatedText class="text-text-heading flex-1 text-lg font-semibold">{{
+        label
+      }}</OTruncatedText>
+      <OButton
+        v-if="focused || canFocus"
+        variant="outline"
+        size="xs"
+        :icon-left="focused ? 'unfold-more' : 'account-tree'"
+        :data-test="focused ? 'query-profile-detail-unfocus' : 'query-profile-detail-focus'"
+        @click="emit('focus', focused ? null : op.id)"
+        >{{
+          focused ? t("search.queryProfile.showWholePlan") : t("search.queryProfile.onlyThisBranch")
+        }}</OButton
+      >
     </div>
     <div v-if="relatives.length" class="mt-2 flex flex-wrap gap-1.5">
       <OBadge
@@ -47,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -57,9 +71,11 @@ import { operatorTitle, operatorWhere } from "./profileText";
 const props = defineProps<{
   model: ProfileModel;
   op: ProfileOperator;
+  canFocus?: boolean;
+  focused?: boolean;
 }>();
 
-const emit = defineEmits<{ select: [opId: string] }>();
+const emit = defineEmits<{ select: [opId: string]; focus: [opId: string | null] }>();
 
 const { t } = useI18nTyped();
 

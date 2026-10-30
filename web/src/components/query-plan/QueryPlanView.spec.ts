@@ -45,8 +45,21 @@ describe("QueryPlanView", () => {
 
   afterEach(() => wrapper?.unmount());
 
-  it("draws every operator as a card without any runtime numbers", () => {
+  it("folds plumbing operators onto edges until the fold switch is turned off", async () => {
     wrapper = mountView();
+    const cards = () => wrapper.findAll('[data-test^="query-profile-card-"][role="button"]');
+    expect(cards().length).toBeLessThan(model.order.length);
+    expect(
+      wrapper.find(`[data-test="query-profile-chip-${opId("RepartitionExec")}"]`).exists(),
+    ).toBe(true);
+    await wrapper.find('[data-test="query-profile-fold-plumbing"]').trigger("click");
+    expect(cards()).toHaveLength(model.order.length);
+    expect(wrapper.findAll('[data-test^="query-profile-chip-"]')).toHaveLength(0);
+  });
+
+  it("draws every operator as a card without any runtime numbers", async () => {
+    wrapper = mountView();
+    await wrapper.find('[data-test="query-profile-fold-plumbing"]').trigger("click");
     const cards = wrapper.findAll('[data-test^="query-profile-card-"][role="button"]');
     expect(cards).toHaveLength(model.order.length);
     expect(wrapper.find('[data-test="query-profile-canvas"] [role="progressbar"]').exists()).toBe(
@@ -68,8 +81,9 @@ describe("QueryPlanView", () => {
     );
   });
 
-  it("shows a short readable detail on each card", () => {
+  it("shows a short readable detail on each card", async () => {
     wrapper = mountView();
+    await wrapper.find('[data-test="query-profile-fold-plumbing"]').trigger("click");
     expect(cardText(wrapper, opId("NewEmptyExec"))).toContain("Scan · app_logs");
     expect(cardText(wrapper, opId("NewEmptyExec"))).toContain("app_logs · 2 columns");
     expect(cardText(wrapper, opId("FilterExec"))).toContain("level = error");
