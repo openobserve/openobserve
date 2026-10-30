@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   nobody reads, and the red one has to survive being scanned past.
 -->
 <template>
-  <span class="flex items-center gap-1" :data-test="`oncall-channels-${email}`">
+  <span class="flex flex-wrap items-center gap-1" :data-test="`oncall-channels-${email}`">
     <span v-if="!chips.length" class="text-text-muted text-xs">{{ ABSENT }}</span>
     <template v-for="chip in chips" :key="chip.channel">
       <OButton
@@ -45,6 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OTooltip side="bottom" :content="chip.tip" />
     </template>
+    <!-- Its own line under the icons: the column is sized for three chips, and a cut word says nothing. -->
+    <span
+      v-if="blockedWord"
+      class="text-text-secondary basis-full text-xs"
+      :data-test="`oncall-channels-word-${email}`"
+    >
+      {{ blockedWord }}
+    </span>
   </span>
 </template>
 
@@ -153,6 +161,21 @@ function chipOf(c: ChannelReadiness): Chip {
     link,
   };
 }
+
+/// One word for the worst blocked state; a cause no word names (no provider, failing sends) stays quiet rather than wrong.
+const blockedWord = computed<I18nText | null>(() => {
+  const of = (channel: Channel) => props.channels.find((c) => c.channel === channel);
+  const email = of("email");
+  if (email && !email.deliverable) return t("oncall.reachWordEmailWontArrive");
+  const phone = [of("sms"), of("voice")].filter(
+    (c): c is ChannelReadiness => !!c && !c.deliverable,
+  );
+  if (phone.some((c) => c.configured_but_unverified)) return t("oncall.reachWordNotVerified");
+  if (phone.some((c) => (c.blocked_because ?? "").toLowerCase().includes("no phone on file"))) {
+    return t("oncall.reachWordNoPhone");
+  }
+  return null;
+});
 
 function openMine() {
   router.push({

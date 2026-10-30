@@ -568,6 +568,27 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("GROUP BY x_axis_1, breakdown_1");
     });
 
+    it("drops a y HAVING filter on a distribution, whose raw rows are not grouped", () => {
+      mockQueryData.fields.y = [
+        {
+          alias: "y_axis_1",
+          column: "latency",
+          isDerived: false,
+          functionName: null,
+          args: [{ type: "field", value: { field: "latency" } }],
+          havingConditions: [{ operator: ">", value: 5 }],
+        },
+      ];
+
+      const result = buildSQLChartQuery({
+        queryData: mockQueryData,
+        chartType: "distribution",
+        dashboardPanelData: mockDashboardPanelData,
+      });
+      expect(result).toContain('latency as "y_axis_1"');
+      expect(result).not.toContain("HAVING");
+    });
+
     it("should build query with x-axis fields only", () => {
       mockQueryData.fields.x = [
         {

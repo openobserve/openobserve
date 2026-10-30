@@ -149,11 +149,26 @@ export default class DashboardSetting {
   async cancelSettingDashboard() {
     await this.cancelBtn.waitFor({ state: "visible" });
     await this.cancelBtn.click();
+    await this.discardSettingsDraftIfAsked();
+  }
+
+  // Closing with unsaved settings opens the leave dialog; Discard keeps the old close-and-forget behaviour.
+  async discardSettingsDraftIfAsked() {
+    const dialog = this.page.locator('[data-test="editor-draft-leave-dialog"]');
+    const drawer = this.page.locator('[data-test="dashboard-settings-drawer"]');
+    const asked = await Promise.race([
+      dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => true),
+      drawer.waitFor({ state: "hidden", timeout: 5000 }).then(() => false),
+    ]).catch(() => false);
+    if (!asked) return;
+    await dialog.locator('[data-test="o-dialog-neutral-btn"]').click();
+    await dialog.waitFor({ state: "hidden", timeout: 10000 });
   }
   //close setting dashboard//
   async closeSettingDashboard() {
     await this.closeSetting.waitFor({ state: "visible" });
     await this.closeSetting.click();
+    await this.discardSettingsDraftIfAsked();
     // The ODrawer animates out over a backdrop that still swallows pointer
     // events mid-transition, so a following click (e.g. the back button) can be
     // eaten. Wait for it to actually be gone.
@@ -546,6 +561,7 @@ export default class DashboardSetting {
         // Wait for close button with a short timeout
         await closeBtn.waitFor({ state: "visible", timeout: 3000 });
         await closeBtn.click({ timeout: 2000 });
+        await this.discardSettingsDraftIfAsked();
 
         // Wait for dialog to actually disappear
         await settingsDialog.waitFor({ state: "hidden", timeout: 5000 });

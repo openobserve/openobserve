@@ -83,6 +83,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-else class="text-text-secondary text-sm">{{ t("oncall.neverAcknowledged") }}</span>
       </template>
 
+      <!-- The same one phrase the Pages list's Escalation column says; no progress is fetched here, so only the record's step is claimed. -->
+      <template #cell-state="{ row }">
+        <span :data-test="`oncall-recent-pages-state-${row.id}`">
+          <OnCallEscalationCell
+            :response-id="row.id"
+            :record="row"
+            :total-rungs="stepsFor(row)?.length ?? null"
+            :reached-step="reachedStep(row)"
+            :progress-loaded="false"
+          />
+        </span>
+      </template>
+
       <template #cell-opened_at="{ value }">
         <OTimeCell :value="value" unit="us" />
       </template>
@@ -98,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import useBreakpoint from "@/composables/useBreakpoint";
+import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -109,6 +123,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { reachedStepOf } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -132,6 +147,15 @@ const emit = defineEmits<{ open: [page: OnCallResponse]; "view-all": [] }>();
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
+
+/// The ladder's steps for this record's priority, earliest first.
+function stepsFor(page: OnCallResponse) {
+  const steps = props.policy?.rungs.find((rung) => rung.priority === page.priority)?.steps;
+  return steps ? [...steps].sort((a, b) => a.after_micros - b.after_micros) : null;
+}
+
+const reachedStep = (page: OnCallResponse) =>
+  reachedStepOf(stepsFor(page), page.reached_rung_micros);
 
 /// The delay before this record's ladder would have woken a SECOND person.
 function secondRungDelay(page: OnCallResponse): number | null {
@@ -158,6 +182,12 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     // A phone table scrolls instead of flexing, and the default width there leaves the alert name a few characters.
     ...(isMobile.value ? { size: 200 } : {}),
     meta: { isName: true, flex: true },
+  },
+  {
+    id: "state",
+    header: t("oncall.state"),
+    accessorFn: (page: OnCallResponse) => page.state,
+    size: 180,
   },
   {
     id: "responder",

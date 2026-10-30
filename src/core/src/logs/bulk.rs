@@ -41,6 +41,7 @@ use crate::{
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
+pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
 
 pub async fn ingest(
     thread_id: usize,
@@ -465,9 +466,24 @@ pub(super) fn prepare_bulk_record(
     }
     let parsed = record
         .get(TIMESTAMP_COL_NAME)
+        // flattening renames a key such as `@timestamp` to `_timestamp`
+        .or_else(|| {
+            record
+                .iter()
+                .find(|(key, value)| {
+                    // what `format_key` turns into `_timestamp`, matched without allocating
+                    let key = key.as_bytes();
+                    key.len() == TIMESTAMP_COL_NAME.len()
+                        && !key[0].is_ascii_alphanumeric()
+                        && key[1..].eq_ignore_ascii_case(&TIMESTAMP_COL_NAME.as_bytes()[1..])
+                        && (value.is_string() || value.is_number())
+                })
+                .map(|(_, value)| value)
+        })
         .map(parse_timestamp_micro_from_value);
     let (timestamp, has_valid_timestamp) = resolve_bulk_timestamp(parsed, min_ts, max_ts)?;
-    if !has_valid_timestamp {
+    // inserted last, a stamped `_timestamp` is the one flattening keeps
+    if !has_valid_timestamp || !record.contains_key(TIMESTAMP_COL_NAME) {
         record.insert(
             TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
@@ -565,6 +581,115 @@ mod tests {
             prepare(json::json!({"_timestamp": max_ts + 1}), None),
             Err(get_future_discard_error().to_string())
         );
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_fails_only_the_stream_whose_key_is_too_long() {
+        let long_name = "b".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let body = format!(
+            "{{\"index\": {{\"_index\": \"test_bulk_key_len_ok\", \"_id\": \"1\"}}}}\n{{\"message\": \"a\"}}\n\
+             {{\"index\": {{\"_index\": \"{long_name}\", \"_id\": \"2\"}}}}\n{{\"message\": \"b\"}}\n"
+        );
+        let resp = ingest(
+            1,
+            "test_org_id",
+            Bytes::from(body),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Logs, &long_name)
+                .is_some();
+        let rejected: Vec<&BulkResponseItem> = resp
+            .items
+            .iter()
+            .flat_map(|item| item.values())
+            .filter(|item| {
+                item.error
+                    .as_ref()
+                    .is_some_and(|e| e.err_type == STREAM_NAME_TOO_LONG)
+            })
+            .collect();
+        if bounded {
+            assert_eq!(rejected.len(), 1);
+            assert_eq!(rejected[0]._id, "2");
+            assert_eq!(rejected[0]._index, long_name);
+        } else {
+            assert!(rejected.is_empty());
+        }
+        // not set: Fluent Bit retries a whole chunk on it, duplicating the other streams' rows
+        assert!(!resp.errors);
+        assert!(
+            infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_key_len_ok").await
+        );
+        assert_eq!(
+            infra::schema::exists("test_org_id", StreamType::Logs, &long_name).await,
+            !bounded
+        );
+    }
+
+    #[test]
+    fn test_prepare_bulk_record_reads_a_key_flattened_into_timestamp() {
+        let now = now_micros();
+        let (min_ts, max_ts) = (now - 3_600_000_000, now + 3_600_000_000);
+        let ts = (now - 60_000_000) / 1000 * 1000;
+        let iso = chrono::DateTime::from_timestamp_micros(ts)
+            .unwrap()
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let stored = |record: json::Value| {
+            let mut record = record.as_object().unwrap().clone();
+            prepare_bulk_record(&mut record, None, min_ts, max_ts)?;
+            crate::logs::ingest::prepare_record(json::Value::Object(record), 0, min_ts, max_ts)
+                .map(|(_, timestamp)| timestamp)
+                .map_err(|_| "rejected after flattening".to_string())
+        };
+        assert_eq!(
+            stored(json::json!({"@timestamp": ts, "level": "a"})),
+            Ok(ts)
+        );
+        assert_eq!(stored(json::json!({"@timestamp": iso})), Ok(ts));
+        assert_eq!(stored(json::json!({"_Timestamp": ts})), Ok(ts));
+        assert!(stored(json::json!({"Atimestamp": ts, "éimestamp": ts})).unwrap() >= now);
+        // the checked value is the stored one, also when a second key is renamed
+        assert_eq!(
+            stored(json::json!({"@timestamp": ts, "-timestamp": min_ts - 1})),
+            Ok(ts)
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": "garbage"})),
+            Err(TS_PARSE_FAILED.to_string())
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": min_ts - 1})),
+            Err(get_upto_discard_error().to_string())
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": max_ts + 1})),
+            Err(get_future_discard_error().to_string())
+        );
+        // a value that is neither a string nor a number is not a time, so the record is stamped now
+        for value in [
+            json::Value::Null,
+            json::json!(true),
+            json::json!([ts]),
+            json::json!({"a": ts}),
+        ] {
+            let stamped = stored(json::json!({"@timestamp": value})).unwrap();
+            assert!(stamped >= now, "{value}");
+        }
+        // `_timestamp` is stamped as before, now with the record's own time
+        let mut record = json::json!({"@timestamp": ts});
+        let record = record.as_object_mut().unwrap();
+        prepare_bulk_record(record, None, min_ts, max_ts).unwrap();
+        assert_eq!(record[TIMESTAMP_COL_NAME], json::json!(ts));
+        // `_timestamp` itself is checked first
+        let mut record = json::json!({"@timestamp": min_ts - 1, "_timestamp": ts});
+        let record = record.as_object_mut().unwrap();
+        assert_eq!(prepare_bulk_record(record, None, min_ts, max_ts), Ok(()));
     }
 
     #[tokio::test]

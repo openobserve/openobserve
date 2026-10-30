@@ -21,6 +21,12 @@ describe("toast()", () => {
     expect(typeof dismiss).toBe("function");
   });
 
+  it("carries the id of its record, whatever the message became", () => {
+    const dismiss = toast({ variant: "success", message: "deleted x" });
+    expect(toastRecords[0].message).toBe("Deleted x");
+    expect(dismiss.id).toBe(toastRecords[0].id);
+  });
+
   it("calling DismissFn() sets open: false on the record", () => {
     const dismiss = toast({ variant: "success", message: "Done" });
     expect(toastRecords[0].open).toBe(true);

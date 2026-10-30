@@ -15,13 +15,14 @@ function runWithFakeGh(t, pages) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(join(dir, "pages.txt"), pages.map(p => JSON.stringify(p)).join(""));
   writeFileSync(join(dir, "gh"), `#!/usr/bin/env bash
-if [ "$2" = "-X" ]; then echo "$3 $4" >> "${dir}/calls.log"; exit 0; fi
+if [ "$2" = "-X" ]; then echo "$3 $4" >> "${dir}/calls.log"; printf '%s' "$6" > "${dir}/body.txt"; exit 0; fi
 cat "${dir}/pages.txt"
 `);
   chmodSync(join(dir, "gh"), 0o755);
   execFileSync("bash", [SCRIPT, "o/r", "7", MARKER, "o/e#9", "reviewed", BOT], {
     env: { PATH: `${dir}:${process.env.PATH}` },
   });
+  t.body = readFileSync(join(dir, "body.txt"), "utf-8");
   return readFileSync(join(dir, "calls.log"), "utf-8").trim();
 }
 
@@ -38,4 +39,10 @@ test("updates the newest marker comment of the bot, across pages", t => {
 test("posts a new comment when only other authors carry the marker", t => {
   const calls = runWithFakeGh(t, [[comment(2, "mallory", MARKER), comment(4, "github-actions[bot]", MARKER)]]);
   assert.equal(calls, "POST repos/o/r/issues/7/comments");
+});
+
+test("the pointer keeps the review count of the comment it replaces", t => {
+  runWithFakeGh(t, [[comment(3, BOT, `${MARKER}\nreview\n<!-- o2-review-pass:2 -->`)]]);
+  assert.match(t.body, /<!-- o2-paired-pointer -->/);
+  assert.match(t.body, /<!-- o2-review-pass:2 -->$/);
 });

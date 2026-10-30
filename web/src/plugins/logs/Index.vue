@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query-window-us="queryWindowUs"
                         :timezone="store.state.timezone"
                         @jump-to-stream-data="onJumpToStreamData"
-                        @open-history="showSearchHistoryfn"
+                        @open-history="openSearchHistory"
                         @ask-ai="onAskAiFixQuery"
                       />
                     </div>
@@ -567,7 +567,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :query-window-us="queryWindowUs"
               :timezone="store.state.timezone"
               @jump-to-stream-data="onJumpToStreamData"
-              @open-history="showSearchHistoryfn"
+              @open-history="openSearchHistory"
               @ask-ai="onAskAiFixQuery"
             />
             <OEmptyState
@@ -703,6 +703,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
+import { logsReapplyRequest } from "@/utils/queryHistory/logs";
+import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
@@ -769,6 +771,7 @@ import {
   nextJobRequestId,
   notePageLoad,
   notePageRequest,
+  REFRESH_QUERY_ORIGIN,
   resetRowSelection,
 } from "@/composables/useLogs/logsRowNav";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -1183,10 +1186,13 @@ export default defineComponent({
         }
       },
     );
+    // Two primitive sources, so other route changes never re-apply; a recent-searches restore bumps seq to restore one row twice.
     watch(
-      () => router.currentRoute.value.query.type,
-      async (type) => {
-        if (type == "search_history_re_apply" || type == "ai_chat_query") {
+      [() => router.currentRoute.value.query.type, () => logsReapplyRequest.value.seq],
+      async ([type, seq], [, prevSeq]) => {
+        const requested = seq !== prevSeq;
+        const runRequested = requested && logsReapplyRequest.value.run;
+        if (requested || type === "search_history_re_apply" || type === "ai_chat_query") {
           searchObj.meta.jobId = "";
           resetRunStateForReapply();
 
@@ -1196,11 +1202,7 @@ export default defineComponent({
           resetSearchObj();
 
           // Set time range based on source type
-          if (
-            type == "ai_chat_query" &&
-            router.currentRoute.value.query.from &&
-            router.currentRoute.value.query.to
-          ) {
+          if (router.currentRoute.value.query.from && router.currentRoute.value.query.to) {
             searchBarRef.value.dateTimeRef.setAbsoluteTime(
               router.currentRoute.value.query.from,
               router.currentRoute.value.query.to,
@@ -1223,6 +1225,8 @@ export default defineComponent({
           await getFunctions();
           await extractFields();
           refreshData();
+          // A newer restore started meanwhile; it carries its own run decision.
+          if (runRequested && logsReapplyRequest.value.seq === seq) runQueryFn();
         }
       },
     );
@@ -1282,8 +1286,9 @@ export default defineComponent({
       }
       let mode: "full" | "page" | "page-size" = "full";
       if (ctx.op === "page") mode = ctx.reason === "page-size" ? "page-size" : "page";
+      const origin = ctx.reason === "refresh" ? REFRESH_QUERY_ORIGIN : initOriginForRun(ctx.origin);
       try {
-        await runGridSearch(generationId, mode, initOriginForRun(ctx.origin));
+        await runGridSearch(generationId, mode, origin);
         if (mode === "full") showRanFilter(generationId, ranQuery);
         refreshHistogramChart();
         if (mode === "full") showJobScheduler.value = true;
@@ -1503,6 +1508,8 @@ export default defineComponent({
       try {
         // restoreUrlQueryParams() deletes a search_history_re_apply `type` off the route, so read it first.
         const arrivalType = router.currentRoute.value.query.type;
+        // Claimed on arrival, so a restore that lands on another tab is not left for a later landing.
+        const landing = takeRecentLanding("logs");
         isRouteChanged();
         if (!store.state.logs.isInitialized) {
           searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
@@ -1559,6 +1566,7 @@ export default defineComponent({
           if (isLogsTab() || searchObj.meta.logsVisualizeToggle === "drilldown") {
             if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
               await applyReAppliedQuery();
+              if (landing?.run) runQueryFn();
             } else {
               searchObj.loading = true;
               loadLogsData("landing", { origin: currentInitOrigin() ?? undefined });
@@ -1962,6 +1970,11 @@ export default defineComponent({
         handleRunQueryFn();
       }
     };
+    // The usage page stays the fallback when recent searches are turned off.
+    const openSearchHistory = () => {
+      if (!searchBarRef.value?.openRecentSearches?.()) showSearchHistoryfn();
+    };
+
     const showSearchHistoryfn = () => {
       // Search History is now its own route (was an `action=history` overlay).
       // Forward the active stream type/name so the history shown there matches
@@ -4085,6 +4098,7 @@ export default defineComponent({
       onChangeInterval,
       onAutoIntervalTrigger,
       showSearchHistoryfn,
+      openSearchHistory,
       isAiEnabled,
       onSelectStream,
       onPickStream,

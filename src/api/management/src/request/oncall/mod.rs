@@ -15,6 +15,9 @@
 
 //! On-call teams, schedules and escalation policies.
 
+#[cfg(any(feature = "enterprise", test))]
+mod ack_page;
+
 use axum::{
     extract::{Path, Query},
     response::Response,
@@ -1397,7 +1400,7 @@ pub async fn get_policy(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
+        match o2_enterprise::enterprise::oncall::service::get_policy_view(&org_id, &team_id).await {
             Ok(policy) => MetaHttpResponse::json(policy),
             Err(e) => to_response(e),
         }
@@ -1592,40 +1595,67 @@ pub async fn set_team_channel(
     }
 }
 
-/// Plain HTML, no JavaScript: it is opened on a phone at night from a mail client.
+/// A server-rendered ack page; plain HTML because it opens on a phone from a mail client.
 #[cfg(feature = "enterprise")]
-fn ack_confirm_page(org_id: &str, token: &str, title: &str) -> Response {
-    let esc = |v: &str| {
-        v.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-    };
-    let body = format!(
-        r#"<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Acknowledge</title></head>
-<body style="font-family:system-ui,sans-serif;margin:0;padding:2rem;text-align:center">
-<h1 style="font-size:1.25rem">{title}</h1>
-<p style="color:#555">Acknowledging tells the others you have this. The
-escalation stops.</p>
-<form method="post" action="/api/v2/{org}/oncall/ack">
-<input type="hidden" name="token" value="{token}">
-<button type="submit" style="font-size:1rem;padding:0.75rem 1.5rem;border-radius:0.25rem;
-border:0;background:#4f46e5;color:#fff">Acknowledge</button>
-</form>
-</body></html>"#,
-        title = esc(title),
-        org = esc(org_id),
-        token = esc(token),
-    );
+fn html_page(status: StatusCode, body: String) -> Response {
     axum::response::Response::builder()
-        .status(StatusCode::OK)
+        .status(status)
         .header(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")
         .body(axum::body::Body::from(body))
         .unwrap()
         .into_response()
+}
+
+/// One page in the app; the URL carries the org so the app opens the right one.
+#[cfg(feature = "enterprise")]
+fn page_url(org_id: &str, response_id: &str) -> String {
+    let base = config::get_config().common.web_url.clone();
+    format!("{base}/web/oncall/responses/{response_id}?org_identifier={org_id}")
+}
+
+/// The refusal for a link that cannot be trusted or points at nothing; it names no record.
+#[cfg(feature = "enterprise")]
+fn broken_link(status: StatusCode, reason: &str) -> Response {
+    // No org in the link: the one in the path is unverified, and naming it would tell orgs apart.
+    let pages = format!(
+        "{}/web/oncall/responses",
+        config::get_config().common.web_url
+    );
+    html_page(status, ack_page::broken_link_html(reason, &pages))
+}
+
+/// The ack link's refusal for an inactive or unreadable org: the same HTML page, never JSON.
+#[cfg(feature = "enterprise")]
+fn ack_status_refusal(
+    org_id: &str,
+    active: Result<bool, impl std::fmt::Display>,
+) -> Option<Response> {
+    match active {
+        Ok(true) => None,
+        Ok(false) => Some(broken_link(
+            StatusCode::FORBIDDEN,
+            "the organization it belongs to is no longer active",
+        )),
+        Err(e) => {
+            log::error!("cannot read the status of org {org_id}: {e}");
+            Some(broken_link(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "the organization could not be checked; try the link again shortly",
+            ))
+        }
+    }
+}
+
+/// The team a linked record belongs to, for its name and zone; unreadable is only logged.
+#[cfg(feature = "enterprise")]
+async fn team_of(record: &config::meta::oncall::Response) -> Option<config::meta::oncall::Team> {
+    let team_id = record.team_id.as_deref()?;
+    infra::table::oncall_teams::get(&record.org_id, team_id)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("[oncall] ack page team {team_id}: {e}");
+            None
+        })
 }
 
 #[utoipa::path(
@@ -1636,7 +1666,10 @@ border:0;background:#4f46e5;color:#fff">Acknowledge</button>
     operation_id = "AcknowledgeOnCallPage",
     summary = "Acknowledge a page from its emailed link",
     params(("org_id" = String, Path, description = "Organization name")),
-    responses((status = 303, description = "Acknowledged, redirects to the page")),
+    responses(
+        (status = 200, description = "Where the page now stands", content_type = "text/html"),
+        (status = 401, description = "The link no longer works", content_type = "text/html"),
+    ),
 )]
 pub async fn acknowledge(
     Path(org_id): Path<String>,
@@ -1656,53 +1689,62 @@ pub async fn acknowledge(
         .await
         {
             Ok(c) => c,
-            Err(e) => {
-                return MetaHttpResponse::error(StatusCode::UNAUTHORIZED.as_u16(), e.to_string())
-                    .into_response();
-            }
+            Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
         // After the signature, so an unsigned caller cannot probe whether the org exists.
         if let Some(refusal) =
-            crate::request::alerts::external_events::inactive_org_response(&org_id).await
+            ack_status_refusal(&org_id, db::org_status::read_active(&org_id).await)
         {
             return refusal;
         }
         // Spent before the ack: expiry does not stop a replay, and a losing token must not act.
-        if !token::spend(
+        let this_click = token::spend(
             &form.token,
             claims.expires_at,
             config::utils::time::now_micros(),
         )
-        .await
-        {
-            // Not an error page: acking is idempotent, so a second click lands where the first did.
-            return ack_redirect(&claims.org_id, &claims.response_id);
-        }
-        if let Err(e) =
-            escalation::acknowledge(&claims.org_id, &claims.response_id, &claims.user_email).await
-        {
-            return to_response(e);
-        }
-        ack_redirect(&claims.org_id, &claims.response_id)
+        .await;
+        let acked = if this_click {
+            escalation::acknowledge(&claims.org_id, &claims.response_id, &claims.user_email)
+                .await
+                // The token is already spent, so the page below shows the record as it stands.
+                .map_err(|e| tracing::error!("[oncall] ack link for {}: {e}", claims.response_id))
+                .ok()
+        } else {
+            None
+        };
+        let just_acked = acked.is_some();
+        let record = match acked {
+            Some(r) => r,
+            None => {
+                match infra::table::oncall_responses::get(&claims.org_id, &claims.response_id).await
+                {
+                    Ok(Some(r)) => r,
+                    Ok(None) => {
+                        return broken_link(
+                            StatusCode::NOT_FOUND,
+                            "the page this link points at no longer exists",
+                        );
+                    }
+                    Err(e) => return internal_error("acknowledge", &e),
+                }
+            }
+        };
+        let team = team_of(&record).await;
+        html_page(
+            StatusCode::OK,
+            ack_page::outcome_html(
+                &ack_page::PageFacts::of(&record, team.as_ref()),
+                &ack_page::AckOutcome::of(&record, &claims.user_email, just_acked),
+                &page_url(&claims.org_id, &claims.response_id),
+            ),
+        )
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, form);
         MetaHttpResponse::forbidden("Not Supported")
     }
-}
-
-/// The org must be in the URL, or the app resolves whichever one was last selected.
-#[cfg(feature = "enterprise")]
-fn ack_redirect(org_id: &str, response_id: &str) -> Response {
-    let base = config::get_config().common.web_url.clone();
-    let location = format!("{base}/web/oncall/responses/{response_id}?org_identifier={org_id}");
-    axum::response::Response::builder()
-        .status(StatusCode::SEE_OTHER)
-        .header(axum::http::header::LOCATION, location)
-        .body(axum::body::Body::empty())
-        .unwrap()
-        .into_response()
 }
 
 #[utoipa::path(
@@ -1716,7 +1758,10 @@ fn ack_redirect(org_id: &str, response_id: &str) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
         ("token" = String, Query, description = "Signed acknowledgement token"),
     ),
-    responses((status = 200, description = "Success", content_type = "text/html")),
+    responses(
+        (status = 200, description = "Success", content_type = "text/html"),
+        (status = 401, description = "The link no longer works", content_type = "text/html"),
+    ),
 )]
 /// GET must only look: mail gateways fetch URLs, so a scanner would take the page first.
 pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
@@ -1734,23 +1779,36 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
         .await
         {
             Ok(c) => c,
-            Err(e) => {
-                return MetaHttpResponse::error(StatusCode::UNAUTHORIZED.as_u16(), e.to_string())
-                    .into_response();
-            }
+            Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
         if let Some(refusal) =
-            crate::request::alerts::external_events::inactive_org_response(&org_id).await
+            ack_status_refusal(&org_id, db::org_status::read_active(&org_id).await)
         {
             return refusal;
         }
-        let title = infra::table::oncall_responses::get(&claims.org_id, &claims.response_id)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|r| r.title)
-            .unwrap_or_else(|| "Acknowledge this page?".to_string());
-        ack_confirm_page(&claims.org_id, &q.token, &title)
+        let record =
+            match infra::table::oncall_responses::get(&claims.org_id, &claims.response_id).await {
+                Ok(Some(r)) => r,
+                Ok(None) => {
+                    return broken_link(
+                        StatusCode::NOT_FOUND,
+                        "the page this link points at no longer exists",
+                    );
+                }
+                Err(e) => return internal_error("ack_page", &e),
+            };
+        let team = team_of(&record).await;
+        html_page(
+            StatusCode::OK,
+            ack_page::get_html(
+                &claims.org_id,
+                &q.token,
+                &ack_page::PageFacts::of(&record, team.as_ref()),
+                &record,
+                &claims.user_email,
+                &page_url(&claims.org_id, &claims.response_id),
+            ),
+        )
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1988,7 +2046,11 @@ async fn with_page_details(
             tracing::error!("[oncall] runbook lookup: {e}");
             Default::default()
         });
-    let rungs = infra::table::oncall_responses::deepest_rungs(&ids)
+    let runs: Vec<(String, i32)> = rows
+        .iter()
+        .map(|r| (r.id.clone(), r.current_run()))
+        .collect();
+    let rungs = infra::table::oncall_responses::deepest_rungs(&runs)
         .await
         .unwrap_or_else(|e| {
             tracing::error!("[oncall] rung lookup: {e}");
@@ -3064,11 +3126,21 @@ pub async fn preview_routing(
         .await
         .map_err(|e| tracing::error!("[oncall] routing preview context: {e}"))
         .ok();
+        let team_name = match routed.team_id() {
+            Some(id) => infra::table::oncall_teams::get(&org_id, id)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::error!("[oncall] routing preview team name: {e}");
+                    None
+                })
+                .map(|t| t.name),
+            None => None,
+        };
 
         MetaHttpResponse::json(serde_json::json!({
             "decision": routed.decision,
             "team_id": routed.team_id(),
-            "reason": routed.reason(),
+            "reason": routed.reason(team_name.as_deref()),
             // Hoisted out of the tagged decision, so no caller needs the variant names.
             "landed_on_default": routed.landed_on_default(),
             "notes": routed.notes,
@@ -4920,6 +4992,31 @@ mod tests {
         let unknown = voice_reply(press("oncall-voice-ack-unknown-org").await).await;
         assert_eq!(blocked, unknown);
         assert_ne!(blocked, VOICE_ORG_INACTIVE);
+    }
+
+    /// A signed link whose org is blocked or unreadable gets the HTML page, not a JSON body.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_ack_link_of_an_inactive_org_is_refused_with_html() {
+        for (active, status) in [
+            (Ok(false), StatusCode::FORBIDDEN),
+            (
+                Err("db down".to_string()),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+        ] {
+            let resp = ack_status_refusal("ack-org", active).expect("refused");
+            assert_eq!(resp.status(), status);
+            assert_eq!(
+                resp.headers()[axum::http::header::CONTENT_TYPE],
+                "text/html; charset=utf-8"
+            );
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(String::from_utf8_lossy(&body).contains("This link no longer works"));
+        }
+        assert!(ack_status_refusal("ack-org", Ok::<_, String>(true)).is_none());
     }
 
     #[cfg(feature = "enterprise")]

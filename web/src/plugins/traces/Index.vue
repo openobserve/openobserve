@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
               class="bg-card-glass-bg"
-              @searchdata="searchData"
+              @searchdata="searchData()"
               @onChangeTimezone="refreshTimezone"
               @update:activeTab="activeTab = $event"
               @error-only-toggled="onErrorOnlyToggled"
@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
               @apply-saved-view="onApplySavedView"
+              @recent-restore="onRecentRestore"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
               @drill-down="searchResultRef?.openComparison()"
@@ -228,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:editor-filter-set="onMetricsEditorFilterSet"
                         @metrics:editor-filter-run="onMetricsEditorFilterRun"
-                        @run-query="searchData"
+                        @run-query="searchData()"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
                         @error-only-toggled="onErrorOnlyToggled"
@@ -359,6 +360,15 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { recordPageLoad, recordPageRequest, type PageLoadReason } from "@/utils/pageCrossing";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
+import {
+  runResultFromError,
+  toRunError,
+  type RestoreTime,
+} from "@/utils/queryHistory/recentSearches";
+import { buildTracesRecord, tracesRestore } from "@/utils/queryHistory/traces";
+import { openRecentOnItsPage, takeRecentLanding } from "@/utils/queryHistory/routes";
+import type { HistoryTime, QueryHistoryEntry } from "@/services/query_history";
 
 interface TracesSavedView {
   version?: number;
@@ -381,6 +391,7 @@ const supportedTraceSearchMode = (value: unknown): TraceSearchMode =>
   resolveTraceSearchMode(value, config.isEnterprise === "true");
 
 const store = useStore();
+const { record: recordRecent } = useRecentSearches();
 const activeTab = computed(() => {
   if (searchObj.meta.searchMode === "service-graph") return "service-graph";
   if (searchObj.meta.searchMode === "services-catalog") return "services-catalog";
@@ -835,7 +846,11 @@ const dropStaleSelection = () => {
   if (dropped) searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
-async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
+async function getQueryData(
+  isPagination: boolean = false,
+  isSort: boolean = false,
+  recordRun: boolean = false,
+) {
   let boundTraceId: string | null = null;
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
@@ -888,9 +903,11 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
     if (!isPagination) {
       submittedFilter = buildEditorFilter();
+      searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
       dropStaleSelection();
     }
     const combinedFilter = submittedFilter;
+    const historyRun = recordRun && !isPagination ? tracesHistoryRun(queryReq) : null;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
 
@@ -1054,6 +1071,12 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
+          if (historyRun) {
+            const result = runResultFromError(
+              toRunError({ code, status: errData?.status, message }),
+            );
+            if (result) recordRecent(buildTracesRecord({ ...historyRun, result }));
+          }
 
           let errorMsg = message || err?.message || t("traces.index.errorProcessingRequest");
           if (code) {
@@ -1088,6 +1111,9 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           delete tracesRequestState[searchTraceId];
         },
         complete: (_payload: any) => {
+          if (historyRun && tracesRequestState[searchTraceId]) {
+            recordRecent(buildTracesRecord({ ...historyRun, result: { status: "ok" } }));
+          }
           searchObj.loading = false;
           currentSearchTraceId = null;
           // An exhausted page must not leave the previous page under the new page number.
@@ -1378,6 +1404,8 @@ const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !search
 
 async function loadPageData() {
   const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
+  // Claimed before any early return, so a restore that finds no stream is not left for a later landing.
+  const landing = takeRecentLanding("traces");
   searchObj.loadingStream = true;
   if (!searchObj.data?.queryResults?.hits?.length) searchObj.data.resultGrid.currentPage = 0;
 
@@ -1388,9 +1416,13 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-  if (searchObj.data.stream.selectedStream.value && (streamFromUrl || !isAutoRunOff())) {
-    searchData();
+  if (!searchObj.data.stream.selectedStream.value) return;
+  // Only a restore from recent searches is a user run; any other landing runs without recording.
+  if (landing) {
+    if (landing.run) searchData();
+    return;
   }
+  if (streamFromUrl || !isAutoRunOff()) searchData(false);
 }
 
 onBeforeMount(async () => {
@@ -1448,16 +1480,33 @@ onActivated(async () => {
     if (applyHandoffFilter()) {
       await loadPageData();
       await nextTick();
-      runQueryFn();
+      runQueryFn(false);
     }
   }
 });
 
-const runQueryFn = () => {
+/** Runs the search; `record` is false for runs no user asked for, such as a page landing. */
+const runQueryFn = (record = true) => {
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.runQuery = false;
-  getQueryData();
+  getQueryData(false, false, record);
 };
+
+/** What a run records once it settles, captured when it is dispatched. */
+function tracesHistoryRun(queryReq: { query: { start_time: number; end_time: number } }) {
+  const datetime = searchObj.data.datetime;
+  return {
+    stream: String(selectedStreamName.value ?? ""),
+    searchMode: String(searchObj.meta.searchMode),
+    query: String(searchObj.data.editorValue ?? ""),
+    time: {
+      type: datetime.type === "absolute" ? "absolute" : "relative",
+      ...(datetime.type === "absolute" ? {} : { period: String(datetime.relativeTimePeriod) }),
+      start_time: Number(queryReq.query.start_time),
+      end_time: Number(queryReq.query.end_time),
+    } as HistoryTime,
+  };
+}
 
 const runQueryOnSort = () => {
   searchObj.data.resultGrid.currentPage = 0;
@@ -1927,14 +1976,14 @@ const showErrorOnly = computed(
   () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
 );
 
-const searchData = () => {
+const searchData = (record = true) => {
   if (!(searchObj.data.stream.streamLists.length && searchObj.data.stream.selectedStream?.label)) {
     return;
   }
 
   if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
 
-  runQueryFn();
+  runQueryFn(record);
 
   analytics.track("traces_search_run", {
     stream_name: searchObj.data.stream.selectedStream.value,
@@ -1975,11 +2024,16 @@ const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
 
 let savedViewApplySeq = 0;
 const onApplySavedView = async (view: TracesSavedView) => {
-  const seq = ++savedViewApplySeq;
   if (view.version !== undefined && view.version !== 1) {
     toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
     return;
   }
+  await applyTracesView(view, true);
+};
+
+/** Applies a stream, filter, window and mode in place, then runs unless only loading. */
+const applyTracesView = async (view: TracesSavedView, run: boolean) => {
+  const seq = ++savedViewApplySeq;
   const streamName = view.stream?.value;
   const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
   if (
@@ -2023,7 +2077,35 @@ const onApplySavedView = async (view: TracesSavedView) => {
   if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
     restoreFilters(view.editorValue);
   }
-  runQueryFn();
+  if (run) runQueryFn();
+};
+
+const onRecentRestore = (entry: QueryHistoryEntry, when: RestoreTime, run: boolean) => {
+  if (entry.source !== "traces") {
+    void openRecentOnItsPage(router, entry, when, store.state.selectedOrganization.identifier, run);
+    return;
+  }
+  const restore = tracesRestore(entry, when);
+  const current = searchObj.data.datetime;
+  const window = restore.window;
+  void applyTracesView(
+    {
+      stream: { label: restore.stream, value: restore.stream },
+      editorValue: restore.query,
+      datetime: {
+        type: window?.type ?? current.type,
+        relativeTimePeriod:
+          window?.type === "relative" ? window.period : current.relativeTimePeriod,
+        startTime: window?.type === "absolute" ? window.startUs : current.startTime,
+        endTime: window?.type === "absolute" ? window.endUs : current.endTime,
+      },
+      searchMode: restore.searchMode === "spans" ? "spans" : "traces",
+      sortBy: searchObj.meta.resultGrid.sortBy,
+      sortOrder: searchObj.meta.resultGrid.sortOrder,
+      selectedFields: [...(searchObj.data.stream.selectedFields ?? [])],
+    },
+    run,
+  );
 };
 
 const streamChangeDialog = ref({ show: false, pendingStream: "" });

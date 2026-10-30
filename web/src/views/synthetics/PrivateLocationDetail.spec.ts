@@ -349,4 +349,44 @@ describe("PrivateLocationDetail", () => {
       );
     });
   });
+
+  describe("load failures (UI-06)", () => {
+    it("shows a retry state for a 500 and recovers on retry", async () => {
+      mockServiceGetLocation.mockRejectedValueOnce({ response: { status: 500 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-error"]').exists()).toBe(
+        true,
+      );
+      await wrapper
+        .find('[data-test="synthetics-private-location-detail-retry-btn"]')
+        .trigger("click");
+      await flushPromises();
+      expect(mockServiceGetLocation).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-error"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("shows the retry state for a network error (no response)", async () => {
+      mockServiceGetLocation.mockRejectedValueOnce(new Error("Network Error"));
+      wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-error"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("keeps the not-found state for a 404", async () => {
+      mockServiceGetLocation.mockRejectedValueOnce({ response: { status: 404 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-error"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-empty"]').exists()).toBe(
+        true,
+      );
+    });
+  });
 });

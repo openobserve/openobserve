@@ -107,6 +107,8 @@ const seeSchedule = async (wrapper: ReturnType<typeof mount>) => {
 
 describe("AddDowntime", () => {
   beforeEach(() => {
+    // An earlier test's unsaved form leaves a draft, whose restore dialog would cover the next page.
+    localStorage.clear();
     queryClient.clear();
     vi.mocked(common.list_Folders).mockImplementation(
       (_org: string, type: string) =>

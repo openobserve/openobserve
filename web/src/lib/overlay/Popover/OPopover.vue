@@ -84,6 +84,10 @@ const emit = defineEmits<{
   "update:open": [boolean];
   /** Forwards reka's initial-focus event so a consumer can redirect it (call `preventDefault()` to opt out of the default first-tabbable focus). */
   "open-auto-focus": [Event];
+  /** Forwards reka's outside pointerdown; `preventDefault()` keeps the popover open, e.g. for a panel it owns outside its content. */
+  "pointer-down-outside": [Event];
+  /** Forwards reka's outside focus; `preventDefault()` keeps the popover open. */
+  "focus-outside": [Event];
 }>();
 
 // Vue boolean-casts an absent `open` prop to `false`, which would lock
@@ -175,11 +179,13 @@ function handlePointerDownOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }
+  emit("pointer-down-outside", event);
 }
 function handleFocusOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }
+  emit("focus-outside", event);
 }
 
 // Close on ancestor scroll so the portal never floats detached from its trigger.
@@ -243,7 +249,7 @@ onBeforeUnmount(() => {
           'outline-none max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
-          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
+          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
           // Open/close reveal animation (matches ODropdown)
           'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
           'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',

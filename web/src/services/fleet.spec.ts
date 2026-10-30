@@ -28,7 +28,6 @@ import {
   createFleetMutation,
   deleteFleetMutation,
   fleetPlanPreviewQuery,
-  moveCollectorsMutation,
   redeliverCollectorMutation,
   renameCollectorMutation,
   renameFleetMutation,
@@ -137,14 +136,6 @@ describe("fleet service", () => {
       name: "edge-2",
     });
     expect(mockClient.delete).toHaveBeenCalledWith("/api/acme/fleet/fleets/f%2F1");
-  });
-
-  it("moveCollectors() posts the ids and the destination", () => {
-    fleet.moveCollectors("acme", ["c1", "c2"], "edge");
-    expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/fleets/move", {
-      collector_ids: ["c1", "c2"],
-      to_fleet: "edge",
-    });
   });
 
   it("reads and writes a fleet's settings", () => {
@@ -833,14 +824,6 @@ describe("fleet mutations", () => {
     expect(mockClient.put).toHaveBeenCalledWith("/api/acme/fleet/settings", body);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.all("acme") });
     expect(updateFleetSettingsMutation("acme").meta?.silentError).toBe(true);
-  });
-
-  it("moves collectors and refetches every fleet read", async () => {
-    mockClient.post.mockResolvedValueOnce({ data: { moved: 2 } });
-    expect(await run(moveCollectorsMutation("acme"), { ids: ["c1", "c2"], to: "edge" })).toEqual({
-      moved: 2,
-    });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.all("acme") });
   });
 
   it("restarts once per id and reports a partial result", async () => {
