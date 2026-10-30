@@ -348,7 +348,11 @@ fn restore_canonical_agent_fields(
 }
 
 #[cfg(feature = "enterprise")]
-async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObservationBuffer) {
+async fn queue_gen_ai_agent_observations(org_id: &str, mut observations: AgentObservationBuffer) {
+    // spans of a destination skipped for its key length were never written
+    observations.retain(|_, o| {
+        infra::file_list::stream_key_violation(org_id, StreamType::Traces, &o.stream_name).is_none()
+    });
     o2_enterprise::enterprise::llm_evaluations::agent_registry::queue_observations(
         org_id.to_string(),
         observations,
