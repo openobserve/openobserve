@@ -26,6 +26,12 @@ export type RuleId =
   "failure" | "no_destination" | "noise" | "notify_failed" | "scheduler_health" | "silent";
 export type Severity = "Info" | "Low" | "Medium" | "High";
 export type Confidence = "Low" | "Medium" | "High";
+/** Stamped from schema version 2 on; a version-1 record has no `kind`. */
+export type RecordKind = "run" | "finding" | "skip";
+/** How far the evidence goes: a confirmed condition, a narrowed cause, or an owner's call. */
+export type Tier = "A" | "B" | "C";
+export type Quality = "usable" | "partial" | "unavailable";
+export type Audience = "owner" | "operator";
 
 export interface Coverage {
   coverage_unreadable_definitions: number;
@@ -45,6 +51,9 @@ export interface RunRow extends Coverage {
   emitted_at: number;
   finding_count: number;
   skip_count: number;
+  /** Version 2 splits `skip_count` into the skips written as records and the routine ones only counted. */
+  written_skip_count?: number;
+  omitted_routine_skip_count?: number;
   alerts_in_scope: number;
   coverage_gap: boolean;
 }
@@ -55,6 +64,9 @@ export interface DigestRecord extends Omit<RunRow, "emitted_at"> {
   org: string;
   config_id: string;
   cluster?: string;
+  /** Absent on a version-1 record, which readers treat as version 1. */
+  schema_version?: number;
+  kind?: RecordKind;
   rule_id?: RuleId;
   severity?: Severity;
   confidence?: Confidence;
@@ -62,11 +74,50 @@ export interface DigestRecord extends Omit<RunRow, "emitted_at"> {
   actions?: string;
   alert_id?: string;
   alert_name?: string;
+  tier?: Tier;
+  pattern?: string;
+  detector_version?: number;
+  quality?: Quality;
+  audience?: Audience;
+  /** A JSON array, stringified whole by ingestion. */
+  limitations?: string;
+  scope_kind?: string;
+  scope_key?: string;
+  finding_id?: string;
+  /** Skip records only: the reason's name, and its numbers as one JSON object. */
+  skip_reason?: string;
+  skip_detail?: string;
   [column: `evidence_${string}`]: number | string | undefined;
 }
 
 export type FindingRecord = DigestRecord &
   Required<Pick<DigestRecord, "rule_id" | "severity" | "confidence" | "title" | "actions">>;
+
+export type SkipRecord = DigestRecord &
+  Required<Pick<DigestRecord, "rule_id" | "skip_reason">> & { kind: "skip" };
+
+export const schemaVersion = (record: DigestRecord): number => record.schema_version ?? 1;
+
+/** A version-1 record has no `kind`, so a rule with a severity is its finding. */
+export const isFinding = (record: DigestRecord): record is FindingRecord =>
+  record.kind === "finding" || (record.kind === undefined && !!record.rule_id);
+
+export const isSkip = (record: DigestRecord): record is SkipRecord => record.kind === "skip";
+
+/** The limitations a finding lists, from the one column ingestion stringified them into. */
+export function limitationsOf(record: DigestRecord): string[] {
+  const value = record.limitations;
+  if (!value) return [];
+  let parsed: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return [value];
+    }
+  }
+  return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+}
 
 export type CoverageVerdict = "none" | "gap" | "full";
 
@@ -109,6 +160,8 @@ export function runIdentity(record: DigestRecord): RunRow {
     emitted_at: record._timestamp,
     finding_count: record.finding_count,
     skip_count: record.skip_count,
+    written_skip_count: record.written_skip_count,
+    omitted_routine_skip_count: record.omitted_routine_skip_count,
     alerts_in_scope: record.alerts_in_scope,
     coverage_gap: record.coverage_gap,
     coverage_unreadable_definitions: record.coverage_unreadable_definitions,
@@ -126,15 +179,21 @@ export function runIdentity(record: DigestRecord): RunRow {
 export function latestEmission(records: DigestRecord[]): {
   run: RunRow | null;
   findings: FindingRecord[];
+  /** The skips a version-2 run wrote as records: a rule that could not run, or looked and declined. */
+  skips: SkipRecord[];
 } {
-  if (records.length === 0) return { run: null, findings: [] };
+  if (records.length === 0) return { run: null, findings: [], skips: [] };
   const newest = Math.max(...records.map((r) => r._timestamp));
   const emission = records.filter((r) => r._timestamp === newest);
   return {
     run: runIdentity(emission[0]),
-    findings: emission.filter((r): r is FindingRecord => !!r.rule_id).sort(findingOrder),
+    findings: emission.filter(isFinding).sort(findingOrder),
+    skips: emission.filter(isSkip).sort(skipOrder),
   };
 }
+
+const skipOrder = (a: SkipRecord, b: SkipRecord) =>
+  a.rule_id.localeCompare(b.rule_id) || (a.alert_name ?? "").localeCompare(b.alert_name ?? "");
 
 /** One emission's records share a `_timestamp`, so the search returns them in no stable order. */
 const findingOrder = (a: FindingRecord, b: FindingRecord) =>
