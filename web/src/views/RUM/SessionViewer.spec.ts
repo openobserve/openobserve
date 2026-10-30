@@ -866,6 +866,38 @@ describe("SessionViewer.vue — session id with an embedded single quote", () =>
   });
 });
 
+describe("SessionViewer.vue — geo columns in the session lookup", () => {
+  const savedFields = replaySchema.fields;
+
+  afterEach(() => {
+    replaySchema.fields = savedFields;
+  });
+
+  it.each([
+    ["geo_info_country", "min(geo_info_country) as country", "geo_info_city"],
+    ["geo_info_city", "min(geo_info_city) as city", "geo_info_country"],
+  ])("selects %s only, when the stream has no other geo column", async (column, select, absent) => {
+    vi.clearAllMocks();
+    replaySchema.fields = { [column]: true };
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-abc",
+      query: { start_time: "1692884313968000", end_time: "1692884769270000" },
+    });
+    const wrapper = mountSessionViewer(router);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const lookup = vi
+      .mocked(searchService.search)
+      .mock.calls.map((call) => (call[0] as any).query.query.sql as string)
+      .find((sql) => sql.includes("min(start)"));
+    expect(lookup).toContain(select);
+    expect(lookup).not.toContain(absent);
+
+    wrapper.unmount();
+  });
+});
+
 describe("SessionViewer.vue — no replay recorded", () => {
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
