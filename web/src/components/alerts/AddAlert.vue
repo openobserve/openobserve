@@ -199,11 +199,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :value="option.value"
                   size="sm"
                   :disabled="option.locked"
+                  :focusable-unavailable="option.locked"
                   :tooltip="option.locked ? anomalyLockedReason : undefined"
                   :data-test="`add-alert-type-tab-${option.value}`"
                 >
                   <template #icon-left>
-                    <OIcon :name="option.locked ? 'lock' : option.icon" size="sm" />
+                    <OIcon
+                      :class="option.locked ? 'text-icon-locked' : undefined"
+                      :name="option.locked ? 'lock' : option.icon"
+                      size="sm"
+                    />
                   </template>
                   {{ option.label }}
                 </OToggleGroupItem>

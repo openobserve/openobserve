@@ -91,13 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #empty>
-            <LicenseDeniedState
-              v-if="toolsetsLocked"
-              :features="['ai_toolsets']"
-              data-test="ai-toolsets-license-denied"
-            />
             <OEmptyState
-              v-else
               size="hero"
               preset="no-ai-toolsets"
               :filtered="!!filterQuery"
@@ -227,12 +221,10 @@ import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { useLicenseLock } from "@/composables/useFeatureLock";
-import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 
 export default defineComponent({
   name: "PageAiToolsets",
   components: {
-    LicenseDeniedState,
     OPageLayout,
     OEmptyState,
     ConfirmDialog,
@@ -254,8 +246,10 @@ export default defineComponent({
     const toolsetDrafts = useEditorDraftIds("ai_toolset");
 
     const orgIdForList = useOrgId();
-    // the list endpoint is licensed under ai_assistant, so a locked page would raise the wrong feature
-    const { locked: toolsetsLocked } = useLicenseLock("ai_toolsets");
+    const { locked: toolsetsFeatureLocked } = useLicenseLock("ai_toolsets");
+    const { locked: assistantLocked } = useLicenseLock("ai_assistant");
+    // The list endpoint is licensed under ai_assistant, so either lock would 403 it.
+    const toolsetsLocked = computed(() => toolsetsFeatureLocked.value || assistantLocked.value);
     const toolsetsList = useQuery(() =>
       Object.assign(aiToolsetsQuery(orgIdForList.value), {
         enabled: !!orgIdForList.value && !toolsetsLocked.value,

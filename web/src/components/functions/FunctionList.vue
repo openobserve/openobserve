@@ -304,11 +304,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
-            @click="onPipelineSelect(pipeline)"
-            class="hover:bg-muted/50 flex cursor-pointer items-center px-3 py-2"
+            :class="
+              pipelinesLocked
+                ? 'flex items-center gap-1.5 px-3 py-2'
+                : 'hover:bg-muted/50 flex cursor-pointer items-center px-3 py-2'
+            "
             :data-test="`function-list-pipeline-item-${pipeline.value}`"
+            @click="!pipelinesLocked && onPipelineSelect(pipeline)"
           >
             <span class="text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
+            <OTooltip v-if="pipelinesLocked" :content="pipelinesLockedReason">
+              <span
+                class="inline-flex"
+                :data-test="`function-list-pipeline-lock-${pipeline.value}`"
+              >
+                <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+              </span>
+            </OTooltip>
           </li>
         </ul>
       </div>
@@ -339,6 +351,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -361,6 +375,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
   name: "functionList",
@@ -373,6 +388,8 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     OBadge,
+    OIcon,
+    OTooltip,
     ODialog,
     ODropdown,
     ODropdownItem,
@@ -390,6 +407,8 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
+    const { locked: pipelinesLocked, lockedReason: pipelinesLockedReason } =
+      useLicenseLock("pipelines");
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
     const selectedDelete: any = ref(null);
@@ -1014,6 +1033,8 @@ export default defineComponent({
       selectedPipeline,
       closeDialog,
       onPipelineSelect,
+      pipelinesLocked,
+      pipelinesLockedReason,
       transformedPipelineList,
       getAssociatedPipelines,
       filterQuery,

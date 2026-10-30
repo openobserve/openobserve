@@ -251,8 +251,11 @@ const heightClasses = computed<string>(() => {
           :name="suffixIcon as any"
           size="xs"
           class="ms-auto shrink-0"
-          :class="suffixIcon === 'lock' ? 'text-warning-600' : ''"
+          :class="suffixIcon === 'lock' ? 'text-icon-locked' : ''"
         />
+        <span v-if="suffixIcon === 'lock' && (suffixLabel ?? tooltip)" class="sr-only">{{
+          suffixLabel ?? tooltip
+        }}</span>
       </template>
       <slot v-else />
     </TabsTrigger>

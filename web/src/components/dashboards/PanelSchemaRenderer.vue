@@ -303,6 +303,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :series-role="contextMenuData?.seriesRole"
         :unit="panelSchema?.config?.unit"
         :unit-custom="panelSchema?.config?.unit_custom"
+        :locked="alertsLocked"
+        :locked-reason="alertsLockedReason"
         @select="handleCreateAlert"
         @close="hideContextMenu"
       />
@@ -1329,7 +1331,7 @@ export default defineComponent({
 
     // Context menu state for alert creation (shared with usePanelAlertCreation)
     const contextMenuData = ref<any>(null);
-    const { locked: alertsLocked } = useLicenseLock("alerts");
+    const { locked: alertsLocked, lockedReason: alertsLockedReason } = useLicenseLock("alerts");
 
     const {
       contextMenuVisible,
@@ -1341,7 +1343,7 @@ export default defineComponent({
       handleCreateAlert,
     } = usePanelAlertCreation({
       panelSchema,
-      allowAlertCreation: computed(() => allowAlertCreation.value && !alertsLocked.value),
+      allowAlertCreation,
       metadata,
       selectedTimeObj,
       contextMenuData,
@@ -2657,6 +2659,8 @@ export default defineComponent({
       drilldownArray,
       selectedAnnotationData,
       openDrilldown,
+      alertsLocked,
+      alertsLockedReason,
       drilldownPopUpRef,
       annotationPopupRef,
       hidePopupsAndOverlays,

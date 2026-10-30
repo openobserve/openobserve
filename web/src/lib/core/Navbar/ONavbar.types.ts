@@ -114,6 +114,8 @@ export interface SubnavChild {
    */
   locked?: boolean;
   lockedMessage?: I18nText;
+  /** Set at render time when the license locks `feature`: the row stays a real link to the locked page, with a lock. */
+  licenseLocked?: boolean;
 }
 
 /** Context for evaluating subnav `gate` predicates (see navGroups.ts). */

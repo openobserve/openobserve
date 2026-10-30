@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="item.locked || item.licenseLocked"
                     name="lock"
                     size="xs"
-                    class="text-warning-600"
+                    class="text-icon-locked"
                   />
                 </span>
                 <span
@@ -124,6 +124,8 @@ export interface SectionHubItem {
   lockedShowUpgradeCta?: boolean;
   /** The license lacks this feature: shows the lock but still opens `to`, whose page shows the license banner. */
   licenseLocked?: boolean;
+  /** Screen-reader text for the lock, e.g. "Locked: needs X". */
+  lockedLabel?: I18nText;
   dataTest?: string;
 }
 

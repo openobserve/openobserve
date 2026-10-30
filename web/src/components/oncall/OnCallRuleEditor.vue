@@ -63,6 +63,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="info-outline" size="sm" class="cursor-help">
                 <OTooltip side="right" :content="t('oncall.ruleEditorConditionsHint')" />
               </OIcon>
+              <OIcon
+                v-if="correlationLocked"
+                name="lock"
+                size="sm"
+                class="text-icon-locked"
+                data-test="oncall-rule-editor-correlation-lock"
+              >
+                <OTooltip side="right" :content="correlationLockedReason" />
+              </OIcon>
             </span>
 
             <!-- The queue is where most rules come from, so its rows are one
@@ -428,6 +437,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import {
   SERVICE_DIMENSION,
   dimensionsSentence,
@@ -449,6 +459,10 @@ const SHOWN_MATCHES = 4;
 
 /// How much of the unrouted queue the "start from a signal" menu offers.
 const STARTABLE_SHOWN = 6;
+
+// Discovered services and dimension values come from the correlation API; manual entry still works when it is locked.
+const { locked: correlationLocked, lockedReason: correlationLockedReason } =
+  useLicenseLock("correlation");
 
 const props = withDefaults(
   defineProps<{
@@ -537,12 +551,13 @@ const title = computed<I18nText>(() =>
 /// deployment starts.
 const scopeAvailable = computed(
   () =>
-    props.services.length > 0 ||
-    props.sets.some((set) =>
-      set.distinguish_by.some(
-        (dimension) => Object.keys(props.catalogue.values[dimension] ?? {}).length > 0,
-      ),
-    ),
+    !correlationLocked &&
+    (props.services.length > 0 ||
+      props.sets.some((set) =>
+        set.distinguish_by.some(
+          (dimension) => Object.keys(props.catalogue.values[dimension] ?? {}).length > 0,
+        ),
+      )),
 );
 
 /// Which of the two builders is on screen. Scope by default, because it is what

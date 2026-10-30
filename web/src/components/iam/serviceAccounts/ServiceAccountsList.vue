@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!rbacAccess.allowed"
                 name="lock"
                 size="xs"
-                class="text-warning-600 shrink-0"
+                class="text-icon-locked shrink-0"
               />
             </span>
           </template>
@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     rbacAccess.allowed
                       ? 'text-text-secondary group-hover:translate-x-0.5'
-                      : 'text-warning-600'
+                      : 'text-icon-locked'
                   "
                   class="shrink-0 transition-transform"
                 />
@@ -508,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     rbacAccess.allowed
                       ? 'text-text-secondary group-hover:translate-x-0.5'
-                      : 'text-warning-600'
+                      : 'text-icon-locked'
                   "
                   class="shrink-0 transition-transform"
                 />

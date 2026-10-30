@@ -655,6 +655,18 @@ describe("OButton", () => {
     });
   });
 
+  describe("lock icon", () => {
+    it.each(["iconLeft", "iconRight"])("paints a %s lock with the locked-icon token", (prop) => {
+      const wrapper = mount(OButton, { props: { [prop]: "lock" }, slots: { default: "Run" } });
+      expect(wrapper.find(".text-icon-locked").exists()).toBe(true);
+    });
+
+    it("leaves other icons uncoloured", () => {
+      const wrapper = mount(OButton, { props: { iconLeft: "add" }, slots: { default: "Run" } });
+      expect(wrapper.find(".text-icon-locked").exists()).toBe(false);
+    });
+  });
+
   describe("inside a license-locked page", () => {
     const mountLocked = (props: Record<string, unknown> = {}) => {
       const Locked = defineComponent({

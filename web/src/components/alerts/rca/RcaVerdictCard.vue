@@ -252,7 +252,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="inline-flex">
             <OButton data-test="rca-paused-connect-btn" variant="outline" size="sm" disabled>
               <template #icon-left>
-                <OIcon name="lock" size="sm" data-test="rca-paused-connect-lock" />
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="rca-paused-connect-lock"
+                />
               </template>
               {{ t("alerts.incidents.rcaSummary.fix.connectToolset") }}
             </OButton>
