@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
@@ -160,8 +160,19 @@ describe("makeBannerSchema", () => {
 describe("AnnouncementBannerEditorForm", () => {
   const stored = [{ message: "First" }, { message: "Second", variant: "warning" }];
 
+  // A form left mounted would autosave into the next test's new-banner draft slot.
+  const mounted: VueWrapper[] = [];
+
   beforeEach(() => {
+    for (const wrapper of mounted.splice(0)) {
+      try {
+        wrapper.unmount();
+      } catch {
+        // A test that cleared the body has already detached this form's elements.
+      }
+    }
     document.body.innerHTML = "";
+    localStorage.clear();
     vi.clearAllMocks();
     service.getConfig.mockResolvedValue({ data: { banners: stored } });
     service.setConfig.mockResolvedValue({ data: {} });
@@ -184,6 +195,7 @@ describe("AnnouncementBannerEditorForm", () => {
       global: { plugins: [i18n], provide: { store } },
       attachTo: document.body,
     });
+    mounted.push(wrapper);
     await flushPromises();
     return wrapper;
   };

@@ -270,6 +270,7 @@ export const BADGE_GROUPS = {
       triaged: { variant: "amber-soft", labelKey: "oncall.state_triaged" },
       acknowledged: { variant: "blue-soft", labelKey: "oncall.state_acknowledged" },
       resolved: { variant: "success-soft", labelKey: "oncall.state_resolved" },
+      exhausted: { variant: "error-soft", labelKey: "oncall.state_exhausted" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -485,7 +486,11 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       // Current RunOutcome vocabulary.
-      firing: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.firing" },
+      // Derived-stream runs record a successful run as `firing`.
+      firing: {
+        variant: "success-soft",
+        labelKey: "components.badge.pipelineRunOutcome.succeeded",
+      },
       normal: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.normal" },
       succeeded: {
         variant: "success-soft",

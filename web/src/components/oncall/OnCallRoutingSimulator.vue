@@ -217,10 +217,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="sending"
         :disabled="!canConfigure"
         data-test="oncall-simulator-send-test"
-        @click="emit('send-test', { team_id: preview.team_id, priority })"
+        @click="sendTest(preview.team_id)"
       >
         {{ t("oncall.simulatorSendTest") }}
       </OButton>
+
+      <!-- Counted per attempt, not per person: one person on email and SMS is two attempts. -->
+      <div
+        v-if="testResult && sentFor === inputsKey"
+        class="flex basis-full flex-col gap-1"
+        data-test="oncall-simulator-test-result"
+      >
+        <template v-if="testResult.attempts.length">
+          <OText variant="meta" data-test="oncall-simulator-test-count">
+            {{
+              t("oncall.testPageCount", { sent: sentAttempts, total: testResult.attempts.length })
+            }}
+          </OText>
+          <span
+            v-for="(attempt, index) in testResult.attempts"
+            :key="index"
+            :class="attempt.delivered ? 'text-text-secondary' : 'text-status-warning-text'"
+            class="text-xs"
+            :data-test="`oncall-simulator-test-attempt-${index}`"
+            >{{ attemptLine(attempt) }}</span
+          >
+        </template>
+        <span v-else class="text-status-warning-text text-xs">{{
+          t("oncall.testPageNobody", {
+            reason: raw(testResult.not_sent_because) || t("oncall.wouldPageNobody"),
+          })
+        }}</span>
+      </div>
     </div>
 
     <!-- Rules that matched and lost, in the server's words. Somebody reading
@@ -263,6 +291,8 @@ import type {
   Channel,
   RoutingPreview,
   TeamRungSummary,
+  TestPageAttempt,
+  TestPageResult,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -290,6 +320,8 @@ const props = withDefaults(
     embedded?: boolean;
     /** False once a configuration write was refused for this org (A10). */
     canConfigure?: boolean;
+    /** What the last real test page did, kept on screen until the next query. */
+    testResult?: TestPageResult | null;
   }>(),
   {
     preview: null,
@@ -301,6 +333,7 @@ const props = withDefaults(
     sending: false,
     embedded: false,
     canConfigure: true,
+    testResult: null,
   },
 );
 
@@ -447,6 +480,33 @@ const responderTone = computed(() => {
   if (!responder.value?.would_a_page_land) return "text-status-error-text";
   return sentChannels.value.length ? "text-status-success-text" : "text-status-warning-text";
 });
+
+/// The team, priority and dimensions on screen, so a result is shown only beside the inputs it was sent for.
+const inputsKey = computed(() =>
+  JSON.stringify([props.preview?.team_id, priority.value, query.value.dimensions]),
+);
+const sentFor = ref<string | null>(null);
+
+function sendTest(teamId: string) {
+  sentFor.value = inputsKey.value;
+  emit("send-test", { team_id: teamId, priority: priority.value });
+}
+
+const sentAttempts = computed(
+  () => props.testResult?.attempts.filter((attempt) => attempt.delivered).length ?? 0,
+);
+
+/// The transport's own error is the reason; without one the row says only that it was not sent.
+function attemptLine(attempt: TestPageAttempt): I18nText {
+  const params = {
+    person: raw(attempt.recipient),
+    channel: t(`oncall.channel_${attempt.channel}`),
+  };
+  if (attempt.delivered) return t("oncall.testPageAttemptSent", params);
+  return attempt.detail
+    ? t("oncall.testPageAttemptNotSent", { ...params, reason: raw(attempt.detail) })
+    : t("oncall.testPageAttemptNotSentBare", params);
+}
 
 /// A losing rule that points at the same team changes nothing; one pointing
 /// elsewhere is the case worth naming, because that is a page going to another

@@ -17,6 +17,7 @@ import store from "../stores";
 import axios from "axios";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { gt } from "@/types/i18n";
+import { expireSession } from "@/utils/sessionServices";
 
 const http = () => {
   const instance = axios.create({
@@ -43,10 +44,7 @@ const http = () => {
               message: error.response.data["error"] || gt("common.invalidCredentials"),
               variant: "error",
             });
-            store.dispatch("logout");
-            localStorage.clear();
-            sessionStorage.clear();
-            window.location.reload();
+            expireSession(store, { clearLocalStorage: true });
             break;
           case 404:
             toast({

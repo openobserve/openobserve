@@ -1460,7 +1460,6 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
-        .route("/v2/{org_id}/alerts/dedup/summary", get(alerts::dedup_stats::get_dedup_summary))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
@@ -1503,8 +1502,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
-        // Deduplication
-        .route("/{org_id}/alerts/deduplication/config", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
+        // Semantic field groups, under their historical path
         .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
         .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff));
 
@@ -2499,7 +2497,6 @@ fn fleet_router() -> Router {
             "/{org_id}/fleet/fleets",
             get(fleet::list_fleets).post(fleet::create_fleet),
         )
-        .route("/{org_id}/fleet/fleets/move", post(fleet::move_collectors))
         .route(
             "/{org_id}/fleet/fleets/{fleet_id}",
             get(fleet::get_fleet)

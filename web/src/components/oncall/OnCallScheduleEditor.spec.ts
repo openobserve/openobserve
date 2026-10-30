@@ -255,6 +255,8 @@ function render(
 
 describe("OnCallScheduleEditor", () => {
   beforeEach(() => {
+    // A draft one test leaves behind would open the restore dialog on the next open.
+    localStorage.clear();
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
@@ -510,6 +512,27 @@ describe("OnCallScheduleEditor", () => {
     expect(wrapper.find('[data-test="oncall-rotation-needs-people-0"]').exists()).toBe(true);
   });
 
+  // People edited on one rotation never reach another, even its form-made pair.
+  it("removing somebody from one rotation leaves its pair alone", async () => {
+    const pair = ["ana@o2.ai", "bob@o2.ai"];
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [rule({ members: [...pair] })]),
+        rota("Secondary", [rule({ members: [...pair], anchor_micros: ANCHOR - MICROS_PER_WEEK })]),
+      ]),
+    });
+    await flushPromises();
+
+    await openRotation(wrapper, 1);
+    await removePerson(wrapper, 0, 0);
+    await wrapper.find('[data-test="oncall-schedule-save"]').trigger("click");
+    await flushPromises();
+
+    const sent = (service.setSchedule.mock.calls.at(-1)![0] as any).data.rotations;
+    expect(sent[0].shift_rules[0].members).toEqual(pair);
+    expect(sent[1].shift_rules[0].members).toHaveLength(1);
+  });
+
   /// The drawer's Save is the one a new rotation is saved from, and a new
   /// rotation starts with nobody in it — so it has to be out of reach until
   /// somebody is picked, not merely refused after the click.
@@ -752,6 +775,14 @@ describe("OnCallScheduleEditor", () => {
   describe("closing with unsaved edits", () => {
     const drawer = (wrapper: any) => wrapper.findComponent({ name: "ODrawer" });
     const discardConfirm = (wrapper: any) => confirmFor(wrapper, "oncall-rotation-discard-confirm");
+    const leaveDialog = () =>
+      document.body.querySelector('[data-test="editor-draft-leave-dialog"]');
+    const leaveChoice = async (dataTest: "o-dialog-neutral-btn" | "o-dialog-close-btn") => {
+      leaveDialog()!.querySelector<HTMLElement>(`[data-test="${dataTest}"]`)!.click();
+      await flushPromises();
+    };
+    // The draft baseline is taken on the user's first pointer or key input, which emitted stub events skip.
+    const touch = () => window.dispatchEvent(new Event("pointerdown"));
 
     const exits: Record<string, (wrapper: any) => Promise<void>> = {
       "Esc or backdrop (update:open)": async (wrapper) => {
@@ -790,16 +821,18 @@ describe("OnCallScheduleEditor", () => {
         expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
       });
 
-      it(`drawer-only, edited: ${exit} asks before discarding`, async () => {
+      it(`drawer-only, edited: ${exit} asks through the leave dialog`, async () => {
         const wrapper = await openDrawerOnly();
+        touch();
         await addPerson(wrapper, 0, "bob@o2.ai");
-        expect(drawer(wrapper).props("persistent")).toBe(true);
 
         await close(wrapper);
         await flushPromises();
 
         expect(drawer(wrapper).props("open")).toBe(true);
-        expect(discardConfirm(wrapper).props("modelValue")).toBe(true);
+        expect(leaveDialog()).not.toBeNull();
+        expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
+        await leaveChoice("o-dialog-neutral-btn");
       });
     }
 
@@ -830,17 +863,16 @@ describe("OnCallScheduleEditor", () => {
       expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(0);
     });
 
-    it("Keep editing leaves the drawer open with the edits intact", async () => {
+    it("Stay leaves the drawer open with the edits intact", async () => {
       const wrapper = await openDrawerOnly();
+      touch();
       await addPerson(wrapper, 0, "bob@o2.ai");
       await exits["the footer Cancel"](wrapper);
       await flushPromises();
 
-      const confirm = discardConfirm(wrapper);
-      confirm.vm.$emit("update:modelValue", false);
-      confirm.vm.$emit("update:cancel");
-      await flushPromises();
+      await leaveChoice("o-dialog-close-btn");
 
+      expect(leaveDialog()).toBeNull();
       expect(drawer(wrapper).props("open")).toBe(true);
       await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
       await flushPromises();
@@ -873,59 +905,55 @@ describe("OnCallScheduleEditor", () => {
       expect(wrapper.emitted("open-members")).toHaveLength(1);
     });
 
-    it("the roster link with edits asks first; Keep editing stays, Discard opens the roster", async () => {
+    it("the roster link with edits asks first; Stay stays, Discard opens the roster", async () => {
       const wrapper = await openEmptyTeamDrawer();
+      touch();
       await wrapper.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "Renamed");
       await flushPromises();
 
       await openMembersLink(wrapper);
       await flushPromises();
       expect(drawer(wrapper).props("open")).toBe(true);
-      expect(discardConfirm(wrapper).props("modelValue")).toBe(true);
+      expect(leaveDialog()).not.toBeNull();
       expect(wrapper.emitted("open-members")).toBeUndefined();
 
-      discardConfirm(wrapper).vm.$emit("update:modelValue", false);
-      discardConfirm(wrapper).vm.$emit("update:cancel");
-      await flushPromises();
+      await leaveChoice("o-dialog-close-btn");
       expect(drawer(wrapper).props("open")).toBe(true);
       expect(wrapper.findComponent({ name: "OInput" }).props("modelValue")).toBe("Renamed");
       expect(wrapper.emitted("open-members")).toBeUndefined();
 
       await openMembersLink(wrapper);
       await flushPromises();
-      discardConfirm(wrapper).vm.$emit("update:ok");
-      await flushPromises();
+      await leaveChoice("o-dialog-neutral-btn");
       expect(drawer(wrapper).props("open")).toBe(false);
       expect(wrapper.emitted("open-members")).toHaveLength(1);
     });
 
     it("a Discard reached through Cancel does not open the roster", async () => {
       const wrapper = await openEmptyTeamDrawer();
+      touch();
       await wrapper.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "Renamed");
       await flushPromises();
 
       await openMembersLink(wrapper);
       await flushPromises();
-      discardConfirm(wrapper).vm.$emit("update:modelValue", false);
-      discardConfirm(wrapper).vm.$emit("update:cancel");
-      await flushPromises();
+      await leaveChoice("o-dialog-close-btn");
 
       await exits["the footer Cancel"](wrapper);
       await flushPromises();
-      discardConfirm(wrapper).vm.$emit("update:ok");
-      await flushPromises();
+      await leaveChoice("o-dialog-neutral-btn");
       expect(drawer(wrapper).props("open")).toBe(false);
       expect(wrapper.emitted("open-members")).toBeUndefined();
     });
 
     it("Discard closes and puts the rotation back as stored", async () => {
       const wrapper = await openDrawerOnly();
+      touch();
       await addPerson(wrapper, 0, "bob@o2.ai");
       await exits["the footer Cancel"](wrapper);
       await flushPromises();
 
-      discardConfirm(wrapper).vm.$emit("update:ok");
-      await flushPromises();
+      await leaveChoice("o-dialog-neutral-btn");
       expect(drawer(wrapper).props("open")).toBe(false);
 
       await wrapper.setProps({ intent: { mode: "edit", id: "rot_primary" } });
@@ -949,6 +977,7 @@ describe("OnCallScheduleEditor", () => {
         intent: { mode: "edit", id: "rot_primary" },
       });
       await flushPromises();
+      touch();
       const [, from] = wrapper
         .find('[data-test="oncall-schedule-restriction-0-0"]')
         .findAllComponents({ name: "OSelect" });
@@ -958,8 +987,7 @@ describe("OnCallScheduleEditor", () => {
 
       await exits["the footer Cancel"](wrapper);
       await flushPromises();
-      discardConfirm(wrapper).vm.$emit("update:ok");
-      await flushPromises();
+      await leaveChoice("o-dialog-neutral-btn");
       await wrapper.setProps({ intent: { mode: "edit", id: "rot_primary" } });
       await flushPromises();
       await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");

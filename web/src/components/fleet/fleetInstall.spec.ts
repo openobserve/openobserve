@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   GATEWAY_RELEASE,
+  HELM_ENV,
   INSTALL_ENV,
   installCommand,
   opampEndpoint,
@@ -119,6 +120,32 @@ describe("installCommand", () => {
     expect(cmd).toContain("--set gateway.enabled=true");
     expect(cmd).not.toContain("replicas");
     expect(cmd).toContain("--set opamp.token='o2ft_abc123'");
+  });
+
+  it("names the cluster only once one is given, for agents and gateways", () => {
+    for (const role of ["agent", "gateway"] as const) {
+      expect(installCommand("kubernetes", { ...target, role })).not.toContain("clusterName");
+      expect(installCommand("kubernetes", { ...target, role, clusterName: "  " })).not.toContain(
+        "clusterName",
+      );
+      expect(installCommand("kubernetes", { ...target, role, clusterName: " prod-us " })).toContain(
+        "--set-string clusterName='prod-us'",
+      );
+    }
+  });
+
+  it("escapes the backslashes and commas Helm would read in a cluster name", () => {
+    expect(installCommand("kubernetes", { ...target, clusterName: "eu,west" })).toContain(
+      "--set-string clusterName='eu\\,west'",
+    );
+    expect(installCommand("kubernetes", { ...target, clusterName: "a\\,b" })).toContain(
+      "--set-string clusterName='a\\\\\\,b'",
+    );
+  });
+
+  it("lists the chart's cluster name and node IP variables as Helm-provided", () => {
+    expect(HELM_ENV).toContain("K8S_CLUSTER_NAME");
+    expect(HELM_ENV).toContain("K8S_NODE_IP");
   });
 
   it("ignores the role outside Kubernetes", () => {

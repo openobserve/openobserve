@@ -10,6 +10,7 @@
     :sub-title="t('oncall.policyHint')"
     bleed
     data-test="oncall-policy-editor"
+    :close-guard="guardClose"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
     <!-- `bleed` because the chip bar spans the full width and supplies its own
@@ -552,7 +553,7 @@
               <OText variant="meta">{{ t("oncall.l0Hint") }}</OText>
 
               <OnCallL0Editor
-                :l0="props.policy?.l0 ?? null"
+                :l0="l0Draft ?? props.policy?.l0 ?? null"
                 @update:l0="onL0Update"
                 @update:valid="(v: boolean) => (l0Valid = v)"
               />
@@ -586,6 +587,7 @@
         </span>
       </div>
     </template>
+    <EditorDraftDialogs :draft="policyDraft" />
   </ODrawer>
 </template>
 
@@ -595,6 +597,9 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -671,6 +676,14 @@ const emit = defineEmits<{
   "update:open": [boolean];
   "open-members": [];
 }>();
+
+interface PolicyDraftData {
+  rungs: PriorityRung[];
+  destinations: string[];
+  repeatCount: number;
+  finalAction: PolicyFinalAction;
+  l0: L0Policy | null;
+}
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -1065,7 +1078,66 @@ function reset() {
   l0Touched.value = false;
 }
 
-watch(() => props.policy, reset, { immediate: true });
+/// The team's room is its own resource with its own Save, so it stays out of the draft.
+const policyContent = (): PolicyDraftData => ({
+  rungs: draft.value,
+  destinations: destinations.value,
+  repeatCount: repeatCount.value,
+  finalAction: finalAction.value,
+  l0: l0Touched.value ? l0Draft.value : null,
+});
+
+/// What the drawer opened on, so switching priority or tab is never an unsaved change.
+let contentAtOpen = "";
+const markOpened = () => {
+  contentAtOpen = stableStringify(policyContent());
+};
+
+function applyPolicyDraft(data: PolicyDraftData) {
+  draft.value = data.rungs;
+  destinations.value = data.destinations;
+  repeatCount.value = data.repeatCount;
+  finalAction.value = data.finalAction;
+  l0Draft.value = data.l0;
+  l0Touched.value = data.l0 !== null;
+  pendingUserStep.value = null;
+  pendingRotation.value = null;
+  if (!draft.value.some((rung) => rung.priority === selected.value)) {
+    selected.value = draft.value[0]?.priority ?? selected.value;
+  }
+}
+
+const policyDraft = useEditorDraft<PolicyDraftData>({
+  kind: "oncall_policy",
+  entityLabel: () => t("common.editorDraft.entities.oncall_policy"),
+  // One policy per team, and a team with no policy yet has no policy id to key on.
+  entityId: () => props.teamId,
+  snapshot: policyContent,
+  apply: applyPolicyDraft,
+  base: () => ({
+    rungs: props.policy?.rungs ?? [],
+    destinations: props.policy?.destinations ?? [],
+    repeat_count: props.policy?.repeat_count ?? 1,
+    final_action: props.policy?.final_action ?? "stop",
+    l0: props.policy?.l0 ?? null,
+  }),
+  hasChanges: () => !!props.open && stableStringify(policyContent()) !== contentAtOpen,
+  save: () => save(),
+});
+
+function startPolicyDraft() {
+  markOpened();
+  void policyDraft.start();
+}
+
+watch(
+  () => props.policy,
+  () => {
+    reset();
+    markOpened();
+  },
+  { immediate: true },
+);
 
 /// The drawer keeps this component mounted between visits, so a discarded edit
 /// would still be sitting in `draft` the next time it opens — and nothing the
@@ -1090,18 +1162,28 @@ watch(
     fetchTeamChannel();
     fetchMembers();
     fetchOnCallNow();
+    startPolicyDraft();
   },
   { immediate: true },
 );
 
-function cancel() {
+async function cancel() {
+  if (!(await policyDraft.confirmLeave())) return;
   reset();
   emit("update:open", false);
 }
 
+/// ✕, Escape and the backdrop ask through the leave dialog instead of closing over unsaved edits.
+function guardClose(): boolean {
+  if (!policyDraft.hasUnsavedChanges()) return true;
+  void cancel();
+  return false;
+}
+
 /// Steps into the Members tab. The drawer closes first — left open, it would
 /// float over a tab it no longer explains.
-function openMembers() {
+async function openMembers() {
+  if (!(await policyDraft.confirmLeave())) return;
   emit("update:open", false);
   emit("open-members");
 }
@@ -1181,7 +1263,16 @@ function onL0Update(value: L0Policy) {
   l0Touched.value = true;
 }
 
-async function save() {
+async function save(): Promise<boolean> {
+  // The leave dialog's Save reaches here past the disabled footer button, so the reason has to be said.
+  if (!canConfigure.value || !l0Valid.value) {
+    toast({
+      variant: "error",
+      title: t("oncall.savePolicyFailed"),
+      message: canConfigure.value ? t("oncall.l0BudgetInvalidNotSaved") : t("oncall.configDenied"),
+    });
+    return false;
+  }
   saving.value = true;
   try {
     await savePolicyWrite.mutateAsync({
@@ -1192,13 +1283,16 @@ async function save() {
       ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
     });
     toast({ variant: "success", message: t("oncall.policySaved") });
+    policyDraft.markSaved();
     emit("saved");
+    return true;
   } catch (err: any) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.savePolicyFailed"),
     });
+    return false;
   } finally {
     saving.value = false;
   }
