@@ -106,6 +106,9 @@ pub async fn get_domain_org_record(
 }
 
 pub async fn verify(mut record: Model) -> Result<Model, anyhow::Error> {
+    if record.meta_mapped{
+        return Ok(record);
+    }
     let res = o2_enterprise::enterprise::status_pages::domain_verifier::check_domain_ownership(
         status_page_custom_domains::Model {
             domain: record.domain.clone(),

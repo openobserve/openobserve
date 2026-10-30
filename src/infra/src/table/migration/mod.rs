@@ -222,8 +222,6 @@ mod m20261009_000003_add_last_downtime_id_to_alert_states;
 mod m20261009_000004_add_kind_to_slo_backfill_jobs;
 mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
-mod m20261030_000001_create_org_domain_ownership_table;
-mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
@@ -245,6 +243,8 @@ mod m20261025_000005_add_held_action_to_slack_link_requests;
 mod m20261026_000001_backfill_v1_rca_pointer;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
+mod m20261030_000001_create_org_domain_ownership_table;
+mod m20261030_000002_create_org_domain_ownership_req_table;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -701,8 +701,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20261004_000001_create_query_history::Migration),
             Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
             Box::new(m20261008_000001_add_name_to_rum_pa_tombstones::Migration),
-            Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
-            Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
             Box::new(m20261009_000001_add_promql_rule_mode::Migration),
             Box::new(m20261009_000001_create_downtimes::Migration),
             Box::new(m20261009_000002_add_muted_by_downtime_id_to_alert_incidents::Migration),
@@ -736,6 +734,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
             Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
             Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
+            Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
+            Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
         ]
     }
 }
@@ -829,7 +829,7 @@ mod tests {
         ),
         (127, "m20261028_000001_add_group_label_set_to_alert_states"),
         (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
-        (129, "m20261030_000001_create_org_domain_ownership_table.rs"),
+        (129, "m20261030_000002_create_org_domain_ownership_req_table"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
