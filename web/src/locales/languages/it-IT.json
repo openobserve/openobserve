@@ -15074,6 +15074,7 @@
       "noStreamsDetected": "Non sono stati rilevati stream. Assicurati che le metriche del grafico del servizio includano le etichette stream_name.",
       "borderColor": "Colore del bordo",
       "borderColorMetric": "Errori",
+      "dashedRingInferred": "Anello tratteggiato: dipendenza dedotta",
       "nodeSize": "Dimensione del nodo",
       "nodeSizeMetric": "Richieste",
       "sizeLow": "Basso",

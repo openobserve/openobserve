@@ -15072,6 +15072,7 @@
       "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",
       "borderColor": "Border Color",
       "borderColorMetric": "Errors",
+      "dashedRingInferred": "Dashed ring: inferred dependency",
       "nodeSize": "Node Size",
       "nodeSizeMetric": "Requests",
       "sizeLow": "Low",

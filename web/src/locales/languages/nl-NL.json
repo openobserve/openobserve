@@ -15074,6 +15074,7 @@
       "noStreamsDetected": "Er zijn geen streams gedetecteerd. Zorg ervoor dat de metrieken van servicegrafieken stream_name-labels bevatten.",
       "borderColor": "Kleur van de rand",
       "borderColorMetric": "Fouten",
+      "dashedRingInferred": "Gestippelde ring: afgeleide afhankelijkheid",
       "nodeSize": "Knooppuntgrootte",
       "nodeSizeMetric": "Verzoeken",
       "sizeLow": "Laag",

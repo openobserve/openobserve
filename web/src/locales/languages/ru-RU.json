@@ -15074,6 +15074,7 @@
       "noStreamsDetected": "Потоки не обнаружены. Убедитесь, что метрики графа сервисов содержат метки stream_name.",
       "borderColor": "Цвет границы",
       "borderColorMetric": "Ошибки",
+      "dashedRingInferred": "Пунктирное кольцо: выведенная зависимость",
       "nodeSize": "Размер узла",
       "nodeSizeMetric": "Запросы",
       "sizeLow": "Низкий",

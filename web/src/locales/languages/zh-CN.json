@@ -15074,6 +15074,7 @@
       "noStreamsDetected": "未检测到任何数据流。确保服务图表指标包含 stream_name 标签。",
       "borderColor": "边框颜色",
       "borderColorMetric": "错误",
+      "dashedRingInferred": "虚线环：推断的依赖",
       "nodeSize": "节点大小",
       "nodeSizeMetric": "请求",
       "sizeLow": "低",

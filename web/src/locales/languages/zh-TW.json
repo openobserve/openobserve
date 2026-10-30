@@ -15069,6 +15069,7 @@
       "noStreamsDetected": "未偵測到串流。請確保服務圖表指標包含 stream_name 標籤。",
       "borderColor": "邊框顏色",
       "borderColorMetric": "錯誤",
+      "dashedRingInferred": "虛線環：推斷的相依性",
       "nodeSize": "節點大小",
       "nodeSizeMetric": "請求",
       "sizeLow": "低",

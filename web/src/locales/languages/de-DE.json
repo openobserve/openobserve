@@ -15074,6 +15074,7 @@
       "noStreamsDetected": "Keine Streams erkannt. Stellen Sie sicher, dass die Service-Graph-Metriken stream_name-Labels enthalten.",
       "borderColor": "Farbe des Randes",
       "borderColorMetric": "Fehler",
+      "dashedRingInferred": "Gestrichelter Ring: abgeleitete Abhängigkeit",
       "nodeSize": "Knotengröße",
       "nodeSizeMetric": "Anfragen",
       "sizeLow": "Niedrig",

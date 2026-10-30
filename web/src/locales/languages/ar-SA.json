@@ -15074,6 +15074,7 @@
       "noStreamsDetected": "لم يتم اكتشاف أي تدفقات. تأكد من أن مقاييس رسم الخدمات تتضمن stream_name الملصقات.",
       "borderColor": "لون الإطار",
       "borderColorMetric": "الأخطاء",
+      "dashedRingInferred": "حلقة متقطعة: تبعية مستنتجة",
       "nodeSize": "حجم العقدة",
       "nodeSizeMetric": "الطلبات",
       "sizeLow": "منخفض",
