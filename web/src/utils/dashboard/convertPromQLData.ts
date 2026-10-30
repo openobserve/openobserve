@@ -83,12 +83,16 @@ import {
   gaugeOverrideTooltip,
 } from "./seriesOverrides";
 import { applyChartStyleOptions } from "./seriesStyleOverrides";
-import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legendBuilder";
+import {
+  buildPromqlSeriesNames,
+  getLegendPosition,
+  labelFreeName,
+} from "./promql/shared/legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries, getSeriesItemOpacity } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { buildSeriesMarkLine } from "./promql/shared/markLines";
-import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
+import { legendExprOf, legendFallbackOf } from "@/utils/dashboard/promql/formula";
 import { sortTooltipParams } from "./tooltipSort";
 import { fitStackedAxisBounds, stackTotalRows } from "./stackTotals";
 
@@ -179,6 +183,7 @@ const buildPromQLMetricCell = (
   panelSchema: MetricPanelSchema,
   seriesOverrides: ReturnType<typeof createSeriesOverrideLookup>,
   colors: MetricCellColors,
+  expr?: string,
 ): { cell: PromQLMetricCell; sparkline: MetricSparkline | null } => {
   const values = [...(metric?.values ?? (metric?.value ? [metric.value] : []))].sort(
     (a, b) => a[0] - b[0],
@@ -227,8 +232,12 @@ const buildPromQLMetricCell = (
       _metricName: name,
       _metricRaw: value,
       _metricRawValue: values.length > 0 ? value : null,
-      // A label-less result is named by its label dump "{}", which names nothing.
-      _metricStatName: label === "{}" ? "" : label,
+      // A label-less result is named by "{}" or its query text; under a single
+      // stat value that repeats the query, so it is left unnamed.
+      _metricStatName:
+        label === "{}" || (label === name && name === labelFreeName(metric?.metric, expr))
+          ? ""
+          : label,
       _metricSparkData: sparkline?.data ?? null,
       _metricSparkConfig: sparkline?.resolved ?? null,
     },
@@ -1058,6 +1067,7 @@ export const convertPromQLData = async (
       metrics: (it?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
       template: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend,
       fallback: legendFallbackOf(panelSchema.queries, parentQueryIndex[index]),
+      expr: legendExprOf(panelSchema.queries, metadata, parentQueryIndex[index]),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
@@ -1410,6 +1420,7 @@ export const convertPromQLData = async (
               panelSchema,
               seriesOverrides,
               metricColors,
+              legendExprOf(panelSchema.queries, metadata, parentQueryIndex[index]),
             ),
           );
       }

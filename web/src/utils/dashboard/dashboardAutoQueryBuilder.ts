@@ -658,22 +658,8 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
     : "";
 
   if (condition.filterType === "group") {
-    const groupConditions = condition.conditions
-      .map((condition: any) => buildCondition(condition, dashboardPanelData))
-      .filter(Boolean);
-    const logicalOperators = condition.conditions
-      .map((c: any) => c.logicalOperator)
-      .filter(Boolean);
-
-    let groupQuery = "";
-    groupConditions.forEach((c: any, index: any) => {
-      if (index > 0) {
-        groupQuery += ` ${logicalOperators[index]} `;
-      }
-      groupQuery += c;
-    });
-
-    return groupConditions.length ? `(${groupQuery})` : "";
+    const groupQuery = joinConditions(condition.conditions, dashboardPanelData);
+    return groupQuery ? `(${groupQuery})` : "";
   } else if (condition.type === "list" && condition.values?.length > 0) {
     const fieldRef = streamAlias
       ? `${streamAlias}.${condition.column.field}`
@@ -740,7 +726,11 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
         condition.column,
         dashboardPanelData,
       )})`;
-    } else if (condition.value != null && condition.value !== "") {
+    } else if (
+      (condition.value != null && condition.value !== "") ||
+      // `x <> ''` parsed from SQL is a real filter, unlike a value not entered yet
+      (condition.emptyLiteral && condition.value === "" && ["=", "<>"].includes(condition.operator))
+    ) {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
@@ -752,11 +742,12 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
         case ">":
         case "<=":
         case ">=":
-          selectFilter += `${condition.operator} ${formatValue(
-            condition.value,
-            condition.column,
-            dashboardPanelData,
-          )}`;
+          // formatValue leaves "" unquoted on a non-string column
+          selectFilter += `${condition.operator} ${
+            condition.value === ""
+              ? "''"
+              : formatValue(condition.value, condition.column, dashboardPanelData)
+          }`;
           break;
         case "Not Contains":
           selectFilter += `NOT LIKE '%${escapeSingleQuotes(condition.value)}%'`;
@@ -788,26 +779,27 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  * @returns {string} - the WHERE clause as a string.
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
-  const whereConditions = filterData
-    ?.map((condition: any) => buildCondition(condition, dashboardPanelData))
-    ?.filter(Boolean);
-
-  const logicalOperators = filterData.map((it: any) => it.logicalOperator);
-  if (whereConditions.length > 0) {
-    return ` WHERE ${whereConditions
-      .map((cond: any, index: any) => {
-        const logicalOperator =
-          index < logicalOperators.length && logicalOperators[index + 1]
-            ? logicalOperators[index + 1]
-            : "";
-
-        return index < logicalOperators.length ? `${cond} ${logicalOperator}` : cond;
-      })
-      .join(" ")}`;
-  }
-
-  return "";
+  const whereQuery = joinConditions(filterData, dashboardPanelData);
+  return whereQuery ? ` WHERE ${whereQuery}` : "";
 };
+
+/**
+ * Join conditions with their logical operators. A condition's logicalOperator
+ * joins it to the condition before it, so each condition is paired with its own
+ * operator before empty ones are dropped; dropping first shifts the operators
+ * and can leave a trailing AND.
+ */
+const joinConditions = (conditions: any[], dashboardPanelData: any): string =>
+  (conditions ?? [])
+    .map((condition: any) => ({
+      sql: buildCondition(condition, dashboardPanelData),
+      logicalOperator: condition?.logicalOperator || "AND",
+    }))
+    .filter((part: any) => part.sql)
+    .map((part: any, index: number) =>
+      index === 0 ? part.sql : `${part.logicalOperator} ${part.sql}`,
+    )
+    .join(" ");
 
 export const mapChart = (dashboardPanelData: any) => {
   const queryData = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
