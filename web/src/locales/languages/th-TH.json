@@ -12067,7 +12067,7 @@
       "acknowledgeGroups": "Acknowledge {count} firing group | Acknowledge {count} firing groups",
       "unacknowledge": "Unacknowledge",
       "takeOver": "Take over",
-      "chip": "Acked by {who} via {source} · {time}",
+      "chip": "Acknowledged by {who} · {time}",
       "chipTooltip": "Acknowledged by {who} at {time} from {source}",
       "firingAcknowledged": "Firing · acknowledged",
       "tile": "Acknowledged",
