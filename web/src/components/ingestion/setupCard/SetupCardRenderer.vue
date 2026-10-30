@@ -44,6 +44,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
 import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import type { FirstEventState, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
@@ -51,6 +52,8 @@ import FirstEventStatus from "../FirstEventStatus.vue";
 import { cliFlagArg, safeHttpUrl, sanitizeInput, shellQuote } from "./subs";
 import type {
   CardSubstitutions,
+  IngestTokenState,
+  RichCardCode,
   RichCardContent,
   RichCardInput,
   RichCardSetupMode,
@@ -67,18 +70,23 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 /** The data-test prefix of a step's code block when the content names none. */
 const SETUP_CODE_BLOCK = "ingestion-setup-code-block";
 
-const props = defineProps<{
-  /** The integration's rich content (already token-substituted). */
-  content: RichCardContent;
-  /** Per-org url/org/token — used for the .env download + detection org. */
-  subs: CardSubstitutions;
-  /** Optional logo URL (e.g. from the manifest) — overrides the content logo. */
-  logoUrl?: string;
-  /** Optional dark-mode logo URL (manifest) — overrides the content dark logo. */
-  logoUrlDark?: string;
-  /** Drop the hero — for a host page whose own header already names the card. */
-  hideHero?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** The integration's rich content (already token-substituted). */
+    content: RichCardContent;
+    /** Per-org url/org/token — used for the .env download + detection org. */
+    subs: CardSubstitutions;
+    /** Optional logo URL (e.g. from the manifest) — overrides the content logo. */
+    logoUrl?: string;
+    /** Optional dark-mode logo URL (manifest) — overrides the content dark logo. */
+    logoUrlDark?: string;
+    /** Drop the hero — for a host page whose own header already names the card. */
+    hideHero?: boolean;
+    /** Blocks that carry the ingest token (those with a masked twin) wait for "ready". */
+    tokenState?: IngestTokenState;
+  }>(),
+  { tokenState: "ready" },
+);
 
 const emit = defineEmits<{
   /** A step's action button was clicked; carries RichCardStepAction.id. */
@@ -261,7 +269,9 @@ const copyFirstSnippet = () => {
   const step = visibleSteps.value[index];
   if (!step) return;
   // A hidden command can't be copied; show the step and its warning instead.
-  if (missingRequired(activeVariant(step))) return scrollToStep(index);
+  if (missingRequired(activeVariant(step)) || tokenWithheld(displayCode(step))) {
+    return scrollToStep(index);
+  }
   const prefix = displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK;
   cardRoot.value?.querySelector<HTMLElement>(`[data-test="${prefix}-copy-btn"]`)?.click();
 };
@@ -321,6 +331,9 @@ const selectVariant = (key: string, variantId: unknown) => {
 };
 const displayCode = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.code : step.code;
+// copy writes `raw`, so a token block shown before the token is known hands out a 401 credential
+const tokenWithheld = (code?: RichCardCode) => !!code?.masked && props.tokenState !== "ready";
+const tokenLoading = (code?: RichCardCode) => !!code?.masked && props.tokenState === "loading";
 const currentVariantNote = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.note : undefined;
 
@@ -782,8 +795,18 @@ function fireConfetti() {
               <slot :name="`step-${step.id}-controls`" :step="step" />
             </div>
 
+            <OSkeleton
+              v-if="tokenLoading(displayCode(step)) && !missingRequired(activeVariant(step))"
+              type="rect"
+              class="my-3 h-20"
+              :data-test="`${displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK}-loading`"
+            />
             <OCodeBlock
-              v-if="displayCode(step) && !missingRequired(activeVariant(step))"
+              v-else-if="
+                displayCode(step) &&
+                !missingRequired(activeVariant(step)) &&
+                !tokenWithheld(displayCode(step))
+              "
               :lang="displayCode(step)?.lang"
               :chrome="codeChrome(step)"
               :filename="displayCode(step)?.filename"
@@ -932,7 +955,14 @@ function fireConfetti() {
               class="step-desc"
               v-html="inlineMd(sectionDescription(extras.advanced))"
             ></p>
+            <OSkeleton
+              v-if="tokenLoading(extras.advanced.code)"
+              type="rect"
+              class="my-3 h-20"
+              data-test="ai-advanced-code-loading"
+            />
             <OCodeBlock
+              v-else-if="!tokenWithheld(extras.advanced.code)"
               :lang="extras.advanced.code.lang"
               :chrome="extras.advanced.code.filename ? 'editor' : 'terminal'"
               :filename="extras.advanced.code.filename"

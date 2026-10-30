@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   narrowed rather than rendering a second copy of it.
 -->
 <template>
-  <!-- Reached from the profile menu, behind the same gate as the On-Call nav entry. -->
+  <!-- Reached from the On-Call menu and the profile menu, behind the same gate. -->
   <OPageLayout
     bleed
     data-test="oncall-mine-page"

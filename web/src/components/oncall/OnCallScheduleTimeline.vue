@@ -380,6 +380,7 @@ import {
   MINUTES_PER_DAY,
   rotationMembers,
   zonedMidnight,
+  zoneCaption,
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
@@ -507,18 +508,7 @@ const localZone = computed(() => Intl.DateTimeFormat().resolvedOptions().timeZon
 /// 09:59" under a clock reading 09:59 is a sentence that costs a read and
 /// carries nothing.
 const zoneLine = computed<I18nText>(() =>
-  localZone.value === props.timezone
-    ? t("oncall.schedZoneSame", { zone: raw(props.timezone) })
-    : t("oncall.schedZoneDiff", {
-        zone: raw(props.timezone),
-        local: raw(
-          new Intl.DateTimeFormat(undefined, {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZoneName: "short",
-          }).format(new Date(nowMicros.value / 1000)),
-        ),
-      }),
+  zoneCaption(props.timezone, localZone.value, nowMicros.value, t),
 );
 
 const share = (micros: number) => (micros - from.value) / span.value;
@@ -536,7 +526,8 @@ const answeredRotations = computed(
 /// Weekday names starting at MONDAY, matching `TimeWindow.days` (which the
 /// engine indexes from Monday, not from Sunday).
 const WEEKDAYS = computed(() => {
-  const format = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+  // Read in UTC: the dates below are UTC midnights, and a browser west of UTC would name the day before.
+  const format = new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" });
   // 2024-01-01 was a Monday.
   return Array.from({ length: 7 }, (_, i) => format.format(new Date(Date.UTC(2024, 0, 1 + i))));
 });
