@@ -741,4 +741,33 @@ describe("usePanelFields", () => {
       expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
     });
   });
+
+  describe("box plot slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes 1 x, 1 y and no breakdown fields", () => {
+      panelData.data.type = "boxplot";
+      expect(addMany("x", 3)).toBe(1);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(0);
+    });
+
+    it("a box plot y field keeps raw values, a pie y field counts", () => {
+      panelData.data.type = "boxplot";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+      panelData.data.queries[0].fields.y = [];
+      panelData.data.type = "pie";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
+    });
+  });
 });

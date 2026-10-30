@@ -38,6 +38,7 @@ import {
   ALERT_LIST_SORTS,
   ALERT_LIST_STATES,
 } from "@/utils/dashboard/alertListPanel";
+import { BOXPLOT_WHISKERS } from "@/utils/dashboard/convertBoxplotData";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { STATE_TIMELINE_DISPLAYS } from "@/utils/dashboard/convertStateTimelineData";
 import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/convertTreemapData";
@@ -623,6 +624,24 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "boxplot": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length > 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addAtMostOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      break;
+    }
+
     case "hostmap": {
       if (fields?.y?.length !== 1) {
         const errorMsg =
@@ -1022,6 +1041,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "h-stacked",
     "heatmap",
     "state-timeline",
+    "boxplot",
     "distribution",
     "treemap",
     "sunburst",
@@ -1219,6 +1239,7 @@ const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[
   ["bar_gauge_orientation", ["bar-gauge"], BAR_GAUGE_ORIENTATIONS],
   ["state_timeline_display", ["state-timeline"], STATE_TIMELINE_DISPLAYS],
   ["sort_order", ["pie", "donut"], SORT_ORDERS],
+  ["boxplot_whisker", ["boxplot"], BOXPLOT_WHISKERS],
   ["funnel_sort", ["funnel"], FUNNEL_SORTS],
   ["funnel_orient", ["funnel"], FUNNEL_ORIENTS],
   ["node_graph_layout", ["node-graph"], NODE_GRAPH_LAYOUTS],
