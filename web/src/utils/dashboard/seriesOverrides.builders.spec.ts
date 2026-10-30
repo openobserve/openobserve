@@ -366,6 +366,7 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
     expect(api.itemStyle.color).toBe(OVERRIDE_COLOR);
     expect(api.label.formatter()).toBe("66.7%");
     expect(web.label).toBeUndefined();
+    expect(options.series[0].label.formatter({ percent: 33 })).toBe("33%");
     const html = options.tooltip.formatter({ marker: "", name: "api", value: 600 });
     expect(html).toContain(`${DISPLAY} : <b>${fmt(600, "bytes", 1)}</b>`);
     expect(options.tooltip.formatter({ marker: "", name: "web", value: 300 })).toContain(

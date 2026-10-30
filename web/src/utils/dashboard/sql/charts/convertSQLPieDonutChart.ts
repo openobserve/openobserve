@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getSeriesColor } from "../../colorPalette";
-import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { createSeriesOverrideLookup, pieShareLabel } from "../../seriesOverrides";
 import { chartColor } from "@/utils/chartTheme";
 import {
   getChartDimensions,
@@ -81,6 +81,10 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         }
       },
     };
+    const percentDecimals = Math.min(
+      pieLegendPercentDecimals(panelSchema.config?.decimals),
+      MAX_SEATS_PRECISION,
+    );
     //generate trace based on the y axis keys
     options.series = yAxisKeys?.map((key: any) => {
       const seriesObj = {
@@ -107,14 +111,11 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         },
         label: {
           show: true,
-          formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+          formatter: pieShareLabel(percentDecimals),
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
         },
-        percentPrecision: Math.min(
-          pieLegendPercentDecimals(panelSchema.config?.decimals),
-          MAX_SEATS_PRECISION,
-        ),
+        percentPrecision: percentDecimals,
       };
       return seriesObj;
     });
@@ -221,6 +222,10 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         }
       },
     };
+    const percentDecimals = Math.min(
+      pieLegendPercentDecimals(panelSchema.config?.decimals),
+      MAX_SEATS_PRECISION,
+    );
     //generate trace based on the y axis keys
     options.series = yAxisKeys?.map((key: any) => {
       const seriesObj = {
@@ -247,14 +252,11 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         },
         label: {
           show: true,
-          formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+          formatter: pieShareLabel(percentDecimals),
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
         },
-        percentPrecision: Math.min(
-          pieLegendPercentDecimals(panelSchema.config?.decimals),
-          MAX_SEATS_PRECISION,
-        ),
+        percentPrecision: percentDecimals,
       };
       return seriesObj;
     });

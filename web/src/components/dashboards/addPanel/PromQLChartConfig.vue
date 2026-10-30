@@ -53,6 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <br />
             <b>{{ t("dashboard.promQLChartConfig.aggDiffLabel") }}</b>
             {{ t("dashboard.promQLChartConfig.aggDiffDesc") }}
+            <template v-if="chartType === 'pie' || chartType === 'donut'">
+              <br /><br />
+              {{ t("dashboard.promQLChartConfig.aggInstantNote") }}
+            </template>
           </template>
         </OTooltip>
       </template>

@@ -1325,10 +1325,55 @@ describe("pie and donut legend values", () => {
 
     options.legend.selected = { api: true, db: false, cache: false };
     expect(options.legend.formatter("api")).toBe("{b|api}  100%");
-    expect(options.legend.formatter("db")).toBe("{b|db}  0%");
+    expect(options.legend.formatter("db")).toBe("{b|db}  -");
 
     options.legend.selected = { api: true, db: true, cache: false };
     expect(options.legend.formatter("api")).toBe("{b|api}  50%");
+  });
+
+  it("keeps a hidden slice's value but shows no percent for it", () => {
+    const options: any = pieOptions(slices);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["value", "percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    options.legend.selected = { api: true, db: false };
+    expect(options.legend.formatter("db")).toBe("{b|db}  10  -");
+    expect(options.legend.formatter("api")).toBe("{b|api}  30  100%");
+  });
+
+  it("gives an explicit right legend width to the names instead of the values cap", () => {
+    const longName = "ziox-querier-595748494c-2vlk5";
+    const options: any = pieOptions([
+      { name: longName, value: 30 },
+      { name: "db", value: 10 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["value", "percent"],
+        decimals: 0,
+        legends_position: "right",
+        legend_width: { value: 450, unit: "px" },
+      }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.textStyle.width).toBe(390);
+    expect(options.legend.formatter(longName)).toBe(`{b|${longName}}  30  75%`);
+  });
+
+  it("still caps an auto-sized right legend at the values width", () => {
+    const options: any = pieOptions(slices);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["value", "percent"], legends_position: "right" }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.textStyle.width).toBeLessThanOrEqual(180);
   });
 
   it("takes an override-decimals and a high-decimals percent over the visible slices too", () => {

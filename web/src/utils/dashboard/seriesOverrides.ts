@@ -120,6 +120,8 @@ const MAX_COMPILED_PATTERNS = 500;
 
 const LINE_STYLES: ReadonlySet<string> = new Set(["solid", "dashed", "dotted"]);
 const DRAW_STYLES: ReadonlySet<string> = new Set(["line", "bars", "points"]);
+// Formatters made by pieShareLabel, so applyPieOverrides replaces them like "{d}%" instead of wrapping them.
+const PIE_SHARE_LABELS = new WeakSet<object>();
 const Y_AXIS_SIDES: ReadonlySet<string> = new Set(["left", "right"]);
 const HIDE_FROM_KEYS = ["chart", "legend", "tooltip"] as const;
 
@@ -297,8 +299,10 @@ const applyPieOverrides = (
 ) => {
   if (!Array.isArray(series?.data)) return;
   // `{d}%` is replaced outright; a custom label reads the lookup itself and only needs the exact share.
-  const percentLabel = series.label?.formatter === "{d}%";
-  const customLabel = typeof series.label?.formatter === "function" ? series.label.formatter : null;
+  const formatter = series.label?.formatter;
+  const percentLabel =
+    formatter === "{d}%" || (typeof formatter === "function" && PIE_SHARE_LABELS.has(formatter));
+  const customLabel = !percentLabel && typeof formatter === "function" ? formatter : null;
   const items = series.data;
   // Like the legend, the share is of the slices still shown; ChartRenderer replaces legend.selected on each toggle.
   let totalFor: { selected: unknown } | null = null;
@@ -415,6 +419,14 @@ const relabelTitles = (title: any, displayNames: Map<string, string>) => {
 };
 
 /** True for an `override_config` entry that targets chart series; tables skip these. */
+/** A pie slice label printing its share at fixed decimals, as the legend does, rather than ECharts' trimmed `{d}`. */
+export const pieShareLabel = (decimals: number) => {
+  const formatter = (params: { percent?: number }): string =>
+    `${Number(params?.percent ?? 0).toFixed(decimals)}%`;
+  PIE_SHARE_LABELS.add(formatter);
+  return formatter;
+};
+
 export const isSeriesOverrideEntry = (entry: any): boolean =>
   entry?.field?.matchBy === SERIES_OVERRIDE_MATCH_BY.EXACT ||
   entry?.field?.matchBy === SERIES_OVERRIDE_MATCH_BY.REGEX;
