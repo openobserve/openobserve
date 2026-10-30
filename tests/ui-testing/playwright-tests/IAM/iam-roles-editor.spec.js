@@ -272,7 +272,7 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
 
     // ---------------- empty role, presets, loading ----------------
 
-    test('U-13 · an empty role offers the three presets', {
+    test('U-13 · the Role Overview Presets panel offers the built-in and job presets', {
         tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
     }, async () => {
         await pm.rolesPage.gotoRoles();
@@ -280,9 +280,21 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
         await pm.rolesPage.waitForGrantsSettled(0);
 
         await expect(pm.rolesPage.summaryEmpty).toBeVisible({ timeout: 15000 });
-        await expect(pm.rolesPage.presetCard('Read-Only')).toBeVisible();
-        await expect(pm.rolesPage.presetCard('Database Monitoring Viewer')).toBeVisible();
-        await expect(pm.rolesPage.presetCard('Kubernetes Viewer')).toBeVisible();
+        await expect(pm.rolesPage.presetsPanel).toBeVisible({ timeout: 15000 });
+        // Job presets hide only when a module they grant is missing; an enterprise org has all of them.
+        for (const id of [
+            'readonly', 'dbm', 'k8s', 'rum_viewer', 'rum_editor',
+            'alert_manager', 'alert_viewer', 'dashboard_editor', 'dashboard_viewer', 'pipeline_editor',
+        ]) {
+            await expect(pm.rolesPage.presetRow(id), `preset ${id} missing from the panel`).toBeVisible();
+        }
+
+        // A row opens its detail in place; Back returns to the list.
+        await pm.rolesPage.openPreset('readonly');
+        await expect(pm.rolesPage.presetRow('alert_manager')).toBeHidden();
+        await pm.rolesPage.presetBack.click();
+        await expect(pm.rolesPage.presetDetail).toBeHidden();
+        await expect(pm.rolesPage.presetRow('alert_manager')).toBeVisible();
     });
 
     // Guards o2-enterprise#2697: a populated role once read "0 Permissions" before its grants loaded.

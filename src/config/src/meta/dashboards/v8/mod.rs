@@ -480,6 +480,10 @@ pub struct FilterCondition {
     pub value: Option<String>,
     pub logical_operator: String,
     pub filter_type: String,
+    /// Set when `value` is an explicit `''` from SQL, so the builder keeps `x <> ''`
+    /// instead of treating the empty value as "not entered yet".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub empty_literal: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -809,6 +813,8 @@ pub struct PanelConfig {
     flame_graph_stack_field: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     flame_graph_value_field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    boxplot_whisker: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1554,6 +1560,39 @@ mod tests {
         );
         let again: Dashboard = serde_json::from_value(back).unwrap();
         assert_eq!(again, d);
+    }
+
+    #[test]
+    fn test_filter_condition_empty_literal_roundtrip() {
+        let kept = serde_json::json!({
+            "type": "condition",
+            "values": [],
+            "column": { "field": "service_name", "streamAlias": null },
+            "operator": "<>",
+            "value": "",
+            "logicalOperator": "AND",
+            "filterType": "condition",
+            "emptyLiteral": true
+        });
+        let filter: PanelFilter = serde_json::from_value(kept).unwrap();
+        match &filter {
+            PanelFilter::Condition(c) => assert_eq!(c.empty_literal, Some(true)),
+            PanelFilter::Group(_) => panic!("expected a condition"),
+        }
+        assert_eq!(serde_json::to_value(&filter).unwrap()["emptyLiteral"], true);
+
+        let plain = serde_json::json!({
+            "type": "condition",
+            "values": [],
+            "column": { "field": "service_name", "streamAlias": null },
+            "operator": "=",
+            "value": "",
+            "logicalOperator": "AND",
+            "filterType": "condition"
+        });
+        let filter: PanelFilter = serde_json::from_value(plain).unwrap();
+        let back = serde_json::to_value(&filter).unwrap();
+        assert!(!back.as_object().unwrap().contains_key("emptyLiteral"));
     }
 
     #[test]
@@ -3022,7 +3061,8 @@ mod tests {
         });
         let rest4 = serde_json::json!({
             "flame_graph_stack_field": "stack",
-            "flame_graph_value_field": "samples"
+            "flame_graph_value_field": "samples",
+            "boxplot_whisker": "iqr"
         });
         for part in [rest, rest2, rest3, rest4] {
             fields
