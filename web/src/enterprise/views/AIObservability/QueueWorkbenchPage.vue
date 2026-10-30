@@ -216,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon
                             name="lock"
+                            class="text-icon-locked"
                             size="sm"
                             data-test="ai-queue-workbench-open-trace-lock"
                           />

@@ -806,7 +806,12 @@ function openInLogs() {
             <span class="inline-flex">
               <OButton size="sm" variant="outline" disabled data-test="log-explorer-open-in-logs">
                 <template #icon-left>
-                  <OIcon name="lock" size="sm" data-test="log-explorer-open-in-logs-lock" />
+                  <OIcon
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="log-explorer-open-in-logs-lock"
+                  />
                 </template>
                 {{ t("panel.logExplorer.openInLogs") }}
               </OButton>
@@ -1173,6 +1178,7 @@ function openInLogs() {
                             <template #icon-left>
                               <OIcon
                                 name="lock"
+                                class="text-icon-locked"
                                 size="sm"
                                 data-test="log-explorer-pattern-open-lock"
                               />

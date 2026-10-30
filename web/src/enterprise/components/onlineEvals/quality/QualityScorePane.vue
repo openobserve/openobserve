@@ -179,7 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="quality-score-pane-open-target"
             >
               <template #icon-left>
-                <OIcon name="lock" size="sm" data-test="quality-score-pane-open-target-lock" />
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="quality-score-pane-open-target-lock"
+                />
               </template>
               {{ t(`onlineEvals.quality.pane.open.${score?.targetScope}`) }}
             </OButton>
@@ -206,7 +211,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="quality-score-pane-open-evaluator"
             >
               <template #icon-left>
-                <OIcon name="lock" size="sm" data-test="quality-score-pane-open-evaluator-lock" />
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="quality-score-pane-open-evaluator-lock"
+                />
               </template>
               {{ t("onlineEvals.quality.pane.evaluatorTrace") }}
             </OButton>

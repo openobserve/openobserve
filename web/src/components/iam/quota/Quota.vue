@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="edit-table-btn"
                 variant="outline"
                 size="sm"
-                :disabled="activeTab == 'role-limits' && !expandedRow"
+                :disabled="activeTab == 'role-limits' && (rolesDenied || !expandedRow)"
                 @click="editTableWithInput"
               >
                 {{ t("iam.quotaPage.editQuota") }}
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5"
           >
             <div
-              v-if="selectedOrganization && activeType == 'table'"
+              v-if="selectedOrganization && activeType == 'table' && !rolesDenied"
               class="flex items-center max-md:min-w-0 max-md:flex-wrap max-md:gap-y-1.5"
             >
               <OSearchInput
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div
-              v-if="selectedOrganization"
+              v-if="selectedOrganization && !rolesDenied"
               class="float-right ms-auto flex items-center max-md:flex-wrap max-md:justify-end max-md:gap-y-1.5"
             >
               <div class="app-tabs-container me-3 h-9 w-fit">
@@ -212,9 +212,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :read-only="!editTable"
         />
       </div>
+      <LicenseDeniedState
+        v-if="rolesDenied"
+        :features="['rbac']"
+        data-test="quota-role-limits-license-denied"
+      />
       <!-- this table for role limits -->
       <div
-        v-if="activeTab == 'role-limits' && activeType == 'table'"
+        v-if="activeTab == 'role-limits' && activeType == 'table' && !rolesDenied"
         class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden"
       >
         <OTable
@@ -310,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="bg-card-glass-bg min-h-0 flex-1"
-        v-if="activeTab == 'role-limits' && activeType == 'json'"
+        v-if="activeTab == 'role-limits' && activeType == 'json' && !rolesDenied"
       >
         <QueryEditor
           data-test="json-view-roles-editor"
@@ -415,6 +420,7 @@ import {
   ref,
   watch,
   defineAsyncComponent,
+  h,
 } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -439,10 +445,15 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { featureState } from "@/utils/featureGate";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+const LockedTabIcon = () => h(OIcon, { name: "lock", size: "sm", class: "text-icon-locked" });
+
 export default defineComponent({
   name: "Quota",
   components: {
     NoOrganizationSelected,
+    LicenseDeniedState,
     OButton,
     OSelect,
     OSearchInput,
@@ -476,6 +487,10 @@ export default defineComponent({
     const activeType = ref<any>("table");
     const activeTimeUnit = ref<string>("second");
 
+    const { lockedReason } = useLicenseLocks();
+    const rbacState = computed(() => featureState(store.state.zoConfig?.features, "rbac"));
+    const rbacLocked = computed(() => rbacState.value === "locked");
+
     const tabs = computed(() => [
       {
         label: t("iam.quotaPage.apiLimits"),
@@ -483,9 +498,16 @@ export default defineComponent({
         icon: "speed",
       },
       // Role limits list custom roles, an API the rbac license gates.
-      ...(featureState(store.state.zoConfig?.features, "rbac") === "enabled"
-        ? [{ label: t("iam.quotaPage.roleLimits"), value: "role-limits", icon: "shield" }]
-        : []),
+      ...(rbacState.value === "hidden"
+        ? []
+        : [
+            {
+              label: t("iam.quotaPage.roleLimits"),
+              value: "role-limits",
+              icon: rbacLocked.value ? LockedTabIcon : "shield",
+              tooltipLabel: rbacLocked.value ? lockedReason("rbac") : undefined,
+            },
+          ]),
     ]);
 
     const timeUnitTabs = ref<any[]>([
@@ -678,6 +700,7 @@ export default defineComponent({
       ];
     });
     const activeTab = ref<string>("api-limits");
+    const rolesDenied = computed(() => activeTab.value === "role-limits" && rbacLocked.value);
     const searchQuery = ref<string>("");
     const apiLimitsRows = ref<any[]>([]);
     const editTable = ref<boolean>(false);
@@ -910,6 +933,7 @@ export default defineComponent({
       editTable.value = true;
     };
     const getRolesByOrganization = async () => {
+      if (rbacLocked.value) return;
       //here we are getting the roles from the api
       //as we are not storing the roles in the store
       //so we need to get the roles from the api
@@ -1506,6 +1530,7 @@ export default defineComponent({
       activeTab,
       updateActiveTab,
       tabs,
+      rolesDenied,
       typeTabs,
       editTable,
       searchQuery,

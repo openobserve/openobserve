@@ -293,7 +293,12 @@ onBeforeUnmount(stopPolling);
         <span class="inline-flex">
           <OButton variant="ghost-primary" size="sm" disabled data-test="k8s2-logs-open">
             <template #icon-left>
-              <OIcon name="lock" size="sm" data-test="k8s2-logs-open-lock" />
+              <OIcon
+                name="lock"
+                class="text-icon-locked"
+                size="sm"
+                data-test="k8s2-logs-open-lock"
+              />
             </template>
             {{ t("infra.k8s2.logsOpenIn") }}
           </OButton>

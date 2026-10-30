@@ -126,7 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex min-w-0 items-center">
             <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
               <span class="me-1.5 inline-flex shrink-0">
-                <OIcon name="lock" size="sm" data-test="ai-discovery-row-lock" />
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="ai-discovery-row-lock"
+                />
               </span>
             </OTooltip>
             <div class="flex min-w-0 flex-col">
@@ -144,7 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex min-w-0 items-center">
             <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
               <span class="me-1.5 inline-flex shrink-0">
-                <OIcon name="lock" size="sm" data-test="ai-discovery-row-lock" />
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="ai-discovery-row-lock"
+                />
               </span>
             </OTooltip>
             <div class="flex min-w-0 flex-col">
@@ -166,7 +176,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex min-w-0 items-center">
             <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
               <span class="me-1.5 inline-flex shrink-0">
-                <OIcon name="lock" size="sm" data-test="ai-discovery-row-lock" />
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="ai-discovery-row-lock"
+                />
               </span>
             </OTooltip>
             <div class="flex min-w-0 flex-col">
