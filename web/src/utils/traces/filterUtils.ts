@@ -9,7 +9,7 @@ import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
 const SQL_STRING = `'(?:[^']|'')*'`;
 // O2 field names may start with a digit (format_key keeps digits anywhere).
 const SIMPLE_CONDITION = new RegExp(
-  `^(?:"[^"]+"\\.)?"?(\\w[\\w.]*)"?(?:\\s*(=|!=|<>)\\s*(${SQL_STRING}|-?\\d+(?:\\.\\d+)?|true|false)|\\s+(is(?:\\s+not)?)\\s+null)$`,
+  `^(?:"[^"]+"\\.|\\w+\\.)?"?(\\w+)"?(?:\\s*(=|!=|<>)\\s*(${SQL_STRING}|-?\\d+(?:\\.\\d+)?|true|false)|\\s+(is(?:\\s+not)?)\\s+null)$`,
   "i",
 );
 
@@ -120,10 +120,14 @@ export const applyFilterTerm = (filterTerm: string, baseValue: string): string =
 
 /** Merges a span filter term into the explorer query: `=` replaces the field's top-level `=` conditions, any other term is appended unless already there. */
 export const mergeFilterTerm = (term: string, baseQuery: string): string => {
+  if (isCommentOnly(term)) return baseQuery;
   const base = baseQuery.trim();
   if (!base) return term;
+  // A comment-only query has no condition for `and` to join.
+  if (isCommentOnly(base)) return `${base}\n${term}`;
   // ANDing onto a bare top-level OR would bind only to its last branch.
-  if (splitTopLevel(base, "or").length > 1) return `(${base}) and ${term}`;
+  if (splitTopLevel(base, "or").length > 1) return `${wrapInParens(base)} and ${term}`;
+  const appended = joinWithAnd([base, term]);
 
   const conjuncts = splitTopLevel(base, "and");
   const incoming = parseSimpleCondition(term);
@@ -133,15 +137,16 @@ export const mergeFilterTerm = (term: string, baseQuery: string): string => {
       return cond?.field === incoming.field && cond.operator === "=";
     };
     const first = conjuncts.findIndex(isSameFieldEquality);
-    if (first === -1) return `${base} and ${term}`;
-    return conjuncts
-      .map((c, i) => (i === first ? term : c))
-      .filter((c, i) => i === first || !isSameFieldEquality(c))
-      .join(" and ");
+    if (first === -1) return appended;
+    return joinWithAnd(
+      conjuncts
+        .map((c, i) => (i === first ? term : c))
+        .filter((c, i) => i === first || !isSameFieldEquality(c)),
+    );
   }
 
   const key = conditionKey(term);
-  return conjuncts.some((c) => conditionKey(c) === key) ? base : `${base} and ${term}`;
+  return conjuncts.some((c) => conditionKey(c) === key) ? base : appended;
 };
 
 /** Merges each top-level `and` condition of `pending` into `baseQuery` with mergeFilterTerm's rules. */
@@ -151,7 +156,7 @@ export const mergePendingFilters = (pending: string, baseQuery: string): string 
   // Splitting a pending top-level or on `and` would AND its branches apart.
   const terms =
     splitTopLevel(conditions, "or").length > 1
-      ? [`(${conditions})`]
+      ? [wrapInParens(conditions)]
       : splitTopLevel(conditions, "and");
   return terms.reduce((query, term) => mergeFilterTerm(term, query), baseQuery);
 };
@@ -172,18 +177,20 @@ export const buildFilterTerm = (
   return `${field} ${operator} '${escaped}'`;
 };
 
-/** Splits `query` on a top-level `and`/`or`, skipping quoted text and parenthesised groups. */
+/** Splits `query` on a top-level `and`/`or`, skipping quoted text, comments and parenthesised groups. */
 const splitTopLevel = (query: string, keyword: "and" | "or"): string[] => {
   // SQL lets the keyword touch a parenthesis: `a = '1' or(b = '2')`, `(a = '1')or b`.
   const separator = new RegExp(`^\\s*${keyword}(?:\\s+|(?=\\())`, "i");
+  // Offsets match `query`, so the scan reads the masked text and the parts are cut from the original.
+  const { masked } = maskSqlComments(query);
   const parts: string[] = [];
   let depth = 0;
   let quote: string | null = null;
   let start = 0;
-  for (let i = 0; i < query.length; i++) {
-    const ch = query[i];
+  for (let i = 0; i < masked.length; i++) {
+    const ch = masked[i];
     if (quote) {
-      if (ch === quote && query[i + 1] === quote) i++;
+      if (ch === quote && masked[i + 1] === quote) i++;
       else if (ch === quote) quote = null;
       continue;
     }
@@ -192,7 +199,7 @@ const splitTopLevel = (query: string, keyword: "and" | "or"): string[] => {
     else if (ch === ")") depth--;
     if (depth !== 0 || (ch !== ")" && !/\s/.test(ch))) continue;
     const end = ch === ")" ? i + 1 : i;
-    const match = separator.exec(query.slice(end));
+    const match = separator.exec(masked.slice(end));
     if (match) {
       parts.push(query.slice(start, end).trim());
       i = end + match[0].length - 1;
@@ -203,11 +210,48 @@ const splitTopLevel = (query: string, keyword: "and" | "or"): string[] => {
   return parts.filter((p) => p !== "");
 };
 
+/** Replaces `--` and block comments outside string literals with spaces of the same length; `openLineComment` is true when the text ends inside a `--` comment. */
+const maskSqlComments = (query: string): { masked: string; openLineComment: boolean } => {
+  let masked = "";
+  let quote: string | null = null;
+  let i = 0;
+  while (i < query.length) {
+    const ch = query[i];
+    const pair = query.slice(i, i + 2);
+    if (!quote && (pair === "--" || pair === "/*")) {
+      const close = pair === "--" ? query.indexOf("\n", i) : query.indexOf("*/", i + 2);
+      if (close === -1) {
+        masked += " ".repeat(query.length - i);
+        return { masked, openLineComment: pair === "--" };
+      }
+      const end = pair === "--" ? close : close + 2;
+      masked += " ".repeat(end - i);
+      i = end;
+      continue;
+    }
+    if (quote && ch === quote) quote = null;
+    else if (!quote && (ch === "'" || ch === '"')) quote = ch;
+    masked += ch;
+    i++;
+  }
+  return { masked, openLineComment: false };
+};
+
+/** True when `sql` ends inside a `--` comment, which would swallow anything added after it on the same line. */
+const endsInLineComment = (sql: string): boolean => maskSqlComments(sql).openLineComment;
+
+const isCommentOnly = (sql: string): boolean => maskSqlComments(sql).masked.trim() === "";
+
+const joinWithAnd = (conditions: string[]): string =>
+  conditions.reduce((sql, next) => `${sql}${endsInLineComment(sql) ? "\n" : " "}and ${next}`);
+
+const wrapInParens = (sql: string): string => `(${sql}${endsInLineComment(sql) ? "\n" : ""})`;
+
 /** `is null` parses as an `=` on null, since buildFilterTerm emits it for an `=` on a null value. */
 const parseSimpleCondition = (
   condition: string,
 ): { field: string; operator: "=" | "!="; value: string } | null => {
-  const match = SIMPLE_CONDITION.exec(condition.trim());
+  const match = SIMPLE_CONDITION.exec(maskSqlComments(condition).masked.trim());
   if (!match) return null;
   const [, field, operator, value, isOperator] = match;
   const negated = isOperator ? /not/i.test(isOperator) : operator !== "=";

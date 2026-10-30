@@ -1317,6 +1317,30 @@ describe("TraceDetailsSidebar", async () => {
         expect(wrapper.emitted("open-trace")).toBeTruthy();
       });
 
+      it("should keep the originating search tab in the linked trace's URL", async () => {
+        const routeSpy = vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+          value: {
+            name: "traceDetails",
+            query: { stream: "default", trace_id: mockSpan.trace_id, tab: "traces" },
+          },
+        } as any);
+        const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
+
+        await wrapper.find('[data-test="trace-event-detail-link-0"]').trigger("click");
+
+        expect(pushSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "traceDetails",
+            query: expect.objectContaining({
+              trace_id: JSON.parse(mockLinks)[0].context.traceId,
+              tab: "traces",
+            }),
+          }),
+        );
+        routeSpy.mockRestore();
+        pushSpy.mockRestore();
+      });
+
       it("should emit select-span when a same trace link is clicked", async () => {
         const linkRow = wrapper.find('[data-test="trace-event-detail-link-1"]');
         await linkRow.trigger("click");

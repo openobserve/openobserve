@@ -49,7 +49,8 @@ export function isInputFocused(target?: EventTarget | null): boolean {
 export function isInsideDialog(target?: EventTarget | null): boolean {
   const el = target ?? document.activeElement;
   if (!(el instanceof Element)) return false;
-  return !!el.closest('[role="dialog"], [role="alertdialog"]');
+  // Dropdowns opened from a drawer are portalled to <body>, outside the drawer's dialog element.
+  return !!el.closest('[role="dialog"], [role="alertdialog"], [data-reka-popper-content-wrapper]');
 }
 
 /**

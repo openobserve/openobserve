@@ -2370,6 +2370,8 @@ export default defineComponent({
           from: convertTimeFromNsToUs(props.span.start_time) - 3600000000,
           to: convertTimeFromNsToUs(props.span.end_time) + 3600000000,
           org_identifier: store.state.selectedOrganization.identifier,
+          // Apply & Search in the linked trace returns to the search tab the user came from.
+          tab: router.currentRoute.value.query.tab,
         };
 
         if (query.trace_id === props.span.trace_id) {

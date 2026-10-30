@@ -1663,6 +1663,14 @@ export default defineComponent({
       showFilterPopover.value = true;
     };
 
+    // A full view opened in a new browser tab starts with the default search mode, so the URL's tab wins.
+    const originSearchTab = (): "traces" | "spans" => {
+      const tab = router.currentRoute.value.query.tab;
+      if (tab === "traces" || tab === "spans") return tab;
+      // Only the traces and spans tabs run a search, so any other tab falls back to spans.
+      return searchObj.meta.searchMode === "traces" ? "traces" : "spans";
+    };
+
     const viewTracesWithQuery = (editorValue: string) => {
       searchObj.data.editorValue = editorValue;
       showFilterPopover.value = false;
@@ -1678,8 +1686,7 @@ export default defineComponent({
       }
       query.query = b64EncodeUnicode(editorValue);
       query["run-query"] = "true";
-      // Only the traces and spans tabs run a search, so any other tab falls back to spans.
-      query.tab = searchObj.meta.searchMode === "traces" ? "traces" : "spans";
+      query.tab = originSearchTab();
       router.push({ name: "traces", query });
     };
 
@@ -3464,6 +3471,7 @@ export default defineComponent({
         from: effectiveTimeRange.value.from.toString(),
         to: effectiveTimeRange.value.to.toString(),
         org_identifier: effectiveOrgIdentifier.value,
+        tab: originSearchTab(),
       };
 
       // Add log_stream parameter for correlation navigation

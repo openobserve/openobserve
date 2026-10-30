@@ -273,6 +273,22 @@ describe("ShortcutManager", () => {
       expect(handler).not.toHaveBeenCalled();
     });
 
+    it("should not fire a plain-key shortcut inside a dropdown portalled out of a drawer", () => {
+      const handler = vi.fn();
+      manager.register({ key: "x", handler, description: "export" });
+      const popper = document.createElement("div");
+      popper.setAttribute("data-reka-popper-content-wrapper", "");
+      const option = document.createElement("div");
+      option.setAttribute("role", "option");
+      popper.appendChild(option);
+      document.body.appendChild(popper);
+
+      manager.handleKeyDown(fakeEvent({ key: "x", target: option }));
+
+      expect(handler).not.toHaveBeenCalled();
+      popper.remove();
+    });
+
     it("control: should still fire the same shortcut outside any dialog", () => {
       const handler = vi.fn();
       manager.register({ key: "x", handler, description: "export" });

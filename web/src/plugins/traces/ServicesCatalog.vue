@@ -1404,11 +1404,13 @@ async function loadServicesCatalog() {
         ),
     );
   };
-  const closePanelIfRowGone = () => {
+  // The side panel reads the selected row's numbers, so it follows the refreshed row or closes when the row is gone.
+  const syncSelectedRow = () => {
     const selectedId = selectedServiceRow.value?.id;
-    if (selectedId && !services.value.some((r) => r.id === selectedId)) {
-      handleCloseSidePanel();
-    }
+    if (!selectedId) return;
+    const refreshed = services.value.find((r) => r.id === selectedId);
+    if (refreshed) selectedServiceRow.value = refreshed;
+    else handleCloseSidePanel();
   };
 
   await fetchQueryDataWithHttpStream(
@@ -1479,7 +1481,7 @@ async function loadServicesCatalog() {
         );
         // Rows from an earlier search (possibly another stream) would otherwise sit beside the error.
         services.value = [];
-        closePanelIfRowGone();
+        syncSelectedRow();
         isLoading.value = false;
         isSearching.value = false;
       },
@@ -1487,7 +1489,7 @@ async function loadServicesCatalog() {
         if (load !== catalogLoad) return;
         // Publishing here also clears the previous search's rows when this one returned no batches.
         publish();
-        closePanelIfRowGone();
+        syncSelectedRow();
         isLoading.value = false;
         isSearching.value = false;
         lastRunAt.value = Date.now();

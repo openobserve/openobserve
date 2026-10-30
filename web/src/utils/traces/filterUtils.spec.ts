@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it } from "vitest";
+import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 
 import {
   getFieldFromExpression,
@@ -378,6 +379,15 @@ describe("mergeFilterTerm", () => {
       );
     });
 
+    it("should match a field qualified by an unquoted stream name", () => {
+      expect(mergeFilterTerm("service_name = 'b'", "traces.service_name = 'a'")).toBe(
+        "service_name = 'b'",
+      );
+      expect(mergeFilterTerm("service_name = 'b'", `traces."service_name" = 'a'`)).toBe(
+        "service_name = 'b'",
+      );
+    });
+
     it("should append when the field has no = condition yet", () => {
       expect(mergeFilterTerm("service_name = 'b'", "duration > 100")).toBe(
         "duration > 100 and service_name = 'b'",
@@ -504,6 +514,84 @@ describe("mergeFilterTerm", () => {
       ).toBe("(a = '1' or(b = '2')) and d = 'x)or(y' and origin = 'o' and c = 'z'");
     });
   });
+
+  describe("a query with SQL comments", () => {
+    it("should not wrap the query for an or inside a line comment", () => {
+      expect(mergeFilterTerm("c = 'z'", "tenant = 'acme' -- either this or that")).toBe(
+        "tenant = 'acme' -- either this or that\nand c = 'z'",
+      );
+    });
+
+    it("should start the appended term on a new line after a bare trailing --", () => {
+      expect(mergeFilterTerm("service_name = 'b'", "duration > 5 --")).toBe(
+        "duration > 5 --\nand service_name = 'b'",
+      );
+    });
+
+    it("should start an appended != term on a new line after a trailing comment", () => {
+      expect(mergeFilterTerm("service_name != 'z'", "duration > 5 -- slow ones")).toBe(
+        "duration > 5 -- slow ones\nand service_name != 'z'",
+      );
+    });
+
+    it("should close the wrapping parenthesis on a new line after a trailing comment", () => {
+      expect(mergeFilterTerm("c = '3'", "a = '1' or b = '2' -- either")).toBe(
+        "(a = '1' or b = '2' -- either\n) and c = '3'",
+      );
+    });
+
+    it("should not wrap the query for an or inside a block comment", () => {
+      expect(mergeFilterTerm("c = 'z'", "a = '1' /* either or */")).toBe(
+        "a = '1' /* either or */ and c = 'z'",
+      );
+    });
+
+    it("should still replace the field when a block comment holds an apostrophe", () => {
+      expect(
+        mergeFilterTerm("service_name = 'b'", "service_name = 'a' /* don't */ and duration > 5"),
+      ).toBe("service_name = 'b' and duration > 5");
+    });
+
+    it("should replace a condition that is followed by a line comment", () => {
+      expect(
+        mergeFilterTerm("service_name = 'b'", "service_name = 'a' -- first pick\nand duration > 5"),
+      ).toBe("service_name = 'b' and duration > 5");
+      expect(
+        mergeFilterTerm("service_name = 'b'", "duration > 5 and service_name = 'a' -- old"),
+      ).toBe("duration > 5 and service_name = 'b'");
+    });
+
+    it("control: should treat -- inside a quoted value as text, not a comment", () => {
+      expect(mergeFilterTerm("d = '2'", "note = 'a -- b' or c = '1'")).toBe(
+        "(note = 'a -- b' or c = '1') and d = '2'",
+      );
+    });
+
+    it("should break the line after a replacing term that ends in a comment", () => {
+      expect(
+        mergeFilterTerm("service_name = 'a' -- pick", "service_name = 'x' and duration > 5"),
+      ).toBe("service_name = 'a' -- pick\nand duration > 5");
+    });
+
+    it("should break the line after a commented term that replaces a middle condition", () => {
+      expect(
+        mergeFilterTerm(
+          "service_name = 'a' -- pick",
+          "duration > 5 and service_name = 'x' and level = 'y'",
+        ),
+      ).toBe("duration > 5 and service_name = 'a' -- pick\nand level = 'y'");
+    });
+
+    it("should put the term on its own line after a comment-only query", () => {
+      expect(mergeFilterTerm("service_name = 'a'", "-- my notes")).toBe(
+        "-- my notes\nservice_name = 'a'",
+      );
+    });
+
+    it("should leave the query unchanged for a comment-only term", () => {
+      expect(mergeFilterTerm("-- todo", "duration > 5")).toBe("duration > 5");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -534,6 +622,82 @@ describe("mergePendingFilters", () => {
     expect(mergePendingFilters("a = '1' or b = '2'", "c = '3'")).toBe(
       "c = '3' and (a = '1' or b = '2')",
     );
+  });
+
+  it("should keep the base conditions after a pending replacement with a trailing comment", () => {
+    expect(
+      mergePendingFilters("service_name = 'a' -- pick", "service_name = 'x' and duration > 5"),
+    ).toBe("service_name = 'a' -- pick\nand duration > 5");
+  });
+
+  it("should close a pending or group on a new line after its trailing comment", () => {
+    expect(mergePendingFilters("a = '1' or b = '2' -- either", "c = '3'")).toBe(
+      "c = '3' and (a = '1' or b = '2' -- either\n)",
+    );
+  });
+
+  it("should leave the query unchanged when the pending text is only a comment", () => {
+    expect(mergePendingFilters("-- todo", "duration > 5")).toBe("duration > 5");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Apply & Search round trip: the merged query parses to the same filter as the comment-free one
+// ---------------------------------------------------------------------------
+
+describe("Apply & Search merge round trip", () => {
+  const parser = new Parser();
+  const whereOf = (condition: string) => {
+    const ast = parser.astify(`select * from t where ${condition}`) as any;
+    return (Array.isArray(ast) ? ast[0] : ast).where;
+  };
+
+  it.each([
+    {
+      pending: "service_name = 'a' -- pick",
+      base: "service_name = 'x' and duration > 5",
+      term: "level != 'debug'",
+      expected: "service_name = 'a' and duration > 5 and level != 'debug'",
+    },
+    {
+      pending: "a = '1' or b = '2' -- either",
+      base: "c = '3'",
+      term: "d = '4'",
+      expected: "c = '3' and (a = '1' or b = '2') and d = '4'",
+    },
+    {
+      pending: "",
+      base: "duration > 5 -- slow\nand service_name = 'a'",
+      term: "service_name = 'b'",
+      expected: "duration > 5 and service_name = 'b'",
+    },
+    {
+      pending: "",
+      base: "a = '1' or b = '2' -- either",
+      term: "c = '3'",
+      expected: "(a = '1' or b = '2') and c = '3'",
+    },
+    {
+      pending: "level = 'x' /* note */ and env = 'prod' -- last",
+      base: "level = 'y' and duration > 5",
+      term: "service_name = 'a'",
+      expected: "level = 'x' and duration > 5 and env = 'prod' and service_name = 'a'",
+    },
+    {
+      pending: "service_name = 'a' -- pick\nand duration > 5",
+      base: "",
+      term: "service_name = 'b'",
+      expected: "service_name = 'b' and duration > 5",
+    },
+    {
+      pending: "-- todo",
+      base: "-- my notes",
+      term: "service_name = 'a'",
+      expected: "service_name = 'a'",
+    },
+  ])("pending $pending + query $base + term $term", ({ pending, base, term, expected }) => {
+    const merged = mergeFilterTerm(term, mergePendingFilters(pending, base));
+    expect(whereOf(merged)).toEqual(whereOf(expected));
   });
 });
 

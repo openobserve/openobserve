@@ -3290,6 +3290,36 @@ describe("TraceDetails", () => {
       apply("service_name", "order-service");
       expect(pushed().query.tab).toBe("spans");
     });
+
+    it("carries the originating tab into the full-view URL", () => {
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const resolveSpy = vi.spyOn(router, "resolve").mockReturnValue({ href: "/full" } as any);
+
+      wrapper.vm.handleExpandToFullView();
+
+      expect(resolveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traceDetails",
+          query: expect.objectContaining({ tab: "traces" }),
+        }),
+      );
+      windowOpenSpy.mockRestore();
+      resolveSpy.mockRestore();
+    });
+
+    it("returns to the Traces tab from a full view whose fresh search state says Spans", () => {
+      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+        value: {
+          query: { trace_id: "test-trace-id", stream: "test-stream", tab: "traces" },
+          name: "traceDetails",
+        },
+      } as any);
+      wrapper.vm.searchObj.meta.searchMode = "spans";
+
+      apply("service_name", "order-service");
+
+      expect(pushed()).toMatchObject({ name: "traces", query: { tab: "traces" } });
+    });
   });
 
   describe("Tab order and active-tab persistence", () => {

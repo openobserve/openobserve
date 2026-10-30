@@ -1362,6 +1362,37 @@ describe("ServicesCatalog", () => {
         error_rate: 7.0,
       });
     });
+
+    it("should give the open side panel the refreshed error rate after a reload", async () => {
+      let paymentErrorRate = 0.5;
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.service_name === "payment-service" ? paymentErrorRate : s.error_rate,
+        }));
+        callbacks?.data?.(null, { type: "search_response_hits", content: { results: { hits } } });
+        callbacks?.complete?.(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      await wrapper
+        .find('[data-test="services-catalog-row-name-payment-service"]')
+        .trigger("click");
+      const panel = () => wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel().props("selectedNode")).toMatchObject({ error_rate: 0.5 });
+
+      paymentErrorRate = 12;
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(panel().props("selectedNode")).toMatchObject({
+        name: "payment-service",
+        error_rate: 12,
+      });
+    });
   });
 
   // -----------------------------------------------------------------------
