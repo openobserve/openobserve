@@ -839,6 +839,21 @@ pub async fn native_session_activity(headers: HeaderMap) -> Response {
     if get_config().common.session_idle_timeout <= 0 {
         return StatusCode::NO_CONTENT.into_response();
     }
+    // A cookie-authenticated heartbeat must not be triggerable cross-site.
+    // Browsers supply Origin for POST; fail closed if it is absent or mismatched.
+    let Some(origin) = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok()) else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    let Some(host) = headers.get(header::HOST).and_then(|v| v.to_str().ok()) else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    let origin_host = origin
+        .strip_prefix("https://")
+        .or_else(|| origin.strip_prefix("http://"))
+        .and_then(|authority| authority.split('/').next());
+    if origin_host != Some(host) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
     let jar = CookieJar::from_headers(&headers);
     let Some(cookie) = jar.get("auth_tokens") else {
         return StatusCode::UNAUTHORIZED.into_response();
