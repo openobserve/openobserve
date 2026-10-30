@@ -27827,6 +27827,8 @@
       "joinsFleetNoConfig": "Mit diesem Token installierte Collector treten dem Fleet {fleet} bei, das noch keine Konfiguration hat.",
       "envRefNote": "Verwenden Sie {ref}-Verweise für Zugangsdaten in Konfigurationen, damit Secrets auf dem Host bleiben.",
       "websocketTransport": "WebSocket verwenden (überträgt Konfiguration sofort; der Proxy muss es unterstützen)",
+      "clusterName": "Cluster-Name",
+      "clusterNameHint": "Wird den Daten dieses Clusters als {attribute} hinzugefügt.",
       "kubernetesNote": "Stellt ein DaemonSet bereit, das den Supervisor und den Collector in einem Container ausführt. Zum Upgrade das Image-Tag ändern.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",

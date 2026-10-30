@@ -34,11 +34,14 @@ const router = createRouter({
   ],
 });
 import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { REFRESH_QUERY_ORIGIN } from "@/composables/useLogs/logsRowNav";
 
 initializeLogsIndexDom();
 
 const loaderCalls = vi.hoisted(() => [] as string[]);
 const loadRuns = vi.hoisted(() => [] as Promise<unknown>[]);
+const gridSearches = vi.hoisted(() => ({ stub: false, calls: [] as unknown[][] }));
 vi.mock("@/composables/useLogs", async () => {
   const actual =
     await vi.importActual<typeof import("@/composables/useLogs")>("@/composables/useLogs");
@@ -58,6 +61,11 @@ vi.mock("@/composables/useLogs", async () => {
         loadVisualizeData: () => {
           loaderCalls.push("visualize");
           return api.loadVisualizeData();
+        },
+        runGridSearch: (...gridArgs: Parameters<typeof api.runGridSearch>) => {
+          if (!gridSearches.stub) return api.runGridSearch(...gridArgs);
+          gridSearches.calls.push(gridArgs);
+          return Promise.resolve();
         },
       };
     },
@@ -323,6 +331,38 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
         wrapper.vm.searchObj.meta.refreshInterval = 0;
         wrapper.vm.refreshData();
         vi.useRealTimers();
+      }
+    });
+
+    it("only a refresh tick tags its grid query with the refresh origin", async () => {
+      const setExecutors = vi.spyOn(useLogsAutoRun(), "setExecutors");
+      await ready();
+      const executeGridRun = setExecutors.mock.calls.find((c) => c[0].logs && c[0].visualize)?.[0]
+        .logs;
+      expect(executeGridRun).toBeTypeOf("function");
+      const generation = wrapper.vm.autoRun.engine.currentGeneration("grid");
+      const run = (reason: string) =>
+        executeGridRun!({
+          generation,
+          reason,
+          reasons: [reason],
+          kind: "refinement",
+          op: "full",
+          signature: wrapper.vm.autoRun.readSignature(),
+          target: "live",
+        } as any);
+      gridSearches.stub = true;
+      gridSearches.calls.length = 0;
+      try {
+        await run("refresh");
+        await run("explicit");
+        expect(gridSearches.calls.map((args) => args[2])).toEqual([
+          REFRESH_QUERY_ORIGIN,
+          undefined,
+        ]);
+      } finally {
+        gridSearches.stub = false;
+        setExecutors.mockRestore();
       }
     });
 
