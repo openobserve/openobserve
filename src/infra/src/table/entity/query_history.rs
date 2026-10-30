@@ -26,7 +26,20 @@ pub struct Model {
     pub query: String,
     pub context: Json,
     pub starred: bool,
+    /// First run of this row; never changed after insert.
     pub created_at: i64,
+    #[sea_orm(column_type = "Text")]
+    pub source: String,
+    /// Hex sha256 of the merge key; NULL on rows written before the key existed.
+    pub query_key: Option<String>,
+    /// Comma-wrapped stream list (`,a,b,`), empty when there are none.
+    #[sea_orm(column_type = "Text")]
+    pub streams: String,
+    pub run_count: i64,
+    /// Last run of this row.
+    pub updated_at: i64,
+    #[sea_orm(column_type = "Text")]
+    pub status: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
