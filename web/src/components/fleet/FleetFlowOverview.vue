@@ -322,6 +322,7 @@ import type { FleetFlowEdgeData, FleetFlowNodeData, FlowSignal, FlowWindow } fro
 import { buildPipelineMap, strokeWidth, type MapEdge, type MapNode } from "./pipelineGraph";
 import { formatCount } from "./fleetFormat";
 import { useFleetFlow } from "./useFleetApi";
+import { typeKey } from "./editor/editorGraph";
 
 const emit = defineEmits<{
   navigate: [tab: FleetTab, query: Record<string, string>];
@@ -615,7 +616,8 @@ function nodeData(n: MapNode): FleetFlowNodeData {
   return {
     label,
     icon: destination
-      ? (DESTINATION_ICON[destinationById.value.get(n.name)?.type ?? ""] ?? "cloud-upload")
+      ? (DESTINATION_ICON[typeKey("exporter", destinationById.value.get(n.name)?.type ?? "")] ??
+        "cloud-upload")
       : COLUMN_ICON[n.id[0]],
     sublabel: rateText(n.rate, nodeSignal(n)),
     compact: !destination,

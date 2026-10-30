@@ -769,6 +769,7 @@ import {
   nextJobRequestId,
   notePageLoad,
   notePageRequest,
+  REFRESH_QUERY_ORIGIN,
   resetRowSelection,
 } from "@/composables/useLogs/logsRowNav";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -1282,8 +1283,9 @@ export default defineComponent({
       }
       let mode: "full" | "page" | "page-size" = "full";
       if (ctx.op === "page") mode = ctx.reason === "page-size" ? "page-size" : "page";
+      const origin = ctx.reason === "refresh" ? REFRESH_QUERY_ORIGIN : initOriginForRun(ctx.origin);
       try {
-        await runGridSearch(generationId, mode, initOriginForRun(ctx.origin));
+        await runGridSearch(generationId, mode, origin);
         if (mode === "full") showRanFilter(generationId, ranQuery);
         refreshHistogramChart();
         if (mode === "full") showJobScheduler.value = true;

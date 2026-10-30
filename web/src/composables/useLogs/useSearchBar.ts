@@ -41,6 +41,7 @@ import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { pruneFreeTextScan } from "@/utils/logs/freeTextScan";
 import {
   closeDrawerForQuery,
+  keepsDetailOnRefresh,
   resetRowSelection,
   withQueryOrigin,
 } from "@/composables/useLogs/logsRowNav";
@@ -472,7 +473,10 @@ export const useSearchBar = (t: TranslateFn) => {
 
       // searchObj.data.histogram.chartParams.title = "";
       searchObjDebug["queryDataStartTime"] = performance.now();
-      if (!isPagination) resetRowSelection(searchObj);
+      // The old index points at a different record once new hits land; the rematch restores it.
+      if (keepsDetailOnRefresh(searchObj))
+        searchObj.meta.resultGrid.navigation.currentRowIndex = null;
+      else if (!isPagination) resetRowSelection(searchObj);
       closeDrawerForQuery(searchObj, isPagination);
       searchObj.meta.searchApplied = true;
       searchObj.data.functionError = "";

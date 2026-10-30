@@ -27827,6 +27827,8 @@
       "joinsFleetNoConfig": "Bu token ile kurulan toplayıcılar henüz yapılandırması olmayan {fleet} filosuna katılır.",
       "envRefNote": "Gizli bilgiler ana bilgisayarda kalsın diye yapılandırmalarda kimlik bilgileri için {ref} başvurularını kullanın.",
       "websocketTransport": "WebSocket kullan (yapılandırma anında iletilir; proxy desteklemelidir)",
+      "clusterName": "Küme adı",
+      "clusterNameHint": "Bu kümenin verilerine {attribute} olarak eklenir.",
       "kubernetesNote": "Supervisor'ı ve toplayıcıyı tek bir kapsayıcıda çalıştıran bir DaemonSet dağıtır. Yükseltmek için imaj etiketini değiştirin.",
       "kubernetesAgent": "Ajan (DaemonSet)",
       "kubernetesGateway": "Ağ geçidi (StatefulSet)",
