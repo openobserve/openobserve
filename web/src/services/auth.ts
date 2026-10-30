@@ -20,6 +20,8 @@ const auth = {
     return http().post(`/auth/login`, payload);
   },
 
+  session_activity: () => http().post("/auth/activity"),
+
   get_dex_login: async () => {
     const res = await http().get("/config/dex_login");
     return res.data;
