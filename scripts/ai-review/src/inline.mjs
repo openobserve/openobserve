@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 
-export const INLINE_SEVERITIES = new Set(["critical", "warning"]);
+import { normalizeSeverity, severityRank } from "./severity.mjs";
+
+export const INLINE_SEVERITIES = new Set(["p0", "p1", "p2"]);
 export const MAX_INLINE_COMMENTS = 10;
 // A model that wraps the block in a code fence leaves an empty fence behind once the block is cut out.
 const EMPTY_FENCE_RE = /^[ \t]*(`{3,}|~{3,})[a-z]*[ \t]*\n\s*\1[ \t]*$/gim;
 const FINGERPRINT_RE = /<!--\s*ai-review-fp:([0-9a-f]{40})\s*-->/g;
-const SEVERITY_LABEL = { critical: "🔴 Blocker", warning: "🟡 Warning" };
+const SEVERITY_LABEL = { p0: "🔴 P0", p1: "🟠 P1", p2: "🟡 P2" };
 
 // Lines a review comment may anchor to with side RIGHT: added and context lines of each hunk, keyed by new path.
 export function rightSideLines(diff) {
@@ -63,7 +65,7 @@ function normalizeFinding(raw) {
   return {
     file: String(raw.file ?? "").trim().replace(/^\.?\//, ""),
     line: Number.parseInt(raw.line, 10) || 0,
-    severity: String(raw.severity ?? "").trim().toLowerCase(),
+    severity: normalizeSeverity(raw.severity),
     category: stripComments(raw.category),
     title,
     body: stripComments(raw.body ?? raw.description),
@@ -133,12 +135,12 @@ export function existingFingerprints(comments, botLogin) {
   return found;
 }
 
-// Keeps critical/warning findings whose anchor is a RIGHT-side line of the PR diff, skips ones already posted, caps the count.
+// GitHub rejects a whole review if one comment anchors outside the RIGHT side of the diff, so such findings are dropped here.
 export function selectInlineComments(findings, rightLines, posted = new Set(), max = MAX_INLINE_COMMENTS) {
   const selected = [];
   const dropped = { severity: 0, anchor: 0, duplicate: 0, cap: 0 };
   const seen = new Set(posted);
-  const ranked = [...findings].sort((a, b) => (a.severity === "critical" ? 0 : 1) - (b.severity === "critical" ? 0 : 1));
+  const ranked = [...findings].sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
   for (const f of ranked) {
     if (!INLINE_SEVERITIES.has(f.severity)) { dropped.severity += 1; continue; }
     if (!f.file || !(f.line > 0) || !rightLines.get(f.file)?.has(f.line)) { dropped.anchor += 1; continue; }

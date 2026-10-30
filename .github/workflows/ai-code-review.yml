@@ -5,7 +5,7 @@ name: AI Code Review
 on:
   pull_request_target:
     branches: [main]
-    # unlabeled/converted_to_draft start a run that only cancels the one in progress (see concurrency).
+    # unlabeled and converted_to_draft never review: their run exists only to cancel the one in progress (see concurrency).
     types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review, converted_to_draft]
   workflow_dispatch:
     inputs:
@@ -31,18 +31,20 @@ on:
 
 permissions: {}
 
-# Workflow-level so a run whose job is skipped still cancels the paid one; unrelated label edits get a private group.
+# Workflow-level so an unlabeled or draft run, whose job is always skipped, still cancels the paid one; pushes queue so a paid run finishes; unrelated label edits get a private group and cancel nothing.
 concurrency:
   group: ai-review-${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && github.event.label.name != 'ready-for-ci') && github.run_id || github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ contains(fromJSON('["unlabeled","converted_to_draft"]'), github.event.action) }}
 
 jobs:
   review:
     # Paid CI runs only on non-draft 'ready-for-ci' PRs, and never when vars.AI_REVIEW_ENABLED is 'false' (the kill switch).
+    # A dispatch from any other ref would run that ref's engine next to the review secrets.
     if: >-
-      ${{ vars.AI_REVIEW_ENABLED != 'false' && (github.event_name == 'workflow_dispatch' || (
+      ${{ vars.AI_REVIEW_ENABLED != 'false' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (
         contains(github.event.pull_request.labels.*.name, 'ready-for-ci') &&
         github.event.pull_request.draft == false &&
+        github.event.action != 'unlabeled' &&
         (github.event.action != 'labeled' || github.event.label.name == 'ready-for-ci')
       )) }}
     # Explicit name: without it GitHub serializes the whole matrix object (api_key_env, marker) into the public check name.
@@ -70,7 +72,7 @@ jobs:
             api_key_env: DEEPSEEK_API_KEY
             marker: "<!-- ai-code-review -->"
     steps:
-      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      # Debounce: lets a burst of pushes land so Resolve PR picks up the newest head.
       - if: github.event_name == 'pull_request_target'
         run: sleep 60
 
@@ -176,6 +178,7 @@ jobs:
           ent_pr="$(jq -r '.number // ""' <<<"$ent_json")"
           if [ -z "$ent_pr" ]; then
             echo "No open $ent_repo PR on branch '$BRANCH'; reviewing here."
+            echo "REVIEW_PAIR_CLEAR=true" >> "$GITHUB_ENV"
             exit 0
           fi
           ent_ready="$(jq -r '(.isDraft | not) and ([.labels[].name] | index("ready-for-ci") != null)' <<<"$ent_json")"
@@ -303,9 +306,13 @@ jobs:
           O2_TRACE_EXPORT_BATCH_SIZE: ${{ vars.O2_TRACE_EXPORT_BATCH_SIZE }}
           # Set the variable to 'true' to also post inline threads; the summary comment always posts.
           REVIEW_INLINE: ${{ vars.AI_REVIEW_INLINE || 'false' }}
-          # Automatic reviews per PR (engine default 2); the manual input lifts the cap for one run.
+          # Optional ceiling on automatic reviews per PR; unset means no cap, so each new commit gets one review. The manual input bypasses it for one run.
           REVIEW_MAX_PASSES: ${{ vars.AI_REVIEW_MAX_PASSES }}
           REVIEW_IGNORE_PASS_LIMIT: ${{ inputs.ignore_pass_limit || 'false' }}
+          # An unknown value means off, so a typo can never start approving.
+          REVIEW_AUTO_APPROVE: ${{ vars.AI_REVIEW_AUTO_APPROVE || 'shadow' }}
+          # Set only when the lookup proved no paired PR is open, so a failed or skipped lookup can never approve.
+          REVIEW_PAIR_CLEAR: ${{ env.REVIEW_PAIR_CLEAR }}
           REVIEW_ARTIFACT_DIR: ${{ runner.temp }}/ai-review-findings
         run: node engine/scripts/ai-review/run-review.mjs
 
