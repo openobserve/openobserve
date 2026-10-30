@@ -42,11 +42,16 @@ use std::time::Duration;
 use config::meta::self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType};
 use infra::{
     db::get_orm_client_rw,
-    table::{org_ingestion_tokens, synthetics_checks, synthetics_jobs, synthetics_runs},
+    table::{org_ingestion_tokens, synthetics_jobs, synthetics_runs},
 };
 
 use crate::{MAX_DISPATCH_ATTEMPTS as MAX_ATTEMPTS, alerting::ERROR_SOURCE_DISPATCH};
 const TICK: Duration = Duration::from_secs(30);
+/// A run whose last job completed this long ago, still without `completed_at`, lost its
+/// finalization.
+const STUCK_RUN_GRACE_US: i64 = 120_000_000;
+/// A run whose last job completed this long ago, still without `completed_at`, lost its
+/// finalization. const STUCK_RUN_GRACE_US: i64 = 120_000_000;
 
 pub async fn run() {
     tracing::info!("[synthetics reaper] started");
@@ -80,6 +85,19 @@ pub async fn run() {
             }
             Err(e) => tracing::error!("[synthetics reaper] dead_letter_expired: {e}"),
             _ => {}
+        }
+
+        match synthetics_runs::finalize_stuck_runs(db, now_us, STUCK_RUN_GRACE_US).await {
+            Ok(done) => {
+                for run in &done {
+                    tracing::warn!(
+                        synthetics_id = %run.synthetics_id,
+                        "[synthetics reaper] finalized a run whose finalization never committed"
+                    );
+                    crate::job_api::publish_check_status(run).await;
+                }
+            }
+            Err(e) => tracing::error!("[synthetics reaper] finalize_stuck_runs: {e}"),
         }
 
         match synthetics_jobs::prune_stale(db, now_us).await {
@@ -142,74 +160,17 @@ async fn handle_dead_letter(
 ) {
     let now_us = config::utils::time::now_micros();
 
-    // Run accounting first, before anything that can bail out early.
-    //
-    // `increment_jobs_done` is the only thing that can bring `jobs_done` up to
-    // `job_count`, and until it does, the run is never complete: it keeps no
-    // `completed_at`, the UI shows it running forever, and — since the alerting
-    // work — `resolve_alert` never evaluates, so the check's failure streak does
-    // not move and no notification can fire. That made this the reaper's most
-    // expensive omission: the dead-letter path is the one that exists to report
-    // "we gave up", and it reported into a run that stayed open.
-    //
-    // Ordering is deliberate. The ingest-token lookup below returns early when
-    // an org has no enabled token, so leaving the increment after it would let a
-    // token problem — nothing to do with this job — orphan the run.
-    //
-    // 4 = Error on the SyntheticStatus scale that `increment_jobs_done` takes
-    // (1=Passed, 2=Warning, 3=Failed, 4=Error), matching what the dispatcher
-    // reports for a failed invoke. Note this is a *different* scale from
-    // `synthetics_jobs.status`, where 4 means Failed.
-    //
-    // Exactly-once is the caller's guarantee: `dead_letter_expired` only returns
-    // rows whose compare-and-swap it won, so one node accounts for one job.
-    if let Err(e) = synthetics_runs::increment_jobs_done(db, &row.run_id, 4, now_us).await {
-        tracing::error!(
-            synthetics_id = %row.synthetics_id,
-            run_id = %row.run_id,
-            job_id = %row.id,
-            "[synthetics reaper] increment_jobs_done: {e}"
-        );
-    }
-
-    // Mark synthetic as Failed so the UI reflects the infra problem.
-    //
-    // "The UI" is every region's, not just this one's: the column is written
-    // only where the check ran, so a dead-letter here left the other regions'
-    // LIST showing the check as whatever they last saw, or "Unknown". The write
-    // reports whether it changed anything, and only a change is published — a
-    // check that is already in Error dead-letters silently, which is the common
-    // case when a private agent has gone away and every run of every check it
-    // served is expiring.
-    match synthetics_checks::update_last_check_status(db, &row.synthetics_id, 4).await {
-        Ok(true) => {
-            #[cfg(feature = "enterprise")]
-            if o2_enterprise::enterprise::common::config::get_config()
-                .super_cluster
-                .enabled
-                && let Err(e) =
-                    o2_enterprise::enterprise::super_cluster::queue::synthetics_check_last_status(
-                        &row.org_id,
-                        &row.synthetics_id,
-                        4,
-                    )
-                    .await
-            {
-                // This function returns nothing and its remaining work — the
-                // results and triggers stream writes — is what actually reports
-                // the dead letter. A failed publish must not stop it.
-                tracing::warn!(
-                    synthetics_id = %row.synthetics_id,
-                    "[synthetics reaper] super-cluster last_check_status publish: {e}"
-                );
-            }
-        }
-        // Unchanged — the steady state, and deliberately silent.
-        Ok(false) => {}
+    // Run accounting first: the ingest-token lookup below can return early, and an unfinalized
+    // run never completes. 4 = Error on the SyntheticStatus scale, as the dispatcher reports.
+    match synthetics_runs::finalize_run(db, &row.run_id, 4, now_us).await {
+        Ok(Some(done)) => crate::job_api::publish_check_status(&done).await,
+        Ok(None) => {}
         Err(e) => {
             tracing::error!(
                 synthetics_id = %row.synthetics_id,
-                "[synthetics reaper] update_last_check_status: {e}"
+                run_id = %row.run_id,
+                job_id = %row.id,
+                "[synthetics reaper] finalize_run: {e}"
             );
         }
     }

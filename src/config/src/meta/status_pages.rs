@@ -113,8 +113,10 @@ pub struct Segment {
 #[derive(Clone, Debug)]
 pub struct EngineCheck {
     pub id: String,
-    pub last_check_status: i32,
-    pub consecutive_failures: i32,
+    /// Consecutive Down run verdicts (`synthetics.status_down_runs`).
+    pub down_runs: i32,
+    /// Consecutive Up run verdicts (`synthetics.status_up_runs`).
+    pub up_runs: i32,
     /// First failing run of the current streak, when the caller can supply it
     /// (from run records). Used to backdate `starts_at`; falls back to `now`.
     pub first_fail_at: Option<i64>,
@@ -467,6 +469,21 @@ fn default_snooze_hours() -> i64 {
     6
 }
 
+impl Thresholds {
+    /// The thresholds a page row stores, with `confirm_after_secs` in seconds.
+    pub fn from_page(
+        confirm_failures: i32,
+        confirm_recovery: i32,
+        confirm_after_secs: Option<i32>,
+    ) -> Self {
+        Self {
+            confirm_failures: confirm_failures.max(1),
+            confirm_recovery: confirm_recovery.max(1),
+            confirm_after_micros: confirm_after_secs.map(|s| i64::from(s) * 1_000_000),
+        }
+    }
+}
+
 impl Default for Thresholds {
     fn default() -> Self {
         Self {
@@ -549,14 +566,11 @@ pub fn incident_actions(
 /// True once the failing streak clears either the run-count or the time-based
 /// confirmation bar.
 fn is_confirmed_failing(check: &EngineCheck, th: &Thresholds, now: i64) -> bool {
-    if check.last_check_status != CHECK_STATUS_DOWN {
-        return false;
-    }
-    if check.consecutive_failures >= th.confirm_failures {
+    if check.down_runs >= th.confirm_failures {
         return true;
     }
     match (th.confirm_after_micros, check.failing_since) {
-        (Some(after), Some(since)) => check.consecutive_failures > 0 && now - since >= after,
+        (Some(after), Some(since)) => check.down_runs > 0 && now - since >= after,
         _ => false,
     }
 }
@@ -568,24 +582,23 @@ fn handle_open(
     now: i64,
     actions: &mut Vec<EngineAction>,
 ) {
-    if check.last_check_status == CHECK_STATUS_UP {
-        let streak = open.recovery_streak + 1;
-        if streak >= th.confirm_recovery {
-            actions.push(EngineAction::Resolve {
-                notice_id: open.notice_id.clone(),
-                at: now,
-            });
-        } else {
-            actions.push(EngineAction::RecoveryProgress {
-                notice_id: open.notice_id.clone(),
-                streak,
-            });
-        }
-    } else if check.last_check_status == CHECK_STATUS_DOWN && open.recovery_streak > 0 {
-        // Failed again mid-recovery: the streak restarts from zero.
+    if check.up_runs >= th.confirm_recovery {
+        actions.push(EngineAction::Resolve {
+            notice_id: open.notice_id.clone(),
+            at: now,
+        });
+        return;
+    }
+    // Progress mirrors `up_runs`, written only on change so a quiet tick writes nothing.
+    let streak = if check.down_runs > 0 {
+        0
+    } else {
+        check.up_runs
+    };
+    if streak != open.recovery_streak {
         actions.push(EngineAction::RecoveryProgress {
             notice_id: open.notice_id.clone(),
-            streak: 0,
+            streak,
         });
     }
 }
@@ -754,11 +767,11 @@ mod tests {
         Segment { from, to: Some(to) }
     }
 
-    fn check(id: &str, status: i32, streak: i32) -> EngineCheck {
+    fn check(id: &str, down_runs: i32, up_runs: i32) -> EngineCheck {
         EngineCheck {
             id: id.into(),
-            last_check_status: status,
-            consecutive_failures: streak,
+            down_runs,
+            up_runs,
             first_fail_at: None,
             failing_since: None,
         }
@@ -794,9 +807,9 @@ mod tests {
         let th = Thresholds::default();
         let none = HashMap::new();
         let quiet = HashSet::new();
-        let one_fail = [check("c1", CHECK_STATUS_DOWN, 1)];
+        let one_fail = [check("c1", 1, 0)];
         assert!(incident_actions(&one_fail, &none, &HashMap::new(), &quiet, &th, 0).is_empty());
-        let confirmed = [check("c1", CHECK_STATUS_DOWN, 2)];
+        let confirmed = [check("c1", 2, 0)];
         let actions = incident_actions(&confirmed, &none, &HashMap::new(), &quiet, &th, 7);
         assert_eq!(
             actions,
@@ -810,7 +823,7 @@ mod tests {
     #[test]
     fn backdating_uses_the_first_failing_run_when_known() {
         let th = Thresholds::default();
-        let mut c = check("c1", CHECK_STATUS_DOWN, 2);
+        let mut c = check("c1", 2, 0);
         c.first_fail_at = Some(1_000);
         let actions = incident_actions(
             &[c],
@@ -836,7 +849,7 @@ mod tests {
             ..Default::default()
         };
         // One failed run of an hourly check, failing for six minutes.
-        let mut c = check("slow", CHECK_STATUS_DOWN, 1);
+        let mut c = check("slow", 1, 0);
         c.failing_since = Some(0);
         let actions = incident_actions(
             &[c],
@@ -853,7 +866,7 @@ mod tests {
     fn snooze_suppresses_opening() {
         let th = Thresholds::default();
         let snoozed: HashSet<String> = ["c1".to_string()].into();
-        let confirmed = [check("c1", CHECK_STATUS_DOWN, 5)];
+        let confirmed = [check("c1", 5, 0)];
         assert!(
             incident_actions(
                 &confirmed,
@@ -872,7 +885,7 @@ mod tests {
         let th = Thresholds::default();
         let resolved: HashMap<String, (String, i64)> =
             [("c1".to_string(), ("n1".to_string(), 100))].into();
-        let confirmed = [check("c1", CHECK_STATUS_DOWN, 2)];
+        let confirmed = [check("c1", 2, 0)];
         let inside = incident_actions(
             &confirmed,
             &HashMap::new(),
@@ -907,7 +920,7 @@ mod tests {
             },
         )]
         .into();
-        let up = [check("c1", CHECK_STATUS_UP, 0)];
+        let up = [check("c1", 0, 1)];
         let first = incident_actions(&up, &open, &HashMap::new(), &HashSet::new(), &th, 0);
         assert_eq!(
             first,
@@ -919,7 +932,8 @@ mod tests {
 
         let mut recovering = open.clone();
         recovering.get_mut("c1").unwrap().recovery_streak = 1;
-        let second = incident_actions(&up, &recovering, &HashMap::new(), &HashSet::new(), &th, 9);
+        let up2 = [check("c1", 0, 2)];
+        let second = incident_actions(&up2, &recovering, &HashMap::new(), &HashSet::new(), &th, 9);
         assert_eq!(
             second,
             vec![EngineAction::Resolve {
@@ -928,7 +942,7 @@ mod tests {
             }]
         );
 
-        let down = [check("c1", CHECK_STATUS_DOWN, 1)];
+        let down = [check("c1", 1, 0)];
         let reset = incident_actions(&down, &recovering, &HashMap::new(), &HashSet::new(), &th, 9);
         assert_eq!(
             reset,
@@ -937,6 +951,88 @@ mod tests {
                 streak: 0
             }]
         );
+    }
+
+    fn open_incident(recovery_streak: i32) -> HashMap<String, OpenAutoIncident> {
+        [(
+            "c1".to_string(),
+            OpenAutoIncident {
+                notice_id: "n1".into(),
+                check_id: "c1".into(),
+                recovery_streak,
+            },
+        )]
+        .into()
+    }
+
+    fn act(
+        c: EngineCheck,
+        open: &HashMap<String, OpenAutoIncident>,
+        th: &Thresholds,
+    ) -> Vec<EngineAction> {
+        incident_actions(&[c], open, &HashMap::new(), &HashSet::new(), th, 0)
+    }
+
+    #[test]
+    fn one_down_run_seen_on_many_ticks_opens_nothing() {
+        let th = Thresholds::default();
+        for _ in 0..10 {
+            assert!(act(check("c1", 1, 0), &HashMap::new(), &th).is_empty());
+        }
+    }
+
+    #[test]
+    fn page_confirm_failures_is_honoured() {
+        let th = Thresholds::from_page(3, 2, None);
+        assert!(act(check("c1", 2, 0), &HashMap::new(), &th).is_empty());
+        assert!(matches!(
+            act(check("c1", 3, 0), &HashMap::new(), &th).as_slice(),
+            [EngineAction::Open { .. }]
+        ));
+    }
+
+    #[test]
+    fn one_up_run_on_many_ticks_keeps_the_incident_open() {
+        let th = Thresholds::default();
+        let first = act(check("c1", 0, 1), &open_incident(0), &th);
+        assert_eq!(
+            first,
+            vec![EngineAction::RecoveryProgress {
+                notice_id: "n1".into(),
+                streak: 1
+            }]
+        );
+        for _ in 0..10 {
+            assert!(act(check("c1", 0, 1), &open_incident(1), &th).is_empty());
+        }
+        assert!(matches!(
+            act(check("c1", 0, 2), &open_incident(1), &th).as_slice(),
+            [EngineAction::Resolve { .. }]
+        ));
+    }
+
+    #[test]
+    fn up_streak_resolves_whatever_the_badge_says() {
+        // The badge (Failed or Warning) is not an input: only the verdict streak is.
+        let th = Thresholds::default();
+        assert!(matches!(
+            act(check("c1", 0, th.confirm_recovery), &open_incident(1), &th).as_slice(),
+            [EngineAction::Resolve { .. }]
+        ));
+    }
+
+    #[test]
+    fn down_run_resets_recovery_and_no_verdict_moves_nothing() {
+        let th = Thresholds::default();
+        assert_eq!(
+            act(check("c1", 1, 0), &open_incident(1), &th),
+            vec![EngineAction::RecoveryProgress {
+                notice_id: "n1".into(),
+                streak: 0
+            }]
+        );
+        // A NoVerdict run leaves both streaks where they were.
+        assert!(act(check("c1", 1, 0), &open_incident(0), &th).is_empty());
     }
 
     #[test]

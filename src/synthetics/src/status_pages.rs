@@ -152,12 +152,6 @@ pub async fn run() {
         .status_page_rebuild_interval
         .max(10);
     let mut hashes = SnapshotHashes::new();
-    // Confirmation streaks observed by THIS loop from `last_check_status`.
-    // Deliberately not the checks table's `consecutive_failures`: the ack path
-    // clears that column for destination-less checks (it is alert bookkeeping,
-    // not neutral state), so a status page keyed on it would never confirm an
-    // outage on a check with no alert destinations.
-    let mut down_streaks: HashMap<String, i32> = HashMap::new();
     // Full mapped-check state, carried across ticks and refreshed by an
     // `updated_at`-watermark delta so per-tick DB cost tracks status *changes*,
     // not the mapped-check count. A full sweep every FULL_SWEEP_TICKS catches
@@ -165,7 +159,7 @@ pub async fn run() {
     let mut rt = RebuilderState::default();
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
-        if let Err(e) = tick(&mut hashes, &mut down_streaks, &mut rt).await {
+        if let Err(e) = tick(&mut hashes, &mut rt).await {
             tracing::error!("[status_pages] rebuild tick failed: {e}");
         }
     }
@@ -187,20 +181,12 @@ struct RebuilderState {
 
 async fn tick(
     hashes: &mut SnapshotHashes,
-    down_streaks: &mut HashMap<String, i32>,
     rt: &mut RebuilderState,
 ) -> Result<(), infra::errors::Error> {
     let conn = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let data = load(conn, now, rt).await?;
-    for s in &data.states {
-        if s.last_check_status == engine::CHECK_STATUS_DOWN {
-            *down_streaks.entry(s.id.clone()).or_insert(0) += 1;
-        } else {
-            down_streaks.remove(&s.id);
-        }
-    }
-    apply_engine_actions(conn, &data, down_streaks, now).await?;
+    apply_engine_actions(conn, &data, now).await?;
     // Re-read notices only if actions changed them; a second bounded read per
     // tick is cheaper than tracking per-action deltas in the POC.
     let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
@@ -314,7 +300,6 @@ async fn muted_checks(
 async fn apply_engine_actions(
     conn: &sea_orm::DatabaseConnection,
     data: &TickData,
-    down_streaks: &HashMap<String, i32>,
     now: i64,
 ) -> Result<(), infra::errors::Error> {
     let checks: Vec<engine::EngineCheck> = data
@@ -322,9 +307,9 @@ async fn apply_engine_actions(
         .iter()
         .map(|s| engine::EngineCheck {
             id: s.id.clone(),
-            last_check_status: s.last_check_status,
-            // The loop's own observed streak, never the DB column — see run().
-            consecutive_failures: down_streaks.get(&s.id).copied().unwrap_or(0),
+            // Per-run verdict streaks written at run finalization; never the badge.
+            down_runs: s.down_runs,
+            up_runs: s.up_runs,
             first_fail_at: None,
             failing_since: None,
         })
@@ -358,18 +343,69 @@ async fn apply_engine_actions(
         }
     }
 
-    let actions = engine::incident_actions(
-        &checks,
-        &open_by_check,
-        &recently_resolved,
-        &data.snoozed,
-        &engine::Thresholds::default(),
-        now,
-    );
-    for action in actions {
-        apply_one(conn, data, action, now).await?;
+    let thresholds = thresholds_by_check(data);
+    let default_th = engine::Thresholds::default();
+    for check in &checks {
+        let th = thresholds.get(check.id.as_str()).unwrap_or(&default_th);
+        let actions = engine::incident_actions(
+            std::slice::from_ref(check),
+            &open_by_check,
+            &recently_resolved,
+            &data.snoozed,
+            th,
+            now,
+        );
+        for action in actions {
+            apply_one(conn, data, action, now).await?;
+        }
     }
     Ok(())
+}
+
+/// The thresholds of the pages each check is mapped to; the strictest wins when pages disagree.
+fn thresholds_by_check(data: &TickData) -> HashMap<&str, engine::Thresholds> {
+    let pages: HashMap<&str, engine::Thresholds> = data
+        .pages
+        .iter()
+        .map(|p| {
+            let th = engine::Thresholds::from_page(
+                p.confirm_failures,
+                p.confirm_recovery,
+                p.confirm_after_secs,
+            );
+            (p.id.as_str(), th)
+        })
+        .collect();
+    let component_page: HashMap<&str, &str> = data
+        .components
+        .iter()
+        .map(|c| (c.id.as_str(), c.status_page_id.as_str()))
+        .collect();
+    let mut out: HashMap<&str, engine::Thresholds> = HashMap::new();
+    for m in &data.mappings {
+        let Some(th) = component_page
+            .get(m.component_id.as_str())
+            .and_then(|page_id| pages.get(page_id))
+        else {
+            continue;
+        };
+        out.entry(m.synthetics_id.as_str())
+            .and_modify(|cur| *cur = stricter(cur, th))
+            .or_insert(*th);
+    }
+    out
+}
+
+fn stricter(a: &engine::Thresholds, b: &engine::Thresholds) -> engine::Thresholds {
+    engine::Thresholds {
+        confirm_failures: a.confirm_failures.max(b.confirm_failures),
+        confirm_recovery: a.confirm_recovery.max(b.confirm_recovery),
+        // A page without a time rule waits for the run count, the stricter bar.
+        confirm_after_micros: a
+            .confirm_after_micros
+            .zip(b.confirm_after_micros)
+            .map(|(x, y)| x.max(y)),
+    }
 }
 
 async fn apply_one(

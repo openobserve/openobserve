@@ -932,6 +932,100 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// The status badge and the status page run streaks, as one completed run leaves them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StatusStreaks {
+    pub last_check_status: i32,
+    pub down_runs: i32,
+    pub up_runs: i32,
+    /// `scheduled_ts` of the run that wrote these values, in microseconds.
+    pub run_ts: i64,
+}
+
+/// Reads the badge and run streaks of one check. `None` when the check is not in this region.
+pub async fn get_status_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<StatusStreaks>, errors::Error> {
+    let row = Entity::find_by_id(id)
+        .select_only()
+        .column(Column::LastCheckStatus)
+        .column(Column::StatusDownRuns)
+        .column(Column::StatusUpRuns)
+        .column(Column::StatusRunTs)
+        .into_tuple::<(i32, i32, i32, i64)>()
+        .one(conn)
+        .await?;
+    Ok(row.map(
+        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+        },
+    ))
+}
+
+/// Replaces `expected` with `next` only if the row still holds `expected`.
+///
+/// `updated_at` moves only when the badge or a streak changes, because the status page delta read
+/// watermarks on it. Returns whether the row still matched.
+pub async fn swap_status_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    expected: &StatusStreaks,
+    next: &StatusStreaks,
+) -> Result<bool, errors::Error> {
+    let mut q = Entity::update_many()
+        .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
+        .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
+        .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
+        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts));
+    if streaks_differ(expected, next) {
+        q = q.col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        );
+    }
+    let res = q
+        .filter(Column::Id.eq(id))
+        .filter(Column::LastCheckStatus.eq(expected.last_check_status))
+        .filter(Column::StatusDownRuns.eq(expected.down_runs))
+        .filter(Column::StatusUpRuns.eq(expected.up_runs))
+        .filter(Column::StatusRunTs.eq(expected.run_ts))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Applies replicated streaks unless this region already holds a run at least as new.
+///
+/// Returns `true` when the row changed. A message from a producer without the streak fields has
+/// `run_ts = 0` and falls back to the badge-only write.
+pub async fn apply_replicated_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    next: &StatusStreaks,
+) -> Result<bool, errors::Error> {
+    if next.run_ts == 0 {
+        return update_last_check_status(conn, id, next.last_check_status).await;
+    }
+    let res = Entity::update_many()
+        .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
+        .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
+        .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
+        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::Id.eq(id))
+        .filter(Column::StatusRunTs.lt(next.run_ts))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
 /// The alert bookkeeping a completed run needs in order to decide whether to
 /// notify. Read and written by the ack path only.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -990,7 +1084,7 @@ pub async fn get_alert_state<C: ConnectionTrait>(
 /// The three columns are guarded, not just the counter: a lost `alerting`
 /// transition is what produces a recovery for an incident nobody was told about.
 ///
-/// Compare `synthetics_runs::increment_jobs_done`, which is a single atomic
+/// Compare `synthetics_runs::finalize_run`, which is a single atomic
 /// `jobs_done = jobs_done + 1`. That shape is not available here because the new
 /// value depends on a policy decision, not on arithmetic over the old one.
 pub async fn update_alert_state_if<C: ConnectionTrait>(
@@ -1154,6 +1248,12 @@ fn build_active_model(check: &Synthetic) -> Result<ActiveModel, errors::Error> {
     })
 }
 
+fn streaks_differ(a: &StatusStreaks, b: &StatusStreaks) -> bool {
+    a.last_check_status != b.last_check_status
+        || a.down_runs != b.down_runs
+        || a.up_runs != b.up_runs
+}
+
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
     match t {
         SyntheticType::Http => "http",
@@ -1221,6 +1321,9 @@ pub(crate) mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            status_down_runs: 0,
+            status_up_runs: 0,
+            status_run_ts: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
