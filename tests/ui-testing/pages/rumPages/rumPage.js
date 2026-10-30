@@ -291,6 +291,24 @@ export class RumPage {
         await expect(this.traceCardNotAvailable).toHaveCount(0);
     }
 
+    async openTraceDetailsFromCard() {
+        await this.traceCardViewDetailsBtn.click();
+    }
+
+    /** View Trace Details lands on that trace's own page, in its traces stream and a real time window, in the current org. */
+    async expectTraceDetailsOpenFor(traceId, stream, org = process.env.ORGNAME || 'default', timeoutMs = 30000) {
+        await expect(this.page).toHaveURL(/\/traces\/trace-details\?/, { timeout: timeoutMs });
+        const query = new URL(this.page.url()).searchParams;
+        expect(query.get('trace_id')).toBe(traceId);
+        expect(query.get('stream')).toBe(stream);
+        expect(query.get('org_identifier')).toBe(org);
+        const from = Number(query.get('from'));
+        const to = Number(query.get('to'));
+        expect(from, 'the trace window needs a start').toBeGreaterThan(0);
+        expect(to, 'the trace window must end after it starts').toBeGreaterThan(from);
+        await expect(this.page.locator('[data-test="trace-details-trace-id"]').first()).toContainText(traceId, { timeout: timeoutMs });
+    }
+
     // ===== ERROR DETAIL — RAW / PRETTY STACK TRACE TABS =====
 
     async expectRawTabVisible() {

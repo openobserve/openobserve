@@ -121,4 +121,33 @@ describe("SessionActivitySparkline", () => {
     expect(wrapper.find(EVENTS_TEXT).text()).toContain("9");
     expect(wrapper.find(LOADING).exists()).toBe(false);
   });
+
+  it.each([
+    ["its own bounds", 1_672_531_300_000, 1_672_531_360_000],
+    ["the same bounds", 1_672_531_200_000, 1_672_531_260_000],
+  ])(
+    "hides the previous session's chart while a recycled row loads a session with %s",
+    async (_label, startTime, endTime) => {
+      const wrapper = mountCell({
+        isBounce: false,
+        startTime: 1_672_531_200_000,
+        endTime: 1_672_531_260_000,
+      });
+      await flushPromises();
+      expect(wrapper.find(EVENTS_TEXT).text()).toContain("3");
+
+      let answer: (value: unknown) => void = () => {};
+      fetchActivity.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+      await wrapper.setProps({ sessionId: "s-2", startTime, endTime });
+      await flushPromises();
+
+      expect(wrapper.find(SPARKLINE).exists()).toBe(false);
+      expect(wrapper.find(LOADING).exists()).toBe(true);
+      expect(fetchActivity).toHaveBeenLastCalledWith("s-2", startTime, endTime, false);
+
+      answer({ ...activity, totalEvents: 7 });
+      await flushPromises();
+      expect(wrapper.find(EVENTS_TEXT).text()).toContain("7");
+    },
+  );
 });

@@ -1,4 +1,7 @@
 import { expect } from '@playwright/test';
+import { RumSessionsPage } from './rumSessionsPage.js';
+
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // The rrweb faults a replay that lost track of a tab's DOM raises, and VideoPlayer's own "Session replay:" decode faults; other rrweb warnings are benign.
 const PLAYER_FAULT = /^\[replayer\] (Node with id '[^']*' not found|Exception in mutation|parent could not remove child|Found unresolved missing node map)|^\[replayer\].*(appendChild|insertBefore|removeChild|detached)|^Session replay:/;
@@ -26,6 +29,15 @@ export class RumReplayPlayerPage {
                 faults.push(`${msg.type()}: ${msg.text()}`);
             }
         });
+        return faults;
+    }
+
+    /** Opens a session's replay and waits until it has a duration; returns the fault list watchPlayerFaults() keeps filling. */
+    async openSession(sessionId, { startTimeUs, endTimeUs = Date.now() * 1000, timeoutMs = 60000 } = {}) {
+        const faults = this.watchPlayerFaults();
+        await new RumSessionsPage(this.page).gotoSessionViewer(sessionId, { startTimeUs, endTimeUs });
+        await this.expectDurationNotZero(timeoutMs);
+        testLogger.info('Replay opened', { sessionId, duration: await this.durationText() });
         return faults;
     }
 

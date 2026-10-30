@@ -70,10 +70,13 @@ vi.mock("@/composables/useQuery", () => ({
 // Null passes getStream through to the real composable; a test sets it to answer stream lookups itself.
 // The browser-logs stream exists unless a test clears rumLogExists, since most fixtures carry error logs.
 // A forced list refresh is counted, and adds the browser-logs stream when rumLogOnRefresh is set.
+// The cached list starts showing a browser-logs stream created mid-session at rumLogListedAt.
 const streamsMock = vi.hoisted(() => ({
   getStream: null as null | ((name: string, type: string, schema: boolean) => Promise<unknown>),
   rumLogExists: true,
   rumLogOnRefresh: false,
+  rumLogListedAt: Number.POSITIVE_INFINITY,
+  rumLogLookups: 0,
   forcedRefreshes: [] as string[],
 }));
 vi.mock("@/composables/useStreams", async (importOriginal) => {
@@ -86,7 +89,8 @@ vi.mock("@/composables/useStreams", async (importOriginal) => {
         ...real,
         getStream: (...b: [string, string, boolean]) => {
           if (b[0] === "_rumlog") {
-            return streamsMock.rumLogExists
+            streamsMock.rumLogLookups += 1;
+            return streamsMock.rumLogExists || Date.now() >= streamsMock.rumLogListedAt
               ? Promise.resolve({ name: "_rumlog", schema: [] })
               : Promise.reject(
                   new Error(
@@ -213,7 +217,8 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import searchService from "@/services/search";
 import i18n from "@/locales";
-import { ACTIVE_WINDOW_MS } from "@/utils/rum/sessionReplayLive";
+import { ACTIVE_WINDOW_MS, LIVE_POLL_MS } from "@/utils/rum/sessionReplayLive";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import analytics from "@/services/product_analytics";
 
@@ -2304,6 +2309,53 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
       wrapper.unmount();
     } finally {
       error.mockRestore();
+    }
+  });
+
+  const rumLogSearches = () =>
+    vi
+      .mocked(searchService.search)
+      .mock.calls.filter((call: any[]) =>
+        String(call[0]?.query?.query?.sql ?? "").includes('"_rumlog"'),
+      ).length;
+
+  it("looks a present _rumlog stream up once per viewer, not on every live poll", async () => {
+    streamsMock.rumLogLookups = 0;
+    streamsMock.forcedRefreshes = [];
+    const wrapper = await mountLive();
+    await vi.advanceTimersByTimeAsync(3 * LIVE_POLL_MS);
+
+    const sqls = vi
+      .mocked(searchService.search)
+      .mock.calls.map((call: any[]) => String(call[0]?.query?.query?.sql ?? ""));
+    expect(sqls.filter((sql) => sql.includes('"_rumdata"')).length).toBeGreaterThan(3);
+    expect(rumLogSearches()).toBeGreaterThan(3);
+    expect(streamsMock.rumLogLookups).toBe(1);
+    expect(streamsMock.forcedRefreshes).toEqual([]);
+    wrapper.unmount();
+  });
+
+  it("searches a _rumlog stream created mid-session once the cached stream list shows it", async () => {
+    streamsMock.rumLogExists = false;
+    streamsMock.rumLogListedAt = NOW + MEDIUM_STALE_TIME;
+    streamsMock.rumLogLookups = 0;
+    streamsMock.forcedRefreshes = [];
+    const wrapper = await mountLive();
+    try {
+      await vi.advanceTimersByTimeAsync(3 * LIVE_POLL_MS);
+      expect(rumLogSearches()).toBe(0);
+
+      await vi.advanceTimersByTimeAsync(MEDIUM_STALE_TIME);
+      expect(rumLogSearches()).toBeGreaterThan(0);
+      expect(streamsMock.forcedRefreshes).toEqual(["logs"]);
+
+      const lookups = streamsMock.rumLogLookups;
+      await vi.advanceTimersByTimeAsync(3 * LIVE_POLL_MS);
+      expect(streamsMock.rumLogLookups).toBe(lookups);
+    } finally {
+      wrapper.unmount();
+      streamsMock.rumLogExists = true;
+      streamsMock.rumLogListedAt = Number.POSITIVE_INFINITY;
     }
   });
 

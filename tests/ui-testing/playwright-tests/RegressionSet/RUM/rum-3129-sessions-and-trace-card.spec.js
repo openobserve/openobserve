@@ -17,6 +17,8 @@ const CHECKOUT = 'https://shop.example.com/checkout';
 const CART = 'https://shop.example.com/cart';
 // A non-default org, because a link that drops its org still works in the default one.
 const STATE_ORG = 'rum_3129_sessions';
+// ingestTraces sends no stream-name header, so the spans land in the org's default traces stream.
+const TRACES_STREAM = 'default';
 
 test.describe('RUM Error Tracking: the Distributed Trace card (o2-enterprise#3129 B2)', () => {
   test.describe.configure({ mode: 'parallel' });
@@ -46,10 +48,11 @@ test.describe('RUM Error Tracking: the Distributed Trace card (o2-enterprise#312
     await navigateToBase(page);
   });
 
-  test('the card finds the backend spans of the error\'s trace and enables View Trace Details', {
+  test('the card finds the backend spans of the error\'s trace and View Trace Details opens that trace', {
     tag: tags('@P2'),
   }, async ({ page }) => {
-    const rum = new PageManager(page).rumPage;
+    const pm = new PageManager(page);
+    const rum = pm.rumPage;
     const traceSearches = rum.watchTraceSearches();
 
     await rum.gotoErrorViewer(fixture.errorId, fixture.timestampUs);
@@ -57,6 +60,10 @@ test.describe('RUM Error Tracking: the Distributed Trace card (o2-enterprise#312
 
     expect(traceSearches.length, 'the card must have searched the traces stream').toBeGreaterThan(0);
     expect(traceSearches.filter((status) => status >= 400), 'the server must accept the card\'s trace search').toEqual([]);
+
+    await rum.openTraceDetailsFromCard();
+    await rum.expectTraceDetailsOpenFor(fixture.traceId, TRACES_STREAM);
+    await pm.tracesPage.expectTraceDetailsVisible();
   });
 });
 
@@ -108,17 +115,11 @@ test.describe('RUM Sessions list in a non-default org (o2-enterprise#3129 B3, B5
     await navigateToBase(page);
   });
 
-  const openList = async (page) => {
-    const sessions = new PageManager(page).rumSessionsPage;
-    await sessions.gotoSessionsList({ org, filter: `application_id='${appId}'`, period: '1h' });
-    await sessions.expectSessionsTableVisible(30000);
-    return sessions;
-  };
-
   test('a Session Viewer opened from the list keeps its org, so a reload reopens the same session', {
     tag: tags('@P2'),
   }, async ({ page }) => {
-    const sessions = await openList(page);
+    const sessions = new PageManager(page).rumSessionsPage;
+    await sessions.openFilteredSessionsList({ org, filter: `application_id='${appId}'` });
     await sessions.waitForSessionRowsPresent();
     await sessions.openFirstSession();
     const sessionId = `(${sessionIds.join('|')})`;
@@ -132,7 +133,8 @@ test.describe('RUM Sessions list in a non-default org (o2-enterprise#3129 B3, B5
   test('the Activity column loads for a session that has no replay', {
     tag: tags('@P3'),
   }, async ({ page }) => {
-    const sessions = await openList(page);
+    const sessions = new PageManager(page).rumSessionsPage;
+    await sessions.openFilteredSessionsList({ org, filter: `application_id='${appId}'` });
     await sessions.waitForSessionRowsPresent();
     for (const sessionId of sessionIds) await sessions.expectActivityLoadedFor(sessionId);
   });
@@ -140,7 +142,8 @@ test.describe('RUM Sessions list in a non-default org (o2-enterprise#3129 B3, B5
   test('SDK telemetry rows without a session id are not listed as a session', {
     tag: tags('@P3'),
   }, async ({ page }) => {
-    const sessions = await openList(page);
+    const sessions = new PageManager(page).rumSessionsPage;
+    await sessions.openFilteredSessionsList({ org, filter: `application_id='${appId}'` });
     await sessions.expectSessionRowCount(sessionIds.length);
     await sessions.expectEverySessionRowHasAnId();
   });

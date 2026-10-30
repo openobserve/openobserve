@@ -2,16 +2,10 @@
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
-const PageManager = require('../../../pages/page-manager.js');
 const { RumReplayPlayerPage } = require('../../../pages/rumPages/rumReplayPlayerPage.js');
-const { getOrCreateRumToken } = require('../../utils/rum-token-api.js');
-const { pinnedCdnSdkVersion } = require('../../utils/rum-sdk-version.js');
-const { waitForStreamRows } = require('../../utils/rum-stream-verify.js');
-const { validatedOrgId, validatedBaseUrl } = require('../../utils/rum-env.js');
 const {
-  startMultiTabReplayServer,
-  localSdkBundleDir,
-  recordPageChangeSession,
+  recordPageChangeScenarios,
+  readStoredReplay,
   ORDERS_TAB,
   CATALOGUE_TAB,
 } = require('./fixtures/multi-tab-replay-app.js');
@@ -28,87 +22,19 @@ const SCENARIOS = {
   complete: { dropUpload: 0 },
 };
 
-const sessions = {};
-
-async function recordScenarios(browser) {
-  const base = validatedBaseUrl();
-  const org = validatedOrgId();
-  const tokenPage = await browser.newPage();
-  const clientToken = await getOrCreateRumToken(tokenPage).finally(() => tokenPage.close());
-  expect(clientToken, 'Precondition: a RUM token must exist').toBeTruthy();
-
-  const server = await startMultiTabReplayServer({
-    clientToken,
-    org,
-    site: base.replace(/^https?:\/\//, ''),
-    insecureHTTP: base.startsWith('http://'),
-    service: `e2e-rum-gap-${RUN_ID}`,
-    applicationId: `e2e-rum-gap-${RUN_ID}`,
-    // The player is under test, not the SDK delivery, so a CDN outage must not fail the recording.
-    sdkDir: localSdkBundleDir(pinnedCdnSdkVersion()),
-  });
-  try {
-    expect(
-      await server.sdkDownloadError(),
-      `The RUM browser SDK could not be loaded from ${server.sdkUrl}, so no replay can be recorded`,
-    ).toBe('');
-    for (const [name, opts] of Object.entries(SCENARIOS)) {
-      // A fresh context per scenario, so each recording is its own RUM session.
-      const context = await browser.newContext();
-      try {
-        sessions[name] = await recordPageChangeSession(context, server, org, opts);
-      } finally {
-        await context.close();
-      }
-    }
-  } finally {
-    await server.close();
-  }
-}
-
-async function storedSegments(browser, recorded) {
-  const probe = await browser.newPage();
-  try {
-    return await waitForStreamRows(probe, {
-      sql: `SELECT start, view_id, index_in_view FROM "_sessionreplay" WHERE session_id = '${recorded.sessionId}' ORDER BY start`,
-      minRows: recorded.stored,
-      timeoutMs: 60000,
-    });
-  } finally {
-    await probe.close();
-  }
-}
-
-const viewIndexes = (rows, viewId) => rows.filter((r) => r.view_id === viewId).map((r) => Number(r.index_in_view)).sort((a, b) => a - b);
-
-async function openPlayer(page, name) {
-  const recorded = sessions[name];
-  const pm = new PageManager(page);
-  const player = new RumReplayPlayerPage(page);
-  const faults = player.watchPlayerFaults();
-  await pm.rumSessionsPage.gotoSessionViewer(recorded.sessionId, {
-    startTimeUs: recorded.firstStartMs * 1000 - HOUR_US,
-    endTimeUs: Date.now() * 1000,
-  });
-  await player.expectDurationNotZero(60000);
-  testLogger.info('Replay opened', { name, sessionId: recorded.sessionId, duration: await player.durationText() });
-  return { player, faults, recorded };
-}
+let sessions = {};
 
 test.describe('RUM session replay with a missing segment (#14694)', () => {
   test.describe.configure({ mode: 'parallel' });
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(RECORDING_TIMEOUT_MS);
-    await recordScenarios(browser);
+    sessions = await recordPageChangeScenarios(browser, SCENARIOS, { appId: `e2e-rum-gap-${RUN_ID}` });
     for (const [name, recorded] of Object.entries(sessions)) {
       expect(recorded.sameSession, `Precondition: the ${name} page change must stay in one RUM session`).toBe(true);
-      recorded.stored = recorded.uploads - (SCENARIOS[name].dropUpload ? 1 : 0);
-      const rows = await storedSegments(browser, recorded);
-      recorded.firstStartMs = Math.min(...rows.map((r) => Number(r.start)));
-      recorded.playableEndSec = Math.floor((Math.max(...rows.map((r) => Number(r.start))) - recorded.firstStartMs) / 1000) - 1;
-      recorded.ordersIndexes = viewIndexes(rows, recorded.ordersViewId);
-      recorded.catalogueIndexes = viewIndexes(rows, recorded.catalogueViewId);
+      const stored = recorded.uploads - (SCENARIOS[name].dropUpload ? 1 : 0);
+      Object.assign(recorded, await readStoredReplay(browser, recorded, stored));
+      recorded.viewerStartUs = recorded.firstStartMs * 1000 - HOUR_US;
       testLogger.info('Recorded replay', { name, ...recorded });
     }
     expect(sessions.middleGap.ordersIndexes, 'Precondition: the orders view must miss index 1 only').toEqual(
@@ -126,7 +52,9 @@ test.describe('RUM session replay with a missing segment (#14694)', () => {
   });
 
   test('a replay missing a middle segment plays past the gap and flags it until the page changes', { tag: TAGS }, async ({ page }) => {
-    const { player, faults, recorded } = await openPlayer(page, 'middleGap');
+    const recorded = sessions.middleGap;
+    const player = new RumReplayPlayerPage(page);
+    const faults = await player.openSession(recorded.sessionId, { startTimeUs: recorded.viewerStartUs });
     await player.expectFrameShows(ORDERS_TAB.heading, 60000);
     await player.playAtNormalSpeed();
     await player.startPlayback();
@@ -138,7 +66,9 @@ test.describe('RUM session replay with a missing segment (#14694)', () => {
   });
 
   test('a replay missing its first segment opens at the first full snapshot instead of a blank player', { tag: TAGS }, async ({ page }) => {
-    const { player, faults, recorded } = await openPlayer(page, 'firstMissing');
+    const recorded = sessions.firstMissing;
+    const player = new RumReplayPlayerPage(page);
+    const faults = await player.openSession(recorded.sessionId, { startTimeUs: recorded.viewerStartUs });
 
     await player.expectFrameShows(CATALOGUE_TAB.heading, 60000);
     await expect
@@ -150,7 +80,9 @@ test.describe('RUM session replay with a missing segment (#14694)', () => {
   });
 
   test('a complete replay plays to the end with no gap notice', { tag: TAGS }, async ({ page }) => {
-    const { player, faults, recorded } = await openPlayer(page, 'complete');
+    const recorded = sessions.complete;
+    const player = new RumReplayPlayerPage(page);
+    const faults = await player.openSession(recorded.sessionId, { startTimeUs: recorded.viewerStartUs });
     await player.expectFrameShows(ORDERS_TAB.heading, 60000);
     await player.watchGapNotice();
     await player.startPlayback();
