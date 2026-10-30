@@ -36,8 +36,22 @@
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->
       <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
-      <OButton variant="primary" size="sm-action" data-test="slos-slolist-new" @click="goToNew">
+      <OButton
+        variant="primary"
+        size="sm-action"
+        data-test="slos-slolist-new"
+        :aria-label="
+          sloDrafts.hasNew ? t('common.editorDraft.newDot', { label: t('slos.new') }) : undefined
+        "
+        @click="goToNew"
+      >
         {{ t("slos.new") }}
+        <EditorDraftDot
+          v-if="sloDrafts.hasNew"
+          :saved-at="sloDrafts.savedAt(null)"
+          corner
+          data-test="slos-slolist-new-draft-dot"
+        />
       </OButton>
     </template>
 
@@ -144,6 +158,12 @@
       <template #cell-name="{ row }">
         <div class="flex min-w-0 items-center gap-2">
           <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
+          <EditorDraftDot
+            v-if="sloDrafts.ids.has(row.id)"
+            :saved-at="sloDrafts.savedAt(row.id)"
+            class="shrink-0"
+            :data-test="`slos-slolist-${row.name}-draft-dot`"
+          />
           <OTag
             v-if="isGrouped(row)"
             variant="purple-soft"
@@ -552,6 +572,9 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -669,6 +692,7 @@ const org = computed(() => store.state.selectedOrganization?.identifier);
 const moveSlos = useMutation(() => moveSlosMutation(org.value));
 const setSloEnabled = useMutation(() => setSloEnabledMutation(org.value));
 const deleteSlo = useMutation(() => deleteSloMutation(org.value));
+const sloDrafts = useEditorDraftIds("slo");
 
 const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
 
@@ -755,6 +779,8 @@ const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[
   { value: "alert", label: t("slos.type.alert"), icon: "shield-alert-outline" },
 ]);
 
+const downtimesEnabled = useDowntimesEnabled();
+
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
   {
     id: "name",
@@ -808,17 +834,14 @@ const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
     hideable: true,
     size: 140,
   },
-  // No hardcoded `size`: OTable derives an action column's width from
-  // `actionCount` (4 × 32px button + 3 × 4px gap + padding), but only when
-  // `isAction` marks it as one. Without the flag it fell through to the
-  // generic size and clipped the last two buttons.
+  // OTable sizes this column from `actionCount` and clips the cell, so it must equal the desktop buttons in `#cell-actions`.
   {
     id: "actions",
     header: t("slos.column.actions"),
     accessor: () => "",
     sortable: false,
     isAction: true,
-    meta: { align: "center", actionCount: 4 },
+    meta: { align: "center", actionCount: downtimesEnabled.value ? 6 : 5 },
   },
 ]);
 
@@ -1045,8 +1068,6 @@ function goToNew() {
   router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
 }
 
-const downtimesEnabled = useDowntimesEnabled();
-
 const activeCorrections = (row: SloListItem) =>
   (row.status?.corrections ?? []).filter((c) => c.status === "active");
 
@@ -1124,6 +1145,7 @@ async function doDelete() {
   if (!row) return;
   try {
     await deleteSlo.mutateAsync(row.id);
+    deleteEditorDraftsFor({ kind: "slo", org: String(org.value ?? ""), entityId: row.id });
     queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
       (old ?? []).filter((r) => r.id !== row.id),
     );

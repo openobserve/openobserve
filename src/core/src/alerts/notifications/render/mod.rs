@@ -364,6 +364,7 @@ mod tests {
             alert_level: "critical".into(),
             alert_status: "firing".to_string(),
             episode_id: None,
+            recovery_reason: String::new(),
             alert_priority: "P1".into(),
             alert_tags: "infra, prod".into(),
             alert_threshold_crit: "90".into(),

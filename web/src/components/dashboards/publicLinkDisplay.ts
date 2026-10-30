@@ -191,6 +191,18 @@ export function statusReason(
   return attentionReason(report, t);
 }
 
+// The list carries no org setting; the server marks a link disabled only while the org switch is off.
+export function orgSwitchedOff(links: PublicLink[]): boolean {
+  return links.some((link) => link.status === "disabled");
+}
+
+/** The status tag's label when its state alone hides something: a paused link of a switched-off org. */
+export function statusLabel(link: PublicLink, t: TranslateFn): I18nText | undefined {
+  return link.status === "disabled" && !link.enabled
+    ? t("dashboard.publicLinks.disabledPaused")
+    : undefined;
+}
+
 // Expired and orphaned links can't be resumed, so their pause toggle is disabled.
 export function canPause(link: PublicLink): boolean {
   return link.status !== "expired" && link.status !== "dashboard_deleted";

@@ -74,7 +74,8 @@ export async function discardAndCleanupTestDashboard(page, dashboardName) {
   // app doesn't gate navigation on unsaved changes), but costs nothing to guard against.
   page.once('dialog', (dialog) => dialog.accept());
   await page.goto(
-    `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`
+    // Without folder=default the list can open on Favorites, whose "This folder" search misses the dashboard.
+    `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
   );
   await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 15000 });
   await deleteDashboard(page, dashboardName);
@@ -169,6 +170,22 @@ export async function setupBarPanelWithBreakdownAndConfig(page, pm, dashboardNam
 }
 
 /**
+ * Stacked-family panel (stacked / h-stacked / area-stacked) broken down by host so each bucket stacks several series — config sidebar opened and ready.
+ */
+export async function setupStackedPanelWithConfig(page, pm, dashboardName, {
+  chartType = "stacked",
+  panelName = "Test Panel",
+} = {}) {
+  await buildPanel(page, pm, dashboardName, {
+    chartType,
+    panelName,
+    breakdownField: "kubernetes_host",
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Stacked panel with breakdown and config ready", { chartType, dashboardName, panelName });
+}
+
+/**
  * Line chart panel — config sidebar opened and ready.
  */
 export async function setupLinePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
@@ -260,6 +277,28 @@ export async function setupDonutPanelWithConfig(page, pm, dashboardName, panelNa
   await buildPanel(page, pm, dashboardName, { chartType: "donut", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Donut panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Pie or donut slicing e2e_automate by kubernetes_namespace_name with the default count measure —
+ * a handful of named slices with known shares. Config sidebar opened and ready.
+ */
+export async function setupNamespacePiePanelWithConfig(page, pm, dashboardName, {
+  chartType = "pie",
+  panelName = "Test Panel",
+} = {}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType(chartType);
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("e2e_automate");
+  await pm.chartTypeSelector.removeField("x_axis_1", "x");
+  await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "x");
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Namespace pie panel with config ready", { chartType, dashboardName, panelName });
 }
 
 /**
@@ -397,6 +436,26 @@ export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelN
 }
 
 /**
+ * PromQL panel of any chart type and query — config sidebar opened and ready.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLChartWithConfig(page, pm, dashboardName, { chartType, query, panelName = "Test Panel" }) {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType, query, panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL panel with config ready", { chartType, query, dashboardName, panelName });
+}
+
+/**
+ * PromQL stacked panel over the seeded cpu_usage metric — config sidebar opened and ready.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLStackedPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "stacked", panelName, query: "cpu_usage" });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL stacked panel with config ready", { dashboardName, panelName });
+}
+
+/**
  * PromQL heatmap panel — config sidebar opened and ready.
  * Caller's test.beforeAll must call ensureMetricsIngested().
  */
@@ -424,6 +483,21 @@ export async function setupPromQLPiePanelWithConfig(page, pm, dashboardName, pan
   await buildPromQLPanel(page, pm, dashboardName, { chartType: "pie", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL pie panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL pie with one slice per region of cpu_usage, as a Range query — config sidebar opened and ready.
+ * last_over_time over 1h keeps the Instant variant non-empty however long after ingestion the test runs.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLRegionPiePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, {
+    chartType: "pie",
+    panelName,
+    query: "sum by (region) (last_over_time(cpu_usage[1h]))",
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL region pie panel with config ready", { dashboardName, panelName });
 }
 
 /**

@@ -516,6 +516,8 @@ export interface OnCallPolicy {
   final_action?: PolicyFinalAction;
   /** Absent on a PUT means UNCHANGED — only send when the user touched it. */
   l0?: L0Policy;
+  /** Read-only. The ladder still has the shape the server generated, so removing a rotation rewrites it rather than being refused. */
+  ladder_is_generated?: boolean;
 }
 
 export interface SubjectRef {
@@ -529,7 +531,8 @@ export interface OnCallResponse {
   id: string;
   org_id: string;
   subject: SubjectRef;
-  team_id: string;
+  /** `null` for a page nothing routed to a team (04-responses R6.1). */
+  team_id: string | null;
   priority: number;
   state: ResponseState;
   opened_at: number;
@@ -543,6 +546,8 @@ export interface OnCallResponse {
   /** Quiet until this instant (micros). Not an acknowledgement. */
   snoozed_until?: number | null;
   ladder_anchor?: number | null;
+  /** When the ladder ran out with nobody answering; the state stays triggered. */
+  exhausted_at?: number | null;
   /** Which run of the ladder this record is on. Absent means the first run. */
   ladder_run?: number | null;
   /** Always on the wire — the server defaults it to `owner`. */
@@ -786,6 +791,8 @@ export interface TeamRungSummary {
   nobody_after_micros?: number | null;
   /** A ladder that stops short of the whole team runs out of people. */
   ends_with_whole_team: boolean;
+  /** The channels this priority pages on. */
+  channels: Channel[];
 }
 
 export interface TeamPageStats {
@@ -955,6 +962,10 @@ export interface FiredRung {
   /** Absolute instant it fired. */
   at: number;
   targets: string[];
+  /** The people it actually reached, from the delivery ledger. */
+  reached?: string[];
+  /** The step fired and the ledger has nobody for it: an unstaffed rotation, say. */
+  reached_nobody?: boolean;
 }
 
 /// Where the ladder has got to. The question mid-incident is "when does this
@@ -966,6 +977,8 @@ export interface EscalationProgress {
   exhausted: boolean;
   /** Set when the ladder is not climbing: acknowledged, snoozed, resolved. */
   stopped_because?: string | null;
+  /** While the first page is held for AI triage, when the hold ends (micros). */
+  held_until_micros?: number | null;
 }
 
 export interface OnCallResponseEvent {
@@ -1251,7 +1264,21 @@ export type TelephonyReason =
   | "token_required"
   | "no_master_key"
   | "account_rejected"
+  | "from_not_on_account"
+  | "unavailable"
   | "unreadable";
+
+/** `GET /telephony/status`: `none` means no account would page, so nothing was checked. */
+export type TelephonyState =
+  "ok" | "account_rejected" | "from_not_on_account" | "unavailable" | "unreadable" | "none";
+
+/** A live check of the account the org would page with; the capabilities are false unless `state` is `ok`. */
+export interface TelephonyStatus {
+  state: TelephonyState;
+  trial: boolean;
+  can_text: boolean;
+  can_call: boolean;
+}
 
 /** The 400 body of a refused telephony call; `message` is the English API text. */
 export interface TelephonyRefusalBody {

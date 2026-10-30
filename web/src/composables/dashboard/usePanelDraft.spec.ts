@@ -23,7 +23,6 @@ import {
   PANEL_DRAFT_TTL_MS,
   PANEL_DRAFT_VERSION,
   cleanupPanelDrafts,
-  clearAllPanelDrafts,
   deletePanelDraft,
   deletePanelDraftsFor,
   formatPanelDraftTime,
@@ -166,7 +165,6 @@ describe("usePanelDraft storage", () => {
     expect(readPanelDraft(panelScope)).toBeNull();
     expect(hasPanelDraft(panelScope)).toBe(false);
     expect(() => deletePanelDraft(panelScope)).not.toThrow();
-    expect(() => clearAllPanelDrafts()).not.toThrow();
     expect(cleanupPanelDrafts()).toBe(0);
   });
 
@@ -237,17 +235,6 @@ describe("usePanelDraft storage", () => {
     const before = panelDraftRevision.value;
     expect(deletePanelDraftsFor({ org: "org1", dashboardId: "nothing" })).toBe(0);
     expect(panelDraftRevision.value).toBe(before);
-  });
-
-  it("clears every draft and nothing else", () => {
-    writePanelDraft(scope, input());
-    writePanelDraft(panelScope, input());
-    localStorage.setItem("unrelated", "keep");
-
-    clearAllPanelDrafts();
-
-    expect(draftKeyCount()).toBe(0);
-    expect(localStorage.getItem("unrelated")).toBe("keep");
   });
 
   it("formats the save time to the minute", () => {

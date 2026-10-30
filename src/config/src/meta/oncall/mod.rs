@@ -61,9 +61,10 @@ pub use preset::{
 };
 pub use rca::RcaContext;
 pub use response::{
-    DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NoBlastRadius, PageDecision, ResolutionCause,
-    ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState, UpstreamRecovery,
-    dependents_all_clear, flap_note, next_ladder_run, page_decision, upstream_recovery,
+    DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NewAlertEffect, NoBlastRadius, PageDecision,
+    ResolutionCause, ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState,
+    UpstreamRecovery, dependents_all_clear, flap_note, next_ladder_run, page_decision,
+    upstream_recovery,
 };
 pub use rotation::{
     AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, DEFAULT_SHIFT_RULE_NAME, GridError,

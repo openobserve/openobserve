@@ -560,6 +560,9 @@ const pagination = useTablePagination(
     get data() {
       return props.data;
     },
+    get rowModelWindowed() {
+      return rowModelWindowed.value;
+    },
   },
   emit,
 );
@@ -753,14 +756,25 @@ function getPivotMerge(
   return pivotMergeMap.value.get(row)?.[columnId] ?? null;
 }
 
-function pivotTotalCell(col: OTableColumnDef<TData>): any {
-  const row = props.stickyTotalRow;
+const stickyTotalRows = computed<Record<string, any>[]>(() => {
+  const rows = props.stickyTotalRow;
+  if (!rows) return [];
+  return Array.isArray(rows) ? rows : [rows];
+});
+
+function pivotTotalCell(col: OTableColumnDef<TData>, row: Record<string, any>): any {
   if (!row) return "";
   const key = (col.accessorKey ?? col.id) as string;
   const val = row[key];
   if (val === undefined || val === null) return "";
   const fmt = (col.meta as any)?.format as ((v: any, r: any) => any) | undefined;
   return fmt ? fmt(val, row) : val;
+}
+
+// A calculated-totals row names its calculation in `__labelKey`'s cell; the values are the figures to stand out.
+function calcRowCellClass(col: OTableColumnDef<TData>, row: Record<string, any>): string {
+  if (!row?.__labelKey) return "";
+  return (col.accessorKey ?? col.id) === row.__labelKey ? "text-text-secondary" : "font-semibold";
 }
 
 // Inline so the mono font wins over the scoped `td { --font-sans }` rule.
@@ -1355,7 +1369,7 @@ defineExpose({
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
         :class="[
-          'px-page-edge flex items-center gap-2 py-2 max-md:flex-wrap max-md:gap-y-1.5',
+          'px-page-edge flex items-center gap-2 py-2 max-md:flex-wrap max-md:gap-y-2',
           props.toolbarBordered ? 'border-table-row-divider border-b' : '',
         ]"
         data-test="o2-table-toolbar"
@@ -1398,7 +1412,7 @@ defineExpose({
             :value="globalFilterLocal"
             type="text"
             :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
-            class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 ps-7 pe-2 text-sm outline-none"
+            class="text-primary placeholder:text-input-placeholder w-full border-none bg-transparent py-1 ps-7 pe-2 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
           />
@@ -1485,7 +1499,8 @@ defineExpose({
             props.bordered &&
             !props.columns.some((c) => c.pinned || c.isAction) &&
             !(props.pivotHeaderLevels && props.pivotHeaderLevels.length) &&
-            !props.stickyColTotals
+            !props.stickyColTotals &&
+            !(props.stickyRowTotals && stickyTotalRows.length)
               ? ''
               : 'border-separate border-spacing-0',
             // Symmetric edge inset (SPACING_AUDIT.md §7): the first and last cell
@@ -1752,11 +1767,15 @@ defineExpose({
 
           <!-- ── Pivot grand-total row (sticky <tfoot>) ── -->
           <tfoot
-            v-if="props.stickyTotalRow"
+            v-if="stickyTotalRows.length"
             data-test="o2-table-pivot-total-foot"
             :class="props.stickyRowTotals ? 'o2-pivot-total-sticky sticky bottom-0 z-10' : ''"
           >
-            <tr class="bg-table-header-bg">
+            <tr
+              v-for="(totalRow, totalIndex) in stickyTotalRows"
+              :key="`pivot-total-row-${totalIndex}`"
+              class="bg-table-header-bg"
+            >
               <td
                 v-for="col in props.columns"
                 :key="`pivot-total-${col.id}`"
@@ -1769,10 +1788,11 @@ defineExpose({
                       ? 'text-center'
                       : 'text-left',
                   props.stickyColTotals && (col.meta as any)?._isTotalColumn ? 'font-semibold' : '',
+                  calcRowCellClass(col, totalRow),
                 ]"
                 :style="pivotTotalCellStyle(col)"
               >
-                {{ pivotTotalCell(col) }}
+                {{ pivotTotalCell(col, totalRow) }}
               </td>
             </tr>
           </tfoot>

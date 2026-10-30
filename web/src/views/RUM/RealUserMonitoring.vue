@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { overviewStateOnly } from "@/utils/rum/performanceOverview";
 import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -306,6 +307,7 @@ const changeTab = (tab: string | number) => {
       name: "rumPerformanceSummary",
       query: {
         ...getQueryParams(performanceState.data.datetime, ""),
+        ...overviewStateOnly(router.currentRoute.value.query),
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });

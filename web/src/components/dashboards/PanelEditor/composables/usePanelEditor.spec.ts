@@ -427,6 +427,29 @@ describe("usePanelEditor", () => {
       ]);
     });
 
+    it("does not list a builder box plot's statistic columns as function fields", () => {
+      dashboardPanelData.data.type = "boxplot";
+      dashboardPanelData.data.queries[0].customQuery = false;
+      dashboardPanelData.data.queries[0].fields.x = [{ alias: "x_axis_1", isDerived: false }];
+      dashboardPanelData.data.queries[0].fields.y = [{ alias: "y_axis_1", isDerived: false }];
+
+      const { updateVrlFunctionFieldList } = usePanelEditor(options);
+      updateVrlFunctionFieldList([
+        "x_axis_1",
+        "y_axis_1_min",
+        "y_axis_1_q1",
+        "y_axis_1_median",
+        "y_axis_1_q3",
+        "y_axis_1_max",
+        "y_axis_1_count",
+        "vrlField",
+      ]);
+
+      expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
+        { name: "vrlField", type: "Utf8" },
+      ]);
+    });
+
     it("should filter out customQueryFields", () => {
       // customQueryFields are read from the per-query cache (meta.queryFields)
       dashboardPanelData.meta.queryFields[0] = {

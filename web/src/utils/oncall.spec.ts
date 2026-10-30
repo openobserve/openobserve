@@ -43,6 +43,10 @@ import {
   isRotationValid,
   isShiftRuleValid,
   isSnoozed,
+  isDeletedTeam,
+  pagePhrase,
+  reachedStepOf,
+  pageState,
   isStaffed,
   isUnresolved,
   coverageHoursSummary,
@@ -72,13 +76,16 @@ import {
   ruleAppliesAt,
   routingReasonOf,
   rungProblem,
-  shiftBands,
   shortReachReason,
+  channelList,
+  listInLocale,
+  stepsNamingRotation,
   toZonedInputValue,
   zonedMidnight,
   coversPresetOf,
   COVERS_PRESETS,
   rotateMembersTo,
+  withRoster,
   turnLine,
   ruleHolder,
   anchorAtWeekdayTime,
@@ -93,6 +100,8 @@ import {
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
 import i18n from "@/locales";
+import rosterParity from "../../../src/config/src/meta/oncall/roster_parity.json";
+import shiftParity from "../../../src/config/src/meta/oncall/shift_parity.json";
 
 const ANCHOR = 1_700_000_000_000_000;
 
@@ -105,26 +114,50 @@ function weekly(members: string[], level: EscalationLevel = "primary"): Rotation
   };
 }
 
+// Shifts count in the TEAM's zone, so these equal the Rust side whatever zone the browser is in.
+describe("shift maths matches the server (shift_parity.json)", () => {
+  it.each(shiftParity.map((c) => [c.case, c] as const))("%s", (_name, c) => {
+    const rule = {
+      name: "Base",
+      members: c.members,
+      shift_micros: c.shift_micros,
+      anchor_micros: c.anchor_micros,
+    };
+    const rotation = { id: "r", name: "R", shift_rules: [rule] };
+    expect(memberAt(rule, c.at_micros, c.timezone)).toBe(c.holder);
+    expect(resolveHolder(rotation, c.at_micros, c.timezone).member).toBe(c.holder);
+    expect(resolveNextHolder(rotation, c.at_micros, c.timezone)).toBe(c.next_holder);
+    expect(nextHandover(rule, c.at_micros, c.timezone)).toBe(c.next_handover);
+    const [first, second] = upcomingShifts(rule, c.at_micros, 2, c.timezone);
+    expect(first).toMatchObject({
+      startMicros: c.shift_start,
+      endMicros: c.next_handover,
+      member: c.holder,
+    });
+    expect(second).toMatchObject({ startMicros: c.next_handover, member: c.next_holder });
+  });
+});
+
 describe("memberAt", () => {
   it("puts the first member on call from the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + MICROS_PER_DAY)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_DAY, "UTC")).toBe("ana@o2.ai");
   });
 
   // The handover instant belongs to the INCOMING person. An inclusive bound
   // would leave both of them on call for the same alert.
   it("treats the handover boundary as exclusive", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK - 1)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK)).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK - 1, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK, "UTC")).toBe("bob@o2.ai");
   });
 
   it("wraps around the member list", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
     const expected = ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"];
     for (let week = 0; week < 9; week++) {
-      expect(memberAt(r, ANCHOR + week * MICROS_PER_WEEK)).toBe(expected[week % 3]);
+      expect(memberAt(r, ANCHOR + week * MICROS_PER_WEEK, "UTC")).toBe(expected[week % 3]);
     }
   });
 
@@ -132,15 +165,15 @@ describe("memberAt", () => {
   // wrap. Without it this returns undefined instead of the right person.
   it("walks backwards for instants before the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR - 1)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK - 1)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR - 1, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK - 1, "UTC")).toBe("ana@o2.ai");
   });
 
   it("keeps a single member on call at every instant", () => {
     const r = weekly(["ana@o2.ai"]);
     for (const offset of [-MICROS_PER_WEEK, 0, MICROS_PER_DAY, 99 * MICROS_PER_WEEK]) {
-      expect(memberAt(r, ANCHOR + offset)).toBe("ana@o2.ai");
+      expect(memberAt(r, ANCHOR + offset, "UTC")).toBe("ana@o2.ai");
     }
   });
 
@@ -151,17 +184,17 @@ describe("memberAt", () => {
       shift_micros: 8 * MICROS_PER_HOUR,
       anchor_micros: ANCHOR,
     };
-    expect(memberAt(r, ANCHOR)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + 8 * MICROS_PER_HOUR)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR + 16 * MICROS_PER_HOUR)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + 8 * MICROS_PER_HOUR, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR + 16 * MICROS_PER_HOUR, "UTC")).toBe("ana@o2.ai");
   });
 
   // An unusable rotation must read as a gap, never as a silently chosen
   // fallback member.
   it("resolves to nobody when the rotation is unusable", () => {
-    expect(memberAt(weekly([]), ANCHOR)).toBeNull();
-    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: 0 }, ANCHOR)).toBeNull();
-    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: -1 }, ANCHOR)).toBeNull();
+    expect(memberAt(weekly([]), ANCHOR, "UTC")).toBeNull();
+    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: 0 }, ANCHOR, "UTC")).toBeNull();
+    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: -1 }, ANCHOR, "UTC")).toBeNull();
   });
 });
 
@@ -169,14 +202,14 @@ describe("nextHandover", () => {
   it("brackets the instant and hands over to the next member", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
     const at = ANCHOR + MICROS_PER_DAY;
-    const handover = nextHandover(r, at)!;
+    const handover = nextHandover(r, at, "UTC")!;
     expect(handover).toBe(ANCHOR + MICROS_PER_WEEK);
-    expect(memberAt(r, handover - 1)).toBe("ana@o2.ai");
-    expect(memberAt(r, handover)).toBe("bob@o2.ai");
+    expect(memberAt(r, handover - 1, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, handover, "UTC")).toBe("bob@o2.ai");
   });
 
   it("is null for an unusable rotation", () => {
-    expect(nextHandover(weekly([]), ANCHOR)).toBeNull();
+    expect(nextHandover(weekly([]), ANCHOR, "UTC")).toBeNull();
   });
 });
 
@@ -414,54 +447,6 @@ describe("speakTarget", () => {
   });
 });
 
-describe("shiftBands", () => {
-  const DAY = 86_400_000_000;
-  const rotation = (members: string[], shift = DAY) => ({
-    name: "Primary",
-    members,
-    shift_micros: shift,
-    anchor_micros: 0,
-  });
-
-  it("lays shifts across the window as fractions of it", () => {
-    const bands = shiftBands(rotation(["ana", "bob"]), 0, 2 * DAY);
-
-    expect(bands).toHaveLength(2);
-    expect(bands[0]).toMatchObject({ user_email: "ana", offset: 0, width: 0.5 });
-    expect(bands[1]).toMatchObject({ user_email: "bob", offset: 0.5, width: 0.5 });
-  });
-
-  /// A band running past the edge would be drawn wider than the chart and push
-  /// everything else off screen.
-  it("clips a shift that overruns the window", () => {
-    const bands = shiftBands(rotation(["ana"], 7 * DAY), 0, DAY);
-
-    expect(bands).toHaveLength(1);
-    expect(bands[0].width).toBe(1);
-    expect(bands[0].endMicros).toBe(DAY);
-  });
-
-  it("includes a shift that started before the window", () => {
-    const bands = shiftBands(rotation(["ana", "bob"]), DAY / 2, DAY);
-
-    expect(bands[0].user_email).toBe("ana");
-    expect(bands[0].startMicros).toBe(DAY / 2);
-  });
-
-  /// A one-minute shift over a month would otherwise draw tens of thousands of
-  /// slivers and lock the page.
-  it("bounds how many bands it will draw", () => {
-    const bands = shiftBands(rotation(["ana"], 60_000_000), 0, 365 * DAY);
-    expect(bands.length).toBeLessThanOrEqual(500);
-  });
-
-  it("draws nothing for an unusable rotation", () => {
-    expect(shiftBands(rotation([]), 0, DAY)).toEqual([]);
-    expect(shiftBands(rotation(["ana"], 0), 0, DAY)).toEqual([]);
-    expect(shiftBands(rotation(["ana"]), DAY, DAY)).toEqual([]);
-  });
-});
-
 describe("colorIndexFor", () => {
   /// A band that changes colour as you page through the calendar is
   /// unreadable, so the colour comes from the person, not their position.
@@ -476,6 +461,182 @@ describe("colorIndexFor", () => {
       const i = colorIndexFor(email, 5);
       expect(i).toBeGreaterThanOrEqual(0);
       expect(i).toBeLessThan(5);
+    }
+  });
+});
+
+describe("pageState", () => {
+  const firedOnce = [{ after_micros: 0, at: 1, targets: [], reached: ["a@o2.ai"] }];
+  const progress = (exhausted: boolean, fired: unknown[] = firedOnce) =>
+    ({ fired, next_targets: [], next_at: null, exhausted }) as any;
+
+  it("says nobody answered for an unanswered page whose ladder ran out", () => {
+    const cases: [Record<string, unknown>, unknown, string][] = [
+      [{ state: "triggered", exhausted_at: 5 }, undefined, "exhausted"],
+      [{ state: "triggered", exhausted_at: null }, undefined, "triggered"],
+      [{ state: "triaged", exhausted_at: 5 }, undefined, "exhausted"],
+      [{ state: "acknowledged", exhausted_at: 5 }, undefined, "acknowledged"],
+      [{ state: "resolved", exhausted_at: 5 }, undefined, "resolved"],
+      // With the ladder's own progress, that is the one signal: the record's flag lags it by minutes.
+      [{ state: "triggered", exhausted_at: null }, progress(true), "exhausted"],
+      [{ state: "triggered", exhausted_at: 5 }, progress(false), "triggered"],
+      [{ state: "acknowledged" }, progress(true), "acknowledged"],
+      // The server marks an empty ladder exhausted; nobody was paged, so nobody failed to answer.
+      [{ state: "triggered" }, progress(true, []), "triggered"],
+    ];
+    for (const [record, ladder, expected] of cases) {
+      expect(pageState(record as any, ladder as any)).toBe(expected);
+    }
+  });
+});
+
+describe("isDeletedTeam", () => {
+  it("calls a team deleted only when it has an id the loaded list does not have", () => {
+    const cases: [string | null | undefined, string[] | null, boolean][] = [
+      [null, ["team_1"], false],
+      [undefined, ["team_1"], false],
+      ["", ["team_1"], false],
+      ["", [], false],
+      ["team_gone", ["team_1"], true],
+      ["team_gone", [], true],
+      ["team_1", ["team_1"], false],
+      ["team_1", null, false],
+    ];
+    for (const [teamId, known, expected] of cases) {
+      expect(isDeletedTeam(teamId, known), `${teamId} / ${known}`).toBe(expected);
+    }
+  });
+});
+
+describe("reachedStepOf", () => {
+  it("names the 1-based step a recorded rung delay matches, or nothing", () => {
+    const steps = [{ after_micros: 900 }, { after_micros: 0 }, { after_micros: 300 }];
+    const cases: [unknown, number | null | undefined, number | null][] = [
+      [steps, 0, 1],
+      [steps, 300, 2],
+      [steps, 900, 3],
+      [steps, 450, null],
+      [steps, null, null],
+      [steps, undefined, null],
+      [null, 300, null],
+    ];
+    for (const [ladder, micros, expected] of cases) {
+      expect(reachedStepOf(ladder as any, micros), `${micros}`).toBe(expected);
+    }
+  });
+});
+
+describe("pagePhrase", () => {
+  const NOW = 1_700_000_000_000_000;
+  const SEC = 1_000_000;
+  const base = { state: "triggered", opened_at: NOW - 600 * SEC };
+  const ladder = (over: Record<string, unknown> = {}) => ({
+    fired: [],
+    next_targets: [],
+    next_at: null,
+    exhausted: false,
+    ...over,
+  });
+  const rung = (reached: string[]) => ({ after_micros: 0, at: NOW, targets: [], reached });
+
+  it("gives each page one phrase, from one signal per fact", () => {
+    const cases: [string, Record<string, unknown>, Record<string, unknown>, unknown][] = [
+      [
+        "resolved",
+        { state: "resolved", closed_at: NOW - 300 * SEC },
+        {},
+        { kind: "resolved", afterMicros: 300 * SEC },
+      ],
+      [
+        "acknowledged",
+        { state: "acknowledged", acked_by: "ana@o2.ai" },
+        {},
+        { kind: "acknowledged", by: "ana@o2.ai" },
+      ],
+      [
+        "snoozed",
+        { snoozed_until: NOW + 60 * SEC },
+        {},
+        { kind: "snoozed", until: NOW + 60 * SEC },
+      ],
+      [
+        "ladder ran out",
+        {},
+        { progress: ladder({ exhausted: true, fired: [rung(["ana@o2.ai"])] }) },
+        { kind: "nobodyAnswered" },
+      ],
+      [
+        "held for triage",
+        {},
+        { progress: ladder({ held_until_micros: NOW + 54.2 * SEC }) },
+        { kind: "held", secondsLeft: 55 },
+      ],
+      [
+        "lapsed hold",
+        {},
+        { progress: ladder({ held_until_micros: NOW - SEC }) },
+        { kind: "notPaged" },
+      ],
+      [
+        "no rungs (the server sends an empty ladder as exhausted)",
+        {},
+        { progress: ladder({ exhausted: true, fired: [] }), totalRungs: 0 },
+        { kind: "pagesNobody" },
+      ],
+      [
+        "the step it is on reached nobody",
+        {},
+        {
+          progress: ladder({
+            fired: [rung(["ana@o2.ai"]), { ...rung([]), reached_nobody: true }],
+          }),
+        },
+        { kind: "reachedNobody", step: 2, total: 3 },
+      ],
+      ["still loading", {}, { progressLoaded: false }, { kind: "unknown" }],
+      [
+        "paging",
+        {},
+        { progress: ladder({ fired: [rung(["ana@o2.ai"]), rung(["bo@o2.ai", "cy@o2.ai"])] }) },
+        { kind: "paging", step: 2, total: 3, who: ["bo@o2.ai", "cy@o2.ai"] },
+      ],
+      [
+        "paging, no progress on the row",
+        {},
+        { reachedStep: 2 },
+        { kind: "paging", step: 2, total: 3, who: [] },
+      ],
+      ["not paged", {}, { progress: ladder() }, { kind: "notPaged" }],
+      [
+        "empty ladder on a list without progress, where the record says it ran out",
+        { exhausted_at: NOW },
+        { totalRungs: 0 },
+        { kind: "pagesNobody" },
+      ],
+      [
+        "no progress asked yet, but the record names its step",
+        {},
+        { progressLoaded: false, reachedStep: 2 },
+        { kind: "paging", step: 2, total: 3, who: [] },
+      ],
+      ["no progress asked, no step recorded", {}, { progressLoaded: false }, { kind: "unknown" }],
+      [
+        "the record paged a step the policy no longer has",
+        { reached_rung_micros: 300 * SEC },
+        { reachedStep: null },
+        { kind: "unknown" },
+      ],
+    ];
+    for (const [name, record, opts, expected] of cases) {
+      const phrase = pagePhrase({
+        record: { ...base, ...record } as any,
+        progress: null,
+        progressLoaded: true,
+        totalRungs: 3,
+        nowMicros: NOW,
+        ...opts,
+      } as any);
+      expect(phrase, name).toEqual(expected);
     }
   });
 });
@@ -539,7 +700,7 @@ describe("ownershipPath", () => {
 describe("upcomingShifts", () => {
   it("starts with the shift containing the given instant", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    const shifts = upcomingShifts(r, ANCHOR + MICROS_PER_DAY, 3);
+    const shifts = upcomingShifts(r, ANCHOR + MICROS_PER_DAY, 3, "UTC");
 
     expect(shifts).toHaveLength(3);
     expect(shifts[0].member).toBe("ana@o2.ai");
@@ -552,7 +713,7 @@ describe("upcomingShifts", () => {
   // Each shift must end exactly where the next begins, or the preview implies
   // a gap or an overlap that the resolver does not have.
   it("produces contiguous shifts", () => {
-    const shifts = upcomingShifts(weekly(["a", "b", "c"]), ANCHOR, 5);
+    const shifts = upcomingShifts(weekly(["a", "b", "c"]), ANCHOR, 5, "UTC");
     for (let i = 1; i < shifts.length; i++) {
       expect(shifts[i].startMicros).toBe(shifts[i - 1].endMicros);
     }
@@ -562,24 +723,24 @@ describe("upcomingShifts", () => {
   // of showing it.
   it("agrees with memberAt at every boundary", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
-    for (const shift of upcomingShifts(r, ANCHOR - MICROS_PER_WEEK, 8)) {
-      expect(memberAt(r, shift.startMicros)).toBe(shift.member);
-      expect(memberAt(r, shift.endMicros - 1)).toBe(shift.member);
+    for (const shift of upcomingShifts(r, ANCHOR - MICROS_PER_WEEK, 8, "UTC")) {
+      expect(memberAt(r, shift.startMicros, "UTC")).toBe(shift.member);
+      expect(memberAt(r, shift.endMicros - 1, "UTC")).toBe(shift.member);
     }
   });
 
   it("works for instants before the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    const shifts = upcomingShifts(r, ANCHOR - 1, 2);
+    const shifts = upcomingShifts(r, ANCHOR - 1, 2, "UTC");
     expect(shifts[0].member).toBe("bob@o2.ai");
     expect(shifts[0].endMicros).toBe(ANCHOR);
     expect(shifts[1].member).toBe("ana@o2.ai");
   });
 
   it("returns nothing for an unusable rotation or a non-positive count", () => {
-    expect(upcomingShifts(weekly([]), ANCHOR, 3)).toEqual([]);
-    expect(upcomingShifts({ ...weekly(["a"]), shift_micros: 0 }, ANCHOR, 3)).toEqual([]);
-    expect(upcomingShifts(weekly(["a"]), ANCHOR, 0)).toEqual([]);
+    expect(upcomingShifts(weekly([]), ANCHOR, 3, "UTC")).toEqual([]);
+    expect(upcomingShifts({ ...weekly(["a"]), shift_micros: 0 }, ANCHOR, 3, "UTC")).toEqual([]);
+    expect(upcomingShifts(weekly(["a"]), ANCHOR, 0, "UTC")).toEqual([]);
   });
 });
 
@@ -1180,8 +1341,19 @@ describe("parseRoutingReason", () => {
       "routed to tm_9 by ownership rule k8s-cluster=introspection/service=search",
     );
     expect(parsed?.mechanism).toBe("ownership");
-    expect(parsed?.teamId).toBe("tm_9");
+    expect(parsed?.team).toBe("tm_9");
     expect(parsed?.dimensions).toEqual({ "k8s-cluster": "introspection", service: "search" });
+  });
+
+  // The server now names the team, and a name may hold spaces.
+  it.each([
+    ["routed to Platform SRE by ownership rule service=search", "ownership"],
+    ["routed to Platform SRE by the alert's own setting", "explicit"],
+    ["no ownership rule matched, so it went to the default team Platform SRE", "default"],
+  ] as const)("reads a spaced team name out of %s", (sentence, mechanism) => {
+    const parsed = parseRoutingReason(sentence);
+    expect(parsed?.mechanism).toBe(mechanism);
+    expect(parsed?.team).toBe("Platform SRE");
   });
 
   it("keeps a value that contains its own equals sign whole", () => {
@@ -1738,6 +1910,76 @@ describe("rotation drawer, part B", () => {
     expect(rotateMembersTo(members, person, index)).toEqual(expected);
   });
 
+  // The draft keeps the holder and the handovers, the same rule as `ShiftRule::with_roster`.
+  it.each([
+    [
+      "add before the first handover",
+      ["a", "b", "c"],
+      -MICROS_PER_DAY,
+      ["a", "b", "c", "d"],
+      ["c", "a", "b", "d"],
+    ],
+    [
+      "add mid-rotation",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "b", "c", "d"],
+      ["b", "c", "a", "d"],
+    ],
+    [
+      "remove the holder",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "c"],
+      ["c", "a"],
+    ],
+    [
+      "remove the next person",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "b"],
+      ["b", "a"],
+    ],
+    [
+      "remove somebody else",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["b", "c"],
+      ["b", "c"],
+    ],
+    ["add to a single person", ["a"], 4 * MICROS_PER_WEEK, ["a", "b"], ["a", "b"]],
+  ])("withRoster: %s", (_case, before, offset, members, expectedOrder) => {
+    const rule = layer("Base", before, 0, []);
+    const now = ANCHOR + offset;
+    const after = { ...rule, members: withRoster(rule, members, now, "UTC") };
+    expect(turnLine(after.members, memberAt(after, now, "UTC"))).toEqual(expectedOrder);
+    expect(nextHandover(after, now, "UTC")).toBe(nextHandover(rule, now, "UTC"));
+  });
+
+  // The Rust suite runs these same cases (`roster_parity.json`), so preview and save cannot drift.
+  it.each(rosterParity.map((c) => [c.case, c] as const))(
+    "withRoster matches the server: %s",
+    (_name, c) => {
+      const rule = {
+        ...layer("Base", c.members, 0, []),
+        shift_micros: c.shift_micros,
+        anchor_micros: c.anchor_micros,
+      };
+      expect(withRoster(rule, c.new_members, c.now_micros, c.timezone)).toEqual(c.expected);
+    },
+  );
+
+  // Shifts are counted in the team's wall time, so a DST change between anchor and now moves no turn.
+  it("withRoster counts shifts in the team's zone across a DST change", () => {
+    // Monday 2026-03-02 09:00 New York (EST); the clocks spring forward on 2026-03-08.
+    const anchor = Date.UTC(2026, 2, 2, 14, 0) * 1000;
+    const rule = { ...layer("Base", ["a", "b", "c"], 0, []), anchor_micros: anchor };
+    // Monday 2026-03-16 09:30 EDT: shift 2 (c) on the wall clock, still shift 1 (b) by UTC arithmetic.
+    const now = Date.UTC(2026, 2, 16, 13, 30) * 1000;
+    const members = withRoster(rule, ["a", "b", "c", "d"], now, "America/New_York");
+    expect(members).toEqual(["b", "d", "c", "a"]);
+  });
+
   it.each([
     [["a", "b", "c", "d"], "c", ["c", "d", "a", "b"]],
     [["a", "b"], null, ["a", "b"]],
@@ -2245,5 +2487,83 @@ describe("rotation editor: how several shift rules add up", () => {
     ])("%s", (_name, spans, expected) => {
       expect(coverageHoursSummary(spans as Array<[number, number]>, t)).toBe(expected);
     });
+  });
+});
+
+// S3/S4: one spelling and one order for a priority's channels.
+describe("channelList", () => {
+  const t = ((k: string) => k) as any;
+
+  it("says the channels in the fixed order, whatever order they are stored in", () => {
+    expect(channelList(["voice", "email", "sms"], t)).toBe(
+      "oncall.channel_email, oncall.channel_sms, oncall.channel_voice",
+    );
+  });
+
+  it("says nothing for no channels", () => {
+    expect(channelList([], t)).toBe("");
+    expect(channelList(undefined, t)).toBe("");
+  });
+});
+
+// S11: which escalation steps a rotation's removal touches.
+describe("stepsNamingRotation", () => {
+  const MIN = 60_000_000;
+  const policy = {
+    id: "p",
+    org_id: "o",
+    team_id: "t",
+    rungs: [
+      {
+        priority: 1 as const,
+        channels: [],
+        steps: [
+          { after_micros: 10 * MIN, targets: [{ kind: "rotation" as const, rotation_id: "r2" }] },
+          { after_micros: 0, targets: [{ kind: "rotation" as const, rotation_id: "r1" }] },
+          { after_micros: 20 * MIN, targets: [{ kind: "whole_team" as const }] },
+        ],
+      },
+      {
+        priority: 2 as const,
+        channels: [],
+        steps: [
+          {
+            after_micros: 0,
+            targets: [
+              { kind: "user" as const, email: "ana@o2.ai" },
+              { kind: "rotation" as const, rotation_id: "r2", mode: "all" as const },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  it("numbers steps by their delay within each priority", () => {
+    expect(stepsNamingRotation(policy, "r2")).toEqual([
+      { priority: 1, step: 2 },
+      { priority: 2, step: 1 },
+    ]);
+    expect(stepsNamingRotation(policy, "r1")).toEqual([{ priority: 1, step: 1 }]);
+  });
+
+  it("finds nothing for a rotation no step names, or with no policy", () => {
+    expect(stepsNamingRotation(policy, "r9")).toEqual([]);
+    expect(stepsNamingRotation(null, "r1")).toEqual([]);
+  });
+});
+
+// L4/F3: lists read as prose in the reader's language, via Intl.ListFormat and the app's locale code.
+describe("listInLocale", () => {
+  it.each([
+    ["en-us", [], ""],
+    ["en-us", ["Primary"], "Primary"],
+    ["en-us", ["Primary", "Secondary"], "Primary and Secondary"],
+    ["de", ["A", "B", "C"], "A, B und C"],
+    ["zh-cn", ["A", "B", "C"], "A、B和C"],
+    ["ja", ["A", "B", "C"], "A、B、C"],
+    ["tr-turk", ["A", "B"], "A ve B"],
+  ])("%s %j reads %j", (locale, items, expected) => {
+    expect(listInLocale(items as string[], locale)).toBe(expected);
   });
 });

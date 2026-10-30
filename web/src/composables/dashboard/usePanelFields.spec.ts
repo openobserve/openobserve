@@ -570,6 +570,32 @@ describe("usePanelFields", () => {
     });
   });
 
+  describe("sunburst slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes up to five rings across the x fields and one breakdown, and one y", () => {
+      panelData.data.type = "sunburst";
+      expect(addMany("x", 3)).toBe(3);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(1);
+      expect(addMany("x", 3)).toBe(4);
+    });
+
+    it("refuses a breakdown once the x fields already fill all five rings", () => {
+      panelData.data.type = "sunburst";
+      expect(addMany("x", 6)).toBe(5);
+      expect(addMany("breakdown", 1)).toBe(0);
+    });
+  });
+
   // ── computed: promqlMode ──────────────────────────────────────────────────
 
   describe("promqlMode", () => {
@@ -581,6 +607,167 @@ describe("usePanelFields", () => {
     it("is true when queryType is promql", () => {
       panelData.data.queryType = "promql";
       expect(fields.promqlMode.value).toBe(true);
+    });
+  });
+
+  describe("bar gauge slots", () => {
+    const addMany = (axis: "x" | "y", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else fields.addYAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes one x and one y field", () => {
+      panelData.data.type = "bar-gauge";
+      expect(addMany("x", 3)).toBe(1);
+      expect(addMany("y", 3)).toBe(1);
+    });
+  });
+  describe("distribution slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes no x, up to 3 y fields and one breakdown", () => {
+      panelData.data.type = "distribution";
+      expect(addMany("x", 3)).toBe(0);
+      expect(addMany("y", 3)).toBe(3);
+      expect(addMany("breakdown", 3)).toBe(1);
+    });
+
+    it("a distribution y field keeps raw values", () => {
+      panelData.data.type = "distribution";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+    });
+  });
+  describe("treemap slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes up to five levels across the group fields and one sub-group, and one y", () => {
+      panelData.data.type = "treemap";
+      expect(addMany("x", 3)).toBe(3);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(1);
+      expect(addMany("x", 3)).toBe(4);
+    });
+
+    it("refuses a sub-group once the group fields already fill five levels", () => {
+      panelData.data.type = "treemap";
+      expect(addMany("x", 6)).toBe(5);
+      expect(addMany("breakdown", 1)).toBe(0);
+    });
+  });
+  describe("funnel slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("funnel takes 1 x, 1 y and 0 breakdown fields", () => {
+      panelData.data.type = "funnel";
+      expect(addMany("x", 3)).toBe(1);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(0);
+    });
+
+    it("a funnel y field counts", () => {
+      panelData.data.type = "funnel";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
+    });
+  });
+  describe("node graph slots", () => {
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "node-graph";
+      for (let i = 0; i < 3; i++) {
+        fields.addXAxisItem({ name: `field_x_${i}` });
+        fields.addYAxisItem({ name: `field_y_${i}` });
+        fields.addBreakDownAxisItem({ name: `field_breakdown_${i}` });
+      }
+      expect(panelData.data.queries[0].fields.x).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.y).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
+    });
+  });
+  describe("alert list slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "alert-list";
+      expect(addMany("x", 3)).toBe(0);
+      expect(addMany("y", 3)).toBe(0);
+      expect(addMany("breakdown", 3)).toBe(0);
+    });
+  });
+  describe("flame graph slots", () => {
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "flame-graph";
+      fields.addXAxisItem({ name: "field_x" });
+      fields.addYAxisItem({ name: "field_y" });
+      fields.addBreakDownAxisItem({ name: "field_b" });
+      expect(panelData.data.queries[0].fields.x).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.y).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
+    });
+  });
+
+  describe("box plot slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes 1 x, 1 y and no breakdown fields", () => {
+      panelData.data.type = "boxplot";
+      expect(addMany("x", 3)).toBe(1);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(0);
+    });
+
+    it("a box plot y field keeps raw values, a pie y field counts", () => {
+      panelData.data.type = "boxplot";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+      panelData.data.queries[0].fields.y = [];
+      panelData.data.type = "pie";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
     });
   });
 });

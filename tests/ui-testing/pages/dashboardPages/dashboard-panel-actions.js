@@ -1,8 +1,12 @@
 // Dashboard actions page
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
+import { expect } from "@playwright/test";
 import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
 import { settlePanelLeave } from "./panel-leave-dialog.js";
+
+// Default unit formatting abbreviates large legend values ("2.40K"); the empty key is an unscaled value.
+const PIE_VALUE_SUFFIX_MULTIPLIER = { "": 1, K: 1e3, M: 1e6, B: 1e9, T: 1e12 };
 
 export default class DashboardactionPage {
   constructor(page) {
@@ -365,6 +369,13 @@ export default class DashboardactionPage {
     await this.waitForChartToRender();
   }
 
+  /** Resolves with the URL of the next PromQL query_range request; call before the action that fires it. */
+  nextPromQLQueryRangeRequest() {
+    return this.page
+      .waitForRequest((req) => req.url().includes("/prometheus/api/v1/query_range"), { timeout: 30000 })
+      .then((req) => new URL(req.url()));
+  }
+
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
 
   // Returns the per-panel edit dropdown locator (data-test keyed by panel name)
@@ -660,17 +671,211 @@ export default class DashboardactionPage {
     await this.page.waitForTimeout(1000);
   }
 
-  // Legend is canvas-painted, so read series names via `_vnode` (`__vueParentComponent` is dev-only).
   async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
     const names = (await this.getChartSeries(scopeSelector)).map((s) => s.name).filter(Boolean);
     return [...new Set(names)];
   }
 
   async getChartSeries(scopeSelector = '[data-test="chart-renderer"]') {
+    const charts = await this.getChartOptionSnapshots(scopeSelector);
+    return charts.flatMap((chart) =>
+      chart.series.map((s) => ({
+        name: s.name,
+        values: s.points.map((point) =>
+          Array.isArray(point) ? point[point.length - 1] : point,
+        ),
+      })),
+    );
+  }
+
+  /**
+   * Legend entries of the first rendered pie/donut, as its live legend formatter prints them.
+   * @param {string} scopeSelector
+   * @returns {Promise<Array<{name: string, value: number, label: string, valuesText: string}>>}
+   */
+  async getPieLegendEntries(scopeSelector = '[data-test="chart-renderer"]') {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    return chart?.legendEntries ?? [];
+  }
+
+  /**
+   * Poll until the first pie/donut's legend entries satisfy `predicate`, then return them.
+   * The formatter is swapped on every render, so a single read right after Apply can see the old one.
+   * @param {(entries: Array<{name: string, value: number, label: string, valuesText: string}>) => boolean} predicate
+   * @param {number} timeout
+   */
+  async waitForPieLegendEntries(predicate, timeout = 20000) {
+    let entries = [];
+    await expect
+      .poll(
+        async () => {
+          entries = await this.getPieLegendEntries();
+          return entries.length > 0 && predicate(entries);
+        },
+        { timeout, intervals: [300, 500, 1000, 2000] }
+      )
+      .toBe(true);
+    return entries;
+  }
+
+  /**
+   * Splits a legend entry's values text ("2002.00  52.05%") into its tokens; no values means none.
+   * @param {{valuesText: string}} entry
+   * @returns {string[]}
+   */
+  getPieLegendTokens(entry) {
+    return entry.valuesText ? entry.valuesText.split(/\s{2,}/) : [];
+  }
+
+  /**
+   * Poll until every pie legend entry shows exactly `count` value tokens, then return the entries.
+   * @param {number} count - 1 for Value or Percent alone, 2 for both
+   */
+  async waitForPieLegendTokenCount(count) {
+    return this.waitForPieLegendEntries((entries) =>
+      entries.every((entry) => this.getPieLegendTokens(entry).length === count)
+    );
+  }
+
+  /** Sum of the first pie's positive slice values: the basis ECharts and the legend take percents of. */
+  async getPieSliceTotal() {
+    const [pie] = await this.getChartSeries();
+    return (pie?.values ?? [])
+      .map(Number)
+      .filter((v) => Number.isFinite(v) && v > 0)
+      .reduce((a, b) => a + b, 0);
+  }
+
+  /**
+   * Assert every entry reads "<value>  <percent>%" with `decimals` digits, the value matching its slice
+   * (a K/M/B/T abbreviation is expanded) and the percent matching its share of the positive total.
+   * @param {Array<{name: string, value: number, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  async expectPieLegendValueAndPercent(entries, decimals = 2) {
+    const total = await this.getPieSliceTotal();
+    expect(total, "pie slice total").toBeGreaterThan(0);
+    for (const entry of entries) {
+      const [valueText, percentText] = this.getPieLegendTokens(entry);
+      this._expectLegendValueMatches(entry, valueText, decimals);
+      this._expectLegendPercentMatches(entry, percentText, decimals, total);
+    }
+  }
+
+  /**
+   * Assert every entry shows its name alone, with no value or percent appended.
+   * @param {Array<{name: string, valuesText: string}>} entries
+   */
+  expectPieLegendNamesOnly(entries) {
+    for (const entry of entries) {
+      expect(entry.valuesText, `legend of ${entry.name} has no values`).toBe("");
+    }
+  }
+
+  /**
+   * Assert every entry shows only its value, with no percent.
+   * @param {Array<{name: string, value: number, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  expectPieLegendValueOnly(entries, decimals = 2) {
+    for (const entry of entries) {
+      const tokens = this.getPieLegendTokens(entry);
+      expect(tokens, `legend tokens of ${entry.name}`).toHaveLength(1);
+      expect(tokens[0], `legend of ${entry.name}`).not.toContain("%");
+      this._expectLegendValueMatches(entry, tokens[0], decimals);
+    }
+  }
+
+  /**
+   * Assert every entry shows only a percent with `decimals` digits.
+   * @param {Array<{name: string, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  expectPieLegendPercentOnly(entries, decimals = 2) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    for (const entry of entries) {
+      expect(entry.valuesText, `legend of ${entry.name}`).toMatch(new RegExp(`^\\d+${fraction}%$`));
+    }
+  }
+
+  _expectLegendValueMatches(entry, valueText, decimals) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    // A metric declared as percent seeds the panel unit, so the value can carry "%" as well as a K/M/B/T scale.
+    const match = String(valueText).match(new RegExp(`^(-?\\d+${fraction})(?:([KMBT])|%)?$`));
+    expect(match, `value of ${entry.name} ("${valueText}")`).not.toBeNull();
+    const multiplier = PIE_VALUE_SUFFIX_MULTIPLIER[match[2] ?? ""];
+    // Half a unit of the last printed digit, scaled by the abbreviation.
+    const tolerance = 0.5 * Math.pow(10, -decimals) * multiplier + 1e-9;
+    expect(
+      Math.abs(Number(match[1]) * multiplier - entry.value),
+      `value of ${entry.name} ("${valueText}" vs ${entry.value})`
+    ).toBeLessThanOrEqual(tolerance);
+  }
+
+  _expectLegendPercentMatches(entry, percentText, decimals, total) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    expect(percentText, `percent of ${entry.name}`).toMatch(new RegExp(`^\\d+${fraction}%$`));
+    const exactShare = (Math.max(entry.value, 0) / total) * 100;
+    // Largest-remainder rounding puts a shown percent at most one last digit off its exact share.
+    const tolerance = 1.01 * Math.pow(10, -decimals);
+    expect(
+      Math.abs(parseFloat(percentText) - exactShare),
+      `percent of ${entry.name} ("${percentText}" vs ${exactShare.toFixed(4)})`
+    ).toBeLessThanOrEqual(tolerance);
+  }
+
+  /**
+   * Value-axis bounds and stacked series of the first rendered chart, read from the live ECharts option.
+   * @param {"yAxis"|"xAxis"} valueAxis - the axis that carries values (xAxis for h-stacked)
+   * @param {string} scopeSelector
+   * @returns {Promise<{min: number|null, max: number|null, series: Array<{name: string, stack: string|null, points: Array}>}|null>}
+   */
+  async getChartValueAxisFit(valueAxis = "yAxis", scopeSelector = '[data-test="chart-renderer"]') {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    if (!chart) return null;
+    const bounds = chart[valueAxis]?.[0] ?? {};
+    return { min: bounds.min ?? null, max: bounds.max ?? null, series: chart.series };
+  }
+
+  // Legend and axes are canvas-painted, so read the live option via `_vnode` (`__vueParentComponent` is dev-only).
+  async getChartOptionSnapshots(scopeSelector = '[data-test="chart-renderer"]') {
     return this.page.evaluate((scopeSel) => {
       const scopes = Array.from(document.querySelectorAll(scopeSel));
-      const series = [];
+      const charts = [];
       const visited = new Set();
+      const numberOrNull = (value) => (typeof value === "number" ? value : null);
+      const axesOf = (axis) =>
+        (Array.isArray(axis) ? axis : axis ? [axis] : []).map((a) => ({
+          type: a?.type ?? null,
+          min: numberOrNull(a?.min),
+          max: numberOrNull(a?.max),
+        }));
+      const pointOf = (point) => {
+        if (Array.isArray(point)) return point.map((v) => (v instanceof Date ? v.getTime() : v));
+        return point !== null && typeof point === "object" ? point.value : point;
+      };
+      // Runs the live legend formatter per pie slice; "{b|name}  v  p%" rich text is split into label and values.
+      const legendEntriesOf = (option) => {
+        const legend = Array.isArray(option.legend) ? option.legend[0] : option.legend;
+        const slices = (option.series?.[0]?.data ?? []).filter(
+          (d) => d !== null && typeof d === "object" && d.name,
+        );
+        return slices.map((d) => {
+          let raw = String(d.name);
+          try {
+            if (typeof legend?.formatter === "function") raw = String(legend.formatter(d.name));
+          } catch {
+            // Non-pie formatters may expect ECharts params; the snapshot must not drop the chart.
+          }
+          const match = raw.match(/^\{[a-z]+\|([^}]*)\}(?:\s+(.*))?$/);
+          return {
+            name: String(d.name),
+            value: typeof d.value === "number" ? d.value : Number(d.value),
+            label: match ? match[1] : raw,
+            valuesText: match ? (match[2] ?? "").trim() : "",
+          };
+        });
+      };
       const walk = (node, depth) => {
         if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
         visited.add(node);
@@ -691,12 +896,17 @@ export default class DashboardactionPage {
             scopes.some((scope) => scope.contains(host))
           ) {
             try {
-              for (const s of chart.getOption()?.series ?? []) {
-                const values = (s?.data ?? []).map((point) =>
-                  Array.isArray(point) ? point[point.length - 1] : (point?.value ?? point),
-                );
-                series.push({ name: s?.name ? String(s.name) : "", values });
-              }
+              const option = chart.getOption() ?? {};
+              charts.push({
+                xAxis: axesOf(option.xAxis),
+                yAxis: axesOf(option.yAxis),
+                series: (option.series ?? []).map((s) => ({
+                  name: s?.name ? String(s.name) : "",
+                  stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+                  points: (s?.data ?? []).map(pointOf),
+                })),
+                legendEntries: legendEntriesOf(option),
+              });
             } catch {
               // A disposed instance throws; it draws nothing anyway.
             }
@@ -707,7 +917,7 @@ export default class DashboardactionPage {
         if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
       };
       walk(document.querySelector("#app")?._vnode, 0);
-      return series;
+      return charts;
     }, scopeSelector);
   }
 

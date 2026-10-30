@@ -58,7 +58,7 @@ pub mod organization;
 pub mod password_policy;
 #[cfg(feature = "enterprise")]
 pub mod playground;
-#[cfg(feature = "profiling")]
+#[cfg(feature = "cpu-profiling")]
 pub mod profiling;
 #[cfg(feature = "enterprise")]
 pub mod prompts;

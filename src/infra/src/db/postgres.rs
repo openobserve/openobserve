@@ -169,6 +169,9 @@ impl super::Db for PostgresDb {
             Err(e) => {
                 if let sqlx::Error::RowNotFound = e {
                     return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+                } else if let sqlx::Error::Database(_) = e {
+                    // stay typed: lc_messages localizes the text but not the SQLSTATE
+                    return Err(Error::from(e));
                 } else {
                     return Err(Error::from(DbError::DBOperError(
                         e.to_string(),

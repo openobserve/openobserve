@@ -32,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Query-related chart content (not html/markdown/custom_chart) -->
       <div
-        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+        v-if="
+          !['html', 'markdown', 'custom_chart', 'alert-list'].includes(dashboardPanelData.data.type)
+        "
         :class="mainContentContainerClass"
         :style="mainContentContainerStyle"
       >
@@ -142,11 +144,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Query Builder -->
                   <DashboardQueryBuilder
-                    v-if="resolvedConfig.showQueryBuilder"
+                    v-if="
+                      resolvedConfig.showQueryBuilder &&
+                      !isCustomSqlPanel(dashboardPanelData.data.type)
+                    "
                     :dashboardData="dashboardData"
                     @custom-chart-template-selected="handleCustomChartTemplateSelected"
                   />
-                  <OSeparator v-if="resolvedConfig.showQueryBuilder" />
+                  <OSeparator
+                    v-if="
+                      resolvedConfig.showQueryBuilder &&
+                      !isCustomSqlPanel(dashboardPanelData.data.type)
+                    "
+                  />
 
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
@@ -190,9 +200,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="
                         !panelSchemaRendererRef?.noData &&
-                        !['table', 'heatmap', 'metric', 'gauge', 'geomap', 'maps'].includes(
-                          dashboardPanelData.data.type,
-                        )
+                        ![
+                          'table',
+                          'heatmap',
+                          'metric',
+                          'gauge',
+                          'bar-gauge',
+                          'treemap',
+                          'sunburst',
+                          'funnel',
+                          'node-graph',
+                          'flame-graph',
+                          'boxplot',
+                          'geomap',
+                          'maps',
+                        ].includes(dashboardPanelData.data.type)
                       "
                       variant="ghost"
                       size="icon"
@@ -304,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           handleLimitNumberOfSeriesWarningMessage
                         "
                         @sparkline-warning-update="handleSparklineWarningUpdate"
-                        @error="handleChartApiError"
+                        @error="onRendererError"
                         @updated:data-zoom="handleDataZoom"
                         @updated:vrl-function-field-list="updateVrlFunctionFieldList"
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -426,6 +448,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :panelId="panelId"
           />
           <DashboardErrorsComponent :errors="errorData" class="shrink-0" />
+        </div>
+      </div>
+
+      <!-- Alert list: no query, so only the preview and its settings -->
+      <div
+        v-if="dashboardPanelData.data.type === 'alert-list'"
+        class="flex"
+        :style="{ height: contentHeight, flex: 1, overflow: 'hidden' }"
+        data-test="panel-editor-alert-list"
+      >
+        <div class="bg-card-glass-bg flex min-w-0 flex-1 flex-col">
+          <div class="relative min-h-0 flex-1 overflow-hidden p-2">
+            <PanelSchemaRenderer
+              v-if="chartData"
+              ref="panelSchemaRendererRef"
+              :key="dashboardPanelData.data.type"
+              :panelSchema="chartData"
+              :dashboard-id="dashboardId"
+              :folder-id="folderId"
+              :selectedTimeObj="dashboardPanelData.meta.dateTime"
+              :variablesData="resolvedVariablesData"
+              :width="6"
+              :showLegendsButton="false"
+              :searchType="searchType"
+              @error="handleChartApiError"
+              @loading-state-change="handleLoadingStateChange"
+            />
+          </div>
+          <DashboardErrorsComponent :errors="errorData" class="shrink-0" />
+        </div>
+        <OSeparator vertical />
+        <div :class="configPanelClass">
+          <PanelSidebar
+            :title="t('dashboard.configLabel')"
+            v-model="dashboardPanelData.layout.isConfigPanelOpen"
+          >
+            <ConfigPanel :variablesData="resolvedVariablesData" :panelData="seriesData" />
+          </PanelSidebar>
         </div>
       </div>
 
@@ -620,7 +680,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             handleLimitNumberOfSeriesWarningMessage
                           "
                           @sparkline-warning-update="handleSparklineWarningUpdate"
-                          @error="handleChartApiError"
+                          @error="onRendererError"
                           @updated:data-zoom="handleDataZoom"
                           @updated:vrl-function-field-list="updateVrlFunctionFieldList"
                           @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -734,6 +794,7 @@ import { usePanelEditor } from "./composables/usePanelEditor";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { SERIES_OVERRIDE_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
+import { isCustomSqlPanel } from "@/utils/dashboard/chartTypeGroups";
 
 // ============================================================================
 // Component Imports
@@ -1287,6 +1348,12 @@ const handleVariablesDataUpdated = (data: PanelEditorVariablesData) => {
   emit("variablesDataUpdated", data);
 };
 
+// The editor shows the error itself; pages that classify a run (Metrics history) need it too.
+const onRendererError = (error: { message?: unknown; code?: unknown } | string | null) => {
+  handleChartApiError(error);
+  emit("renderer-error", error);
+};
+
 const handleDataZoom = (event: any) => {
   const result = onDataZoom(event);
   emit("dataZoom", {
@@ -1399,6 +1466,7 @@ watch(
 
 watch(
   () => [
+    dashboardPanelData.data.type,
     dashboardPanelData.data.config?.heatmap_y_bucket,
     dashboardPanelData.data.config?.heatmap_y_min,
     dashboardPanelData.data.config?.heatmap_y_max,

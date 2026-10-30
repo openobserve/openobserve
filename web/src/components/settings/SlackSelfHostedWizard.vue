@@ -91,9 +91,10 @@ const props = defineProps<{ installation: InstallationView | null }>();
 
 const emit = defineEmits<{ done: []; cancel: [] }>();
 
-/** A 409 from row 2 or row 6 for the Slack team of an instance workspace (R-81) or of org workspaces (R-82). */
+/** Why create or install failed: the server's message (a 409 names the instance team, R-81, or org workspaces, R-82), or no response. */
 interface WizardRefusal {
   message: string;
+  unreachable: boolean;
   instanceTeam: boolean;
   contact: string | null;
   candidates: SlackTakeOverCandidate[];
@@ -125,17 +126,25 @@ const refusalOf = (error: unknown): WizardRefusal | null => {
   const body = (error as { response?: { data?: Partial<SlackApiError> } }).response?.data;
   return {
     message,
+    unreachable: false,
     instanceTeam: body?.error_detail === INSTANCE_TEAM_DETAIL,
     contact: body?.hint?.trim() || null,
     candidates: takeOverOf(body?.error_detail),
   };
 };
 
+// Axios sets `request` once the call left the browser; no `response` then means nothing answered.
+const noResponse = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const { request, response } = error as { request?: unknown; response?: unknown };
+  return request !== undefined && response === undefined;
+};
+
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const userEmail = computed<string>(() => store.state.userInfo?.email ?? "");
-const orgName = computed<string>(() => store.state.selectedOrganization?.name || org.value);
+const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
 const { isMetaOrg } = useIsMetaOrg();
 const queryClient = useQueryClient();
 const installations = useQuery(() =>
@@ -207,6 +216,9 @@ watch(
 
 const manual = ref(false);
 const createRefusal = ref<WizardRefusal | null>(null);
+const createRequest = computed(() =>
+  raw(`POST /api/${encodeURIComponent(org.value)}/slack/installations`),
+);
 // The Create step shows every refusal in place, beside the token it refused.
 const createInstallation = useMutation(() => {
   const options = createInstallationMutation(org.value);
@@ -231,7 +243,10 @@ const createApp = async (value: CreateAppForm): Promise<void> => {
     created.value = await createInstallation.mutateAsync(body);
   } catch (error) {
     createRefusal.value = refusalOf(error) ?? {
-      message: t("common.unknownError"),
+      message: noResponse(error)
+        ? t("slackApp.wizard.create.unreachableTitle")
+        : t("common.unknownError"),
+      unreachable: noResponse(error),
       instanceTeam: false,
       contact: null,
       candidates: [],
@@ -591,9 +606,6 @@ const nextBlocked = computed(() => {
             :loading="prerequisites.isFetching.value"
             @recheck="prerequisites.refetch()"
           />
-          <p class="text-text-secondary m-0 text-xs">
-            {{ t("slackApp.prereq.helmHint", { variable: raw("O2_MASTER_ENCRYPTION_KEY") }) }}
-          </p>
         </div>
       </OStep>
 
@@ -668,13 +680,23 @@ const nextBlocked = computed(() => {
             v-if="createRefusal && !createRefusal.candidates.length"
             variant="error-soft"
             icon="error-outline"
+            :role="createRefusal.unreachable ? 'alert' : undefined"
             :data-test="
-              createRefusal.instanceTeam
-                ? 'slack-wizard-instance-team'
-                : 'slack-wizard-create-error'
+              createRefusal.unreachable
+                ? 'slack-wizard-unreachable'
+                : createRefusal.instanceTeam
+                  ? 'slack-wizard-instance-team'
+                  : 'slack-wizard-create-error'
             "
           >
-            <template v-if="createRefusal.instanceTeam">
+            <div v-if="createRefusal.unreachable" class="flex flex-col gap-1">
+              <span class="font-semibold">{{ raw(createRefusal.message) }}</span>
+              <span>{{ t("slackApp.wizard.create.unreachableDetail") }}</span>
+              <span class="font-mono text-xs wrap-anywhere">
+                {{ t("slackApp.wizard.create.noResponse", { request: createRequest }) }}
+              </span>
+            </div>
+            <template v-else-if="createRefusal.instanceTeam">
               <span class="font-semibold">{{ raw(createRefusal.message) }}</span>
               {{ t("slackApp.wizard.noAppCreated") }}
             </template>
@@ -765,22 +787,37 @@ const nextBlocked = computed(() => {
                 revealable
                 autocomplete="off"
                 :label="t('slackApp.wizard.create.tokenLabel')"
-                :help-text="t('slackApp.wizard.create.tokenHelp')"
                 required
                 data-test="slack-wizard-config-token"
               />
-              <OButton
-                as="a"
-                :href="SLACK_APPS_URL"
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="ghost-primary"
-                size="xs"
-                icon-right="open-in-new"
-                class="w-fit"
+              <p
+                class="text-text-secondary m-0 mt-1 max-w-3xl text-xs leading-relaxed"
+                data-test="slack-wizard-token-help"
               >
-                {{ t("slackApp.wizard.create.generateToken") }}
-              </OButton>
+                {{ t("slackApp.wizard.create.tokenHelp") }}
+              </p>
+              <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <OButton
+                  as="a"
+                  :href="SLACK_APPS_URL"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="ghost-primary"
+                  size="xs"
+                  icon-right="open-in-new"
+                >
+                  {{ t("slackApp.wizard.create.generateToken") }}
+                </OButton>
+                <span class="text-text-label max-md:hidden" aria-hidden="true">·</span>
+                <OButton
+                  variant="ghost-primary"
+                  size="xs"
+                  data-test="slack-wizard-manual"
+                  @click="manual = true"
+                >
+                  {{ t("slackApp.wizard.create.manualLink") }}
+                </OButton>
+              </div>
             </div>
           </template>
           <template v-else>
@@ -845,21 +882,20 @@ const nextBlocked = computed(() => {
                 data-test="slack-wizard-app-token"
               />
             </div>
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              class="w-fit"
+              data-test="slack-wizard-manual"
+              @click="manual = false"
+            >
+              {{ t("slackApp.wizard.create.useToken") }}
+            </OButton>
           </template>
 
           <div class="flex flex-wrap items-center justify-end gap-2">
             <OButton variant="outline" size="sm-action" @click="step = 1">
               {{ t("slackApp.wizard.back") }}
-            </OButton>
-            <OButton
-              variant="ghost-primary"
-              size="sm-action"
-              data-test="slack-wizard-manual"
-              @click="manual = !manual"
-            >
-              {{
-                manual ? t("slackApp.wizard.create.useToken") : t("slackApp.wizard.create.manual")
-              }}
             </OButton>
             <OButton
               variant="primary"

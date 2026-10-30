@@ -68,6 +68,7 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 
 # ---------- other agents ----------
 /.agents/*
+!/.agents/engineering-guidelines.md
 
 alert_mock
 # Local verification artifacts (browser screenshots, per-crate scratch DBs)
@@ -83,3 +84,5 @@ rustc-ice-*.txt
 /.claude/settings.local.json
 /.claude/worktrees/
 .screenshots/
+
+__pycache__/

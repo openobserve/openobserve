@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="languageListRef"
                   role="group"
                   :aria-label="t('menu.language')"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg max-lg:static max-lg:me-0 max-lg:mt-1 max-lg:w-full max-lg:min-w-0 max-lg:shadow-none dark:shadow-lg"
+                  class="rounded-default bg-dropdown-bg shadow-overlay max-lg:border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border border-transparent py-1 max-lg:static max-lg:me-0 max-lg:mt-1 max-lg:w-full max-lg:min-w-0 max-lg:shadow-none"
                   data-test="language-dropdown-item"
                   @keydown="onLanguageListKeydown"
                 >

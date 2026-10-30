@@ -33,7 +33,7 @@ use o2_enterprise::enterprise::{
 use o2_openfga::{
     authorizer::authz::{
         add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
-        get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
+        get_ownership_all_org_tuple, get_ownership_tuple, get_parent_tuple, update_tuples,
     },
     meta::mapping::{
         LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, NON_OWNING_ORG, OFGA_MODELS, OFGAModel,
@@ -79,7 +79,9 @@ struct PendingMigrations {
     ai_chat_shares: bool,
     fleet: bool,
     public_dashboards: bool,
+    incident_integrations: bool,
     missing_ownership: bool,
+    profiles: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -343,6 +345,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             &mut tuples,
                         );
                     }
+                    if pending.profiles {
+                        get_parent_tuple(
+                            &format!("_all_{org_name}"),
+                            "stream",
+                            &format!("profiles:_all_{org_name}"),
+                            &mut tuples,
+                        );
+                    }
                 }
                 run_folder_and_data_migrations(&pending).await;
             }
@@ -563,6 +573,12 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.public_dashboards {
         keys.push("public_dashboards");
     }
+    if pending.profiles {
+        keys.push("profiles");
+    }
+    if pending.incident_integrations {
+        keys.push("incident_integrations");
+    }
     keys
 }
 
@@ -749,6 +765,16 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] public dashboards permissions migration needed");
         pending.public_dashboards = true;
     }
+    let v0_0_61 = version_compare::Version::from("0.0.61").unwrap();
+    if meta_version >= v0_0_61 && existing_model_version < v0_0_61 {
+        log::info!("[OFGA:Local] profiles stream permissions migration needed");
+        pending.profiles = true;
+    }
+    let v0_0_62 = version_compare::Version::from("0.0.62").unwrap();
+    if meta_version >= v0_0_62 && existing_model_version < v0_0_62 {
+        log::info!("[OFGA:Local] incident integrations permissions migration needed");
+        pending.incident_integrations = true;
+    }
 
     pending
 }
@@ -854,5 +880,29 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(all_org_ownership_keys(&pending), vec!["public_dashboards"]);
+    }
+
+    #[test]
+    fn profiles_back_fill_runs_once_across_0_0_61() {
+        assert!(pending_migrations("0.0.61", "0.0.60").profiles);
+        assert!(!pending_migrations("0.0.61", "0.0.61").profiles);
+        assert!(!pending_migrations("0.0.60", "0.0.59").profiles);
+        assert_eq!(
+            all_org_ownership_keys(&pending_migrations("0.0.61", "0.0.60")),
+            vec!["profiles"]
+        );
+        assert!(OFGA_MODELS.contains_key("profiles"));
+    }
+
+    #[test]
+    fn incident_integrations_back_fill_runs_once_across_0_0_62() {
+        let pending = pending_migrations("0.0.62", "0.0.61");
+        assert!(pending.incident_integrations && !pending.profiles);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["incident_integrations"]
+        );
+        assert!(!pending_migrations("0.0.62", "0.0.62").incident_integrations);
+        assert!(!pending_migrations("0.0.61", "0.0.60").incident_integrations);
     }
 }

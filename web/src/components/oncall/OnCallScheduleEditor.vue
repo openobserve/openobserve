@@ -88,7 +88,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="delete-outline"
-            :aria-label="t('oncall.removeRotation')"
+            :aria-label="t('oncall.laneDelete')"
             :data-test="`oncall-schedule-remove-${row.id}`"
             @click.stop="removeRotation(row)"
           />
@@ -129,7 +129,8 @@
       :width="60"
       :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
       :subtitle="t('oncall.rotationDrawerHint')"
-      :persistent="wouldDiscardEdits"
+      :persistent="!draftsActive && wouldDiscardEdits"
+      :close-guard="draftsActive ? guardDrawerClose : undefined"
       :show-close="false"
       data-test="oncall-rotation-drawer"
       @update:open="cancelDrawer()"
@@ -346,7 +347,7 @@
             data-test="oncall-rotation-delete"
             @click="confirmRemove = true"
           >
-            {{ t("oncall.removeRotation") }}
+            {{ t("oncall.laneDelete") }}
           </OButton>
           <OButton variant="outline" size="sm-action" class="ms-auto" @click="cancelDrawer">
             {{ t("oncall.cancel") }}
@@ -365,6 +366,7 @@
       </template>
     </ODrawer>
 
+    <EditorDraftDialogs :draft="scheduleDraft" />
     <ConfirmDialog
       v-model="confirmDiscard"
       data-test="oncall-rotation-discard-confirm"
@@ -375,16 +377,15 @@
       focus-cancel
       @update:ok="discardAndClose"
     />
-    <ConfirmDialog
-      v-model="confirmRemove"
+    <OnCallRemoveRotationDialog
+      v-model:open="confirmRemove"
       data-test="oncall-rotation-remove-confirm"
-      :title="t('oncall.removeRotationTitle', { name: raw(active?.name ?? '') })"
-      message-keypath="oncall.removeRotationMessage"
-      :message-name="active?.name"
-      :ok-label="t('oncall.removeRotation')"
-      ok-variant="destructive"
-      focus-cancel
-      @update:ok="deleteActive"
+      :rotation-id="active?.id ?? ''"
+      :rotations="draft"
+      :holders="removeHolders"
+      :policy="policy ?? null"
+      @confirm="confirmDelete"
+      @open-policy="openPolicy"
     />
   </div>
 </template>
@@ -394,6 +395,9 @@ import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { dropRotationDrafts, newRotationVariant, rotationDraftId } from "./scheduleDrafts";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -413,12 +417,14 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OnCallShiftRuleFields from "./OnCallShiftRuleFields.vue";
 import OnCallDraftPreview from "./OnCallDraftPreview.vue";
 import OnCallRuleTabMenu from "./OnCallRuleTabMenu.vue";
+import OnCallRemoveRotationDialog from "./OnCallRemoveRotationDialog.vue";
 import { useRotationPreview } from "@/composables/useRotationPreview";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { queryClient } from "@/composables/query/queryClient";
 import { setTeamScheduleMutation, unavailabilityQuery } from "@/services/oncall.queries";
 import { useMutation } from "@tanstack/vue-query";
 import type {
+  OnCallPolicy,
   OnCallSchedule,
   OnCallTeamMember,
   Rotation,
@@ -439,6 +445,7 @@ import {
   coverageHoursSummary,
   effectiveRivals,
   effectiveWeekCoverage,
+  formatInZone,
   formatMinuteOfDay,
   formatStamp,
   overlappingRules,
@@ -468,16 +475,31 @@ const props = defineProps<{
    * add ONE rotation put a page-sized mode between the button and the form.
    */
   drawerOnly?: boolean;
+  /** The team's policy, so removing a rotation can say which escalation steps it takes. */
+  policy?: OnCallPolicy | null;
 }>();
 const emit = defineEmits<{
   saved: [];
   "intent-handled": [];
   /** Nothing here can add a person, so the roster is asked for by name. */
   "open-members": [];
+  /** A hand-edited policy pages the rotation being removed; it has to be edited first. */
+  "open-policy": [];
 }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
+
+interface ScheduleDraftData {
+  rotation: Rotation | null;
+  isNew: boolean;
+  ruleTab: string;
+}
+
+/// Only the drawer the team page opens keeps drafts; the bulk editor keeps its own Save and Cancel.
+const draftsActive = !!props.drawerOnly;
+/// The rotation a new one was duplicated from, which picks its own draft slot.
+const duplicateOf = ref<string | null>(null);
 
 const draft = ref<Rotation[]>([]);
 const saving = ref(false);
@@ -608,10 +630,9 @@ function awayClashesFor(rule: ShiftRule): Unavailability[] {
 
 const stamp = (micros: number) => formatStamp(micros, props.timezone);
 
+// The team's clock, the same one the roster's away chip uses.
 function shortDate(micros: number): string {
-  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
-    new Date(micros / 1000),
-  );
+  return formatInZone(micros, props.timezone, { day: "numeric", month: "short" });
 }
 
 function editRotation(rotation: Rotation) {
@@ -660,7 +681,13 @@ const activeIsSavable = computed(() => {
   return !rotation.shift_rules.some((rule) => priorityClashFor(rule));
 });
 
-function openMembers() {
+async function openMembers() {
+  if (draftsActive) {
+    if (!(await scheduleDraft.confirmLeave())) return;
+    editing.value = false;
+    emit("open-members");
+    return;
+  }
   if (wouldDiscardEdits.value) {
     membersAfterDiscard.value = true;
     confirmDiscard.value = true;
@@ -934,6 +961,7 @@ watch(
       const found = draft.value.find((r) => r.id === intent.id);
       if (found) {
         isNew.value = false;
+        duplicateOf.value = null;
         editRotation(found);
       }
     }
@@ -968,6 +996,7 @@ function addRotation() {
   draft.value.push(rotation);
   // Straight into the editor: an empty row is not something anybody can act on.
   isNew.value = true;
+  duplicateOf.value = null;
   editRotation(rotation);
 }
 
@@ -987,14 +1016,26 @@ function duplicateRotation(id: string) {
   };
   draft.value.push(copy);
   isNew.value = true;
+  duplicateOf.value = id;
   editRotation(copy);
 }
 
 /// Every way out but Save and Remove comes here; the watcher below discards.
-function cancelDrawer() {
+async function cancelDrawer() {
+  if (draftsActive) {
+    if (await scheduleDraft.confirmLeave()) editing.value = false;
+    return;
+  }
   membersAfterDiscard.value = false;
   if (wouldDiscardEdits.value) confirmDiscard.value = true;
   else editing.value = false;
+}
+
+/// ✕, Escape and the backdrop ask through the leave dialog instead of closing over unsaved edits.
+function guardDrawerClose(): boolean {
+  if (!scheduleDraft.hasUnsavedChanges()) return true;
+  void cancelDrawer();
+  return false;
 }
 
 function discardAndClose() {
@@ -1028,16 +1069,39 @@ watch(editing, (isOpen) => {
   if (abandoned) draft.value = draft.value.filter((r) => r !== abandoned);
 });
 
+/// Who each rotation puts on call now, by name, for the delete confirm.
+const removeHolders = computed(() =>
+  draft.value
+    .map((rotation) => ({ rotation_id: rotation.id, email: holderOf(rotation) }))
+    .filter((holder) => holder.email)
+    .map((holder) => ({ rotation_id: holder.rotation_id, name: nameOf(holder.email) })),
+);
+
+function confirmDelete() {
+  confirmRemove.value = false;
+  void deleteActive();
+}
+
+/// The drawer closes first: the policy editor is a drawer too, and one flow gets one surface.
+function openPolicy() {
+  confirmRemove.value = false;
+  editing.value = false;
+  emit("open-policy");
+}
+
 /// Deletion is a save: the drawer is the only surface, so there is no separate
 /// "now press Save" step to forget.
 async function deleteActive() {
   const target = active.value;
   if (!target) return;
+  const stored = !isNew.value;
   draft.value = draft.value.filter((r) => r !== target);
-  await save();
+  if ((await save()) && stored) {
+    dropRotationDrafts({ org: String(orgId.value), teamId: props.teamId, rotationId: target.id });
+  }
 }
 
-async function save() {
+async function save(): Promise<boolean> {
   // Dropping the empty ones and reporting success is how a rotation somebody
   // just filled in looked saved while nothing was stored: the server refuses a
   // rule with nobody in it, so this has to be refused here and said out loud.
@@ -1049,8 +1113,9 @@ async function save() {
       variant: "error",
       message: t("oncall.rotationEmptyNotSaved", { name: raw(empty.name) }),
     });
-    return;
+    return false;
   }
+  // `setTeamScheduleMutation` clears the default-staffing marker: a schedule a human saved is no longer the one nobody chose.
   const rotations = draft.value;
   saving.value = true;
   try {
@@ -1060,6 +1125,7 @@ async function save() {
       rotation_count: rotations.length,
     });
     toast({ variant: "success", message: t("oncall.scheduleSaved") });
+    if (draftsActive) scheduleDraft.markSaved();
     // Stored, so no longer new — the close watcher would otherwise read this
     // rotation as abandoned and drop it straight back out of the draft.
     isNew.value = false;
@@ -1070,13 +1136,62 @@ async function save() {
     active.value = null;
     // The parent's schedule is a ref: invalidation expires it, it never repaints it.
     emit("saved");
+    return true;
   } catch (err: any) {
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.saveScheduleFailed"),
     });
+    return false;
   } finally {
     saving.value = false;
   }
 }
+
+/// Laid over the stored schedule, so rotations other people changed since are not written back stale.
+function applyScheduleDraft(data: ScheduleDraftData) {
+  const restored = data.rotation;
+  if (!restored) return;
+  reset();
+  const at = draft.value.findIndex((r) => r.id === restored.id);
+  // A stored rotation deleted meanwhile is dropped by the restore before it gets here; never re-add one.
+  if (!data.isNew && at < 0) return;
+  const stored = at >= 0 ? JSON.stringify(draft.value[at]) : "";
+  if (at >= 0) draft.value.splice(at, 1, restored);
+  else draft.value.push(restored);
+  active.value = draft.value.find((r) => r.id === restored.id) ?? null;
+  isNew.value = data.isNew;
+  openedAs.value = isNew.value ? "" : stored;
+  activeRuleTab.value = Number(data.ruleTab) < restored.shift_rules.length ? data.ruleTab : "0";
+}
+
+const scheduleDraft = useEditorDraft<ScheduleDraftData>({
+  kind: "oncall_schedule",
+  entityLabel: () => t("common.editorDraft.entities.oncall_schedule"),
+  entityId: () =>
+    !isNew.value && active.value ? rotationDraftId(props.teamId, active.value.id) : null,
+  newVariant: () => newRotationVariant(props.teamId, duplicateOf.value),
+  snapshot: () => ({
+    rotation: active.value,
+    isNew: isNew.value,
+    ruleTab: activeRuleTab.value,
+  }),
+  apply: applyScheduleDraft,
+  // The stored rotation, or null once it is gone, which drops its draft with a notice.
+  base: () =>
+    isNew.value
+      ? undefined
+      : ((props.schedule?.rotations ?? []).find((r) => r.id === active.value?.id) ?? null),
+  hasChanges: () => editing.value && wouldDiscardEdits.value,
+  save: () => save(),
+});
+
+// Immediate: an intent present at mount opens the drawer during setup, before this watcher exists.
+watch(
+  editing,
+  (isOpen) => {
+    if (isOpen && draftsActive) void scheduleDraft.start();
+  },
+  { immediate: true },
+);
 </script>

@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
@@ -23,7 +24,8 @@ import OnCallMine from "@/views/OnCall/OnCallMine.vue";
 
 vi.mock("@/services/oncall", () => ({ default: { myOnCall: vi.fn() } }));
 
-vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const back = vi.fn();
+vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn(), back }) }));
 
 const service = vi.mocked(oncallService);
 
@@ -31,7 +33,11 @@ const service = vi.mocked(oncallService);
 const deliveriesRefresh = vi.fn().mockResolvedValue(undefined);
 
 const stubs = {
-  OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
+  OPageLayout: {
+    name: "OPageLayout",
+    props: ["back"],
+    template: "<div><slot name='actions' /><slot /></div>",
+  },
   OContent: { name: "OContent", template: "<div><slot /></div>" },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
@@ -123,5 +129,39 @@ describe("OnCallMine", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-mine-unavailable"]').exists()).toBe(true);
+  });
+
+  /// A failed first load is not "you are on no team" — that would tell an on-call engineer they are off duty.
+  it("shows the error with a retry when the first load fails", async () => {
+    queryClient.clear();
+    service.myOnCall.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-mine-no-teams"]').exists()).toBe(false);
+    const error = wrapper.findComponent('[data-test="oncall-mine-teams-error"]');
+    expect(error.exists()).toBe(true);
+
+    error.vm.$emit("action");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-mine-teams-error"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').exists()).toBe(true);
+  });
+
+  /// Opened from the avatar menu or a channel chip, so Back returns there rather than to Pages.
+  it("goes back in history when there is history, else to Pages", async () => {
+    window.history.replaceState({ back: "/web/logs" }, "");
+    const fromHistory = render();
+    await flushPromises();
+    fromHistory.findComponent({ name: "OPageLayout" }).props("back").onClick();
+    expect(back).toHaveBeenCalledTimes(1);
+
+    window.history.replaceState({}, "");
+    const direct = render();
+    await flushPromises();
+    expect(direct.findComponent({ name: "OPageLayout" }).props("back").to).toEqual(
+      expect.objectContaining({ name: "onCallResponses" }),
+    );
   });
 });
