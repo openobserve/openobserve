@@ -9687,8 +9687,8 @@
       "raiseThresholdDesc": "트리거 값을 관측된 정상 상태에서 멀어지게 조정합니다.",
       "lengthenEvaluationWindow": "평가 기간 늘리기",
       "lengthenEvaluationWindowDesc": "기간을 넓혀 짧은 급증이 더 이상 알림을 트리거하지 않도록 합니다.",
-      "enableDeduplication": "중복 제거 사용",
-      "enableDeduplicationDesc": "중복 제거 기간 내의 반복 발생을 하나로 합칩니다.",
+      "enableDeduplication": "반복 억제 켜기",
+      "enableDeduplicationDesc": "매 평가가 아니라 상태 변경 시 한 번만 알림을 보냅니다.",
       "reviewForDeletion": "삭제 검토",
       "reviewForDeletionDesc": "알림을 폐기하기 전에 쿼리가 여전히 실제 상황과 일치하는지 확인합니다.",
       "fixAlertQuery": "알림 쿼리 수정",
@@ -10005,12 +10005,8 @@
     "organizationIdLabel": "조직 ID",
     "alertCreationTitle": "알림 생성",
     "noAlertsFound": "알림이 없습니다.",
-    "suppressedByDeduplication": "중복 제거로 억제됨",
-    "occurrence": "{count}회 발생 | {count}회 발생",
     "groupedNotification": "그룹화된 알림",
     "alertsBatchedTogether": "함께 일괄 처리된 알림",
-    "notificationSent": "알림 전송됨",
-    "occurrencesDeduplicated": "중복 제거된 발생",
     "alertExecutionDetails": "알림 실행 세부 정보",
     "evaluationTime": "평가 시간",
     "queryTime": "쿼리 시간",
@@ -10060,15 +10056,7 @@
     "serviceGraphTooltipTo": "종료: {time}",
     "serviceGraphTooltipTemporalCorrelation": "시간적 상관관계",
     "serviceGraphTooltipServiceDependency": "서비스 종속성",
-    "totalAlerts": "전체 알림",
-    "usingDeduplication": "중복 제거 사용 중",
-    "deduplicationConfiguredTooltip": "중복 제거가 구성된 알림",
-    "suppressionRate24h": "억제율 (24시간)",
     "suppressed": "억제됨 /",
-    "total": "전체",
-    "passedLabel": "통과됨:",
-    "pendingBatches": "대기 중인 배치",
-    "pendingBatchesTooltip": "함께 그룹화되기를 기다리는 알림",
     "historyTimeline": {
       "firing": "발생 중",
       "ok": "정상",
@@ -10089,7 +10077,8 @@
     "endTime": "종료 시간",
     "duration": "지속 시간",
     "retries": "재시도",
-    "dedup": "중복 제거",
+    "suppression": "억제",
+    "suppressedAsRepeat": "반복으로 억제됨",
     "validation": {
       "streamTypeRequired": "Stream 유형은 필수입니다.",
       "streamNameRequired": "Stream 이름은 필수입니다.",
@@ -10281,15 +10270,6 @@
     "all": "모두",
     "history": "알림 기록",
     "searcHistory": "알림 이름 입력",
-    "deduplication": {
-      "fingerprintFields": "유사한 알림 그룹화 기준",
-      "fingerprintFieldsHint": "알림을 유사하다고 판단할 필드를 선택하세요(예: hostname, service). 쿼리에 따라 자동 감지하려면 비워 두세요.",
-      "fingerprintFieldsTooltip": "알림을 중복으로 간주하려면 어떤 필드가 일치해야 하는지 선택하세요. 예를 들어 'hostname'을 선택하면 같은 호스트에서 발생한 알림이 함께 그룹화됩니다. 서로 다른 알림 유형(예: High CPU와 High Memory)은 같은 호스트에서 발생하더라도 그룹화되지 않습니다. 쿼리 유형에 따른 자동 감지를 사용하려면 비워 두세요.",
-      "timeWindow": "동일한 알림으로 간주할 기간",
-      "timeWindowHint": "유사한 알림을 그룹화하는 기간입니다. 확인 주기와 맞추려면 비워 두세요.",
-      "timeWindowTooltip": "그룹화를 위해 최근 알림을 기억하는 기간입니다. 이 기간 안에 비슷한 알림이 발생하면 다시 전송되지 않습니다. 알림의 확인 주기를 사용하려면 비워 두세요.",
-      "fingerprintFieldsHelp": "비워 두면 쿼리에 따라 자동 감지합니다 (SQL: GROUP BY 열, PromQL: 레이블, 사용자 지정: 조건 필드)"
-    },
     "summary": {
       "scrollToBottom": "맨 아래로 스크롤",
       "title": "요약",
@@ -10337,38 +10317,15 @@
         "defaultConditions": "구성된 조건이 충족되면 알림 받기"
       }
     },
-    "correlation": {
-      "title": "알림 상관관계",
-      "description": "조직 전체에서 알림의 상관 관계 및 중복 제거 방법을 구성합니다.핑거프린트 값이 일치하는 알림은 함께 그룹화됩니다.",
-      "semanticFieldNote": "참고: 시맨틱 필드 매핑은 서비스 ID 탭에서 구성됩니다.",
-      "enableOrgLevel": "조직 수준 중복 제거 활성화",
-      "enableOrgLevelTooltip": "이 조직의 모든 알림에 대해 중복 제거 및 상관 관계 분석 기능을 활성화합니다.",
-      "enableCrossAlert": "교차 알림 중복 제거 활성화",
-      "enableCrossAlertTooltip": "서로 다른 알림이 동일한 핑거프린트를 공유할 때 서로 중복된 데이터를 제거하도록 허용",
-      "fingerprintGroups": "교차 알림 핑거프린트 그룹",
-      "fingerprintGroupsTooltip": "교차 알림 핑거프린팅에 사용할 시맨틱 그룹을 선택합니다.이러한 측정기준에 대해 동일한 값을 공유하는 경우 알림은 중복 제거됩니다.",
-      "fingerprintGroupsHint": "교차 알림 중복 제거를 위한 시맨틱 그룹을 하나 이상 선택하십시오.",
-      "fingerprintGroupsRequired": "시맨틱 그룹을 하나 이상 선택해야 합니다.",
-      "defaultWindow": "기본 상관 관계 창 (분)",
-      "defaultWindowTooltip": "시맨틱 필드 일치가 없는 경우 지정된 기간의 알림과 데이터는 관련된 것으로 간주됩니다.",
-      "defaultWindowDescription": "시맨틱 필드 일치가 없는 경우 지정된 기간의 알림과 데이터는 관련된 것으로 간주됩니다.",
-      "defaultWindowPlaceholder": "기본적으로 알림 기간 사용",
-      "cancelButton": "취소",
-      "saveButton": "설정 저장",
-      "settingsSaved": "조직 중복 제거 설정이 성공적으로 저장되었습니다.",
-      "settingsSaveError": "설정 저장 실패"
-    },
     "placeholders": {
       "typeSomething": "무언가를 입력하세요",
       "value": "값",
       "selectColumn": "컬럼 선택",
       "savedFunctions": "저장된 함수",
-      "autoUsesCheckInterval": "자동 (검사 간격 사용)",
       "addTag": "태그를 추가하고 Enter를 누르세요"
     },
     "steps": {
       "compareWithPast": "과거와 비교하기",
-      "deduplication": "중복 제거",
       "advanced": "고급"
     },
     "stepCaptions": {
@@ -10376,7 +10333,6 @@
       "conditions": "알림을 트리거해야 하는 항목",
       "compareWithPast": "현재 결과를 다른 기간의 데이터와 비교",
       "alertSettings": "알림 규칙을 설정하고 알림 수신 방법을 선택하세요.",
-      "deduplication": "비슷한 알림을 그룹화하여 동일한 알림을 여러 번 전송하지 마십시오.",
       "advanced": "컨텍스트 변수, 설명 및 행 템플릿"
     },
     "failedToFetchHistory": "알림 기록을 가져오지 못했습니다.",
@@ -10399,8 +10355,6 @@
         "closeActions": "작업 닫기",
         "viewAlertHistory": "알림 기록 보기",
         "actionsFor": "조치 대상:",
-        "configureDedup": "데이터 중복 제거 설정",
-        "configureDedupTooltip": "이 알림에 대해 중복 제거를 구성합니다.",
         "editAlert": "알림 편집",
         "editAlertTooltip": "알림 구성 편집",
         "viewHistory": "기록 보기",
@@ -11180,6 +11134,8 @@
       "recoveryChatMessage": "새 \"해결됨\" 메시지",
       "keepFiringFor": "발생 유지 시간",
       "keepFiringForTooltip": "조건이 해제된 후 이 시간만큼 기다린 뒤 복구합니다. 0이면 즉시 복구합니다.",
+      "suppressRepeats": "반복 억제",
+      "suppressRepeatsTooltip": "알림이 발생하기 시작하거나 레벨이 변경될 때 한 번만 알림을 보내고, 매 평가마다 보내지 않습니다. 각 무음 기간 이후에도 계속 알림을 받으려면 꺼 두세요.",
       "keepFiringForInvalid": "0초 이상 입력하세요",
       "keepFiringForTooLong": "최대 86400초(24시간)까지 입력하세요"
     },
@@ -13680,7 +13636,6 @@
       "identityConfigNoSets": "저장하기 전에 하나 이상의 ID 집합을 구성하세요.",
       "discoveredServicesTab": "검색된 서비스",
       "serviceDiscoveryTab": "탐지 규칙",
-      "alertCorrelationTab": "알림 그룹화",
       "fieldAliasesTab": "필드 매핑",
       "fieldAliasesSaved": "필드 별칭이 성공적으로 저장되었습니다",
       "fieldAliasesSaveError": "필드 별칭 저장 실패",
@@ -21217,7 +21172,6 @@
     "alerts": {
       "failedToNavigateToAlert": "알림으로 이동하지 못했습니다",
       "alertNotFound": "알림을 찾을 수 없습니다",
-      "alertNotFoundInAlerts": "알림 \"{name}\"을(를) {count}개의 알림에서 찾을 수 없습니다",
       "failedToLoadAlerts": "알림을 로드하지 못했습니다",
       "alertsDeletedSuccessfully": "{count} 알림이 성공적으로 삭제되었습니다 | {count} 알림이 성공적으로 삭제되었습니다",
       "failedToDeleteAlerts": "{count} 알림을 삭제하지 못했습니다 | {count} 알림을 삭제하지 못했습니다",
@@ -21286,7 +21240,6 @@
       "pleaseWaitWhileLoadingTemplates": "템플릿을 불러오는 동안 잠시 기다려 주세요...",
       "alertSavedSuccessfully": "알림이 성공적으로 저장되었습니다.",
       "alertUpdatedSuccessfully": "알림이 성공적으로 업데이트되었습니다.",
-      "openingDedupConfig": "{name}에 대한 중복 제거 구성 열기",
       "editingAlert": "알림 편집 중: {name}",
       "ack": {
         "acked": "{name} 확인함",
@@ -26066,7 +26019,7 @@
       "logged": "기록됨"
     },
     "policy": {
-      "gateHint": "기존 알림에 대한 변경 중에서는 중복 제거만 이전 상태 스냅샷과 검토 기간을 동반하여 자체적으로 적용됩니다: 검사를 통과하면 유지되고, 실패하면 롤백됩니다. 그 외의 모든 변경은 원클릭 승인을 기다립니다.",
+      "gateHint": "기존 알림에 대한 변경 중 반복 억제 켜기만 자체적으로 적용되며, 이전 상태 스냅샷과 검토 기간이 함께 제공됩니다. 검사를 통과하면 유지되고, 실패하면 롤백됩니다. 그 외의 모든 변경은 원클릭 승인을 기다립니다.",
       "off": "꺼짐",
       "suggest": "제안",
       "auto": "자동",
@@ -26085,7 +26038,7 @@
         "gateDesc": "조사 결과가 나올 때까지 최대 2분간 호출을 보류합니다. 실패 시 열림(fail open): 트리아지가 시간 초과되거나 실패하면 그대로 호출하고, 조사가 아직 진행 중이거나 실패했다고 알리며, 원인은 스레드에 이어서 표시됩니다."
       },
       "classes": {
-        "EnableDeduplication": "몇 분 내에 반복되는 알림에 대해 중복 제거를 켭니다.",
+        "EnableDeduplication": "매 평가마다 알림을 보내는 알림에 대해 반복 억제를 켭니다.",
         "CreateDetector": "서비스의 요청, 오류 또는 지연 시간에 대한 이상 탐지기를 만듭니다.",
         "RaiseThreshold": "정상적인 날에 발생하는 임계값을 높입니다.",
         "LengthenEvaluationWindow": "요동치는 알림의 평가 기간을 늘립니다.",
@@ -26634,10 +26587,10 @@
           "on": "연결 알림"
         },
         "L-302": {
-          "done": "checkout 지연 알림 3개를 하나로 그룹화했습니다",
-          "why": "94%의 경우 함께 울려서, 지연 한 번에 3번 호출되었습니다.",
-          "from": "알림 3개",
-          "to": "1",
+          "done": "체크아웃 지연 알림 3개에 대해 반복 억제를 켰습니다",
+          "why": "발생 상태가 유지되는 동안 매 평가마다 알림을 보내, 한 번의 지연으로 120번 호출되었습니다.",
+          "from": "매 평가",
+          "to": "변경당 한 번",
           "on": "checkout 지연"
         },
         "L-303": {
@@ -26694,7 +26647,7 @@
         "checkoutPaged": "checkout의 결제 실패 건으로 온콜을 호출했습니다.",
         "recsHeld": "recommendations의 사소한 문제는 금요일 요약을 위해 보류했습니다.",
         "diskApproved": "ingest-1의 디스크 알림을 {to}%로 올리는 것을 승인하셨습니다.",
-        "latencyGrouped": "checkout 지연 알림 세 개를 하나로 묶었습니다. 그래서 한 번의 지연에 대해 한 번만 호출됩니다.",
+        "latencyGrouped": "체크아웃 지연 알림 세 개에 대해 반복 억제를 켰으므로, 한 번의 지연은 한 번만 호출됩니다.",
         "queueFixed": "orders 큐 워커를 추가했지만 큐가 계속 커져서, 다시 되돌리고 온콜을 호출했습니다.",
         "loginPaged": "느린 로그인 건으로 온콜을 호출했습니다.",
         "queuePermission": "제가 직접 큐 워커를 최대 8개까지 추가할 수 있도록 허용하셨습니다.",

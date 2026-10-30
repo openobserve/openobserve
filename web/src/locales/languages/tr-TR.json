@@ -9687,8 +9687,8 @@
       "raiseThresholdDesc": "Tetikleme değerini gözlemlenen kararlı durumdan uzaklaştırın.",
       "lengthenEvaluationWindow": "Değerlendirme penceresini uzat",
       "lengthenEvaluationWindowDesc": "Süreyi genişleterek kısa bir ani yükselişin artık uyarıyı tetiklememesini sağlayın.",
-      "enableDeduplication": "Tekilleştirmeyi etkinleştir",
-      "enableDeduplicationDesc": "Tekilleştirme penceresi içindeki tekrarlanan tetiklenmeleri birleştirin.",
+      "enableDeduplication": "Tekrarları bastırmayı aç",
+      "enableDeduplicationDesc": "Her değerlendirmede değil, durum değişikliği başına bir kez bildir.",
       "reviewForDeletion": "Silme için gözden geçir",
       "reviewForDeletionDesc": "Uyarıyı devre dışı bırakmadan önce sorgunun hâlâ gerçeklikle uyuştuğunu doğrulayın.",
       "fixAlertQuery": "Uyarı sorgusunu düzelt",
@@ -10005,12 +10005,8 @@
     "organizationIdLabel": "Kuruluş Kimliği",
     "alertCreationTitle": "Uyarı Oluşturma",
     "noAlertsFound": "Uyarı bulunamadı",
-    "suppressedByDeduplication": "Yineleme giderme tarafından bastırıldı",
-    "occurrence": "{count} oluşum | {count} oluşum",
     "groupedNotification": "Gruplanmış bildirim",
     "alertsBatchedTogether": "birlikte gruplanan uyarılar",
-    "notificationSent": "Bildirim gönderildi",
-    "occurrencesDeduplicated": "Yinelenen oluşumlar giderildi",
     "alertExecutionDetails": "Uyarı Çalıştırma Ayrıntıları",
     "evaluationTime": "Değerlendirme Zamanı",
     "queryTime": "Sorgu Zamanı",
@@ -10060,15 +10056,7 @@
     "serviceGraphTooltipTo": "Bitiş: {time}",
     "serviceGraphTooltipTemporalCorrelation": "Zamansal korelasyon",
     "serviceGraphTooltipServiceDependency": "Hizmet bağımlılığı",
-    "totalAlerts": "Toplam Uyarılar",
-    "usingDeduplication": "Tekilleştirme Kullanılıyor",
-    "deduplicationConfiguredTooltip": "Tekilleştirme yapılandırılmış uyarılar",
-    "suppressionRate24h": "Bastırma Oranı (24 saat)",
     "suppressed": "bastırılan /",
-    "total": "toplam",
-    "passedLabel": "Geçti:",
-    "pendingBatches": "Bekleyen Toplu İşlemler",
-    "pendingBatchesTooltip": "Birlikte gruplandırılmayı bekleyen uyarılar",
     "historyTimeline": {
       "firing": "Tetiklenen",
       "ok": "Tamam",
@@ -10089,7 +10077,8 @@
     "endTime": "Bitiş Zamanı",
     "duration": "Süre",
     "retries": "Yeniden Denemeler",
-    "dedup": "Tekilleştirme",
+    "suppression": "Bastırma",
+    "suppressedAsRepeat": "Tekrar olduğu için bastırıldı",
     "validation": {
       "streamTypeRequired": "Akış türü gereklidir.",
       "streamNameRequired": "Akış adı gereklidir.",
@@ -10281,15 +10270,6 @@
     "all": "Hepsi",
     "history": "Uyarı Geçmişi",
     "searcHistory": "Uyarı Adını Girin",
-    "deduplication": {
-      "fingerprintFields": "Benzer uyarıları şuna göre grupla",
-      "fingerprintFieldsHint": "Tekilleştirme için kullanılacak alanları seçin. Sorgu türüne göre otomatik algılama için boş bırakın.",
-      "fingerprintFieldsTooltip": "Uyarıların yinelenen sayılması için hangi alanların eşleşmesi gerektiğini seçin. Örneğin 'hostname' seçmek, aynı ana bilgisayardan gelen uyarıların birlikte gruplanacağı anlamına gelir. Farklı uyarı türleri (ör. Yüksek CPU ve Yüksek Bellek), aynı ana bilgisayardan gelseler bile asla gruplanmaz. Sorgu türünüze göre otomatik algılama için boş bırakın.",
-      "timeWindow": "Zaman Penceresi (dakika)",
-      "timeWindowHint": "Uyarı parmak izlerinin izlenmesi ne kadar sürer. Uyarı süresini kullanmak için boş bırakın.",
-      "timeWindowTooltip": "Uyarı parmak izlerini izleme ve kopyalama süresi. Bu pencerede aynı parmak izine sahip bir uyarı oluşursa, bastırılır. Uyarı değerlendirme süresini kullanmak için boş bırakın.",
-      "fingerprintFieldsHelp": "Sorguya göre otomatik algılama için boş bırakın (SQL: GROUP BY sütunları, PromQL: etiketler, Özel: koşul alanları)"
-    },
     "summary": {
       "scrollToBottom": "En alta kaydır",
       "title": "Özet",
@@ -10337,38 +10317,15 @@
         "defaultConditions": "Yapılandırılan koşullar yerine getirildiğinde beni uyarın"
       }
     },
-    "correlation": {
-      "title": "Uyarı Korelasyonu",
-      "description": "Uyarıların kuruluş genelinde nasıl ilişkilendirileceğini ve çoğaltılmasının nasıl yapıldığını yapılandırın. Eşleşen parmak izi değerlerine sahip uyarılar birlikte gruplandırılacaktır.",
-      "semanticFieldNote": "Not: Anlamsal alan eşlemeleri Hizmet Kimliği sekmesinde yapılandırılır.",
-      "enableOrgLevel": "Kuruluş Düzeyinde Tekilleştirmeyi Etkinleştir",
-      "enableOrgLevelTooltip": "Bu kuruluştaki tüm uyarılar için tekilleştirme ve korelasyon özelliklerini etkinleştirin",
-      "enableCrossAlert": "Çapraz Uyarı Tekilleştirmeyi Etkinleştir",
-      "enableCrossAlertTooltip": "Farklı uyarıların aynı parmak izini paylaştıklarında birbirlerinin kopyasını kaldırmasına izin verin",
-      "fingerprintGroups": "Çapraz Uyarı Parmak İzi Grupları",
-      "fingerprintGroupsTooltip": "Çapraz uyarı parmak izi için hangi anlamsal grupların kullanılacağını seçin. Bu boyutlar için aynı değerleri paylaşırlarsa uyarılar çoğaltılır.",
-      "fingerprintGroupsHint": "Çapraz uyarı tekilleştirme için en az bir anlamsal grup seçin",
-      "fingerprintGroupsRequired": "En az bir semantik grup seçilmelidir",
-      "defaultWindow": "Varsayılan Korelasyon Penceresi (dakika)",
-      "defaultWindowTooltip": "Anlamsal alan eşleşmesinin yokluğunda, verilen süreden gelen uyarılar ve veriler ilişkili kabul edilir",
-      "defaultWindowDescription": "Anlamsal alan eşleşmesinin yokluğunda, verilen süreden gelen uyarılar ve veriler ilişkili kabul edilir",
-      "defaultWindowPlaceholder": "Varsayılan olarak uyarı süresini kullan",
-      "cancelButton": "İptal",
-      "saveButton": "Ayarları Kaydet",
-      "settingsSaved": "Kuruluş yinelenen silme ayarları başarıyla kaydedildi",
-      "settingsSaveError": "Ayarlar kaydedilemedi"
-    },
     "placeholders": {
       "typeSomething": "Bir şey yazın",
       "value": "Değer",
       "selectColumn": "Sütun seç",
       "savedFunctions": "Kaydedilen fonksiyonlar",
-      "autoUsesCheckInterval": "Otomatik (kontrol aralığını kullanır)",
       "addTag": "Etiket ekleyip Enter'a basın"
     },
     "steps": {
       "compareWithPast": "Geçmişle karşılaştırın",
-      "deduplication": "Tekilleştirme",
       "advanced": "Gelişmiş"
     },
     "stepCaptions": {
@@ -10376,7 +10333,6 @@
       "conditions": "Uyarıyı ne tetiklemeli",
       "compareWithPast": "Mevcut sonuçları başka bir zaman dilimine ait verilerle karşılaştırın",
       "alertSettings": "Uyarı kurallarınızı belirleyin ve nasıl bilgilendirilmek istediğinizi seçin.",
-      "deduplication": "Benzer uyarıları birlikte gruplandırarak aynı uyarıyı birden çok kez göndermekten kaçının.",
       "advanced": "Bağlam değişkenleri, açıklama ve satır şablonu"
     },
     "failedToFetchHistory": "Uyarı geçmişi alınamadı",
@@ -10399,8 +10355,6 @@
         "closeActions": "Eylemleri kapat",
         "viewAlertHistory": "Uyarı Geçmişini Görüntüle",
         "actionsFor": "Aşağıdakiler için eylemler:",
-        "configureDedup": "Dedup'ı Yapılandır",
-        "configureDedupTooltip": "Bu uyarı için tekilleştirmeyi yapılandırın",
         "editAlert": "Uyarıyı Düzenle",
         "editAlertTooltip": "Uyarı yapılandırmasını düzenle",
         "viewHistory": "Geçmişi Görüntüle",
@@ -11180,6 +11134,8 @@
       "recoveryChatMessage": "yeni \"Çözüldü\" mesajı",
       "keepFiringFor": "Tetiklenmiş kalma süresi",
       "keepFiringForTooltip": "Koşul ortadan kalktıktan sonra düzelmiş sayılmadan önce bu kadar bekleyin. 0 hemen düzelmiş sayar.",
+      "suppressRepeats": "Tekrarları bastır",
+      "suppressRepeatsTooltip": "Uyarı tetiklenmeye başladığında veya seviye değiştirdiğinde bir kez bildir; her değerlendirmede değil. Her sessizlik döneminden sonra hatırlatma almaya devam etmek için kapalı bırakın.",
       "keepFiringForInvalid": "0 veya daha fazla saniye girin",
       "keepFiringForTooLong": "En fazla 86400 saniye (24 saat) girin"
     },
@@ -13680,7 +13636,6 @@
       "identityConfigNoSets": "Kaydetmeden önce en az bir kimlik kümesi yapılandırın.",
       "discoveredServicesTab": "Keşfedilen Hizmetler",
       "serviceDiscoveryTab": "Tespit Kuralları",
-      "alertCorrelationTab": "Uyarı Korelasyonu",
       "fieldAliasesTab": "Alan Eşlemeleri",
       "fieldAliasesSaved": "Alan takma adları başarıyla kaydedildi",
       "fieldAliasesSaveError": "Alan takma adları kaydedilemedi",
@@ -21217,7 +21172,6 @@
     "alerts": {
       "failedToNavigateToAlert": "Uyarıya gidilemedi",
       "alertNotFound": "Uyarı bulunamadı",
-      "alertNotFoundInAlerts": "Uyarı \"{name}\" {count} uyarı içinde bulunamadı",
       "failedToLoadAlerts": "Uyarılar yüklenemedi",
       "alertsDeletedSuccessfully": "{count} uyarı başarıyla silindi | {count} uyarı başarıyla silindi",
       "failedToDeleteAlerts": "{count} uyarı silinemedi | {count} uyarı silinemedi",
@@ -21286,7 +21240,6 @@
       "pleaseWaitWhileLoadingTemplates": "Şablonlar yüklenirken lütfen bekleyin...",
       "alertSavedSuccessfully": "Uyarı başarıyla kaydedildi.",
       "alertUpdatedSuccessfully": "Uyarı başarıyla güncellendi.",
-      "openingDedupConfig": "{name} için tekilleştirme yapılandırması açılıyor",
       "editingAlert": "Uyarı düzenleniyor: {name}",
       "ack": {
         "acked": "{name} onaylandı",
@@ -26066,7 +26019,7 @@
       "logged": "Kaydedildi"
     },
     "policy": {
-      "gateHint": "Mevcut uyarılara yönelik değişiklikler arasında yalnızca yinelenenleri kaldırma kendi başına uygulanır; önceki durumun bir anlık görüntüsü ve bir inceleme süresiyle birlikte: kontrolleri geçerse korunur, başarısız olursa geri alınır. Diğer her şey tek tıklamalı onay bekler.",
+      "gateHint": "Mevcut uyarılardaki değişiklikler arasında yalnızca tekrarları bastırmayı açma işlemi kendiliğinden uygulanır; önceki durumun anlık görüntüsü ve bir inceleme penceresiyle: kontrolleri geçerse korunur, başarısız olursa geri alınır. Diğer her şey tek tıkla onay bekler.",
       "off": "Kapalı",
       "suggest": "Öner",
       "auto": "Otomatik",
@@ -26085,7 +26038,7 @@
         "gateDesc": "Araştırma tamamlanana kadar çağrıyı en fazla 2 dakika bekletir. Hata durumunda açık davranır: triyaj zaman aşımına uğrar veya başarısız olursa yine de çağrı gönderir; araştırmanın hâlâ sürdüğünü veya başarısız olduğunu söyler ve kök neden aynı ileti dizisinde gelir."
       },
       "classes": {
-        "EnableDeduplication": "Dakikalar içinde tekrarlayan bir uyarı için tekilleştirmeyi aç.",
+        "EnableDeduplication": "Her değerlendirmede bildirim gönderen bir uyarı için tekrarları bastırmayı aç.",
         "CreateDetector": "Bir hizmetin istekleri, hataları veya gecikmesi üzerinde anomali dedektörü oluştur.",
         "RaiseThreshold": "Sağlıklı günlerde tetiklenen bir eşiği yükselt.",
         "LengthenEvaluationWindow": "Sürekli açılıp kapanan bir uyarının penceresini uzat.",
@@ -26634,10 +26587,10 @@
           "on": "bağlantı uyarısı"
         },
         "L-302": {
-          "done": "3 checkout gecikme uyarısını tek bir uyarı halinde grupladım",
-          "why": "Zamanın %94'ünde birlikte tetikleniyorlardı, bu yüzden tek bir yavaşlama size 3 kez bildirim gönderdi.",
-          "from": "3 uyarı",
-          "to": "1",
+          "done": "3 checkout gecikmesi uyarısı için tekrarları bastırmayı açtı",
+          "why": "Tetiklenmiş kaldıkları sürece her değerlendirmede bildirim gönderdiler, bu yüzden tek bir yavaşlama size 120 kez çağrı gönderdi.",
+          "from": "Her değerlendirme",
+          "to": "Değişiklik başına bir kez",
           "on": "checkout gecikmesi"
         },
         "L-303": {
@@ -26694,7 +26647,7 @@
         "checkoutPaged": "checkout ödemeleri başarısız kıldığı için nöbetçiye bildirim gönderdim.",
         "recsHeld": "recommendations ile ilgili küçük bir sorunu Cuma günkü özet için beklettim.",
         "diskApproved": "ingest-1'deki disk uyarısını %{to} değerine yükseltmeyi onayladınız.",
-        "latencyGrouped": "Üç checkout yavaşlama uyarısını tek bir uyarıda birleştirdim, böylece tek bir yavaşlama yalnızca bir kez bildirim gönderir.",
+        "latencyGrouped": "Üç checkout yavaşlaması uyarısı için tekrarları bastırmayı açtım, böylece tek bir yavaşlama bir kez çağrı gönderir.",
         "queueFixed": "orders kuyruğuna çalışan ekledim, ama kuyruk büyümeye devam etti; ben de onları geri aldım ve nöbetçiye bildirim gönderdim.",
         "loginPaged": "Yavaş oturum açma hakkında nöbetçiye bildirim gönderdim.",
         "queuePermission": "Kuyruğa kendi başıma, en fazla 8 çalışan eklememe izin verdiniz.",

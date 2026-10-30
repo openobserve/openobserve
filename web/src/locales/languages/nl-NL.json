@@ -9687,8 +9687,8 @@
       "raiseThresholdDesc": "Verplaats de triggerwaarde weg van de waargenomen stabiele toestand.",
       "lengthenEvaluationWindow": "Evaluatievenster verlengen",
       "lengthenEvaluationWindowDesc": "Verbreed de periode zodat een korte piek het alarm niet meer activeert.",
-      "enableDeduplication": "Deduplicatie inschakelen",
-      "enableDeduplicationDesc": "Voeg herhaalde afvuringen binnen een deduplicatievenster samen.",
+      "enableDeduplication": "Herhalingen onderdrukken inschakelen",
+      "enableDeduplicationDesc": "Meld één keer per statuswijziging in plaats van bij elke evaluatie.",
       "reviewForDeletion": "Beoordelen voor verwijdering",
       "reviewForDeletionDesc": "Controleer of de query nog steeds overeenkomt met de werkelijkheid voordat je het alarm buiten gebruik stelt.",
       "fixAlertQuery": "Alarmquery herstellen",
@@ -10005,12 +10005,8 @@
     "organizationIdLabel": "Organisatie-ID",
     "alertCreationTitle": "Alarm maken",
     "noAlertsFound": "Geen alarmen gevonden",
-    "suppressedByDeduplication": "Onderdrukt door deduplicatie",
-    "occurrence": "{count} voorkomen | {count} voorkomens",
     "groupedNotification": "Gegroepeerde melding",
     "alertsBatchedTogether": "alarmen gebundeld",
-    "notificationSent": "Melding verzonden",
-    "occurrencesDeduplicated": "voorkomens ontdubbeld",
     "alertExecutionDetails": "Details van de alarmuitvoering",
     "evaluationTime": "Evaluatietijd",
     "queryTime": "Querytijd",
@@ -10060,15 +10056,7 @@
     "serviceGraphTooltipTo": "Tot: {time}",
     "serviceGraphTooltipTemporalCorrelation": "Temporele correlatie",
     "serviceGraphTooltipServiceDependency": "Serviceafhankelijkheid",
-    "totalAlerts": "Totaal meldingen",
-    "usingDeduplication": "Deduplicatie in gebruik",
-    "deduplicationConfiguredTooltip": "Meldingen met geconfigureerde deduplicatie",
-    "suppressionRate24h": "Onderdrukkingspercentage (24u)",
     "suppressed": "onderdrukt /",
-    "total": "totaal",
-    "passedLabel": "Geslaagd:",
-    "pendingBatches": "Batches in afwachting",
-    "pendingBatchesTooltip": "Meldingen die wachten op groepering",
     "historyTimeline": {
       "firing": "Actief",
       "ok": "Ok",
@@ -10089,7 +10077,8 @@
     "endTime": "Eindtijd",
     "duration": "Duur",
     "retries": "Pogingen",
-    "dedup": "Dedup",
+    "suppression": "Onderdrukking",
+    "suppressedAsRepeat": "Onderdrukt als herhaling",
     "validation": {
       "streamTypeRequired": "Stream-type is vereist.",
       "streamNameRequired": "Stream-naam is vereist.",
@@ -10281,15 +10270,6 @@
     "all": "Alles",
     "history": "Alarmgeschiedenis",
     "searcHistory": "Voer de naam van het alarm in",
-    "deduplication": {
-      "fingerprintFields": "Vingerafdrukvelden",
-      "fingerprintFieldsHint": "Selecteer de velden die u wilt gebruiken voor deduplicatie. Laat dit veld leeg voor automatische detectie op basis van het zoektype.",
-      "fingerprintFieldsTooltip": "Kies welke velden moeten overeenkomen om alarmen als duplicaten te beschouwen. Als u bijvoorbeeld 'hostname' selecteert, worden alarmen van dezelfde host gegroepeerd. Verschillende alarmtypen (bijv. hoge CPU versus hoog geheugen) worden nooit gegroepeerd, ook niet als ze van dezelfde host komen. Laat leeg voor automatische detectie op basis van uw querytype.",
-      "timeWindow": "Alarmen als identiek beschouwen binnen",
-      "timeWindowHint": "Periode waarin vergelijkbare alarmen worden gegroepeerd. Laat leeg om uw controle-interval te gebruiken.",
-      "timeWindowTooltip": "Hoe lang recente alarmen worden onthouden om te groeperen. Als binnen deze tijd een vergelijkbaar alarm optreedt, wordt het niet opnieuw verzonden. Laat leeg om het controle-interval van uw alarm te gebruiken.",
-      "fingerprintFieldsHelp": "Laat leeg voor automatische detectie op basis van query (SQL: GROUP BY-kolommen, PromQL: labels, Aangepast: conditievelden)"
-    },
     "summary": {
       "scrollToBottom": "Scroll naar beneden",
       "title": "Samenvatting",
@@ -10337,38 +10317,15 @@
         "defaultConditions": "Waarschuw me wanneer aan de geconfigureerde voorwaarden is voldaan"
       }
     },
-    "correlation": {
-      "title": "Correlatie tussen alarmen",
-      "description": "Configureer hoe alarmen in de hele organisatie worden gecorreleerd en ontdubbeld. Alarmen met overeenkomende vingerafdrukwaarden worden gegroepeerd.",
-      "semanticFieldNote": "Opmerking: Semantische veldtoewijzingen worden geconfigureerd op het tabblad Service Identity.",
-      "enableOrgLevel": "Deduplicatie op organisatieniveau inschakelen",
-      "enableOrgLevelTooltip": "Schakel deduplicatie- en correlatiefuncties in voor alle meldingen in deze organisatie",
-      "enableCrossAlert": "Deduplicatie tussen alarmen inschakelen",
-      "enableCrossAlertTooltip": "Sta toe dat verschillende meldingen elkaar ontdubbelen wanneer ze dezelfde vingerafdruk delen",
-      "fingerprintGroups": "Vingerafdrukgroepen tussen alarmen",
-      "fingerprintGroupsTooltip": "Selecteer welke semantische groepen worden gebruikt voor vingerafdrukken tussen alarmen. Alarmen worden ontdubbeld als ze dezelfde waarden hebben voor deze dimensies.",
-      "fingerprintGroupsHint": "Selecteer ten minste één semantische groep voor deduplicatie tussen alarmen",
-      "fingerprintGroupsRequired": "Er moet minstens één semantische groep worden geselecteerd",
-      "defaultWindow": "Standaard correlatievenster (minuten)",
-      "defaultWindowTooltip": "Als er geen semantische veldovereenkomst is, worden alarmen en gegevens van een bepaalde duur als gerelateerd beschouwd",
-      "defaultWindowDescription": "Als er geen semantische veldovereenkomst is, worden alarmen en gegevens van een bepaalde duur als gerelateerd beschouwd",
-      "defaultWindowPlaceholder": "Gebruik standaard de alarmperiode",
-      "cancelButton": "Annuleer",
-      "saveButton": "Instellingen opslaan",
-      "settingsSaved": "Organisatie-deduplicatie-instellingen succesvol opgeslagen",
-      "settingsSaveError": "Instellingen opslaan mislukt"
-    },
     "placeholders": {
       "typeSomething": "Typ iets",
       "value": "Waarde",
       "selectColumn": "Kolom selecteren",
       "savedFunctions": "Opgeslagen functies",
-      "autoUsesCheckInterval": "Auto (maakt gebruik van controle-interval)",
       "addTag": "Voeg tag toe en druk op Enter"
     },
     "steps": {
       "compareWithPast": "Vergelijk met Past",
-      "deduplication": "Deduplicatie",
       "advanced": "Geavanceerd"
     },
     "stepCaptions": {
@@ -10376,7 +10333,6 @@
       "conditions": "Wat zou het alarm moeten activeren",
       "compareWithPast": "Vergelijk de huidige resultaten met gegevens uit een andere periode",
       "alertSettings": "Stel je alarmregels in en kies hoe je op de hoogte wilt worden gehouden.",
-      "deduplication": "Voorkom dat hetzelfde alarm meerdere keren wordt verzonden door soortgelijke meldingen te groeperen.",
       "advanced": "Contextvariabelen, beschrijving en rijsjabloon"
     },
     "failedToFetchHistory": "Het ophalen van de alarmgeschiedenis is mislukt",
@@ -10399,8 +10355,6 @@
         "closeActions": "Acties sluiten",
         "viewAlertHistory": "Alarmgeschiedenis bekijken",
         "actionsFor": "Acties voor:",
-        "configureDedup": "Dedup configureren",
-        "configureDedupTooltip": "Configureer deduplicatie voor dit alarm",
         "editAlert": "Alarm bewerken",
         "editAlertTooltip": "Alarmconfiguratie bewerken",
         "viewHistory": "Geschiedenis bekijken",
@@ -11180,6 +11134,8 @@
       "recoveryChatMessage": "nieuw \"Opgelost\"-bericht",
       "keepFiringFor": "Blijf afgaan gedurende",
       "keepFiringForTooltip": "Wacht zo lang nadat de voorwaarde is verdwenen voordat wordt hersteld. 0 herstelt onmiddellijk.",
+      "suppressRepeats": "Herhalingen onderdrukken",
+      "suppressRepeatsTooltip": "Meld één keer wanneer het alarm begint af te gaan of van niveau verandert, niet bij elke evaluatie. Laat dit uit staan om na elke stilteperiode herinneringen te blijven ontvangen.",
       "keepFiringForInvalid": "Voer 0 of meer seconden in",
       "keepFiringForTooLong": "Voer maximaal 86400 seconden in (24 uur)"
     },
@@ -13680,7 +13636,6 @@
       "identityConfigNoSets": "Configureer ten minste één identiteitsset voordat u opslaat.",
       "discoveredServicesTab": "Ontdekte services",
       "serviceDiscoveryTab": "Detectieregels",
-      "alertCorrelationTab": "Correlatie tussen alarmen",
       "fieldAliasesTab": "Veldtoewijzingen",
       "fieldAliasesSaved": "Veldaliassen zijn opgeslagen",
       "fieldAliasesSaveError": "Opslaan van veldaliassen mislukt",
@@ -21217,7 +21172,6 @@
     "alerts": {
       "failedToNavigateToAlert": "Navigeren naar alarm mislukt",
       "alertNotFound": "Alarm niet gevonden",
-      "alertNotFoundInAlerts": "Alarm \"{name}\" niet gevonden in {count} alarmen",
       "failedToLoadAlerts": "Laden van alarmen mislukt",
       "alertsDeletedSuccessfully": "{count} alarm succesvol verwijderd | {count} alarmen succesvol verwijderd",
       "failedToDeleteAlerts": "Verwijderen van {count} alarm mislukt | Verwijderen van {count} alarmen mislukt",
@@ -21286,7 +21240,6 @@
       "pleaseWaitWhileLoadingTemplates": "Even geduld terwijl sjablonen worden geladen...",
       "alertSavedSuccessfully": "Alarm succesvol opgeslagen.",
       "alertUpdatedSuccessfully": "Alarm succesvol bijgewerkt.",
-      "openingDedupConfig": "Deduplicatieconfiguratie openen voor: {name}",
       "editingAlert": "Alarm bewerken: {name}",
       "ack": {
         "acked": "{name} bevestigd",
@@ -26066,7 +26019,7 @@
       "logged": "Geregistreerd"
     },
     "policy": {
-      "gateHint": "Van wijzigingen aan bestaande alarmen wordt alleen deduplicatie zelfstandig toegepast, met een snapshot van de vorige status en een beoordelingsperiode: behouden als de controles slagen, teruggedraaid als ze falen. Al het overige wacht op goedkeuring met één klik.",
+      "gateHint": "Van wijzigingen aan bestaande alarmen wordt alleen het inschakelen van herhalingen onderdrukken zelfstandig toegepast, met een momentopname van de vorige status en een beoordelingsvenster: behouden als de controles slagen, teruggedraaid als ze mislukken. Al het andere wacht op goedkeuring met één klik.",
       "off": "Uit",
       "suggest": "Suggereren",
       "auto": "Auto",
@@ -26085,7 +26038,7 @@
         "gateDesc": "Houd de oproep tegen totdat het onderzoek is afgerond, maximaal 2 minuten. Open faalgedrag: als triage een timeout krijgt of mislukt, wordt er alsnog een oproep gedaan, wordt gemeld dat het onderzoek nog loopt of is mislukt, en de oorzaak volgt in de thread."
       },
       "classes": {
-        "EnableDeduplication": "Deduplicatie inschakelen voor een alarm dat zich binnen enkele minuten herhaalt.",
+        "EnableDeduplication": "Herhalingen onderdrukken inschakelen voor een alarm dat bij elke evaluatie meldt.",
         "CreateDetector": "Maak een anomaliedetector voor de verzoeken, fouten of latentie van een service.",
         "RaiseThreshold": "Verhoog een drempel die op gezonde dagen afgaat.",
         "LengthenEvaluationWindow": "Verleng het venster van een alarm dat flappert.",
@@ -26634,10 +26587,10 @@
           "on": "verbindingsalarm"
         },
         "L-302": {
-          "done": "De 3 checkout-latentiealarmen samengevoegd tot één",
-          "why": "Ze gingen 94% van de tijd samen af, dus één vertraging gaf je 3 keer een piketmelding.",
-          "from": "3 alarmen",
-          "to": "1",
+          "done": "Herhalingen onderdrukken ingeschakeld voor de 3 checkout-latentiealarmen",
+          "why": "Ze meldden bij elke evaluatie zolang ze afgingen, waardoor je door één vertraging 120 keer werd opgeroepen.",
+          "from": "Elke evaluatie",
+          "to": "Eén keer per wijziging",
           "on": "checkout-latentie"
         },
         "L-303": {
@@ -26694,7 +26647,7 @@
         "checkoutPaged": "Ik heb piket opgeroepen omdat bij checkout betalingen mislukken.",
         "recsHeld": "Ik heb een klein probleem met recommendations achtergehouden voor de samenvatting van vrijdag.",
         "diskApproved": "Je hebt goedgekeurd dat het schijfalarm op ingest-1 naar {to}% wordt verhoogd.",
-        "latencyGrouped": "Ik heb de drie traagheidsalarmen van checkout samengevoegd tot één, zodat één enkele vertraging maar één keer piket oproept.",
+        "latencyGrouped": "Ik heb herhalingen onderdrukken ingeschakeld voor de drie checkout-traagheidsalarmen, zodat één enkele vertraging maar één oproep oplevert.",
         "queueFixed": "Ik heb workers voor de orders-wachtrij toegevoegd, maar de wachtrij bleef groeien, dus ik heb ze teruggedraaid en piket opgeroepen.",
         "loginPaged": "Ik heb piket opgeroepen vanwege traag inloggen.",
         "queuePermission": "Je hebt me toegestaan zelf wachtrij-workers toe te voegen, tot 8.",

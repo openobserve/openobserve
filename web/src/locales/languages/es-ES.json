@@ -9687,8 +9687,8 @@
       "raiseThresholdDesc": "Aleja el valor de disparo del estado estable observado.",
       "lengthenEvaluationWindow": "Ampliar la ventana de evaluación",
       "lengthenEvaluationWindowDesc": "Amplía el período para que un pico breve ya no dispare la alerta.",
-      "enableDeduplication": "Activar la deduplicación",
-      "enableDeduplicationDesc": "Agrupa los disparos repetidos dentro de una ventana de deduplicación.",
+      "enableDeduplication": "Activar la supresión de repeticiones",
+      "enableDeduplicationDesc": "Notificar una vez por cada cambio de estado en lugar de en cada evaluación.",
       "reviewForDeletion": "Revisar para eliminar",
       "reviewForDeletionDesc": "Confirma que la consulta sigue coincidiendo con la realidad antes de retirar la alerta.",
       "fixAlertQuery": "Corregir la consulta de la alerta",
@@ -10005,12 +10005,8 @@
     "organizationIdLabel": "ID de organización",
     "alertCreationTitle": "Creación de alerta",
     "noAlertsFound": "No se encontraron alertas",
-    "suppressedByDeduplication": "Suprimido por deduplicación",
-    "occurrence": "{count} ocurrencia | {count} ocurrencias",
     "groupedNotification": "Notificación agrupada",
     "alertsBatchedTogether": "alertas agrupadas en lote",
-    "notificationSent": "Notificación enviada",
-    "occurrencesDeduplicated": "ocurrencias deduplicadas",
     "alertExecutionDetails": "Detalles de ejecución de alerta",
     "evaluationTime": "Tiempo de evaluación",
     "queryTime": "Tiempo de consulta",
@@ -10060,15 +10056,7 @@
     "serviceGraphTooltipTo": "Hasta: {time}",
     "serviceGraphTooltipTemporalCorrelation": "Correlación temporal",
     "serviceGraphTooltipServiceDependency": "Dependencia de servicios",
-    "totalAlerts": "Total de alertas",
-    "usingDeduplication": "Usando deduplicación",
-    "deduplicationConfiguredTooltip": "Alertas con deduplicación configurada",
-    "suppressionRate24h": "Tasa de supresión (24h)",
     "suppressed": "suprimidos /",
-    "total": "total",
-    "passedLabel": "Aprobados:",
-    "pendingBatches": "Lotes pendientes",
-    "pendingBatchesTooltip": "Alertas esperando agruparse",
     "historyTimeline": {
       "firing": "Disparada",
       "ok": "Ok",
@@ -10089,7 +10077,8 @@
     "endTime": "Hora de fin",
     "duration": "Duración",
     "retries": "Reintentos",
-    "dedup": "Deduplicación",
+    "suppression": "Supresión",
+    "suppressedAsRepeat": "Suprimida como repetición",
     "validation": {
       "streamTypeRequired": "El tipo de Stream es obligatorio.",
       "streamNameRequired": "El nombre del Stream es obligatorio.",
@@ -10281,15 +10270,6 @@
     "all": "Todas",
     "history": "Historial de alertas",
     "searcHistory": "Introduzca el nombre de la alerta",
-    "deduplication": {
-      "fingerprintFields": "Agrupar alertas similares por",
-      "fingerprintFieldsHint": "Selecciona los campos que hacen que las alertas sean similares (p. ej., hostname, service). Déjalo vacío para detectarlos automáticamente según tu consulta.",
-      "fingerprintFieldsTooltip": "Elige qué campos deben coincidir para que las alertas se consideren duplicadas. Por ejemplo, seleccionar 'hostname' significa que las alertas del mismo host se agruparán. Los distintos tipos de alertas (p. ej., CPU alta frente a memoria alta) nunca se agrupan, aunque procedan del mismo host. Déjalo vacío para la detección automática según el tipo de consulta.",
-      "timeWindow": "Considerar idénticas las alertas dentro de",
-      "timeWindowHint": "Periodo para agrupar alertas similares. Déjalo vacío para usar el intervalo de comprobación.",
-      "timeWindowTooltip": "Cuánto tiempo se recuerdan las alertas recientes para agruparlas. Si se produce una alerta similar dentro de este tiempo, no se volverá a enviar. Déjalo vacío para usar el intervalo de comprobación de la alerta.",
-      "fingerprintFieldsHelp": "Deje vacío para detectar automáticamente según la consulta (SQL: columnas GROUP BY, PromQL: etiquetas, Personalizado: campos de condición)"
-    },
     "summary": {
       "scrollToBottom": "Ir al final",
       "title": "Resumen",
@@ -10337,38 +10317,15 @@
         "defaultConditions": "Alertarme cuando se cumplan las condiciones configuradas"
       }
     },
-    "correlation": {
-      "title": "Correlación de alertas",
-      "description": "Configure cómo se correlacionan y deduplican las alertas en toda la organización. Las alertas con valores de huellas digitales coincidentes se agruparán.",
-      "semanticFieldNote": "Nota: Las asignaciones de campos semánticos se configuran en la pestaña Identidad del servicio.",
-      "enableOrgLevel": "Habilite la deduplicación a nivel de organización",
-      "enableOrgLevelTooltip": "Habilite las funciones de deduplicación y correlación para todas las alertas de esta organización",
-      "enableCrossAlert": "Habilitar la deduplicación de alertas cruzadas",
-      "enableCrossAlertTooltip": "Permitir que diferentes alertas se desdupliquen entre sí cuando comparten la misma huella digital",
-      "fingerprintGroups": "Grupos de huellas digitales entre alertas",
-      "fingerprintGroupsTooltip": "Seleccione los grupos semánticos que desea utilizar para las huellas digitales entre alertas. Las alertas se deduplicarán si comparten los mismos valores para estas dimensiones.",
-      "fingerprintGroupsHint": "Seleccione al menos un grupo semántico para la deduplicación de alertas cruzadas",
-      "fingerprintGroupsRequired": "Debe seleccionarse al menos un grupo semántico",
-      "defaultWindow": "Ventana de correlación predeterminada (minutos)",
-      "defaultWindowTooltip": "En ausencia de una coincidencia de campo semántica, las alertas y los datos de una duración determinada se consideran relacionados",
-      "defaultWindowDescription": "En ausencia de una coincidencia de campo semántica, las alertas y los datos de una duración determinada se consideran relacionados",
-      "defaultWindowPlaceholder": "Usa el período de alerta de forma predeterminada",
-      "cancelButton": "Cancelar",
-      "saveButton": "Guardar configuración",
-      "settingsSaved": "Configuración de deduplicación de la organización guardada correctamente",
-      "settingsSaveError": "Error al guardar la configuración"
-    },
     "placeholders": {
       "typeSomething": "Escriba algo",
       "value": "Valor",
       "selectColumn": "Seleccionar columna",
       "savedFunctions": "Funciones guardadas",
-      "autoUsesCheckInterval": "Automático (usa el intervalo de verificación)",
       "addTag": "Agregar etiqueta y presionar Enter"
     },
     "steps": {
       "compareWithPast": "Comparar con Past",
-      "deduplication": "Deduplicación",
       "advanced": "Avanzado"
     },
     "stepCaptions": {
@@ -10376,7 +10333,6 @@
       "conditions": "Qué debería activar la alerta",
       "compareWithPast": "Compare los resultados actuales con los datos de otro período",
       "alertSettings": "Establece tus reglas de alerta y elige cómo quieres recibir las notificaciones.",
-      "deduplication": "Evite enviar la misma alerta varias veces agrupando alertas similares.",
       "advanced": "Variables de contexto, descripción y plantilla de filas"
     },
     "failedToFetchHistory": "No se pudo obtener el historial de alertas",
@@ -10399,8 +10355,6 @@
         "closeActions": "Cerrar acciones",
         "viewAlertHistory": "Ver historial de alertas",
         "actionsFor": "Acciones para:",
-        "configureDedup": "Configurar Dedup",
-        "configureDedupTooltip": "Configurar la deduplicación para esta alerta",
         "editAlert": "Editar alerta",
         "editAlertTooltip": "Editar la configuración de alertas",
         "viewHistory": "Ver historial",
@@ -11180,6 +11134,8 @@
       "recoveryChatMessage": "nuevo mensaje de \"Resuelta\"",
       "keepFiringFor": "Seguir disparando durante",
       "keepFiringForTooltip": "Espera este tiempo después de que la condición deje de cumplirse antes de recuperarse. 0 recupera inmediatamente.",
+      "suppressRepeats": "Suprimir repeticiones",
+      "suppressRepeatsTooltip": "Notificar una vez cuando la alerta empiece a dispararse o cambie de nivel, no en cada evaluación. Déjalo desactivado para seguir recibiendo recordatorios después de cada periodo de silencio.",
       "keepFiringForInvalid": "Introduce 0 o más segundos",
       "keepFiringForTooLong": "Introduce como máximo 86400 segundos (24 horas)"
     },
@@ -13680,7 +13636,6 @@
       "identityConfigNoSets": "Configura al menos un conjunto de identidades antes de guardar.",
       "discoveredServicesTab": "Servicios descubiertos",
       "serviceDiscoveryTab": "Reglas de detección",
-      "alertCorrelationTab": "Correlación de alertas",
       "fieldAliasesTab": "Asignaciones de campos",
       "fieldAliasesSaved": "Alias de campos guardados correctamente",
       "fieldAliasesSaveError": "No se pudieron guardar los alias de campos",
@@ -21217,7 +21172,6 @@
     "alerts": {
       "failedToNavigateToAlert": "Error al navegar a la alerta",
       "alertNotFound": "Alerta no encontrada",
-      "alertNotFoundInAlerts": "Alerta \"{name}\" no encontrada en {count} alertas",
       "failedToLoadAlerts": "Error al cargar las alertas",
       "alertsDeletedSuccessfully": "Se eliminó correctamente {count} alerta | Se eliminaron correctamente {count} alertas",
       "failedToDeleteAlerts": "No se pudo eliminar {count} alerta | No se pudieron eliminar {count} alertas",
@@ -21286,7 +21240,6 @@
       "pleaseWaitWhileLoadingTemplates": "Espere mientras se cargan las plantillas...",
       "alertSavedSuccessfully": "Alerta guardada correctamente.",
       "alertUpdatedSuccessfully": "Alerta actualizada correctamente.",
-      "openingDedupConfig": "Abriendo configuración de deduplicación para: {name}",
       "editingAlert": "Editando alerta: {name}",
       "ack": {
         "acked": "Se confirmó {name}",
@@ -26066,7 +26019,7 @@
       "logged": "Registrado"
     },
     "policy": {
-      "gateHint": "Entre los cambios a alertas existentes, solo la deduplicación se aplica por sí sola, con una instantánea del estado anterior y una ventana de revisión: se conserva si sus comprobaciones pasan y se revierte si fallan. Todo lo demás espera una aprobación con un solo clic.",
+      "gateHint": "Entre los cambios en alertas existentes, solo activar la supresión de repeticiones se aplica por sí solo, con una instantánea del estado anterior y una ventana de revisión: se conserva si sus comprobaciones pasan y se revierte si fallan. Todo lo demás espera una aprobación con un solo clic.",
       "off": "Desactivado",
       "suggest": "Sugerir",
       "auto": "Auto",
@@ -26085,7 +26038,7 @@
         "gateDesc": "Retiene el aviso hasta que llegue la investigación, durante un máximo de 2 minutos. Falla de forma abierta: si el triaje agota el tiempo o falla, avisa igualmente al guardia, indica que la investigación sigue en curso o ha fallado, y la causa llega en el mismo hilo."
       },
       "classes": {
-        "EnableDeduplication": "Activa la deduplicación para una alerta que se repite en cuestión de minutos.",
+        "EnableDeduplication": "Activar la supresión de repeticiones para una alerta que notifica en cada evaluación.",
         "CreateDetector": "Crea un detector de anomalías sobre las solicitudes, los errores o la latencia de un servicio.",
         "RaiseThreshold": "Eleva un umbral que se dispara en días sin problemas.",
         "LengthenEvaluationWindow": "Alarga la ventana de una alerta que fluctúa.",
@@ -26634,10 +26587,10 @@
           "on": "alerta de conexión"
         },
         "L-302": {
-          "done": "Agrupé las 3 alertas de latencia de checkout en una",
-          "why": "Se activaban juntas el 94% del tiempo, así que una ralentización te avisó 3 veces.",
-          "from": "3 alertas",
-          "to": "1",
+          "done": "Se activó la supresión de repeticiones en las 3 alertas de latencia de checkout",
+          "why": "Notificaban en cada evaluación mientras permanecían disparadas, por lo que una sola ralentización te avisó 120 veces.",
+          "from": "Cada evaluación",
+          "to": "Una vez por cambio",
           "on": "latencia de checkout"
         },
         "L-303": {
@@ -26694,7 +26647,7 @@
         "checkoutPaged": "Avisé a la guardia sobre los pagos fallidos de checkout.",
         "recsHeld": "Dejé en espera un problema menor con recommendations para el resumen del viernes.",
         "diskApproved": "Aprobaste elevar la alerta de disco en ingest-1 a {to}%.",
-        "latencyGrouped": "Agrupé las tres alertas de lentitud de checkout en una sola, así una única ralentización genera un solo aviso.",
+        "latencyGrouped": "Activé la supresión de repeticiones para las tres alertas de lentitud de checkout, así que una sola ralentización avisa una vez.",
         "queueFixed": "Añadí workers de la cola de orders, pero la cola siguió creciendo, así que los revertí y avisé a la guardia.",
         "loginPaged": "Avisé a la guardia sobre el inicio de sesión lento.",
         "queuePermission": "Me permitiste añadir workers de cola por mi cuenta, hasta 8.",
