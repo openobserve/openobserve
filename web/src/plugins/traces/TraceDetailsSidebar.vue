@@ -205,15 +205,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="shrink-0">
-            <!-- Single button with wrapper for tooltip functionality -->
-            <span class="inline-block" tabindex="0">
+            <OTooltip v-if="logsLocked" :content="logsLockedReason">
+              <span class="inline-flex">
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  class="h-full text-xs!"
+                  disabled
+                  icon-left="lock"
+                  data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+                >
+                  {{ t("traces.viewLogs") }}
+                </OButton>
+              </span>
+            </OTooltip>
+            <span v-else class="inline-block" tabindex="0">
               <OButton
                 variant="outline"
                 size="xs"
                 class="h-full text-xs!"
                 :disabled="isViewLogsDisabled"
-                :loading="!logsLocked && config.isEnterprise === 'true' && correlationLoading"
-                :icon-left="logsLocked ? 'lock' : undefined"
+                :loading="config.isEnterprise === 'true' && correlationLoading"
                 @click.stop="viewSpanLogs"
                 data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
               >
@@ -2904,6 +2916,7 @@ export default defineComponent({
       isViewLogsDisabled,
       viewLogsTooltipContent,
       logsLocked,
+      logsLockedReason,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,

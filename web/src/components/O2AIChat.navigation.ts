@@ -176,9 +176,13 @@ export function generateNavigationFromToolResult(
   };
 }
 
-/** License key of the signal page a navigation action opens; null when it opens no signal page. */
+const RESOURCE_FEATURES: Record<string, string> = { alert: "alerts", dashboard: "dashboards" };
+
+/** License key of the page a navigation action opens; null when that page has no key. */
 export function navigationFeature(action: NavigationAction): string | null {
-  return action.action === "load_query" ? streamTypeFeature(action.resource_type) : null;
+  return action.action === "load_query"
+    ? streamTypeFeature(action.resource_type)
+    : (RESOURCE_FEATURES[action.resource_type] ?? null);
 }
 
 export function navigationPageName(action: NavigationAction): string {

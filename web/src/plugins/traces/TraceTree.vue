@@ -249,9 +249,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="outline"
                           size="icon"
                           disabled
+                          :aria-label="t('traces.viewLogs')"
                           :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
                         >
-                          <OIcon name="lock" size="sm" />
+                          <OIcon name="lock" class="text-icon-locked" size="sm" />
                         </OButton>
                         <OTooltip :content="logsLockedReason" />
                       </span>

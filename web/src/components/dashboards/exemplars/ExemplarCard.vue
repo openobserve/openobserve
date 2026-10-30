@@ -201,17 +201,7 @@ const position = computed(() => {
           <span class="min-w-0">{{ t("dashboard.exemplars.traceNotAvailable") }}</span>
         </div>
         <div v-else class="flex min-w-0 flex-wrap items-center gap-2">
-          <OButton
-            v-if="verdict.state === 'checking'"
-            variant="outline"
-            size="sm"
-            disabled
-            data-test="dashboard-panel-exemplar-trace-checking"
-          >
-            <template #icon-left><OSpinner size="xs" /></template>
-            {{ t("dashboard.exemplars.checkingTrace") }}
-          </OButton>
-          <OTooltip v-else-if="lockedReason" :content="lockedReason">
+          <OTooltip v-if="lockedReason" :content="lockedReason">
             <span class="inline-flex">
               <OButton
                 variant="outline"
@@ -222,6 +212,7 @@ const position = computed(() => {
                 <template #icon-left>
                   <OIcon
                     name="lock"
+                    class="text-icon-locked"
                     size="sm"
                     data-test="dashboard-panel-exemplar-open-trace-lock"
                   />
@@ -230,6 +221,16 @@ const position = computed(() => {
               </OButton>
             </span>
           </OTooltip>
+          <OButton
+            v-else-if="verdict.state === 'checking'"
+            variant="outline"
+            size="sm"
+            disabled
+            data-test="dashboard-panel-exemplar-trace-checking"
+          >
+            <template #icon-left><OSpinner size="xs" /></template>
+            {{ t("dashboard.exemplars.checkingTrace") }}
+          </OButton>
           <OButton
             v-else-if="verdict.state === 'found'"
             variant="primary"

@@ -431,16 +431,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               disabled
               focusable-unavailable
+              icon-left="lock"
+              :description="goToLogsLockedReason"
               data-test="dashboard-move-to-logs-module"
             >
-              <template #icon-left><OIcon name="search" size="sm" /></template>
-              <span class="min-w-0 flex-1">
-                <OTooltip :content="goToLogsLockedReason" side="left" />
-                {{ t("panel.goToLogs") }}
-              </span>
-              <template #icon-right>
-                <OIcon name="lock" size="sm" data-test="dashboard-move-to-logs-module-lock" />
-              </template>
+              {{ t("panel.goToLogs") }}
             </ODropdownItem>
             <ODropdownItem
               v-else-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"

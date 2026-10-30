@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-view-in-traces-btn"
               >
                 <template #icon-left>
-                  <OIcon name="lock" size="sm" />
+                  <OIcon name="lock" class="text-icon-locked" size="xs" />
                 </template>
                 {{ t("traces.serviceGraphNodeSidePanel.viewTraces") }}
               </OButton>
@@ -331,12 +331,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :fill-height="false"
                 pagination="none"
                 @sort-change="(p: any) => handleSortChange(p.column)"
-                @row-click="
-                  (row: any) =>
-                    navigateToTraces({
-                      operationName: row.operation,
-                      callerService: isInferred ? row.caller : undefined,
-                    })
+                v-on="
+                  tracesLocked
+                    ? {}
+                    : {
+                        rowClick: (row: any) =>
+                          navigateToTraces({
+                            operationName: row.operation,
+                            callerService: isInferred ? row.caller : undefined,
+                          }),
+                      }
                 "
               >
                 <template #cell-errors="{ row }">
@@ -378,9 +382,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon"
                       disabled
+                      :aria-label="t('traces.serviceGraphNodeSidePanel.viewInTraces')"
                       data-test="service-graph-side-panel-view-traces-btn"
                     >
-                      <OIcon name="lock" size="sm" />
+                      <OIcon name="lock" class="text-icon-locked" size="sm" />
                     </OButton>
                     <OTooltip :content="tracesLockedReason" />
                   </span>
@@ -473,13 +478,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :fill-height="false"
                 pagination="none"
                 @sort-change="(p: any) => handleSortChange(p.column)"
-                @row-click="
-                  (row: any) =>
-                    navigateToTraces({
-                      resourceFilter: cfg.fields
-                        ? { fields: cfg.fields, value: row[cfg.colId] }
-                        : { field: cfg.groupField, value: row[cfg.colId] },
-                    })
+                v-on="
+                  tracesLocked
+                    ? {}
+                    : {
+                        rowClick: (row: any) =>
+                          navigateToTraces({
+                            resourceFilter: cfg.fields
+                              ? { fields: cfg.fields, value: row[cfg.colId] }
+                              : { field: cfg.groupField, value: row[cfg.colId] },
+                          }),
+                      }
                 "
               >
                 <template #cell-hover-actions="{ row, column, active }">
@@ -488,9 +497,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon"
                       disabled
+                      :aria-label="t('traces.serviceGraphNodeSidePanel.viewInTraces')"
                       :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                     >
-                      <OIcon name="lock" size="sm" />
+                      <OIcon name="lock" class="text-icon-locked" size="sm" />
                     </OButton>
                     <OTooltip :content="tracesLockedReason" />
                   </span>
@@ -2463,7 +2473,6 @@ export default defineComponent({
       maxDurationMicros?: number;
       mode?: "spans" | "traces";
     }) => {
-      // Row clicks route here too, and a table row has no disabled state.
       if (tracesLocked.value) return;
       emit("view-traces", {
         stream: props.streamFilter,

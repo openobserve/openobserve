@@ -82,7 +82,12 @@ const writes = computed(() => writeActionsFor(props.target.kind));
           {{ t(ITEMS[type].label) }}
         </span>
         <template #icon-right>
-          <OIcon name="lock" size="sm" :data-test="`k8s2-row-menu-${type}-license-lock`" />
+          <OIcon
+            name="lock"
+            class="text-icon-locked"
+            size="sm"
+            :data-test="`k8s2-row-menu-${type}-license-lock`"
+          />
         </template>
       </ODropdownItem>
       <ODropdownItem

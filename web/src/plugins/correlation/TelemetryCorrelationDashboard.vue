@@ -459,24 +459,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                 </div>
                 <div class="ms-auto flex items-center gap-2">
-                  <span class="inline-flex">
-                    <OButton
-                      variant="ghost"
-                      size="sm-action"
-                      :disabled="tracesLocked"
-                      @click="openTracesPage"
-                      data-test="correlation-view-traces-page"
-                      class="text-xs"
-                    >
-                      <OIcon v-if="tracesLocked" name="lock" size="sm" class="me-1" />
-                      <OIcon v-else name="open-in-new" size="xs" class="me-1" />
-                      {{ t("correlation.viewInTraces") }}
-                    </OButton>
-                    <OTooltip
-                      :content="tracesLocked ? tracesLockedReason : t('correlation.viewInTraces')"
-                      side="top"
-                    />
-                  </span>
+                  <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+                    <span class="inline-flex">
+                      <OButton
+                        variant="ghost"
+                        size="sm-action"
+                        disabled
+                        icon-left="lock"
+                        data-test="correlation-view-traces-page"
+                        class="text-xs"
+                      >
+                        {{ t("correlation.viewInTraces") }}
+                      </OButton>
+                    </span>
+                  </OTooltip>
+                  <OButton
+                    v-else
+                    variant="ghost"
+                    size="sm-action"
+                    icon-left="open-in-new"
+                    @click="openTracesPage"
+                    data-test="correlation-view-traces-page"
+                    class="text-xs"
+                  >
+                    {{ t("correlation.viewInTraces") }}
+                  </OButton>
                   <OTag type="fieldTag" value="primary">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
                   </OTag>
@@ -911,24 +918,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </OTag>
               <div class="ms-auto flex items-center gap-2">
-                <span class="inline-flex">
-                  <OButton
-                    variant="ghost"
-                    size="sm-action"
-                    :disabled="tracesLocked"
-                    @click="openTracesPage"
-                    data-test="correlation-view-traces-page"
-                    class="text-xs"
-                  >
-                    <OIcon v-if="tracesLocked" name="lock" size="sm" class="me-1" />
-                    <OIcon v-else name="open-in-new" size="xs" class="me-1" />
-                    {{ t("correlation.viewInTraces") }}
-                  </OButton>
-                  <OTooltip
-                    :content="tracesLocked ? tracesLockedReason : t('correlation.viewInTraces')"
-                    side="top"
-                  />
-                </span>
+                <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+                  <span class="inline-flex">
+                    <OButton
+                      variant="ghost"
+                      size="sm-action"
+                      disabled
+                      icon-left="lock"
+                      data-test="correlation-view-traces-page"
+                      class="text-xs"
+                    >
+                      {{ t("correlation.viewInTraces") }}
+                    </OButton>
+                  </span>
+                </OTooltip>
+                <OButton
+                  v-else
+                  variant="ghost"
+                  size="sm-action"
+                  icon-left="open-in-new"
+                  @click="openTracesPage"
+                  data-test="correlation-view-traces-page"
+                  class="text-xs"
+                >
+                  {{ t("correlation.viewInTraces") }}
+                </OButton>
               </div>
             </div>
           </div>

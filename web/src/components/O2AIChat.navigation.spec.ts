@@ -341,9 +341,13 @@ describe("navigationFeature", () => {
     ).toBe(key);
   });
 
-  it("never keys a direct navigation", () => {
+  it.each([
+    ["alert", "alerts"],
+    ["dashboard", "dashboards"],
+    ["pipeline", null],
+  ])("keys a direct %s navigation to %s", (type, key) => {
     expect(
-      navigationFeature({ action: "navigate_direct", resource_type: "alert", target: {} } as any),
-    ).toBeNull();
+      navigationFeature({ action: "navigate_direct", resource_type: type, target: {} } as any),
+    ).toBe(key);
   });
 });

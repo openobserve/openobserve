@@ -472,20 +472,29 @@ describe("UsageTab", () => {
 
     const link = (signal: string) => wrapper.find(`[data-test="home-usage-tab-explore-${signal}"]`);
 
-    it("renders a locked signal as a disabled non-link and keeps the others as links", async () => {
+    it("keeps a locked row a link and swaps its chevron for a gold lock", async () => {
       wrapper = mountUsageTab();
       await flushPromises();
       // the tab refreshes /config on mount, so the license state lands after it
       store.commit("setConfig", { ...store.state.zoConfig, features: { metrics: "locked" } });
       await flushPromises();
 
-      expect(link("metrics").element.tagName).toBe("DIV");
-      expect(link("metrics").attributes("aria-disabled")).toBe("true");
-      const icons = wrapper.findAllComponents(".OIcon-stub").map((i) => i.props("name"));
-      expect(icons).toContain("lock");
+      expect(link("metrics").element.tagName).toBe("A");
+      expect(link("metrics").attributes("aria-disabled")).toBeUndefined();
+      expect(wrapper.find('[data-test="home-usage-tab-explore-metrics-lock"]').exists()).toBe(true);
+      expect(link("metrics").find(".sr-only").text()).toContain("Locked: needs");
       expect(link("logs").element.tagName).toBe("A");
-      expect(link("logs").attributes("aria-disabled")).toBeUndefined();
-      expect(link("traces").element.tagName).toBe("A");
+      expect(wrapper.find('[data-test="home-usage-tab-explore-logs-lock"]').exists()).toBe(false);
+    });
+
+    it("locks the Alerts view button with the reason as its label", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+      store.commit("setConfig", { ...store.state.zoConfig, features: { alerts: "locked" } });
+      await flushPromises();
+
+      const btn = wrapper.findComponent('[data-test="home-usage-tab-view-alerts-btn"]');
+      expect(String(btn.props("ariaLabel"))).toContain("Locked: needs");
     });
 
     it("renders every signal as a link when none is locked", async () => {

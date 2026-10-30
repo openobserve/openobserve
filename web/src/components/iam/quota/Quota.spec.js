@@ -549,3 +549,22 @@ describe.skip("Quota page", () => {
     expect(wrapper.vm.filteredRoleLevelModuleRows.length).toBe(2);
   });
 });
+
+describe("Quota role limits tab under a locked rbac license", () => {
+  it("keeps the tab, shows the denied state and skips the roles fetch", async () => {
+    const saved = store.state.zoConfig;
+    store.state.zoConfig = { ...saved, features: { rbac: "locked" } };
+    const wrapper = await mountQuota();
+    const tab = wrapper.vm.tabs.find((t) => t.value === "role-limits");
+    expect(tab).toBeDefined();
+    expect(tab.tooltipLabel).toContain("Locked");
+
+    iamSvc.getRoles.mockClear();
+    await wrapper.vm.updateActiveTab("role-limits");
+    await flushPromises();
+    expect(iamSvc.getRoles).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="quota-role-limits-license-denied"]').exists()).toBe(true);
+    wrapper.unmount();
+    store.state.zoConfig = saved;
+  });
+});

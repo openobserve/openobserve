@@ -184,7 +184,9 @@ const isStopped = computed(() =>
                   disabled
                   data-test="o2-ai-chat-error-navigate-locked"
                 >
-                  <template #icon-left><OIcon name="lock" size="sm" /></template>
+                  <template #icon-left
+                    ><OIcon name="lock" class="text-icon-locked" size="sm"
+                  /></template>
                   {{ block.navigationAction.label }}
                 </OButton>
               </span>
@@ -251,7 +253,9 @@ const isStopped = computed(() =>
                   disabled
                   data-test="o2-ai-chat-navigate-locked"
                 >
-                  <template #icon-left><OIcon name="lock" size="sm" /></template>
+                  <template #icon-left
+                    ><OIcon name="lock" class="text-icon-locked" size="sm"
+                  /></template>
                   {{ block.navigationAction.label }}
                 </OButton>
               </span>

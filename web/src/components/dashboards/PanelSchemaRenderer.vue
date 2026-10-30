@@ -255,16 +255,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="drilldownLockedReason(drilldown)"
             class="text-dropdown-item-disabled flex cursor-not-allowed items-center px-4 py-2 text-sm"
             aria-disabled="true"
+            tabindex="0"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
           >
-            <OTooltip :content="drilldownLockedReason(drilldown)!" side="right" />
             <OIcon
               size="xs"
-              class="me-2"
+              class="text-icon-locked me-2"
               name="lock"
               :data-test="`drilldown-menu-item-${drilldown.name}-lock`"
             />
-            <span class="select-none">{{ drilldown.name }}</span>
+            <span class="flex min-w-0 flex-col">
+              <span class="select-none">{{ drilldown.name }}</span>
+              <span
+                class="text-text-secondary text-xs select-none"
+                :data-test="`drilldown-menu-item-${drilldown.name}-reason`"
+                >{{ drilldownLockedReason(drilldown) }}</span
+              >
+            </span>
           </div>
           <div
             v-else

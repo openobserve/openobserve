@@ -94,16 +94,21 @@ const navLockReason = computed(() => {
         >{{ formatToolCallMessage(block).suffix }}
       </span>
       <!-- Navigation icon -->
-      <OIcon
+      <OTooltip
         v-if="block.navigationAction && !block.pendingConfirmation && !readonly && navLockReason"
-        name="lock"
-        size="xs"
-        class="navigation-icon ms-auto cursor-not-allowed opacity-70"
-        data-test="o2-ai-chat-tool-navigate-locked"
-        @click.stop
+        :content="navLockReason"
       >
-        <OTooltip :content="navLockReason" />
-      </OIcon>
+        <span class="ms-auto inline-flex" @click.stop>
+          <OButton
+            variant="ghost"
+            size="icon-xs"
+            disabled
+            icon-left="lock"
+            :aria-label="block.navigationAction.label"
+            data-test="o2-ai-chat-tool-navigate-locked"
+          />
+        </span>
+      </OTooltip>
       <OIcon
         v-else-if="block.navigationAction && !block.pendingConfirmation && !readonly"
         name="open-in-new"

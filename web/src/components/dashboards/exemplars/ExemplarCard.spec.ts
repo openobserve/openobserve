@@ -193,6 +193,12 @@ describe("ExemplarCard", () => {
     },
   );
 
+  it("traces locked: shows the locked action, never Checking trace", () => {
+    const wrapper = mountCard({ lockedReason: raw("Locked: needs Traces") });
+    expect(byTest(wrapper, "dashboard-panel-exemplar-open-trace-locked").exists()).toBe(true);
+    expect(byTest(wrapper, "dashboard-panel-exemplar-trace-checking").exists()).toBe(false);
+  });
+
   it("traces enabled: no locked Open trace", () => {
     const wrapper = mountCard({
       verdict: { state: "found", stream: "default", startUs: 1, endUs: 2 },

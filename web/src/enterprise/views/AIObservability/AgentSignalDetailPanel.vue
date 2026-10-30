@@ -126,7 +126,7 @@
           :frame="false"
           pagination="client"
           :page-size="10"
-          @row-click="openTrace"
+          v-on="rowClickListeners"
         >
           <!-- Trace id renders with an "open in new tab" icon so it's clear the
                row opens the trace in a new browser tab, not in place. -->
@@ -138,7 +138,12 @@
             >
               <OTooltip :content="tracesLock.lockedReason.value">
                 <span class="inline-flex">
-                  <OIcon name="lock" size="sm" data-test="agent-signal-detail-trace-lock" />
+                  <OIcon
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="agent-signal-detail-trace-lock"
+                  />
                 </span>
               </OTooltip>
               <OTruncatedText class="font-mono">{{ row.trace_id }}</OTruncatedText>
@@ -548,7 +553,7 @@ const fetchDetails = async () => {
 // Details re-derives the exact trace time from its spans, so a wide window is
 // safe — it only needs to contain the trace.
 const openTrace = (row: Record<string, any>) => {
-  if (!row?.trace_id || tracesLock.locked.value) return;
+  if (!row?.trace_id) return;
   const nowUs = Date.now() * 1000;
   // Guarantee a valid, containing µs window. Trace Details re-derives the exact
   // trace time from its spans, so a wide window is safe — it only needs to
@@ -572,6 +577,7 @@ const openTrace = (row: Record<string, any>) => {
   });
   window.open(resolved.href, "_blank", "noopener,noreferrer");
 };
+const rowClickListeners = computed(() => (tracesLock.locked.value ? {} : { rowClick: openTrace }));
 
 watch(
   () => [props.open, props.row],

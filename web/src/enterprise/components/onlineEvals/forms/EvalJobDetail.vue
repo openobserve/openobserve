@@ -381,7 +381,12 @@
               <span class="inline-flex items-center">
                 <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
                   <span class="me-1.5 inline-flex">
-                    <OIcon name="lock" size="sm" data-test="eval-job-detail-run-lock" />
+                    <OIcon
+                      name="lock"
+                      class="text-icon-locked"
+                      size="sm"
+                      data-test="eval-job-detail-run-lock"
+                    />
                   </span>
                 </OTooltip>
                 <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
@@ -436,7 +441,12 @@
               <span class="inline-flex items-center">
                 <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
                   <span class="me-1.5 inline-flex">
-                    <OIcon name="lock" size="sm" data-test="eval-job-detail-run-lock" />
+                    <OIcon
+                      name="lock"
+                      class="text-icon-locked"
+                      size="sm"
+                      data-test="eval-job-detail-run-lock"
+                    />
                   </span>
                 </OTooltip>
                 <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>

@@ -275,7 +275,7 @@ describe("OverviewTab", () => {
 
       expect(wrapper.find(TRACES_CARD).exists()).toBe(true);
       expect(wrapper.find(TRACES_CARD).attributes("aria-disabled")).toBe("true");
-      expect(wrapper.find('[data-test="overview-empty-traces-card-lock"]').exists()).toBe(true);
+      expect(wrapper.find(TRACES_CARD).classes()).toContain("cursor-not-allowed");
       await wrapper.find(TRACES_CARD).trigger("click");
       expect(push).not.toHaveBeenCalled();
 

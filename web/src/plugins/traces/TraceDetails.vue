@@ -539,20 +539,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="w-44!"
               />
               <span class="traces-view-logs-btn ps-1">
-                <!-- Single button with wrapper for tooltip functionality -->
-                <span class="inline-block" tabindex="0">
+                <OTooltip v-if="logsLocked" :content="logsLockedReason">
+                  <span class="inline-flex">
+                    <OButton
+                      data-test="trace-details-view-logs-btn"
+                      variant="outline"
+                      size="sm"
+                      class="h-8! text-xs font-normal!"
+                      disabled
+                      icon-left="lock"
+                    >
+                      {{
+                        searchObj.meta.redirectedFromLogs
+                          ? t("traces.backToLogs")
+                          : t("traces.viewLogs")
+                      }}
+                    </OButton>
+                  </span>
+                </OTooltip>
+                <span v-else class="inline-block" tabindex="0">
                   <OButton
                     data-test="trace-details-view-logs-btn"
                     variant="outline"
                     size="sm"
                     class="h-8! text-xs font-normal!"
+                    icon-left="search"
                     :disabled="isViewLogsDisabled"
                     @click="redirectToLogs"
                   >
-                    <template #icon-left>
-                      <OIcon v-if="logsLocked" name="lock" size="sm" />
-                      <OIcon v-else name="search" size="xs" />
-                    </template>
                     {{
                       searchObj.meta.redirectedFromLogs
                         ? t("traces.backToLogs")
@@ -561,11 +575,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OTooltip
                     :content="
-                      logsLocked
-                        ? logsLockedReason
-                        : isViewLogsDisabled
-                          ? t('search.selectLogsStreamFirst')
-                          : t('traces.viewLogs')
+                      isViewLogsDisabled ? t('search.selectLogsStreamFirst') : t('traces.viewLogs')
                     "
                   />
                 </span>

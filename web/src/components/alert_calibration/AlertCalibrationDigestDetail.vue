@@ -46,7 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-calibration-digest-view-in-logs"
           >
             <template #icon-left>
-              <OIcon name="lock" size="sm" data-test="alert-calibration-digest-view-in-logs-lock" />
+              <OIcon
+                name="lock"
+                class="text-icon-locked"
+                size="sm"
+                data-test="alert-calibration-digest-view-in-logs-lock"
+              />
             </template>
             {{ t("alertCalibration.detail.viewInLogs") }}
           </OButton>

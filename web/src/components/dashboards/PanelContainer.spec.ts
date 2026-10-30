@@ -1345,6 +1345,38 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.goToLogsLockedReason).toBeTruthy();
     });
 
+    it("go to logs shows as a disabled, focusable menu item with the reason as description", async () => {
+      (store.state as any).zoConfig.features = { logs: "locked" };
+      wrapper = createWrapper(
+        { data: mockPanelData },
+        {
+          ODropdown: {
+            name: "ODropdown",
+            template: '<div><slot name="trigger" /><slot /></div>',
+          },
+          ODropdownItem: {
+            name: "ODropdownItem",
+            props: {
+              disabled: Boolean,
+              focusableUnavailable: Boolean,
+              iconLeft: String,
+              description: String,
+            },
+            template: "<div><slot /></div>",
+          },
+        },
+      );
+      wrapper.vm.metaData = { queries: [{}] };
+      await flushPromises();
+      const item = wrapper
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c: any) => c.attributes("data-test") === "dashboard-move-to-logs-module");
+      expect(item?.props("disabled")).toBe(true);
+      expect(item?.props("focusableUnavailable")).toBe(true);
+      expect(item?.props("iconLeft")).toBe("lock");
+      expect(item?.props("description")).toBe(wrapper.vm.goToLogsLockedReason);
+    });
+
     it("go to logs stays live while another signal is locked or the stream type is free", () => {
       (store.state as any).zoConfig.features = { traces: "locked" };
       wrapper = createWrapper({ data: mockPanelData });

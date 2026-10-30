@@ -88,6 +88,21 @@ describe("MetricUsageList", () => {
     expect(find(wrapper, "metrics-detail-used-in-dashboards").exists()).toBe(false);
   });
 
+  it("marks only the groups whose feature is license-locked", () => {
+    const zo = (store.state as any).zoConfig;
+    const prior = zo.features;
+    zo.features = { alerts: "locked", anomaly_detection: "locked" };
+    try {
+      wrapper = mountList({ usage: USAGE, status: "done" });
+      expect(find(wrapper, "metrics-detail-used-in-lock-alerts").exists()).toBe(true);
+      expect(find(wrapper, "metrics-detail-used-in-lock-slos").exists()).toBe(true);
+      expect(find(wrapper, "metrics-detail-used-in-lock-dashboards").exists()).toBe(false);
+      expect(find(wrapper, "metrics-detail-used-in-lock-pipelines").exists()).toBe(false);
+    } finally {
+      zo.features = prior;
+    }
+  });
+
   it("says how many queries were matched only by name, and marks those objects", () => {
     wrapper = mountList({ usage: USAGE, status: "done" });
     expect(find(wrapper, "metrics-detail-used-in-unparsed").text()).toContain(

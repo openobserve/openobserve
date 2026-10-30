@@ -252,22 +252,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="item in drilldownMenu[signal]"
                     :key="item.name"
                     :disabled="!item.openable || isSignalLocked(signal)"
+                    focusable-unavailable
                     :icon-left="isSignalLocked(signal) ? 'lock' : undefined"
+                    :description="
+                      isSignalLocked(signal)
+                        ? signalLockedReason(signal)
+                        : item.openable
+                          ? undefined
+                          : t('metrics.explorer.detail.drilldown.noServiceField')
+                    "
                     :data-test="`metrics-detail-drilldown-${signal}-${item.name}`"
                     @select="drilldown.openStream(signal, item)"
                   >
-                    <span class="flex min-w-0 flex-col">
-                      <span class="truncate">{{ raw(item.name) }}</span>
-                      <span
-                        v-if="isSignalLocked(signal)"
-                        class="text-text-secondary text-xs"
-                        :data-test="`metrics-detail-drilldown-${signal}-locked`"
-                        >{{ signalLockedReason(signal) }}</span
-                      >
-                      <span v-else-if="!item.openable" class="text-text-secondary text-xs">{{
-                        t("metrics.explorer.detail.drilldown.noServiceField")
-                      }}</span>
-                    </span>
+                    <span class="truncate">{{ raw(item.name) }}</span>
                   </ODropdownItem>
                   <ODropdownItem v-if="!drilldownMenu[signal].length" disabled>
                     {{

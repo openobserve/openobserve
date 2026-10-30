@@ -341,7 +341,12 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
                 data-test="k8s2-drawer-action-traces"
               >
                 <template #icon-left>
-                  <OIcon name="lock" size="sm" data-test="k8s2-drawer-action-traces-lock" />
+                  <OIcon
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="k8s2-drawer-action-traces-lock"
+                  />
                 </template>
                 {{ t("infra.k8s2.drawerActionTraces") }}
               </OButton>
@@ -368,7 +373,12 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
                 data-test="k8s2-drawer-action-metrics"
               >
                 <template #icon-left>
-                  <OIcon name="lock" size="sm" data-test="k8s2-drawer-action-metrics-lock" />
+                  <OIcon
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="k8s2-drawer-action-metrics-lock"
+                  />
                 </template>
                 {{ t("infra.k8s2.drawerActionMetrics") }}
               </OButton>
