@@ -21,12 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseenter="showPopupsAndOverlays"
   >
     <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
-      <OReveal
-        v-if="!errorDetail?.message"
-        :ready="!isAwaitingFirstLoad"
+      <div
+        v-if="!errorDetail?.message && !isAwaitingFirstLoad"
         :style="{ height: chartPanelHeight, width: '100%' }"
       >
-        <template #skeleton><div class="h-full" /></template>
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
@@ -167,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :x="hoveredQueryAnnotation.x"
           :y="hoveredQueryAnnotation.y"
         />
-      </OReveal>
+      </div>
       <div
         v-if="metricItems.length && !noData && !loading"
         class="pointer-events-none absolute inset-0 z-8"
@@ -373,7 +371,6 @@ import {
   withTimeRangeVariables,
 } from "@/utils/dashboard/variables/variablesUtils";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import OReveal from "@/lib/feedback/Reveal/OReveal.vue";
 import {
   forecastPointOf,
   usePanelAlertCreation,
@@ -496,7 +493,6 @@ export default defineComponent({
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
-    OReveal,
     OButton,
     OIcon,
     OTooltip,
