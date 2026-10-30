@@ -176,6 +176,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertDestinations",
         requires: "alertList",
         categoryKey: "menu.alerts",
+        feature: "alerts",
       },
       {
         titleKey: "alert_templates.header",
@@ -183,6 +184,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertTemplates",
         requires: "alertList",
         categoryKey: "menu.alerts",
+        feature: "alerts",
       },
       // The curated catalog you add alerts FROM — gated the same way, so
       // hiding Alerts hides the place to get more. Last, like its tab: you go

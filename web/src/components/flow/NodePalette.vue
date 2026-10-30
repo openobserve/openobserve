@@ -139,7 +139,7 @@ export default {
               >
                 {{ node.label }}
               </div>
-              <OIcon v-if="node.locked" name="lock" size="sm" class="text-warning-600 shrink-0" />
+              <OIcon v-if="node.locked" name="lock" size="sm" class="text-icon-locked shrink-0" />
               <div v-else class="drag-dots grid h-2 w-2 grid-cols-2 gap-0.5">
                 <span class="dot h-0.5 w-0.5 rounded-full transition-all"></span>
                 <span class="dot h-0.5 w-0.5 rounded-full transition-all"></span>

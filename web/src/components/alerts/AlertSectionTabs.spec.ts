@@ -113,13 +113,13 @@ describe("AlertSectionTabs", () => {
     const lockOf = (wrapper: ReturnType<typeof mountTabs>, key: string) =>
       wrapper.find(`[data-test="alert-section-tab-${key}-lock"]`).exists();
 
-    it("puts a lock on the alert-owned tabs only, when alerts is locked", () => {
+    it("puts a lock on every tab when alerts is locked", () => {
       store.state.zoConfig.features = { alerts: "locked" };
       const wrapper = mountTabs();
       expect(lockOf(wrapper, "alertList")).toBe(true);
       expect(lockOf(wrapper, "alertLibrary")).toBe(true);
-      expect(lockOf(wrapper, "alertDestinations")).toBe(false);
-      expect(lockOf(wrapper, "alertTemplates")).toBe(false);
+      expect(lockOf(wrapper, "alertDestinations")).toBe(true);
+      expect(lockOf(wrapper, "alertTemplates")).toBe(true);
     });
 
     it("shows no lock when alerts is enabled", () => {

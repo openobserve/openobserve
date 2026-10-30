@@ -260,10 +260,33 @@ describe("SettingsIndex", () => {
         ["synthetics_locations", "synthetics"],
         ["queryManagement", "query_management"],
         ["storageSettings", "byob"],
-        ["correlation_settings", "correlation"],
       ])("marks %s license-locked under a locked %s license", (key, feature) => {
         const byKey = byKeyUnder({ features: { [feature]: "locked" } });
         expect(byKey(key)?.licenseLocked).toBe(true);
+      });
+
+      it("locks Correlation only when the alerts feature it also runs on is locked", () => {
+        const only = byKeyUnder({ features: { correlation: "locked" } });
+        expect(only("correlation_settings")?.licenseLocked).toBe(false);
+        const both = byKeyUnder({ features: { correlation: "locked", alerts: "locked" } });
+        expect(both("correlation_settings")?.licenseLocked).toBe(true);
+      });
+
+      it.each(["model_pricing", "llm_providers", "gen_ai_agent_mapping"])(
+        "locks %s and keeps it visible under a locked ai_observability license",
+        (key) => {
+          const byKey = byKeyUnder({
+            online_evals_enabled: false,
+            features: { ai_observability: "locked" },
+          });
+          expect(byKey(key)?.licenseLocked).toBe(true);
+          if (key !== "model_pricing") expect(byKey(key)?.visible).toBe(true);
+        },
+      );
+
+      it("keeps Telephony visible and locked under a locked oncall license", () => {
+        const byKey = byKeyUnder({ oncall_enabled: false, features: { oncall: "locked" } });
+        expect(byKey("telephony")).toMatchObject({ visible: true, licenseLocked: true });
       });
 
       it.each([
@@ -280,7 +303,7 @@ describe("SettingsIndex", () => {
         const byKey = byKeyUnder({
           synthetics_enabled: false,
           service_streams_enabled: false,
-          features: { synthetics: "locked", correlation: "locked" },
+          features: { synthetics: "locked", correlation: "locked", alerts: "locked" },
         });
         expect(byKey("synthetics_locations")).toMatchObject({ visible: true, licenseLocked: true });
         expect(byKey("correlation_settings")).toMatchObject({ visible: true, licenseLocked: true });
@@ -293,6 +316,8 @@ describe("SettingsIndex", () => {
           "queryManagement",
           "storageSettings",
           "correlation_settings",
+          "telephony",
+          "llm_providers",
         ]) {
           expect(byKey(key)?.licenseLocked).toBe(false);
         }

@@ -133,6 +133,7 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
       group: section.group,
       locked,
       lockedMessage,
+      lockedLabel: locked ? lockedMessage : undefined,
     };
   });
 });

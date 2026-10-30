@@ -518,14 +518,24 @@ function handleClick(event: MouseEvent): void {
     <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
     <span :class="loading ? 'contents text-transparent [&>*]:opacity-0' : 'contents'">
       <slot name="icon-left">
-        <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
+        <OIcon
+          v-if="iconLeft"
+          :name="iconLeft"
+          size="sm"
+          :class="iconLeft === 'lock' ? 'text-icon-locked' : undefined"
+        />
       </slot>
       <slot />
       <span v-if="unavailable && !descriptionId" :id="reasonId" class="sr-only" aria-hidden="true"
         ><slot name="unavailable-reason"
       /></span>
       <slot name="icon-right">
-        <OIcon v-if="iconRight" :name="iconRight" size="sm" />
+        <OIcon
+          v-if="iconRight"
+          :name="iconRight"
+          size="sm"
+          :class="iconRight === 'lock' ? 'text-icon-locked' : undefined"
+        />
       </slot>
     </span>
   </Primitive>

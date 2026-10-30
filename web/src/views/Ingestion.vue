@@ -62,21 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="max-md:hidden">{{ t("ingestion.manageTokensBtnLabel") }}</span>
         </OButton>
       </FeatureLockExempt>
-      <OTooltip v-if="isRUMPage && rumLocked" :content="rumLockedReason">
-        <span class="inline-flex">
-          <OButton
-            variant="primary"
-            size="sm"
-            icon-left="lock"
-            disabled
-            data-test="ingestion-reset-token-btn"
-          >
-            {{ t(`ingestion.generateRUMTokenLabel`) }}
-          </OButton>
-        </span>
-      </OTooltip>
       <OButton
-        v-else-if="
+        v-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
           store.state.organizationData.rumToken.rum_token != ''
         "
@@ -262,7 +249,6 @@ import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import { useOrgCredential, type PasscodeRead } from "@/composables/useOrgCredential";
 import { FIRST_EVENT_ASK_AI } from "@/components/ingestion/firstEventAskAi";
 import { useLicenseLock } from "@/composables/useFeatureLock";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 
 export default defineComponent({
@@ -275,7 +261,6 @@ export default defineComponent({
     OButton,
     OSearchInput,
     OSelect,
-    OTooltip,
     FeatureLockExempt,
   },
   emits: ["sendToAiChat"],
@@ -288,7 +273,7 @@ export default defineComponent({
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
     const confirmRUMUpdate = ref<boolean>(false);
-    const { locked: rumLocked, lockedReason: rumLockedReason } = useLicenseLock("rum");
+    const { locked: rumLocked } = useLicenseLock("rum");
     const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
@@ -669,7 +654,6 @@ export default defineComponent({
       navigateToIngestionTokens,
       isRUMPage,
       rumLocked,
-      rumLockedReason,
       confirmUpdate,
       confirmRUMUpdate,
       getImageURL,

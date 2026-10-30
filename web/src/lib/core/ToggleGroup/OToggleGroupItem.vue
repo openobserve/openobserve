@@ -81,6 +81,10 @@ const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
   xs: "h-5 px-1.5 text-xs max-md:px-1",
 };
 
+function lockClass(icon: string): string | undefined {
+  return icon === "lock" ? "text-icon-locked" : undefined;
+}
+
 // Icon size mirrors the toggle size
 const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | "md"> = {
   md: "md",
@@ -93,7 +97,12 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
   <template v-if="menu?.mode === 'trigger'">
     <template v-if="menu.isActive(props.value)">
       <slot v-if="slots['icon-left']" name="icon-left" />
-      <OIcon v-else-if="props.iconLeft" :name="props.iconLeft" size="sm" />
+      <OIcon
+        v-else-if="props.iconLeft"
+        :name="props.iconLeft"
+        size="sm"
+        :class="lockClass(props.iconLeft)"
+      />
       <slot />
     </template>
   </template>
@@ -107,7 +116,12 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
   >
     <template v-if="slots['icon-left'] || props.iconLeft" #icon-left>
       <slot v-if="slots['icon-left']" name="icon-left" />
-      <OIcon v-else-if="props.iconLeft" :name="props.iconLeft" size="sm" />
+      <OIcon
+        v-else-if="props.iconLeft"
+        :name="props.iconLeft"
+        size="sm"
+        :class="lockClass(props.iconLeft)"
+      />
     </template>
     <slot />
     <template #icon-right>
@@ -188,7 +202,12 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       />
       <!-- Slot takes precedence; falls back to `icon-left` prop -->
       <slot v-if="slots['icon-left']" name="icon-left" />
-      <OIcon v-else-if="props.iconLeft" :name="props.iconLeft" :size="iconSize[props.size]" />
+      <OIcon
+        v-else-if="props.iconLeft"
+        :name="props.iconLeft"
+        :size="iconSize[props.size]"
+        :class="lockClass(props.iconLeft)"
+      />
       <span v-if="unavailable" :id="labelId" class="contents"><slot /></span>
       <slot v-else />
       <slot v-if="slots['icon-right']" name="icon-right" />
@@ -196,7 +215,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         v-else-if="props.iconRight"
         :name="props.iconRight"
         :size="iconSize[props.size]"
-        :class="props.iconRight === 'lock' ? 'text-warning-600' : ''"
+        :class="lockClass(props.iconRight)"
       />
     </ToggleGroupItem>
     <span v-if="unavailable && props.tooltip" :id="reasonId" aria-hidden="true" class="sr-only">{{

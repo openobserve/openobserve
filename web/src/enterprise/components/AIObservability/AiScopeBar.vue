@@ -56,7 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem
           value="agent"
           size="sm"
-          :icon-right="!showAgentToggle ? 'lock' : undefined"
+          :icon-right="!showAgentToggle || aiObsLock.locked.value ? 'lock' : undefined"
+          :disabled="aiObsLock.locked.value"
+          :focusable-unavailable="aiObsLock.locked.value"
+          :tooltip="aiObsLock.locked.value ? aiObsLock.lockedReason.value : undefined"
         >
           {{ labels.agent }}
         </OToggleGroupItem>
@@ -137,6 +140,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import AgentScopeCascade from "./AgentScopeCascade.vue";
 
 type FilterMode = "stream" | "agent";
@@ -254,6 +258,7 @@ const activeStreamModel = computed({
 });
 
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+const aiObsLock = useLicenseLock("ai_observability");
 
 // OToggleGroup is controlled (`:model-value`), so refusing to emit the mode
 // change here is what keeps the locked Agent toggle from actually switching —

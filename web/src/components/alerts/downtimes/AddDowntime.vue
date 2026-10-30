@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   :icon-left="moduleLocks[m].locked.value ? 'lock' : MODULE_ICONS[m]"
                   :disabled="moduleLocks[m].locked.value"
+                  :focusable-unavailable="moduleLocks[m].locked.value"
                   :tooltip="
                     moduleLocks[m].locked.value ? moduleLocks[m].lockedReason.value : undefined
                   "

@@ -113,7 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="pattern-detail-create-alert-btn"
                 >
                   <template #icon-left>
-                    <OIcon name="lock" size="sm" data-test="pattern-detail-create-alert-lock" />
+                    <OIcon
+                      name="lock"
+                      class="text-icon-locked"
+                      size="sm"
+                      data-test="pattern-detail-create-alert-lock"
+                    />
                   </template>
                   {{ t("logs.patternList.createAlertAction") }}
                 </OButton>

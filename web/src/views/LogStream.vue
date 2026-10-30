@@ -112,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="log-stream-profiles-toggle"
                 >
                   <template #icon-left
-                    ><OIcon :name="profilesLocked ? 'lock' : 'memory'" size="xs" class="shrink-0"
+                    ><OIcon
+                      :name="profilesLocked ? 'lock' : 'memory'"
+                      size="xs"
+                      class="shrink-0"
+                      :class="profilesLocked && 'text-icon-locked'"
                   /></template>
                   {{ t("logStream.labelProfiles") }}
                 </OToggleGroupItem>

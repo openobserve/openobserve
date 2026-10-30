@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
                 >
                   <template #icon-left>
-                    <OIcon name="lock" size="sm" />
+                    <OIcon name="lock" class="text-icon-locked" size="sm" />
                   </template>
                   {{ t("traces.viewProfile") }}
                 </OButton>
@@ -468,6 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="correlated-logs"
           :label="t('correlation.correlatedLogs')"
           :suffix-icon="correlationTabLocked ? 'lock' : undefined"
+          :tooltip="correlationTabLocked ? correlationLockedReason : undefined"
           data-test="trace-details-sidebar-tabs-correlated-logs"
           class="font-normal! capitalize"
         />
@@ -476,6 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="correlated-metrics"
           :label="t('correlation.correlatedMetrics')"
           :suffix-icon="correlationTabLocked ? 'lock' : undefined"
+          :tooltip="correlationTabLocked ? correlationLockedReason : undefined"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
           class="font-normal! capitalize"
         />
@@ -1317,7 +1319,8 @@ export default defineComponent({
 
     const correlationAccess = useLockedAffordance("correlation");
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-    const { locked: correlationLicenseLocked } = useLicenseLock("correlation");
+    const { locked: correlationLicenseLocked, lockedReason: correlationLockedReason } =
+      useLicenseLock("correlation");
     const correlationTabLocked = computed(
       () => !correlationAccess.value.allowed || correlationLicenseLocked.value,
     );
@@ -2804,6 +2807,7 @@ export default defineComponent({
       t,
       correlationAccess,
       correlationLicenseLocked,
+      correlationLockedReason,
       correlationTabLocked,
       profilingLocked,
       profilingLockedReason,

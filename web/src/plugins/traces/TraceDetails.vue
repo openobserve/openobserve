@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="fact-check" size="sm" />
                 <template #icon-right
-                  ><OIcon name="lock" size="xs" class="text-warning-600"
+                  ><OIcon name="lock" size="xs" class="text-icon-locked"
                 /></template>
               </OButton>
             </template>
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="table-chart" size="sm" />
               <template v-if="!queuesAccess.allowed" #icon-right>
-                <OIcon name="lock" size="xs" class="text-warning-600" />
+                <OIcon name="lock" size="xs" class="text-icon-locked" />
               </template>
               <OTooltip
                 v-if="queuesAccess.allowed"
@@ -554,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   disabled
                 >
                   <template #icon-left>
-                    <OIcon name="lock" size="sm" />
+                    <OIcon name="lock" class="text-icon-locked" size="sm" />
                   </template>
                   {{ t("rum.playSessionReplay") }}
                 </OButton>

@@ -29,6 +29,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
 import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useOrgId } from "@/composables/query";
 import { escapeLabel, type QueryId } from "./kubernetesQueries";
@@ -229,17 +230,24 @@ const alertsTile = computed(() => {
   const firing = signals.firingAlerts.value.length;
   const incidents = signals.openIncidents.value.length;
   if (!signals.alertsAvailable.value && !signals.incidentsAvailable.value) {
+    const locked = signals.alertsLocked.value;
     return {
       value: "—",
-      sub: t("infra.k8s2.overviewKpiUnavailable"),
+      sub: locked ? signals.alertsLockedReason.value : t("infra.k8s2.overviewKpiUnavailable"),
       tone: "neutral" as StatTone,
+      locked,
     };
   }
   const sub =
     signals.incidentsAvailable.value && incidents
       ? t("infra.k8s2.overviewKpiAlertsIncidents", { count: incidents }, incidents)
       : t("infra.k8s2.overviewKpiAlertsFiring");
-  return { value: firing, sub, tone: (firing || incidents ? "error" : "success") as StatTone };
+  return {
+    value: firing,
+    sub,
+    tone: (firing || incidents ? "error" : "success") as StatTone,
+    locked: false,
+  };
 });
 
 const chartLabel = computed(
@@ -342,6 +350,7 @@ function openAlerts() {
 }
 
 function onAlertsTile() {
+  if (alertsTile.value.locked) return;
   if (!signals.alertsAvailable.value && signals.incidentsAvailable.value) openIncidents();
   else openAlerts();
 }
@@ -407,7 +416,7 @@ function onAlertsTile() {
           @click="emit('navigate', { view: 'events', status: 'warnings' })"
         />
         <OStatCard
-          clickable
+          :clickable="!alertsTile.locked"
           icon="campaign"
           :label="t('infra.k8s2.overviewKpiAlerts')"
           :value="alertsTile.value"
@@ -416,7 +425,20 @@ function onAlertsTile() {
           :loading="signals.alertsLoading.value"
           data-test="k8s2-overview-kpi-alerts"
           @click="onAlertsTile"
-        />
+        >
+          <template v-if="alertsTile.locked" #value>
+            <OTooltip :content="signals.alertsLockedReason.value">
+              <span class="inline-flex">
+                <OIcon
+                  name="lock"
+                  size="sm"
+                  class="text-icon-locked"
+                  data-test="k8s2-overview-kpi-alerts-lock"
+                />
+              </span>
+            </OTooltip>
+          </template>
+        </OStatCard>
       </div>
 
       <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
@@ -541,9 +563,13 @@ function onAlertsTile() {
             :incidents="signals.openIncidents.value"
             :incidents-visible="signals.incidentsAvailable.value"
             :incidents-loading="signals.incidentsLoading.value"
+            :incidents-locked="signals.incidentsLocked.value"
+            :incidents-locked-reason="signals.incidentsLockedReason.value"
             :alerts="signals.firingAlerts.value"
             :alerts-visible="signals.alertsAvailable.value"
             :alerts-loading="signals.alertsLoading.value"
+            :alerts-locked="signals.alertsLocked.value"
+            :alerts-locked-reason="signals.alertsLockedReason.value"
             :end-us="range.end"
             @open-incident="openIncident"
             @open-incidents="openIncidents"

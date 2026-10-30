@@ -71,47 +71,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              Both pickers are optional; assignments are applied after the
              account is created, and failures surface in the token-reveal
              screen without blocking it. -->
-        <template v-if="!beingUpdated && rbacLicensed">
+        <template v-if="!beingUpdated && rbacState !== 'hidden'">
           <!-- RBAC not allowed: the select would write to form state and the
                button would open AddRole on click, so a locked click is caught
                on this wrapper BEFORE it reaches either — removing `disabled`
                there would let the "real" action fire alongside the dialog. -->
-          <span
-            class="contents"
-            @click.capture="!rbacAccess.allowed ? onLockedRbacClick($event) : undefined"
-          >
-            <OFormSelect
-              name="roles"
-              multiple
-              :options="roleOptions"
-              :label="t('serviceAccounts.form.roles.label')"
-              data-test="iam-add-service-account-roles-select"
-              class="showLabelOnTop mt-2"
-            />
-            <div class="mt-1 flex justify-end">
-              <OButton
-                variant="ghost"
-                size="sm"
-                type="button"
-                data-test="iam-add-service-account-create-role-btn"
-                @click="!rbacAccess.allowed ? undefined : (showAddRoleDialog = true)"
+          <OTooltip :content="rbacLockedReason" :disabled="!rbacLocked">
+            <div
+              @click.capture="
+                !rbacAccess.allowed || rbacLocked ? onLockedRbacClick($event) : undefined
+              "
+            >
+              <OFormSelect
+                name="roles"
+                :disabled="rbacLocked"
+                multiple
+                :options="roleOptions"
+                :label="t('serviceAccounts.form.roles.label')"
+                data-test="iam-add-service-account-roles-select"
+                class="showLabelOnTop mt-2"
               >
-                <template v-if="!rbacAccess.allowed" #icon-left>
-                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                <template v-if="rbacLocked" #icon-left>
+                  <OIcon name="lock" size="sm" class="text-icon-locked" />
                 </template>
-                <template v-else #icon-left><OIcon name="add" size="sm" /></template>
-                {{ t("serviceAccounts.form.roles.create") }}
-              </OButton>
+              </OFormSelect>
+              <div class="mt-1 flex justify-end">
+                <OButton
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  :disabled="rbacLocked"
+                  data-test="iam-add-service-account-create-role-btn"
+                  @click="!rbacAccess.allowed ? undefined : (showAddRoleDialog = true)"
+                >
+                  <template v-if="!rbacAccess.allowed || rbacLocked" #icon-left>
+                    <OIcon name="lock" size="sm" class="text-icon-locked" />
+                  </template>
+                  <template v-else #icon-left><OIcon name="add" size="sm" /></template>
+                  {{ t("serviceAccounts.form.roles.create") }}
+                </OButton>
+              </div>
+              <OFormSelect
+                name="groups"
+                :disabled="rbacLocked"
+                multiple
+                :options="groupOptions"
+                :label="t('serviceAccounts.form.groups.label')"
+                data-test="iam-add-service-account-groups-select"
+                class="showLabelOnTop mt-2"
+              >
+                <template v-if="rbacLocked" #icon-left>
+                  <OIcon name="lock" size="sm" class="text-icon-locked" />
+                </template>
+              </OFormSelect>
             </div>
-            <OFormSelect
-              name="groups"
-              multiple
-              :options="groupOptions"
-              :label="t('serviceAccounts.form.groups.label')"
-              data-test="iam-add-service-account-groups-select"
-              class="showLabelOnTop mt-2"
-            />
-          </span>
+          </OTooltip>
         </template>
       </OForm>
     </div>
@@ -149,6 +163,8 @@ import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { updateRole, updateGroup } from "@/services/iam";
 import { featureState } from "@/utils/featureGate";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -171,7 +187,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { ODialog, OForm, OFormInput, OFormSelect, OButton, OIcon, AddRole },
+  components: { ODialog, OForm, OFormInput, OFormSelect, OButton, OIcon, OTooltip, AddRole },
   props: {
     open: {
       type: Boolean,
@@ -229,14 +245,15 @@ export default defineComponent({
     const rbacAccess = useLockedAffordance("rbac");
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
     // Every role/group list and assignment API needs the rbac license; without it the pickers go.
-    const rbacLicensed = computed(
-      () => featureState(store.state.zoConfig?.features, "rbac") === "enabled",
-    );
+    const rbacState = computed(() => featureState(store.state.zoConfig?.features, "rbac"));
+    const rbacLicensed = computed(() => rbacState.value === "enabled");
+    const rbacLocked = computed(() => rbacState.value === "locked");
+    const { lockedReason: rbacLockedReason } = useLicenseLock("rbac");
 
     function onLockedRbacClick(event: MouseEvent) {
       event.preventDefault();
       event.stopPropagation();
-      openUpgradeDialog();
+      if (!rbacLocked.value) openUpgradeDialog();
     }
 
     const roleOptions = ref<SelectOption[]>([]);
@@ -283,7 +300,9 @@ export default defineComponent({
       addServiceAccountSchema,
       addServiceAccountDefaults,
       rbacAccess,
-      rbacLicensed,
+      rbacState,
+      rbacLocked,
+      rbacLockedReason,
       onLockedRbacClick,
       roleOptions,
       groupOptions,

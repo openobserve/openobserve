@@ -67,7 +67,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              affordance when it can't apply is cleaner (ui-architect empty-affordance
              rule). The tooltip explains the concept when the entry IS available. -->
         <OTooltip
-          v-if="genAiAgentMappingAccess.allowed && canCompare && !compareMode"
+          v-if="aiObsLock.locked.value && !compareMode"
+          :content="aiObsLock.lockedReason.value"
+        >
+          <span class="inline-flex">
+            <OButton
+              variant="outline"
+              size="sm"
+              disabled
+              icon-left="lock"
+              data-test="llm-insights-compare-license-locked"
+            >
+              {{ t("traces.lLMInsightsDashboard.compareEntry") }}
+            </OButton>
+          </span>
+        </OTooltip>
+        <OTooltip
+          v-else-if="genAiAgentMappingAccess.allowed && canCompare && !compareMode"
           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
         >
           <OButton
@@ -93,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openUpgradeDialog"
           >
             <template #icon-right
-              ><OIcon name="lock" size="sm" class="text-warning-600"
+              ><OIcon name="lock" size="sm" class="text-icon-locked"
             /></template>
             {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
@@ -340,6 +356,7 @@ import VersionCompareView from "@/enterprise/components/AIObservability/VersionC
 import { useVersionCompare } from "./composables/useVersionCompare";
 import analytics from "@/services/product_analytics";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
 const { t } = useI18nTyped();
@@ -419,6 +436,7 @@ const genAiAgentMappingAccess = checkFeatureAccess(
   buildFeatureGateContext(store.state.zoConfig),
 );
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+const aiObsLock = useLicenseLock("ai_observability");
 // Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
 // page lands on Agent for consistency. Only an explicit `?type=stream` URL param
 // overrides it (a stale saved preference must not silently land on Stream).
@@ -426,7 +444,11 @@ const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 // compare), so OSS is pinned to Stream regardless of the URL/localStorage — the
 // toggle to reach Agent is locked, not gone, but clicking it is a no-op.
 const filterMode = ref<"stream" | "agent">(
-  !genAiAgentMappingAccess.allowed ? "stream" : urlType === "stream" ? "stream" : "agent",
+  !genAiAgentMappingAccess.allowed || aiObsLock.locked.value
+    ? "stream"
+    : urlType === "stream"
+      ? "stream"
+      : "agent",
 );
 // Env/name/version to seed the cascade with once the list loads: the URL
 // deep-link first, else the persisted last selection. Resolved into

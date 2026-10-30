@@ -990,6 +990,7 @@ const useRoutes = () => {
       component: AlertsDestinationList,
       meta: {
         titleKey: "alert_destinations.header",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1001,6 +1002,7 @@ const useRoutes = () => {
       component: TemplateList,
       meta: {
         titleKey: "alert_templates.header",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
