@@ -141,6 +141,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-status="{ row }">
                   <TraceStatusCell :item="row" />
                 </template>
+
+                <template #[`cell-${SPAN_ERROR_COLUMN_ID}`]="{ row }">
+                  <SpanErrorCell :row="row" :timestamp-field="timestampCol" />
+                </template>
+
+                <template #[`cell-${SPAN_EVENTS_COLUMN_ID}`]="{ row }">
+                  <SpanEventsCell :row="row" :timestamp-field="timestampCol" />
+                </template>
                 <template #cell-input_tokens="{ row }">
                   <span class="text-text-body font-mono text-xs" data-test="trace-row-input-tokens">
                     {{
@@ -256,13 +264,19 @@ import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
-import { useTracesTableColumns } from "@/plugins/traces/composables/useTracesTableColumns";
+import {
+  SPAN_DERIVED_COLUMN_IDS,
+  useTracesTableColumns,
+} from "@/plugins/traces/composables/useTracesTableColumns";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
 import TraceStatusCell from "./TraceStatusCell.vue";
 import SpanStatusPill from "./SpanStatusPill.vue";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
+import SpanErrorCell from "./SpanErrorCell.vue";
+import SpanEventsCell from "./SpanEventsCell.vue";
+import { SPAN_ERROR_COLUMN_ID, SPAN_EVENTS_COLUMN_ID } from "./spanResultCells";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
 import { formatTimeWithSuffix } from "../../../utils/zincutils";
 import { escapeSingleQuotes } from "../../../utils/queryUtils";
@@ -513,7 +527,7 @@ onMounted(() => {
 const onColumnReorder = (newOrder: string[]) => {
   const mode = props.searchMode ?? "traces";
   searchObj.data.stream.selectedFields = newOrder.filter(
-    (id) => id !== store.state.zoConfig.timestamp_column,
+    (id) => id !== store.state.zoConfig.timestamp_column && !SPAN_DERIVED_COLUMN_IDS.has(id),
   );
   // useTraces only persists per traces/spans; other modes have no column state.
   updatedLocalLogFilterField(mode as "traces" | "spans");

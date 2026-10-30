@@ -316,6 +316,7 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
+import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -405,6 +406,8 @@ const {
   searchObj,
   resetSearchObj,
   getUrlQueryParams,
+  applyUrlListState,
+  syncUrlViewState,
   copyTracesUrl,
   formatTracesMetaData,
   setServiceColors,
@@ -497,6 +500,9 @@ let currentCountTraceId: string | null = null;
 let builtWhereClause = "";
 // Paging must keep page 1's filter, so later editor edits never mix into it.
 let submittedFilter = "";
+// A link's page applies to the first search after it is read; any later Run starts at page 1.
+let pendingUrlPage: number | null = null;
+const stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
 const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
 
@@ -905,6 +911,7 @@ async function getQueryData(
       submittedFilter = buildEditorFilter();
       searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
       dropStaleSelection();
+      searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
     }
     const combinedFilter = submittedFilter;
     const historyRun = recordRun && !isPagination ? tracesHistoryRun(queryReq) : null;
@@ -1416,14 +1423,32 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-  if (!searchObj.data.stream.selectedStream.value) return;
-  // Only a restore from recent searches is a user run; any other landing runs without recording.
-  if (landing) {
-    if (landing.run) searchData();
-    return;
+  const forcedRun = await consumeRunQueryFlag();
+  if (searchObj.data.stream.selectedStream.value) {
+    // Only a restore from recent searches is a user run; any other landing runs without recording.
+    if (landing) {
+      if (landing.run) searchData();
+    } else if ((streamFromUrl || !isAutoRunOff()) && (forcedRun || !reopensStagedEdit())) {
+      searchData(false);
+    }
   }
-  if (streamFromUrl || !isAutoRunOff()) searchData(false);
+  pendingUrlPage = null;
 }
+
+// run-query is one-shot; left in the entry, Back to it would run whatever edit was staged there later.
+const consumeRunQueryFlag = async () => {
+  const query = { ...router.currentRoute.value.query };
+  if (!("run-query" in query)) return false;
+  const forced = query["run-query"] === "true";
+  delete query["run-query"];
+  await router.replace({ query });
+  return forced;
+};
+
+// Back from a trace remounts this page over the results it left; a staged edit comes back staged, not run.
+const reopensStagedEdit = () =>
+  !!searchObj.data.queryResults?.hits?.length &&
+  tracesRunIsStaged(searchObj, store.state.zoConfig?.auto_query_enabled);
 
 onBeforeMount(async () => {
   if (
@@ -1440,6 +1465,8 @@ onBeforeMount(async () => {
   await loadTracesParser();
   if (!searchObj.loading) {
     await loadPageData();
+  } else {
+    pendingUrlPage = null;
   }
 });
 
@@ -1448,6 +1475,7 @@ onDeactivated(() => {
 });
 
 onUnmounted(() => {
+  stopUrlSync();
   cleanupContextProvider();
 });
 
@@ -1487,7 +1515,8 @@ onActivated(async () => {
 
 /** Runs the search; `record` is false for runs no user asked for, such as a page landing. */
 const runQueryFn = (record = true) => {
-  searchObj.data.resultGrid.currentPage = 0;
+  searchObj.data.resultGrid.currentPage = pendingUrlPage ?? 0;
+  pendingUrlPage = null;
   searchObj.runQuery = false;
   getQueryData(false, false, record);
 };
@@ -1509,6 +1538,7 @@ function tracesHistoryRun(queryReq: { query: { start_time: number; end_time: num
 }
 
 const runQueryOnSort = () => {
+  pendingUrlPage = null;
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.runQuery = false;
   getQueryData(false, true);
@@ -1540,6 +1570,8 @@ function restoreUrlQueryParams() {
       value: queryParams.stream,
     };
   }
+
+  pendingUrlPage = applyUrlListState(queryParams).currentPage;
 }
 
 const onSplitterUpdate = () => {
@@ -1600,11 +1632,11 @@ const onMetricsEditorFilterSet = (text: string) => {
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
-// A comparison filter is an explicit apply from a page the search closes, so it searches in manual mode too.
+// With auto-run off the comparison filter stays staged like any other edit; Run applies it and closes Drill down.
 const onMetricsEditorFilterRun = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
-  searchData();
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,
@@ -2004,6 +2036,11 @@ const getMoreData = () => {
 
 const onChangeStream = async () => {
   await extractFields();
+  // Swap in the new stream's columns now, or the URL sync writes the old stream's columns into its URL.
+  if (searchObj.meta.searchMode === "spans" || searchObj.meta.searchMode === "traces") {
+    loadLocalLogFilterField(searchObj.meta.searchMode);
+    rebuildColumns();
+  }
   if (!isAutoRunOff()) runQueryFn();
 };
 
