@@ -89,7 +89,8 @@ vi.mock("@/components/dashboards/settings/AnnotationSettings.vue", () => ({
 }));
 
 // Mock getImageURL utility
-vi.mock("../../utils/zincutils", () => ({
+vi.mock("../../utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../utils/zincutils")>()),
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 

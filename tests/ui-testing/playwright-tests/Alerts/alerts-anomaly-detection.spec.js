@@ -408,7 +408,10 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.addFilter('kubernetes_namespace_name', '=', 'ziox');
       await expect(rows).toHaveCount(initial + 1);
 
-      await pm.anomalyDetectionPage.removeFilter(initial);
+      await expect(pm.anomalyDetectionPage.filterBuilder().chip('kubernetes_namespace_name'))
+        .toContainText('ziox');
+
+      await pm.anomalyDetectionPage.removeFilter('kubernetes_namespace_name');
       await expect(rows).toHaveCount(initial);
     });
 

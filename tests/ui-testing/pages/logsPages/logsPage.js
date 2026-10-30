@@ -315,8 +315,8 @@ export class LogsPage {
         // the hidden one and fail Playwright's visibility actionability check.
         this.fieldListSearchInput = '[data-test="logs-build-query-page"] [data-test="o-field-list-search-field"]';
         this.fieldListSearchInputWrapper = '[data-test="logs-build-query-page"] [data-test="o-field-list-search"]';
-        // Builder filter conditions — each rendered with data-test="dashboard-add-condition-label-{index}-{label}"
-        this.filterConditionLabelItems = '[data-test^="dashboard-add-condition-label-"]';
+        // Builder filter conditions — each a chip of the shared filter builder, data-test="dashboard-filter-builder-chip-{field}"
+        this.filterConditionLabelItems = '[data-test^="dashboard-filter-builder-chip-"]:has([data-test$="-field"])';
 
         // Chart selection
         this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
@@ -11318,7 +11318,7 @@ export class LogsPage {
     /**
      * Check if the filter section has any conditions populated.
      * Looks for filter condition items inside the filter layout.
-     * Filter conditions use data-test="dashboard-add-condition-label-{index}-{label}" pattern.
+     * Filter conditions are chips with data-test="dashboard-filter-builder-chip-{field}".
      * @returns {Promise<number>} Number of filter conditions found
      */
     async getFilterConditionCount() {

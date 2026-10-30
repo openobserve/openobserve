@@ -170,79 +170,47 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const initialCount = await builder.getLabelFilterCount();
     testLogger.info(`Initial filter count: ${initialCount}`);
 
-    // 2. Add first filter and verify default text
+    // 2. Opening the bar lists the metric's labels; nothing is added until a matcher is complete
     await builder.clickAddLabelFilter();
-    expect(await builder.getLabelFilterCount()).toBe(initialCount + 1);
-    const defaultText = await builder.getLabelFilterText(0);
-    expect(defaultText).toContain('Select label');
-    testLogger.info('First filter added with "Select label" default');
+    expect(await builder.getLabelFilterCount()).toBe(initialCount);
+    const firstLabel = await builder.firstOptionKey();
+    testLogger.info(`First label: ${firstLabel}`);
 
-    // 3. Open filter menu and verify dropdowns
-    await builder.openLabelFilterMenu(0);
-    await expect(builder.labelSelectLast).toBeVisible({ timeout: 5000 });
-    await expect(builder.operatorSelectLast).toBeVisible();
-    await expect(builder.valueSelectLast).toBeVisible();
-    testLogger.info('Label, Operator, Value dropdowns all visible');
+    if (firstLabel) {
+      // 3. Picking a label lists PromQL's matchers, plus IN / NOT IN written as an alternation
+      await builder.getLabelFilterOption(firstLabel).click();
+      for (const id of ['eq', 'neq', 'regex', 'not_regex', 'in', 'not_in']) {
+        await expect(builder.getLabelFilterOption(id)).toBeVisible({ timeout: 5000 });
+      }
+      testLogger.info('Operators verified: =, !=, =~, !~, IN, NOT IN');
 
-    // 4. Verify value dropdown is disabled (no label selected yet)
-    const isDisabled = await builder.isValueSelectDisabled();
-    expect(isDisabled).toBe(true);
-    testLogger.info('Value dropdown disabled before label selection');
+      // 4. "=" then the first loaded value completes the chip
+      await builder.selectOperator('=');
+      const firstValue = await builder.selectFirstLabelValue();
+      await builder.labelBuilder.close();
+      expect(await builder.getLabelFilterCount()).toBe(initialCount + 1);
+      const chipText = await builder.getLabelFilterText(0);
+      expect(chipText).toContain(firstLabel);
+      if (firstValue) expect(chipText).toContain(firstValue);
+      testLogger.info(`Chip text: "${chipText}"`);
 
-    // 5. Verify operator dropdown has all 4 operators
-    // Operator dropdown is OSelect (Reka Select) post-migration; popover/items
-    // use forwarded data-test attributes.
-    await builder.operatorSelectLast.click();
-    await builder.operatorPopover.waitFor({ state: 'visible', timeout: 5000 });
-    const operators = ['=', '!=', '=~', '!~'];
-    expect(await builder.operatorOptions.count()).toBeGreaterThanOrEqual(4);
-    for (const op of operators) {
-      expect(await builder.getOperatorOptionByValue(op).count()).toBeGreaterThan(0);
-    }
-    testLogger.info('All 4 operators verified: =, !=, =~, !~');
-    await page.keyboard.press('Escape');
-    await builder.operatorPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      // 5. A regex value is typed, not picked
+      await builder.addCompleteLabelFilter(firstLabel, '=~', '.+');
+      await builder.addCompleteLabelFilter(firstLabel, '!~', 'zz.*');
+      expect(await builder.getLabelFilterCount()).toBe(initialCount + 3);
+      expect(await builder.getLabelFilterText(1)).toContain('.+');
+      testLogger.info('Added 2 typed regex matchers, total: ' + (initialCount + 3));
 
-    // 6. Select a label and verify chip text updates
-    await builder.labelSelectLast.click();
-    await builder.labelPopover.waitFor({ state: 'visible', timeout: 5000 });
-    const labelCount = await builder.labelOptions.count();
-    testLogger.info(`Available labels: ${labelCount}`);
-
-    if (labelCount > 0) {
-      const firstLabelText = await builder.labelOptions.first().textContent();
-      await builder.labelOptions.first().click();
-      await builder.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-      testLogger.info(`Selected label: ${firstLabelText}`);
-
-      // Default operator should be "="
-      const opText = await builder.operatorSelectLast.textContent().catch(() => '');
-      expect(opText).toContain('=');
-      testLogger.info(`Default operator: ${opText}`);
-
-      await page.keyboard.press('Escape');
-
-      // Chip text should no longer say "Select label"
-      const updatedText = await builder.getLabelFilterText(0);
-      expect(updatedText).not.toContain('Select label');
-      testLogger.info(`Updated chip text: "${updatedText}"`);
+      // 6. Remove all filters
+      await builder.removeLabelFilter(2);
+      await builder.removeLabelFilter(1);
+      await builder.removeLabelFilter(0);
+      expect(await builder.getLabelFilterCount()).toBe(0);
+      testLogger.info('All filters removed');
     } else {
-      await page.keyboard.press('Escape');
+      await builder.labelBuilder.close();
       testLogger.warn('No labels available');
     }
-
-    // 7. Add more filters and verify count
-    await builder.clickAddLabelFilter();
-    await builder.clickAddLabelFilter();
-    expect(await builder.getLabelFilterCount()).toBe(initialCount + 3);
-    testLogger.info('Added 2 more filters, total: ' + (initialCount + 3));
-
-    // 8. Remove all filters
-    await builder.removeLabelFilter(2);
-    await builder.removeLabelFilter(1);
-    await builder.removeLabelFilter(0);
-    expect(await builder.getLabelFilterCount()).toBe(0);
-    testLogger.info('All filters removed');
   });
 
   // =========================================================================
@@ -447,8 +415,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const builder = pm.metricsBuilderPage;
 
     // Setup: add filter, operation, step value
-    await builder.clickAddLabelFilter();
-    expect(await builder.getLabelFilterCount()).toBe(1);
+    const added = await builder.addFirstLabelFilter();
+    expect(await builder.getLabelFilterCount()).toBe(added.label ? 1 : 0);
 
     const opAdded = await builder.addOperation('Rate');
     expect(opAdded).toBe(true);
@@ -468,7 +436,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Switched back to Builder mode');
 
     // Verify all state persisted
-    expect(await builder.getLabelFilterCount()).toBe(1);
+    expect(await builder.getLabelFilterCount()).toBe(added.label ? 1 : 0);
     expect(await builder.getOperationCount()).toBe(1);
 
     expect(await builder.getStepValue()).toBe('2m');
@@ -498,7 +466,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.selectLast15Minutes();
 
     // 3. Add label filter
-    await builder.clickAddLabelFilter();
+    const added = await builder.addFirstLabelFilter();
+    expect(added.label).not.toBe('');
     expect(await builder.getLabelFilterCount()).toBeGreaterThan(0);
 
     // 4. Add Rate operation
@@ -708,7 +677,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.selectLast15Minutes();
 
     // 2. Add label filter
-    await builder.clickAddLabelFilter();
+    const added = await builder.addFirstLabelFilter();
+    expect(added.label).not.toBe('');
     expect(await builder.getLabelFilterCount()).toBe(1);
 
     // 3. Add Rate operation
@@ -771,53 +741,18 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Time range: last 15 minutes');
 
     // 3. Add a label filter and fully configure label + operator + value
-    await builder.clickAddLabelFilter();
-    expect(await builder.getLabelFilterCount()).toBe(1);
-
-    // Open filter menu to configure it
-    await builder.openLabelFilterMenu(0);
-
-    // Select a label — OSelect post-migration, options use forwarded data-test
-    await builder.labelSelectLast.click();
-    await builder.labelPopover.waitFor({ state: 'visible', timeout: 5000 });
-
-    const labelCount = await builder.labelOptions.count();
-    let selectedLabel = '';
-    let selectedOperator = '=';
-    let selectedValue = '';
-
-    if (labelCount > 0) {
-      selectedLabel = (await builder.labelOptions.first().textContent()).trim();
-      await builder.labelOptions.first().click();
-      await builder.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-      testLogger.info(`Selected label: ${selectedLabel}`);
-
-      // Verify default operator is "="
-      const operatorText = await builder.operatorSelectLast.textContent().catch(() => '');
-      expect(operatorText).toContain('=');
-      selectedOperator = operatorText.trim();
-      testLogger.info(`Operator: ${selectedOperator}`);
-
-      // Select a value (gates on the async values fetch so the filter isn't left empty)
-      selectedValue = await builder.selectFirstLabelValue();
-      if (selectedValue) {
-        testLogger.info(`Selected value: ${selectedValue}`);
-      }
-
-      // Close the filter menu — LabelFilterEditor chip menu is ODropdown post-migration
-      await page.keyboard.press('Escape');
-      await builder.getLabelFilterMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-
-      // Assert: chip text shows "label = value" pattern (e.g. "environment = development")
+    const added = await builder.addFirstLabelFilter();
+    const selectedLabel = added.label;
+    const selectedValue = added.value;
+    if (selectedLabel) {
+      expect(await builder.getLabelFilterCount()).toBe(1);
       const chipText = await builder.getLabelFilterText(0);
-      expect(chipText).not.toContain('Select label');
       expect(chipText).toContain(selectedLabel);
       if (selectedValue) {
         expect(chipText).toContain(selectedValue);
       }
       testLogger.info(`Filter chip: "${chipText}"`);
     } else {
-      await page.keyboard.press('Escape');
       testLogger.info('No labels available, continuing without label filter config');
     }
 
@@ -968,39 +903,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.selectLast15Minutes();
 
     // 3. Add label filter and configure label + operator(=) + value
-    await builder.clickAddLabelFilter();
-    expect(await builder.getLabelFilterCount()).toBe(1);
-
-    await builder.openLabelFilterMenu(0);
-    await builder.labelSelectLast.click();
-    // OSelect post-migration; popover/options use forwarded data-test
-    await builder.labelPopover.waitFor({ state: 'visible', timeout: 5000 });
-
-    const labelCount = await builder.labelOptions.count();
-    let selectedLabel = '';
-    let selectedValue = '';
-
-    if (labelCount > 0) {
-      selectedLabel = (await builder.labelOptions.first().textContent()).trim();
-      await builder.labelOptions.first().click();
-      await builder.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-      testLogger.info(`Label: ${selectedLabel}`);
-
-      // Operator defaults to "="
-      const operatorText = await builder.operatorSelectLast.textContent().catch(() => '');
-      expect(operatorText).toContain('=');
-
-      // Select value (gates on the async values fetch so the filter isn't left empty)
-      selectedValue = await builder.selectFirstLabelValue();
-      if (selectedValue) {
-        testLogger.info(`Value: ${selectedValue}`);
-      }
-
-      await page.keyboard.press('Escape');
-      // LabelFilterEditor chip menu = ODropdown post-migration
-      await builder.getLabelFilterMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-
-      // Assert chip shows label = value
+    const added = await builder.addFirstLabelFilter();
+    const selectedLabel = added.label;
+    const selectedValue = added.value;
+    if (selectedLabel) {
+      expect(await builder.getLabelFilterCount()).toBe(1);
       const chipText = await builder.getLabelFilterText(0);
       expect(chipText).toContain(selectedLabel);
       if (selectedValue) {
@@ -1008,8 +915,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       }
       testLogger.info(`Filter chip: "${chipText}"`);
     } else {
-      await page.keyboard.press('Escape');
-      testLogger.info('No labels available');
+      testLogger.info('No labels available, continuing without label filter config');
     }
 
     // 4. Add Sum operation
@@ -1143,39 +1049,19 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.selectLast15Minutes();
 
     // 3. Add label filter with label + operator(=) + value
-    await builder.clickAddLabelFilter();
-    expect(await builder.getLabelFilterCount()).toBe(1);
-
-    await builder.openLabelFilterMenu(0);
-    await builder.labelSelectLast.click();
-    // OSelect post-migration; popover/options use forwarded data-test
-    await builder.labelPopover.waitFor({ state: 'visible', timeout: 5000 });
-
-    const labelCount = await builder.labelOptions.count();
-    let selectedLabel = '';
-    let selectedValue = '';
-
-    if (labelCount > 0) {
-      selectedLabel = (await builder.labelOptions.first().textContent()).trim();
-      await builder.labelOptions.first().click();
-      await builder.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-      testLogger.info(`Label: ${selectedLabel}`);
-
-      // Select value (gates on the async values fetch so the filter isn't left empty)
-      selectedValue = await builder.selectFirstLabelValue();
-      if (selectedValue) {
-        testLogger.info(`Value: ${selectedValue}`);
-      }
-      await page.keyboard.press('Escape');
-      // LabelFilterEditor chip menu = ODropdown post-migration
-      await builder.getLabelFilterMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-
-      // Assert chip text
+    const added = await builder.addFirstLabelFilter();
+    const selectedLabel = added.label;
+    const selectedValue = added.value;
+    if (selectedLabel) {
+      expect(await builder.getLabelFilterCount()).toBe(1);
       const chipText = await builder.getLabelFilterText(0);
       expect(chipText).toContain(selectedLabel);
+      if (selectedValue) {
+        expect(chipText).toContain(selectedValue);
+      }
       testLogger.info(`Filter chip: "${chipText}"`);
     } else {
-      await page.keyboard.press('Escape');
+      testLogger.info('No labels available, continuing without label filter config');
     }
 
     // 4. Add Sum operation

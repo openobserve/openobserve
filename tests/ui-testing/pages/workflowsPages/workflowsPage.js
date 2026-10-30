@@ -21,6 +21,7 @@ const { expect, test } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 const LIST_TIMEOUT_MS = 45000;   // K10: list load is slow
 const DRAWER_TIMEOUT_MS = 25000; // K11: bumped from 15s — drawer dropdowns under CI parallel load
@@ -240,16 +241,10 @@ class WorkflowsPage {
     this.conditionNote = '[data-test="workflow-condition-note"]';
     this.conditionNoteDismiss = '[data-test="workflow-condition-note-dismiss"]';
     this.conditionBuilder = '[data-test="condition-builder"]';
-    this.condColumnTrigger = '[data-test="alert-conditions-select-column-trigger"]';
-    this.condColumnSearch = '[data-test="alert-conditions-select-column-search"]';
-    this.condColumnOption = '[data-test="alert-conditions-select-column-option"]';
-    this.condOperatorTrigger = '[data-test="alert-conditions-operator-select-trigger"]';
-    this.condOperatorOption = '[data-test="alert-conditions-operator-select-option"]';
-    // v-if'd away entirely for unary operators (is_null/is_empty/...) — absence,
-    // not an empty string, is what a unary operator looks like in the DOM.
-    this.condValueField = '[data-test="alert-conditions-value-input-field"]';
-    this.condAddBtn = '[data-test="alert-conditions-add-condition-btn"]';
-    this.condDeleteBtn = '[data-test="alert-conditions-delete-condition-btn"]';
+    // The shared condition builder (FilterBuilder, prefix "condition-builder"); a unary
+    // chip (is_null / is_empty ...) has no value part.
+    this.conditions = new FilterBuilderDriver(page, 'condition-builder');
+    this.condValueField = '[data-test^="condition-builder-chip-"][data-test$="-value"]';
   }
 
   // Workflows is an Enterprise-only feature: on a build without it the API answers 404/403.
@@ -532,11 +527,8 @@ class WorkflowsPage {
     }
     if (column !== undefined) {
       await this.dismissConditionGuidelinesIfPresent();
-      await this.pickSelectOption(`${row} ${this.condColumnTrigger}`, this.condColumnOption, column);
-      await this.pickSelectOption(`${row} ${this.condOperatorTrigger}`, this.condOperatorOption, operator);
-      if (value !== undefined) {
-        await this.page.locator(`${row} ${this.condValueField}`).fill(value);
-      }
+      const builder = new FilterBuilderDriver(this.page, 'condition-builder', this.page.locator(row));
+      await builder.addCondition(column, operator, value);
     }
   }
 
@@ -950,7 +942,14 @@ class WorkflowsPage {
 
   /** Column values the condition builder offers — trigger-kind specific. */
   async conditionColumnValues() {
-    return this.selectOptionValues(this.condColumnTrigger, this.condColumnOption);
+    await this.conditions.openNewCondition();
+    const prefix = 'condition-builder-suggest-item-';
+    const keys = await this.page
+      .locator(`[data-test^="${prefix}"]`)
+      .evaluateAll((els, p) => els.map((e) => e.getAttribute('data-test').slice(p.length)), prefix);
+    await this.conditions.closePicker();
+    // Picker rows that are not fields (start a group, use typed text) carry a control-character key.
+    return keys.filter((key) => !key.startsWith('\u0000'));
   }
 
   /**
@@ -960,11 +959,7 @@ class WorkflowsPage {
   async setCondition({ column, operator, value }) {
     await this.page.locator(this.conditionBuilder).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     await this.dismissConditionGuidelinesIfPresent();
-    await this.pickSelectOption(this.condColumnTrigger, this.condColumnOption, column);
-    await this.pickSelectOption(this.condOperatorTrigger, this.condOperatorOption, operator);
-    if (value !== undefined) {
-      await this.page.locator(this.condValueField).fill(value);
-    }
+    await this.conditions.addCondition(column, operator, value);
   }
 
   /**
@@ -973,13 +968,10 @@ class WorkflowsPage {
    * operators against one column.
    */
   async setConditionOperator(operator, value) {
-    await this.pickSelectOption(this.condOperatorTrigger, this.condOperatorOption, operator);
-    if (value !== undefined) {
-      await this.page.locator(this.condValueField).fill(value);
-    }
+    await this.conditions.changeOperator(0, operator, value);
   }
 
-  /** Unary operators remove the value input from the DOM (v-if), not just clear it. */
+  /** A unary chip has no value part at all. */
   async expectConditionValueAbsent() {
     await expect(this.page.locator(this.condValueField)).toHaveCount(0);
   }

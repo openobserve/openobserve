@@ -226,6 +226,25 @@ impl OnlineEvalJob {
         Ok(())
     }
 
+    /// Extended-operator value checks on the job filter, end signals and span selector filters.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        validate_condition_json_operator_values(&self.filter_condition)?;
+        let end_signals = [
+            self.trace_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+            self.session_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        ];
+        for signal in end_signals.into_iter().flatten() {
+            validate_condition_json_operator_values(signal)?;
+        }
+        self.span_selectors.iter().try_for_each(|selector| {
+            validate_condition_json_operator_values(&selector.filter_condition)
+        })
+    }
+
     pub fn validate_for_activation(&self) -> Result<(), &'static str> {
         self.validate()?;
         if !matches!(self.target_scope, TargetScope::Trace) {
@@ -735,6 +754,28 @@ mod tests {
             created_at: 1000,
             updated_at: 2000,
         }
+    }
+
+    #[test]
+    fn test_validate_operator_values_checks_filter_and_end_signal() {
+        let mut job = OnlineEvalJob::from(make_model());
+        assert!(job.validate_operator_values().is_ok());
+
+        job.filter_condition = end_signal();
+        assert!(job.validate_operator_values().is_ok());
+
+        let mut bad_signal = end_signal();
+        bad_signal["conditions"]["conditions"][0]["operator"] = serde_json::json!("re_match");
+        bad_signal["conditions"]["conditions"][0]["value"] = serde_json::json!("(");
+        job.trace_config = Some(TraceEvalConfig {
+            end_signal: Some(bad_signal.clone()),
+            ..TraceEvalConfig::default()
+        });
+        assert!(job.validate_operator_values().is_err());
+
+        job.trace_config = None;
+        job.filter_condition = bad_signal["conditions"].clone();
+        assert!(job.validate_operator_values().is_err());
     }
 
     #[test]

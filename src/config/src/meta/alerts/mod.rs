@@ -35,6 +35,7 @@ pub mod aggregation_level;
 pub mod alert;
 pub mod auto_investigate;
 pub mod composite;
+pub mod condition_ops;
 pub mod content_spec;
 pub mod dispatch;
 pub mod grouping;
@@ -378,6 +379,11 @@ impl TriggerCondition {
 }
 
 impl TriggerCondition {
+    /// Rejects the list/pattern operators, which a numeric threshold cannot evaluate.
+    pub fn validate_threshold_operator(&self) -> Result<(), String> {
+        reject_extended_threshold_operator("trigger condition", self.operator)
+    }
+
     /// How long a group of this alert may go unobserved before M-7 resolves it,
     /// in microseconds, measured from `last_seen`.
     ///
@@ -561,6 +567,17 @@ pub struct QueryCondition {
 }
 
 impl QueryCondition {
+    /// Rejects the list/pattern operators on the aggregation `having` and the PromQL condition.
+    pub fn validate_threshold_operators(&self) -> Result<(), String> {
+        if let Some(agg) = self.aggregation.as_ref() {
+            reject_extended_threshold_operator("aggregation having", agg.having.operator)?;
+        }
+        if let Some(cond) = self.promql_condition.as_ref() {
+            reject_extended_threshold_operator("PromQL condition", cond.operator)?;
+        }
+        Ok(())
+    }
+
     /// Whether this alert evaluates and pages per group.
     ///
     /// The aggregation and PromQL families store the opt-in in different places
@@ -624,6 +641,32 @@ pub enum ConditionList {
     #[serde(serialize_with = "serialize_legacy_conditions")]
     LegacyConditions(Vec<Condition>),
     EndCondition(Condition),
+}
+
+impl ConditionList {
+    /// Save-time value checks for the extended operators; other operators always pass.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        match self {
+            ConditionList::OrNode { or: nodes } | ConditionList::AndNode { and: nodes } => nodes
+                .iter()
+                .try_for_each(ConditionList::validate_operator_values),
+            ConditionList::NotNode { not } => not.validate_operator_values(),
+            ConditionList::LegacyConditions(conditions) => conditions.iter().try_for_each(|c| {
+                condition_ops::validate_condition_value(
+                    &c.column,
+                    &c.operator,
+                    &c.value,
+                    c.extended_case_insensitive(),
+                )
+            }),
+            ConditionList::EndCondition(c) => condition_ops::validate_condition_value(
+                &c.column,
+                &c.operator,
+                &c.value,
+                c.extended_case_insensitive(),
+            ),
+        }
+    }
 }
 
 impl MemorySize for ConditionList {
@@ -904,8 +947,24 @@ pub struct Condition {
     pub operator: Operator,
     #[schema(value_type = Object)]
     pub value: Value,
+    /// Legacy flag: honoured only by the V2 in-memory evaluators and the extended operators.
     #[serde(default)]
     pub ignore_case: bool,
+    /// Case-insensitive matching for every string operator on every evaluation path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_insensitive: Option<bool>,
+}
+
+impl Condition {
+    /// Case folding for the original operators; the legacy `ignore_case` does not apply here.
+    pub fn is_case_insensitive(&self) -> bool {
+        self.case_insensitive.unwrap_or(false)
+    }
+
+    /// Case folding for the extended operators, which have no legacy `ignore_case` entries.
+    pub fn extended_case_insensitive(&self) -> bool {
+        self.ignore_case || self.is_case_insensitive()
+    }
 }
 
 impl MemorySize for Condition {
@@ -922,6 +981,7 @@ pub enum Operator {
     #[default]
     EqualTo,
     #[serde(rename = "!=")]
+    #[serde(alias = "<>")]
     NotEqualTo,
     #[serde(rename = ">")]
     GreaterThan,
@@ -932,16 +992,16 @@ pub enum Operator {
     #[serde(rename = "<=")]
     LessThanEquals,
     #[serde(rename = "contains")]
-    #[serde(alias = "Contains")]
+    #[serde(alias = "Contains", alias = "str_match")]
     Contains,
     #[serde(rename = "not_contains")]
-    #[serde(alias = "NotContains")]
+    #[serde(alias = "NotContains", alias = "Not Contains")]
     NotContains,
     #[serde(rename = "is_null")]
-    #[serde(alias = "IsNull")]
+    #[serde(alias = "IsNull", alias = "Is Null")]
     IsNull,
     #[serde(rename = "is_not_null")]
-    #[serde(alias = "IsNotNull")]
+    #[serde(alias = "IsNotNull", alias = "Is Not Null")]
     IsNotNull,
     #[serde(rename = "is_empty")]
     #[serde(alias = "IsEmpty")]
@@ -949,6 +1009,39 @@ pub enum Operator {
     #[serde(rename = "is_not_empty")]
     #[serde(alias = "IsNotEmpty")]
     IsNotEmpty,
+    #[serde(rename = "in")]
+    #[serde(alias = "IN")]
+    In,
+    #[serde(rename = "not_in")]
+    #[serde(alias = "NOT IN")]
+    NotIn,
+    #[serde(rename = "starts_with")]
+    #[serde(alias = "Starts With")]
+    StartsWith,
+    #[serde(rename = "ends_with")]
+    #[serde(alias = "Ends With")]
+    EndsWith,
+    #[serde(rename = "re_match")]
+    #[serde(alias = "regex")]
+    ReMatch,
+    #[serde(rename = "re_not_match")]
+    #[serde(alias = "not_regex")]
+    ReNotMatch,
+}
+
+impl Operator {
+    /// Operators added with the shared filter builder; only these get save-time value checks.
+    pub fn is_extended(&self) -> bool {
+        matches!(
+            self,
+            Operator::In
+                | Operator::NotIn
+                | Operator::StartsWith
+                | Operator::EndsWith
+                | Operator::ReMatch
+                | Operator::ReNotMatch
+        )
+    }
 }
 
 impl std::fmt::Display for Operator {
@@ -966,6 +1059,12 @@ impl std::fmt::Display for Operator {
             Operator::IsNotNull => write!(f, "is not null"),
             Operator::IsEmpty => write!(f, "is empty"),
             Operator::IsNotEmpty => write!(f, "is not empty"),
+            Operator::In => write!(f, "in"),
+            Operator::NotIn => write!(f, "not in"),
+            Operator::StartsWith => write!(f, "starts with"),
+            Operator::EndsWith => write!(f, "ends with"),
+            Operator::ReMatch => write!(f, "matches regex"),
+            Operator::ReNotMatch => write!(f, "does not match regex"),
         }
     }
 }
@@ -1008,10 +1107,26 @@ pub struct ConditionItemCondition {
     pub operator: Operator,
     #[schema(value_type = Object)]
     pub value: Value,
+    /// Legacy flag: honoured only by the V2 in-memory evaluators and the extended operators.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore_case: Option<bool>,
+    /// Case-insensitive matching for every string operator on every evaluation path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_insensitive: Option<bool>,
     #[serde(rename = "logicalOperator")]
     pub logical_operator: LogicalOperator,
+}
+
+impl ConditionItemCondition {
+    /// Case folding the V2 in-memory evaluators apply, which have always honoured `ignore_case`.
+    pub fn in_memory_case_insensitive(&self) -> bool {
+        self.ignore_case.unwrap_or(false) || self.case_insensitive.unwrap_or(false)
+    }
+
+    /// Case folding for the extended operators, which have no legacy `ignore_case` entries.
+    pub fn extended_case_insensitive(&self) -> bool {
+        self.in_memory_case_insensitive()
+    }
 }
 
 impl MemorySize for ConditionItemCondition {
@@ -1071,6 +1186,11 @@ impl ConditionGroup {
         }
         Ok(())
     }
+
+    /// Save-time value checks for the extended operators; other operators always pass.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        validate_items_operator_values(&self.conditions)
+    }
 }
 
 /// Versioned condition parameters for alerts
@@ -1081,6 +1201,16 @@ pub enum AlertConditionParams {
     V1(ConditionList),
     /// v2 format: Linear ConditionGroup (version: 2)
     V2(ConditionGroup),
+}
+
+impl AlertConditionParams {
+    /// Save-time value checks for the extended operators; other operators always pass.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        match self {
+            AlertConditionParams::V1(conditions) => conditions.validate_operator_values(),
+            AlertConditionParams::V2(conditions) => conditions.validate_operator_values(),
+        }
+    }
 }
 
 impl MemorySize for AlertConditionParams {
@@ -1161,6 +1291,27 @@ pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
     offset_minutes
         .checked_mul(60)
         .and_then(FixedOffset::east_opt)
+}
+
+fn reject_extended_threshold_operator(place: &str, operator: Operator) -> Result<(), String> {
+    if operator.is_extended() {
+        return Err(format!(
+            "Operator '{operator}' is not supported in the {place}; use =, !=, >, >=, < or <="
+        ));
+    }
+    Ok(())
+}
+
+fn validate_items_operator_values(items: &[ConditionItem]) -> Result<(), String> {
+    items.iter().try_for_each(|item| match item {
+        ConditionItem::Condition(c) => condition_ops::validate_condition_value(
+            &c.column,
+            &c.operator,
+            &c.value,
+            c.extended_case_insensitive(),
+        ),
+        ConditionItem::Group { conditions, .. } => validate_items_operator_values(conditions),
+    })
 }
 
 /// `start_micros + secs + tolerance`, or `None` when any step overflows.
@@ -1419,6 +1570,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("10".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }]),
             ),
             (
@@ -1428,6 +1580,7 @@ mod test {
                     operator: Operator::NotContains,
                     value: Value::String("monitor".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }]),
             ),
             (
@@ -1437,6 +1590,7 @@ mod test {
                     operator: Operator::Contains,
                     value: Value::String("something".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }]),
             ),
             (
@@ -1446,6 +1600,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("error".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }]),
             ),
             (r#"[]"#, ConditionList::LegacyConditions(vec![])),
@@ -1493,12 +1648,14 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("error".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
                 Condition {
                     column: "job".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("something".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }
             ])
         );
@@ -1537,12 +1694,14 @@ mod test {
                                 operator: Operator::EqualTo,
                                 value: Value::String("error".into()),
                                 ignore_case: false,
+                                case_insensitive: None,
                             }),
                             ConditionList::EndCondition(Condition {
                                 column: "job".to_string(),
                                 operator: Operator::EqualTo,
                                 value: Value::String("something".into()),
                                 ignore_case: false,
+                                case_insensitive: None,
                             }),
                         ],
                     })
@@ -1579,12 +1738,14 @@ mod test {
                         operator: Operator::EqualTo,
                         value: Value::String("error".into()),
                         ignore_case: false,
+                        case_insensitive: None,
                     }),
                     ConditionList::EndCondition(Condition {
                         column: "job".to_string(),
                         operator: Operator::EqualTo,
                         value: Value::String("something".into()),
                         ignore_case: false,
+                        case_insensitive: None,
                     })
                 ]
             }
@@ -1632,12 +1793,14 @@ mod test {
                                 operator: Operator::EqualTo,
                                 value: Value::String("value1".into()),
                                 ignore_case: true,
+                                case_insensitive: None,
                             }),
                             ConditionList::EndCondition(Condition {
                                 column: "level".to_string(),
                                 operator: Operator::EqualTo,
                                 value: Value::String("error".into()),
                                 ignore_case: false,
+                                case_insensitive: None,
                             })
                         ]
                     },
@@ -1646,6 +1809,7 @@ mod test {
                         operator: Operator::GreaterThan,
                         value: Value::String("value3".into()),
                         ignore_case: false,
+                        case_insensitive: None,
                     })
                 ]
             }
@@ -1661,12 +1825,14 @@ mod test {
                 operator: Operator::EqualTo,
                 value: Value::String("error".into()),
                 ignore_case: false,
+                case_insensitive: None,
             },
             Condition {
                 column: "job".into(),
                 operator: Operator::EqualTo,
                 value: Value::String("something".into()),
                 ignore_case: false,
+                case_insensitive: None,
             },
         ]);
 
@@ -2016,6 +2182,7 @@ mod test {
             operator: Operator::EqualTo,
             value: Value::String("error".to_string()),
             ignore_case: None,
+            case_insensitive: None,
             logical_operator: LogicalOperator::And,
         });
 
@@ -2041,6 +2208,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2048,6 +2216,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -2064,6 +2233,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2071,6 +2241,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -2486,6 +2657,7 @@ mod test {
                 operator: Operator::GreaterThan,
                 value: serde_json::json!(90),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: multi,
@@ -2672,6 +2844,7 @@ mod test {
                 operator: Operator::EqualTo,
                 value: serde_json::Value::String("error".to_string()),
                 ignore_case: Some(false),
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2699,6 +2872,7 @@ mod test {
                 operator: Operator::EqualTo,
                 value: serde_json::Value::String("error".to_string()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2715,6 +2889,7 @@ mod test {
                 operator: Operator::GreaterThan,
                 value: serde_json::Value::Number(serde_json::Number::from(400)),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2753,6 +2928,7 @@ mod test {
                 operator: Operator::EqualTo,
                 value: serde_json::Value::String("error".to_string()),
                 ignore_case: false,
+                case_insensitive: None,
             })],
         };
         let params = AlertConditionParams::V1(conditions);
@@ -2863,6 +3039,7 @@ mod test {
             operator: Operator::EqualTo,
             value: serde_json::json!("error"),
             ignore_case: None,
+            case_insensitive: None,
             logical_operator: LogicalOperator::And,
         };
         let json = serde_json::to_value(&cic).unwrap();
@@ -2876,6 +3053,7 @@ mod test {
             operator: Operator::EqualTo,
             value: serde_json::json!("error"),
             ignore_case: Some(true),
+            case_insensitive: None,
             logical_operator: LogicalOperator::Or,
         };
         let json = serde_json::to_value(&cic).unwrap();
@@ -2890,6 +3068,7 @@ mod test {
             operator: Operator::EqualTo,
             value: serde_json::json!("value"),
             ignore_case: false,
+            case_insensitive: None,
         })
     }
 
@@ -2905,6 +3084,7 @@ mod test {
             operator: Operator::EqualTo,
             value: serde_json::json!(1),
             ignore_case: false,
+            case_insensitive: None,
         }]);
         assert_eq!(cond.depth(), 1);
     }
@@ -3018,6 +3198,7 @@ mod test {
             operator: Operator::GreaterThan,
             value: serde_json::json!(5),
             ignore_case: false,
+            case_insensitive: None,
         };
         let node = ConditionList::LegacyConditions(vec![cond]);
         let items: Vec<_> = node.into_iter().collect();
@@ -3139,5 +3320,166 @@ mod test {
         let round_trip: QueryCondition = serde_json::from_value(serialized).unwrap();
         assert!(round_trip.promql_rule_mode);
         assert!(round_trip.promql_multi_alert);
+    }
+
+    #[test]
+    fn test_operator_aliases_deserialize_and_serialize_canonically() {
+        let cases = [
+            ("=", Operator::EqualTo, "="),
+            ("<>", Operator::NotEqualTo, "!="),
+            ("Contains", Operator::Contains, "contains"),
+            ("str_match", Operator::Contains, "contains"),
+            ("Not Contains", Operator::NotContains, "not_contains"),
+            ("NotContains", Operator::NotContains, "not_contains"),
+            ("Is Null", Operator::IsNull, "is_null"),
+            ("Is Not Null", Operator::IsNotNull, "is_not_null"),
+            ("in", Operator::In, "in"),
+            ("IN", Operator::In, "in"),
+            ("not_in", Operator::NotIn, "not_in"),
+            ("NOT IN", Operator::NotIn, "not_in"),
+            ("starts_with", Operator::StartsWith, "starts_with"),
+            ("Starts With", Operator::StartsWith, "starts_with"),
+            ("ends_with", Operator::EndsWith, "ends_with"),
+            ("Ends With", Operator::EndsWith, "ends_with"),
+            ("re_match", Operator::ReMatch, "re_match"),
+            ("regex", Operator::ReMatch, "re_match"),
+            ("re_not_match", Operator::ReNotMatch, "re_not_match"),
+            ("not_regex", Operator::ReNotMatch, "re_not_match"),
+        ];
+        for (input, expected, canonical) in cases {
+            let op: Operator = serde_json::from_value(Value::String(input.to_string())).unwrap();
+            assert_eq!(op, expected, "{input}");
+            assert_eq!(
+                serde_json::to_value(op).unwrap(),
+                Value::String(canonical.to_string())
+            );
+        }
+        assert!(serde_json::from_value::<Operator>(Value::String("like".to_string())).is_err());
+    }
+
+    #[test]
+    fn test_saved_v2_group_round_trips_byte_identically() {
+        let json = r#"{"filterType":"group","logicalOperator":"AND","conditions":[{"filterType":"condition","column":"level","operator":"=","value":"error","logicalOperator":"AND"},{"filterType":"group","logicalOperator":"OR","conditions":[{"filterType":"condition","column":"msg","operator":"contains","value":"x","ignore_case":true,"logicalOperator":"OR"}]}]}"#;
+        let group: ConditionGroup = serde_json::from_str(json).unwrap();
+        assert_eq!(serde_json::to_string(&group).unwrap(), json);
+        assert!(group.validate_operator_values().is_ok());
+    }
+
+    #[test]
+    fn test_validate_operator_values_only_checks_extended_operators() {
+        let group = |op: &str, value: serde_json::Value| -> ConditionGroup {
+            serde_json::from_value(serde_json::json!({
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [{
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": [{
+                        "filterType": "condition", "column": "c", "operator": op,
+                        "value": value, "logicalOperator": "AND"
+                    }]
+                }]
+            }))
+            .unwrap()
+        };
+        assert!(
+            group("=", serde_json::json!([]))
+                .validate_operator_values()
+                .is_ok()
+        );
+        assert!(
+            group("contains", serde_json::json!("("))
+                .validate_operator_values()
+                .is_ok()
+        );
+        assert!(
+            group("in", serde_json::json!(["a"]))
+                .validate_operator_values()
+                .is_ok()
+        );
+        assert!(
+            group("in", serde_json::json!([]))
+                .validate_operator_values()
+                .is_err()
+        );
+        assert!(
+            group("re_match", serde_json::json!("("))
+                .validate_operator_values()
+                .is_err()
+        );
+
+        let list: ConditionList = serde_json::from_value(serde_json::json!({
+            "not": {"or": [
+                {"column": "c", "operator": "=", "value": "a", "ignore_case": false},
+                {"column": "c", "operator": "not_regex", "value": "[", "ignore_case": false}
+            ]}
+        }))
+        .unwrap();
+        assert!(list.validate_operator_values().is_err());
+        let legacy: ConditionList = serde_json::from_value(serde_json::json!([
+            {"column": "c", "operator": "NotContains", "value": "", "ignore_case": false}
+        ]))
+        .unwrap();
+        assert!(legacy.validate_operator_values().is_ok());
+    }
+
+    #[test]
+    fn test_threshold_operators_reject_only_extended_operators() {
+        for op in [
+            Operator::GreaterThanEquals,
+            Operator::EqualTo,
+            Operator::Contains,
+        ] {
+            let tc = TriggerCondition {
+                operator: op,
+                ..Default::default()
+            };
+            assert!(tc.validate_threshold_operator().is_ok(), "{op:?}");
+        }
+        for op in [
+            Operator::In,
+            Operator::NotIn,
+            Operator::StartsWith,
+            Operator::EndsWith,
+            Operator::ReMatch,
+            Operator::ReNotMatch,
+        ] {
+            let tc = TriggerCondition {
+                operator: op,
+                ..Default::default()
+            };
+            let err = tc.validate_threshold_operator().unwrap_err();
+            assert!(err.contains("trigger condition"), "{err}");
+        }
+    }
+
+    #[test]
+    fn test_query_condition_rejects_extended_having_and_promql_operators() {
+        let cond = |operator| Condition {
+            column: "v".to_string(),
+            operator,
+            value: Value::from(1),
+            ignore_case: false,
+            case_insensitive: None,
+        };
+        let mut qc = QueryCondition::default();
+        assert!(qc.validate_threshold_operators().is_ok());
+
+        qc.promql_condition = Some(cond(Operator::GreaterThan));
+        assert!(qc.validate_threshold_operators().is_ok());
+        qc.promql_condition = Some(cond(Operator::ReMatch));
+        let err = qc.validate_threshold_operators().unwrap_err();
+        assert!(err.contains("PromQL condition"), "{err}");
+
+        qc.promql_condition = None;
+        qc.aggregation = Some(Aggregation {
+            group_by: None,
+            function: AggFunction::Count,
+            having: cond(Operator::In),
+            warning_value: None,
+            multi_alert: false,
+        });
+        let err = qc.validate_threshold_operators().unwrap_err();
+        assert!(err.contains("aggregation having"), "{err}");
     }
 }

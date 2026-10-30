@@ -3015,6 +3015,7 @@ mod tests {
                 operator: op,
                 value: json!(90),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert,
@@ -3033,6 +3034,7 @@ mod tests {
                 operator: op,
                 value: json!(10),
                 ignore_case: false,
+                case_insensitive: None,
             }),
             promql_multi_alert: multi,
             ..Default::default()
@@ -4605,6 +4607,7 @@ mod tests {
             operator: Operator::GreaterThan,
             value: serde_json::json!(0),
             ignore_case: false,
+            case_insensitive: None,
         });
         assert_eq!(
             validate_multi_alert(&query, &tc, false),

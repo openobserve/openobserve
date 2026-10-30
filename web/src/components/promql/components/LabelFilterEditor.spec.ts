@@ -13,433 +13,176 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
-import LabelFilterEditor from "./LabelFilterEditor.vue";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import LabelFilterEditor from "./LabelFilterEditor.vue";
 
-// Mock useDashboardPanelData composable
-// ONE set of spies, not a fresh pair per call: a mock that returns new
-// functions each time can be called correctly and still be unassertable.
 const panelApi = vi.hoisted(() => ({
   fetchPromQLLabels: vi.fn().mockResolvedValue(undefined),
-  // Values are fetched per label now, on demand. Omitting this from the mock
-  // made every mount throw the moment the component started asking for them.
   fetchPromQLLabelValues: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => panelApi),
 }));
 
-describe("LabelFilterEditor", () => {
-  let wrapper: any;
+const valueStore = vi.hoisted(() => ({
+  getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
+  requestFieldValues: vi.fn().mockResolvedValue(["api", "web"]),
+}));
+vi.mock("@/composables/fieldValueStore", () => valueStore);
 
-  const mockLabels = [
-    { label: "method", op: "=", value: "GET" },
-    { label: "status", op: "=", value: "200" },
-  ];
+const fetchQuery = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/query/queryClient", () => ({ queryClient: { fetchQuery } }));
 
-  const mockDashboardData = {
-    meta: {
-      promql: {
-        availableLabels: ["method", "status", "path", "host"],
-        labelValuesMap: new Map([
-          ["method", ["GET", "POST", "PUT", "DELETE"]],
-          ["status", ["200", "404", "500"]],
-          ["path", ["/api/users", "/api/products"]],
-        ]),
-        loadingLabels: false,
-      },
+const DT = "promql-label-filter-builder";
+
+const panelData = () => ({
+  meta: {
+    promql: {
+      availableLabels: ["method", "status", "path"],
+      labelValuesMap: new Map([["method", ["GET", "POST"]]]),
+      loadingLabels: false,
     },
-  };
+  },
+});
 
-  const defaultProps = {
-    labels: mockLabels,
-    metric: "http_requests_total",
-    dashboardData: mockDashboardData,
-    dashboardPanelData: mockDashboardData,
-  };
+let wrapper: VueWrapper | null = null;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+function mountEditor(props: Record<string, unknown>) {
+  wrapper = mount(LabelFilterEditor, {
+    attachTo: document.body,
+    props: { labels: [], metric: "http_requests_total", ...props } as any,
+    global: { plugins: [i18n, store] },
+  });
+  return wrapper;
+}
+
+const builder = () => wrapper!.findComponent(FilterBuilder);
+const emitted = () => wrapper!.emitted("update:labels") as unknown[][] | undefined;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  fetchQuery.mockResolvedValue({
+    schema: [{ name: "job" }, { name: "value" }, { name: "_timestamp" }, { name: "instance" }],
+  });
+});
+
+afterEach(() => {
+  wrapper?.unmount();
+  wrapper = null;
+  document.body.innerHTML = "";
+});
+
+describe("LabelFilterEditor", () => {
+  it("keeps its label and edits matchers with the PromQL builder profile", () => {
+    mountEditor({ dashboardPanelData: panelData() });
+    expect(wrapper!.find('[data-test="promql-labelfilter-editor-label"]').text()).toBe(
+      "Label filters",
+    );
+    expect(builder().props("profile")).toBe("promql-builder");
+    expect(builder().props("dataTest")).toBe(DT);
   });
 
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+  it("shows each saved matcher as a chip", () => {
+    mountEditor({
+      dashboardPanelData: panelData(),
+      labels: [
+        { label: "method", op: "=", value: "GET" },
+        { label: "path", op: "=~", value: "/api/.*" },
+      ],
+    });
+    expect(wrapper!.find(`[data-test="${DT}-chip-method"]`).text()).toContain("GET");
+    expect(wrapper!.find(`[data-test="${DT}-chip-path"]`).text()).toContain("/api/.*");
   });
 
-  const createWrapper = (props = {}) => {
-    return mount(LabelFilterEditor, {
-      props: {
-        ...defaultProps,
-        ...props,
-      },
-      global: {
-        plugins: [i18n, store],
-        provide: {
-          dashboardPanelDataPageKey: "dashboard",
-        },
-        mocks: {
-          $t: (key: string) => key,
-        },
-      },
-    });
-  };
+  it("removing a matcher keeps the others as saved", async () => {
+    const labels = [
+      { label: "method", op: "=", value: "GET" },
+      { label: "status", op: "!~", value: "5.." },
+    ];
+    mountEditor({ dashboardPanelData: panelData(), labels });
+    await wrapper!.find(`[data-test="${DT}-chip-method-remove"]`).trigger("click");
+    await flushPromises();
+    expect(emitted()!.at(-1)![0]).toEqual([labels[1]]);
+  });
 
-  // ── What the builder asks for, and when (tmp/code.md D11) ─────────────────
-  describe("label sources", () => {
-    beforeEach(() => {
-      panelApi.fetchPromQLLabels.mockClear();
-      panelApi.fetchPromQLLabelValues.mockClear();
+  describe("in a dashboard panel", () => {
+    it("offers the panel's labels as fields", () => {
+      mountEditor({ dashboardPanelData: panelData() });
+      expect(builder().props("fields")).toEqual([
+        { name: "method", type: "string" },
+        { name: "status", type: "string" },
+        { name: "path", type: "string" },
+      ]);
     });
 
-    it("asks for the values of a label the user has chosen", async () => {
-      // The wiring half. fetchPromQLLabelValues can be perfectly correct and
-      // never called — which is how three prop gaps shipped in this workstream.
-      wrapper = createWrapper({ labels: [{ label: "service", op: "=", value: "" }] });
+    it("reads the label list when the metric changes, not on every render", async () => {
+      mountEditor({ dashboardPanelData: panelData() });
       await flushPromises();
-      expect(panelApi.fetchPromQLLabelValues).toHaveBeenCalledWith(
-        "http_requests_total",
-        "service",
-      );
+      expect(panelApi.fetchPromQLLabels).toHaveBeenCalledTimes(1);
+      await wrapper!.setProps({ labels: [{ label: "method", op: "=", value: "GET" }] });
+      expect(panelApi.fetchPromQLLabels).toHaveBeenCalledTimes(1);
+      await wrapper!.setProps({ metric: "cpu_usage" });
+      await flushPromises();
+      expect(panelApi.fetchPromQLLabels).toHaveBeenLastCalledWith("cpu_usage");
     });
 
-    it("asks for nothing when the filter row has no label yet", async () => {
-      wrapper = createWrapper({ labels: [{ label: "", op: "=", value: "" }] });
-      await flushPromises();
+    it("loads a label's values only when they are asked for", async () => {
+      mountEditor({ dashboardPanelData: panelData() });
       expect(panelApi.fetchPromQLLabelValues).not.toHaveBeenCalled();
+      const values = await builder().props("loadValues")!("method", "");
+      expect(panelApi.fetchPromQLLabelValues).toHaveBeenCalledWith("http_requests_total", "method");
+      expect(values).toEqual(["GET", "POST"]);
     });
 
-    it("does not re-read the label list when only the time range changes", async () => {
-      // The label list comes from the stream SCHEMA now, which has no time
-      // range — so watching the panel's dateTime buys a request per range
-      // change and changes nothing about the answer.
-      wrapper = createWrapper();
-      await flushPromises();
-      const afterMount = panelApi.fetchPromQLLabels.mock.calls.length;
-
-      await wrapper.setProps({
-        dashboardPanelData: {
-          meta: {
-            ...mockDashboardData.meta,
-            dateTime: { start_time: new Date("2026-01-01"), end_time: new Date("2026-01-08") },
-          },
-        },
+    it("offers the dashboard's variables before the loaded values", () => {
+      mountEditor({
+        dashboardPanelData: panelData(),
+        dashboardData: { variables: { list: [{ name: "env" }, { name: "region" }] } },
       });
-      await flushPromises();
-
-      expect(panelApi.fetchPromQLLabels.mock.calls.length).toBe(afterMount);
-    });
-
-    it("still re-reads them when the metric changes", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      panelApi.fetchPromQLLabels.mockClear();
-
-      await wrapper.setProps({ metric: "node_cpu_seconds_total" });
-      await flushPromises();
-
-      expect(panelApi.fetchPromQLLabels).toHaveBeenCalledWith("node_cpu_seconds_total");
+      expect(builder().props("extraValueSuggestions")!("method")).toEqual(["$env", "$region"]);
     });
   });
 
-  describe("Component Rendering", () => {
-    it("should render label filter editor", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="promql-labelfilter-editor"]').exists()).toBe(true);
+  describe("on the PromQL builder page", () => {
+    it("reads the metric's labels from its schema, leaving out value and time columns", async () => {
+      mountEditor({});
+      await flushPromises();
+      expect(panelApi.fetchPromQLLabels).not.toHaveBeenCalled();
+      expect(builder().props("fields")).toEqual([
+        { name: "instance", type: "string" },
+        { name: "job", type: "string" },
+      ]);
     });
 
-    it("should display layout name", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="promql-labelfilter-editor-label"]').text()).toBe(
-        "Label filters",
+    it("asks the values API when no values are cached", async () => {
+      mountEditor({});
+      const values = await builder().props("loadValues")!("job", "");
+      expect(valueStore.getFieldValuesForSuggestion).toHaveBeenCalled();
+      expect(valueStore.requestFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({ streamType: "metrics", streamName: "http_requests_total" }),
+        "job",
       );
+      expect(values).toEqual(["api", "web"]);
     });
 
-    it("should render label filter items", () => {
-      wrapper = createWrapper();
-      const filterItems = wrapper.findAll('[data-test="promql-labelfilter-item"]');
-      expect(filterItems.length).toBe(mockLabels.length);
-    });
-
-    it("should render add button", () => {
-      wrapper = createWrapper();
-      const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      expect(addButton.exists()).toBe(true);
-    });
-
-    it("should display correct label text for each filter", () => {
-      wrapper = createWrapper();
-      const text = wrapper.text();
-      // Chip label now renders structured spans (field / op / value) with the
-      // operator spacing supplied via CSS padding rather than literal spaces.
-      expect(text).toContain("method=GET");
-      expect(text).toContain("status=200");
-    });
-  });
-
-  describe("Label Operations", () => {
-    it("should add new label filter when add button is clicked", async () => {
-      const labels = [{ label: "method", op: "=", value: "GET" }];
-      wrapper = createWrapper({ labels });
-
-      const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      await addButton.trigger("click");
-
-      // Check that update:labels event was emitted with new label
-      const emittedLabels = wrapper.emitted("update:labels");
-      expect(emittedLabels).toBeTruthy();
-      expect(emittedLabels![0][0]).toHaveLength(2);
-      expect(emittedLabels![0][0][1]).toEqual({
-        label: "",
-        op: "=",
-        value: "",
-      });
-    });
-
-    it("should remove label filter when remove button is clicked", async () => {
-      const labels = [...mockLabels];
-      wrapper = createWrapper({ labels });
-
-      const removeButton = wrapper.find('[data-test="promql-label-filter-remove-0"]');
-      await removeButton.trigger("click");
-
-      // Check that update:labels event was emitted with removed label
-      const emittedLabels = wrapper.emitted("update:labels");
-      expect(emittedLabels).toBeTruthy();
-      expect(emittedLabels![0][0]).toHaveLength(1);
-      expect(emittedLabels![0][0][0].label).toBe("status");
-    });
-
-    it("should initialize with empty label filter", async () => {
-      const emptyLabels: any[] = [];
-      wrapper = createWrapper({ labels: emptyLabels });
-
-      const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      await addButton.trigger("click");
-
-      // Check that update:labels event was emitted with new label
-      const emittedLabels = wrapper.emitted("update:labels");
-      expect(emittedLabels).toBeTruthy();
-      expect(emittedLabels![0][0]).toHaveLength(1);
-      expect(emittedLabels![0][0][0]).toEqual({
-        label: "",
-        op: "=",
-        value: "",
-      });
-    });
-  });
-
-  describe("Duplicate Prevention", () => {
-    it("excludes already-selected labels so the same label cannot be picked twice", () => {
-      // Arrange: "method" and "status" are already selected in the two existing filters.
-      // availableLabels is ["method", "status", "path", "host"].
-      // availableLabelOptions should therefore only contain ["path", "host"].
-      wrapper = createWrapper();
-
-      // Act: render a new (empty) filter row so the label select is shown.
-      const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      expect(addButton.exists()).toBe(true);
-
-      // Assert: the component renders without error and shows the correct number
-      // of filter items (both existing filters are rendered).
-      const filterItems = wrapper.findAll('[data-test="promql-labelfilter-item"]');
-      expect(filterItems.length).toBe(2);
-    });
-
-    it("renders label filter buttons with text that reflects current selections", () => {
-      // Arrange: verify that both selected labels appear in the rendered output,
-      // confirming that the component correctly renders each filter's label.
-      wrapper = createWrapper();
-
-      // Act / Assert
-      const text = wrapper.text();
-      // Chip label now renders structured spans (field / op / value) with the
-      // operator spacing supplied via CSS padding rather than literal spaces.
-      expect(text).toContain("method=GET");
-      expect(text).toContain("status=200");
-    });
-
-    it("emits the full updated list when a new empty filter is added, preserving existing selections", () => {
-      // Arrange: start with one selected label so duplicate-prevention has
-      // something to filter.  After clicking Add, the emitted payload must
-      // still carry the original filter plus the new empty one.
-      const singleLabel = [{ label: "method", op: "=", value: "GET" }];
-      wrapper = createWrapper({ labels: singleLabel });
-
-      // Act
-      const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      expect(addButton.exists()).toBe(true);
-      addButton.trigger("click");
-
-      // Assert: the emitted list contains the original filter unchanged and a
-      // new blank filter — the component has not duplicated or dropped anything.
-      const emitted = wrapper.emitted("update:labels");
-      expect(emitted).toBeTruthy();
-      const newList = emitted![0][0] as Array<{
-        label: string;
-        op: string;
-        value: string;
-      }>;
-      expect(newList).toHaveLength(2);
-      expect(newList[0]).toEqual({ label: "method", op: "=", value: "GET" });
-      expect(newList[1]).toEqual({ label: "", op: "=", value: "" });
-    });
-  });
-
-  describe("Computed Label Display", () => {
-    it('should display "Select label" when label is empty', () => {
-      const emptyLabel = { label: "", op: "=", value: "" };
-      wrapper = createWrapper();
-
-      const result = wrapper.vm.computedLabel(emptyLabel);
-      expect(result).toBe("Select label");
-    });
-
-    it("should display label name when value is empty", () => {
-      const labelOnly = { label: "method", op: "=", value: "" };
-      wrapper = createWrapper();
-
-      const result = wrapper.vm.computedLabel(labelOnly);
-      expect(result).toBe("method");
-    });
-
-    it("should display full label expression when complete", () => {
-      const fullLabel = { label: "method", op: "=", value: "GET" };
-      wrapper = createWrapper();
-
-      const result = wrapper.vm.computedLabel(fullLabel);
-      expect(result).toBe("method = GET");
-    });
-
-    it("should handle regex operators", () => {
-      const regexLabel = { label: "path", op: "=~", value: "/api.*" };
-      wrapper = createWrapper();
-
-      const result = wrapper.vm.computedLabel(regexLabel);
-      expect(result).toBe("path =~ /api.*");
-    });
-  });
-
-  describe("Label Values", () => {
-    it("should get label value options for a label", () => {
-      wrapper = createWrapper();
-
-      const options = wrapper.vm.getLabelValueOptions("method");
-      expect(options.length).toBeGreaterThan(0);
-      expect(options.some((opt: any) => opt.value === "GET")).toBe(true);
-    });
-
-    it("should include dashboard variables in options", () => {
-      const dataWithVars = {
-        ...mockDashboardData,
-        variables: {
-          list: [
-            { name: "env", value: "prod" },
-            { name: "region", value: "us-east" },
-          ],
-        },
-      };
-      wrapper = createWrapper({ dashboardData: dataWithVars });
-
-      const options = wrapper.vm.getLabelValueOptions("method");
-      expect(options.some((opt: any) => opt.value === "$env")).toBe(true);
-      expect(options.some((opt: any) => opt.value === "$region")).toBe(true);
-    });
-
-    it("should mark variables in options", () => {
-      const dataWithVars = {
-        ...mockDashboardData,
-        variables: {
-          list: [{ name: "env", value: "prod" }],
-        },
-      };
-      wrapper = createWrapper({ dashboardData: dataWithVars });
-
-      const options = wrapper.vm.getLabelValueOptions("method");
-      const varOption = options.find((opt: any) => opt.value === "$env");
-      expect(varOption?.isVariable).toBe(true);
-    });
-
-    it("should return empty array for unknown label", () => {
-      wrapper = createWrapper();
-
-      const options = wrapper.vm.getLabelValueOptions("unknown_label");
-      expect(options.length).toBe(0);
-    });
-  });
-
-  describe("Operator Handling", () => {
-    it("should provide all operator options", () => {
-      wrapper = createWrapper();
-
-      const operators = ["=", "!=", "=~", "!~"];
-      operators.forEach((op) => {
-        expect(wrapper.vm.operatorOptions).toContain(op);
-      });
-    });
-  });
-
-  describe("Metric Change", () => {
-    it("should fetch labels when metric changes", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.setProps({ metric: "new_metric" });
+    it("has no labels and asks for nothing without a metric", async () => {
+      mountEditor({ metric: "" });
       await flushPromises();
-
-      // The composable should be called (it's mocked at the top of this file)
-      expect(wrapper.vm.metric).toBe("new_metric");
+      expect(fetchQuery).not.toHaveBeenCalled();
+      expect(builder().props("fields")).toEqual([]);
+      await expect(builder().props("loadValues")!("job", "")).resolves.toEqual([]);
     });
 
-    it("should clear labels when metric is cleared", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.setProps({ metric: "" });
+    it("an unreadable schema leaves the label list empty", async () => {
+      fetchQuery.mockRejectedValueOnce(new Error("boom"));
+      mountEditor({});
       await flushPromises();
-
-      expect(wrapper.props("dashboardData").meta.promql.availableLabels).toBeDefined();
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("should have proper data-test attributes", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="promql-add-label-filter"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="promql-label-filter-0"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="promql-label-filter-remove-0"]').exists()).toBe(true);
-    });
-
-    it("should have tooltips on buttons", () => {
-      wrapper = createWrapper();
-
-      const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      expect(addButton.findComponent({ name: "OTooltip" }).exists()).toBe(true);
-    });
-  });
-
-  describe("Loading State", () => {
-    it("should show loading state when fetching labels", () => {
-      const loadingData = {
-        meta: {
-          promql: {
-            ...mockDashboardData.meta.promql,
-            loadingLabels: true,
-          },
-        },
-      };
-      wrapper = createWrapper({ dashboardPanelData: loadingData });
-
-      expect(wrapper.vm.loadingLabels).toBe(true);
-    });
-
-    it("should not show loading state initially", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.loadingLabels).toBe(false);
+      expect(builder().props("fields")).toEqual([]);
+      expect(builder().props("fieldsLoading")).toBe(false);
     });
   });
 });

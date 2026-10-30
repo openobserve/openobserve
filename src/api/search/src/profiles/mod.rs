@@ -25,6 +25,7 @@ use axum::{Json, extract::rejection::JsonRejection, http::Method, response::Resp
 use config::{
     get_config,
     meta::{
+        alerts::{Operator, condition_ops::validate_condition_value},
         search::{Query, Request, RequestEncoding, Response as SearchResponse, SearchEventType},
         stream::StreamType,
         traces::session::{quote_identifier, quote_sql_string},
@@ -55,9 +56,14 @@ const DEFAULT_RESULT_SIZE: i64 = 99_999;
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct ProfileFilter {
     pub key: String,
+    /// `=` (default), `!=`, `=~` (regex), `!~` (negated regex), `in` or `not_in`.
     #[serde(default = "default_eq_op")]
     pub op: String,
+    #[serde(default)]
     pub value: String,
+    /// List for `in`/`not_in`; when empty, `value` is split on commas instead.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<String>,
 }
 
 fn default_eq_op() -> String {
@@ -216,6 +222,7 @@ fn parse_filters_param(raw: Option<&str>) -> Vec<ProfileFilter> {
                 key,
                 op: "=".to_string(),
                 value,
+                values: Vec::new(),
             })
         })
         .collect()
@@ -226,6 +233,75 @@ fn decode_filter_component(raw: &str) -> String {
     urlencoding::decode(trimmed)
         .map(|value| value.into_owned())
         .unwrap_or_else(|_| trimmed.to_string())
+}
+
+/// One label filter as SQL on an already validated column.
+fn filter_predicate(col: &str, filter: &ProfileFilter) -> Result<String, String> {
+    let quoted = quote_identifier(col);
+    match filter.op.as_str() {
+        "=" => Ok(format!("{quoted} = {}", quote_sql_string(&filter.value))),
+        "!=" | "<>" => Ok(format!("{quoted} != {}", quote_sql_string(&filter.value))),
+        "=~" | "!~" | "re_match" | "re_not_match" => {
+            let negated = matches!(filter.op.as_str(), "!~" | "re_not_match");
+            let operator = if negated {
+                Operator::ReNotMatch
+            } else {
+                Operator::ReMatch
+            };
+            validate_condition_value(
+                &filter.key,
+                &operator,
+                &serde_json::Value::String(filter.value.clone()),
+                false,
+            )?;
+            let func = if negated { "re_not_match" } else { "re_match" };
+            Ok(format!(
+                "{func}({quoted}, {})",
+                quote_sql_string(&filter.value)
+            ))
+        }
+        "in" | "IN" | "not_in" | "NOT IN" => {
+            let negated = matches!(filter.op.as_str(), "not_in" | "NOT IN");
+            let values: Vec<String> = if filter.values.is_empty() {
+                filter
+                    .value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty())
+                    .map(str::to_string)
+                    .collect()
+            } else {
+                filter.values.clone()
+            };
+            let operator = if negated {
+                Operator::NotIn
+            } else {
+                Operator::In
+            };
+            validate_condition_value(
+                &filter.key,
+                &operator,
+                &serde_json::Value::Array(
+                    values
+                        .iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
+                false,
+            )?;
+            let list = values
+                .iter()
+                .map(|v| quote_sql_string(v))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let keyword = if negated { "NOT IN" } else { "IN" };
+            Ok(format!("{quoted} {keyword} ({list})"))
+        }
+        other => Err(format!(
+            "unsupported filter op '{other}'; use =, !=, =~, !~, in or not_in"
+        )),
+    }
 }
 
 pub(crate) fn build_where_clause(body: &ProfilesQueryBody) -> Result<String, Response> {
@@ -261,22 +337,13 @@ pub(crate) fn build_where_clause(body: &ProfilesQueryBody) -> Result<String, Res
     }
 
     for filter in &body.filters {
-        if filter.op != "=" {
-            return Err(MetaHttpResponse::bad_request(
-                "only filter op '=' is supported",
-            ));
-        }
         let Some(col) = label_column(&filter.key) else {
             return Err(MetaHttpResponse::bad_request(format!(
                 "invalid filter key: {}",
                 filter.key
             )));
         };
-        parts.push(format!(
-            "{} = {}",
-            quote_identifier(&col),
-            quote_sql_string(&filter.value)
-        ));
+        parts.push(filter_predicate(&col, filter).map_err(MetaHttpResponse::bad_request)?);
     }
 
     Ok(parts.join(" AND "))
@@ -556,6 +623,7 @@ mod tests {
                 key: "env".to_string(),
                 op: "=".to_string(),
                 value: "prod".to_string(),
+                values: Vec::new(),
             }],
             ..Default::default()
         };
@@ -570,11 +638,61 @@ mod tests {
                 key: "k8s.pod.name".to_string(),
                 op: "=".to_string(),
                 value: "pod-a".to_string(),
+                values: Vec::new(),
             }],
             ..Default::default()
         };
         let where_clause = build_where_clause(&body).unwrap();
         assert_eq!(where_clause, r#""k8s_pod_name" = 'pod-a'"#);
+    }
+
+    fn where_for(op: &str, value: &str, values: &[&str]) -> Result<String, Response> {
+        build_where_clause(&ProfilesQueryBody {
+            filters: vec![ProfileFilter {
+                key: "env".to_string(),
+                op: op.to_string(),
+                value: value.to_string(),
+                values: values.iter().map(|v| v.to_string()).collect(),
+            }],
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn filter_ops_beyond_equality_build_quoted_sql() {
+        assert_eq!(where_for("!=", "it's", &[]).unwrap(), r#""env" != 'it''s'"#);
+        assert_eq!(where_for("<>", "a", &[]).unwrap(), r#""env" != 'a'"#);
+        assert_eq!(
+            where_for("=~", "^pro.*", &[]).unwrap(),
+            r#"re_match("env", '^pro.*')"#
+        );
+        assert_eq!(
+            where_for("!~", "^dev", &[]).unwrap(),
+            r#"re_not_match("env", '^dev')"#
+        );
+        assert_eq!(
+            where_for("in", "prod, stage", &[]).unwrap(),
+            r#""env" IN ('prod', 'stage')"#
+        );
+        assert_eq!(
+            where_for("not_in", "ignored", &["a,b", "o'c"]).unwrap(),
+            r#""env" NOT IN ('a,b', 'o''c')"#
+        );
+    }
+
+    #[test]
+    fn filter_ops_reject_bad_input() {
+        assert!(where_for("=~", "a(", &[]).is_err());
+        assert!(where_for("in", " , ", &[]).is_err());
+        assert!(where_for("like", "a", &[]).is_err());
+    }
+
+    #[test]
+    fn filter_without_op_defaults_to_equality() {
+        let filter: ProfileFilter =
+            serde_json::from_str(r#"{"key":"env","value":"prod"}"#).unwrap();
+        assert_eq!(filter.op, "=");
+        assert!(filter.values.is_empty());
     }
 
     #[test]

@@ -16,6 +16,10 @@
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
+        alerts::{
+            Operator,
+            condition_ops::{MAX_REGEX_PATTERN_LEN, validate_condition_value},
+        },
         dashboards::{Dashboard, ListDashboardsParams, v8},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
@@ -59,7 +63,7 @@ use crate::auth::{check_folder_write_permissions, check_permissions};
 /// dashboard is moved or deleted so the pin never goes stale.
 const HOME_DASHBOARD_SETTING_KEY: &str = "home_dashboard";
 
-/// Mirrors `ALL_CONDITION_OPERATOR_VALUES` in `web/src/components/alerts/conditionOperators.ts`.
+/// Mirrors `ANNOTATION_FILTER_OPERATORS` in `web/src/utils/dashboard/validateAnnotationSources.ts`.
 const ANNOTATION_FILTER_OPERATORS: &[&str] = &[
     "=",
     "!=",
@@ -69,10 +73,18 @@ const ANNOTATION_FILTER_OPERATORS: &[&str] = &[
     "<",
     "Contains",
     "NotContains",
+    "contains",
+    "not_contains",
     "is_null",
     "is_not_null",
     "is_empty",
     "is_not_empty",
+    "in",
+    "not_in",
+    "starts_with",
+    "ends_with",
+    "re_match",
+    "re_not_match",
 ];
 
 /// An error that occurs interacting with dashboards.
@@ -1225,6 +1237,12 @@ pub fn checked_annotation_sources(dashboard: &mut Dashboard) -> Result<(), Dashb
                 source.id
             )));
         }
+        if let Some(reason) = first_invalid_regex(&source.filters.conditions) {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: {reason}",
+                source.id
+            )));
+        }
     }
     Ok(())
 }
@@ -1262,6 +1280,44 @@ fn first_invalid_column(conditions: &[v8::AnnotationConditionItem]) -> Option<&s
         }
         v8::AnnotationConditionItem::Group { conditions, .. } => first_invalid_column(conditions),
     })
+}
+
+/// The first regex leaf whose pattern fails the shared alert check, as its error message.
+fn first_invalid_regex(conditions: &[v8::AnnotationConditionItem]) -> Option<String> {
+    conditions.iter().find_map(|node| match node {
+        v8::AnnotationConditionItem::Condition(leaf) => {
+            let operator = match leaf.operator.as_str() {
+                "re_match" => Operator::ReMatch,
+                "re_not_match" => Operator::ReNotMatch,
+                _ => return None,
+            };
+            // A `$var` pattern is only known after substitution, so only its length is checked.
+            if has_variable_reference(&leaf.value) {
+                return (leaf.value.chars().count() > MAX_REGEX_PATTERN_LEN).then(|| {
+                    format!(
+                        "Condition on '{}': regex is longer than {MAX_REGEX_PATTERN_LEN} characters",
+                        leaf.column
+                    )
+                });
+            }
+            validate_condition_value(
+                &leaf.column,
+                &operator,
+                &serde_json::Value::String(leaf.value.clone()),
+                leaf.case_insensitive.unwrap_or(false),
+            )
+            .err()
+        }
+        v8::AnnotationConditionItem::Group { conditions, .. } => first_invalid_regex(conditions),
+    })
+}
+
+/// Whether `value` references a dashboard variable (`$name` or `${name}`).
+fn has_variable_reference(value: &str) -> bool {
+    value
+        .split('$')
+        .skip(1)
+        .any(|rest| rest.starts_with(|c: char| c == '{' || c == '_' || c.is_alphabetic()))
 }
 
 /// Drops `panels` ids with no live panel, so a deleted panel can't leave a source pointed at it.
@@ -1775,6 +1831,7 @@ mod tests {
                         column: "col".to_string(),
                         operator: "bogus".to_string(),
                         value: "x".to_string(),
+                        case_insensitive: None,
                         logical_operator: v8::AnnotationLogicalOperator::And,
                     },
                 )],
@@ -1792,8 +1849,113 @@ mod tests {
             column: column.to_string(),
             operator: "=".to_string(),
             value: "x".to_string(),
+            case_insensitive: None,
             logical_operator: v8::AnnotationLogicalOperator::And,
         })
+    }
+
+    #[test]
+    fn checked_annotation_sources_accepts_the_filter_builder_operators() {
+        for operator in [
+            "in",
+            "not_in",
+            "starts_with",
+            "ends_with",
+            "re_match",
+            "re_not_match",
+            "contains",
+            "not_contains",
+        ] {
+            let mut source = valid_source("s1");
+            let mut leaf = single_condition_leaf("col");
+            if let v8::AnnotationConditionItem::Condition(ref mut c) = leaf {
+                c.operator = operator.to_string();
+                c.case_insensitive = Some(true);
+            }
+            source.filters.conditions = vec![leaf];
+            let mut dashboard = dashboard_from_sources(vec![source]);
+            assert!(
+                checked_annotation_sources(&mut dashboard).is_ok(),
+                "{operator} must be accepted"
+            );
+        }
+    }
+
+    fn dashboard_with_regex_leaf(operator: &str, value: &str) -> Dashboard {
+        let mut source = valid_source("s1");
+        let mut leaf = single_condition_leaf("col");
+        if let v8::AnnotationConditionItem::Condition(ref mut c) = leaf {
+            c.operator = operator.to_string();
+            c.value = value.to_string();
+        }
+        source.filters.conditions = vec![v8::AnnotationConditionItem::Group {
+            logical_operator: v8::AnnotationLogicalOperator::And,
+            conditions: vec![leaf],
+        }];
+        dashboard_from_sources(vec![source])
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_an_invalid_regex() {
+        for operator in ["re_match", "re_not_match"] {
+            let mut dashboard = dashboard_with_regex_leaf(operator, "a(");
+            assert!(matches!(
+                checked_annotation_sources(&mut dashboard),
+                Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("invalid regex")
+            ));
+        }
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_a_regex_over_the_length_limit() {
+        let long = "é".repeat(MAX_REGEX_PATTERN_LEN + 1);
+        let mut dashboard = dashboard_with_regex_leaf("re_match", &long);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("characters")
+        ));
+        let at_limit = "é".repeat(MAX_REGEX_PATTERN_LEN);
+        let mut dashboard = dashboard_with_regex_leaf("re_match", &at_limit);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_a_valid_or_variable_regex() {
+        for value in ["^api-[0-9]+$", "${service}", "^$service-.*", "err$"] {
+            let mut dashboard = dashboard_with_regex_leaf("re_match", value);
+            assert!(
+                checked_annotation_sources(&mut dashboard).is_ok(),
+                "{value} must be accepted"
+            );
+        }
+        let long_var = format!("$svc{}", "a".repeat(MAX_REGEX_PATTERN_LEN));
+        let mut dashboard = dashboard_with_regex_leaf("re_match", &long_var);
+        assert!(checked_annotation_sources(&mut dashboard).is_err());
+    }
+
+    #[test]
+    fn checked_annotation_sources_does_not_compile_non_regex_values() {
+        let mut dashboard = dashboard_with_regex_leaf("contains", "a(");
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn annotation_leaf_without_case_insensitive_round_trips_unchanged() {
+        let json =
+            r#"{"column":"level","operator":"Contains","value":"err","logicalOperator":"AND"}"#;
+        let leaf: v8::AnnotationConditionLeaf = serde_json::from_str(json).unwrap();
+        assert_eq!(leaf.case_insensitive, None);
+        assert_eq!(serde_json::to_string(&leaf).unwrap(), json);
+
+        use std::hash::{Hash, Hasher};
+        let mut actual = std::hash::DefaultHasher::new();
+        leaf.hash(&mut actual);
+        let mut derived = std::hash::DefaultHasher::new();
+        "level".to_string().hash(&mut derived);
+        "Contains".to_string().hash(&mut derived);
+        "err".to_string().hash(&mut derived);
+        v8::AnnotationLogicalOperator::And.hash(&mut derived);
+        assert_eq!(actual.finish(), derived.finish());
     }
 
     #[test]

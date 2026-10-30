@@ -16,7 +16,6 @@
 import { z } from "zod";
 import type { TranslateFn } from "@/types/i18n";
 import type { TargetModule } from "@/services/downtimes";
-import { builderToCondition } from "@/utils/downtimes/conditionBridge";
 import { conditionError } from "@/utils/downtimes/conditionRules";
 import {
   ALL_FOLDERS,
@@ -165,7 +164,7 @@ const targetIssues = (
 
 const conditionIssues = (v: DowntimeFormValues, t: TranslateFn): Issue[] => {
   if (!v.condition_open || !v.modules.some(hasIdentity)) return [];
-  const key = conditionError(builderToCondition(v.condition));
+  const key = conditionError(v.condition);
   return key ? [{ path: ["condition"], message: t(key) }] : [];
 };
 

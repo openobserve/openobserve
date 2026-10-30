@@ -238,7 +238,7 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.openCondition();
 
     await pm.downtimesPage.save();
-    await pm.downtimesPage.expectErrorText('Choose a dimension for every row.');
+    await pm.downtimesPage.expectErrorText('Add a condition, or remove the condition block.');
 
     await pm.downtimesPage.fillConditionRow(0, { key: 'service', value: '*' });
     await pm.downtimesPage.save();

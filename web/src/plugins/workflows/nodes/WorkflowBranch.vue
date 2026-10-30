@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ref="(el: any) => setBuilderRef(row.handle, el)"
           :fields="fields"
           :initial-conditions="row.initialConditions"
+          profile="workflow"
           normalize-column-names
           optional
         />

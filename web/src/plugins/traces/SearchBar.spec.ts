@@ -1369,6 +1369,36 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("filter builder growth", () => {
+    let rectSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+    afterEach(() => {
+      rectSpy?.mockRestore();
+      localStorage.removeItem("o2.traces.queryInput");
+    });
+
+    it("reports how far the builder grew past one line, and null once the editor is back", async () => {
+      localStorage.setItem("o2.traces.queryInput", "builder");
+      rectSpy = vi
+        .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+        .mockImplementation(function (this: HTMLElement) {
+          const builder = this.getAttribute("data-test") === "traces-search-bar-filter-builder";
+          return { height: builder ? 84 : 0, width: 0 } as DOMRect;
+        });
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      // Three 1.875rem lines measure 84px; one line is the pane's own height.
+      expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
+      await wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("query editor autocomplete wiring", () => {
     const editorProps = () => wrapper.findComponent({ ref: "queryEditorRef" });
 

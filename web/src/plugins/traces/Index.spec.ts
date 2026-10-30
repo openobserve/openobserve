@@ -1885,6 +1885,18 @@ describe("Index.vue (Main Traces Page)", () => {
       delete store.state.zoConfig.auto_query_enabled;
     });
 
+    it("should grow the query pane with the filter builder and shrink it back", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+      const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
+      bar.vm.$emit("filterBuilderGrowth", 54);
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90 + 54);
+      bar.vm.$emit("filterBuilderGrowth", null);
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
+    });
+
     it("should render the drill-down target in the search tab", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();

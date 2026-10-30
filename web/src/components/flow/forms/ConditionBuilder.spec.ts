@@ -5,7 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -13,416 +13,233 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
+import { describe, it, expect, afterEach } from "vitest";
 import i18n from "@/locales";
 import ConditionBuilder from "./ConditionBuilder.vue";
 
-const mockToast = vi.fn();
-vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => mockToast(...a) }));
-
-// FilterGroup is heavy (and unrelated to this logic); stub it.
-vi.mock("@/components/alerts/FilterGroup.vue", () => ({
-  default: {
-    name: "FilterGroup",
-    template: '<div class="filter-group-stub" />',
-    props: [
-      "streamFields",
-      "group",
-      "depth",
-      "conditionInputWidth",
-      "allowCustomColumns",
-      "module",
-      "namePrefix",
-      "indentRem",
-    ],
-    emits: ["add-condition", "add-group", "remove-group"],
-  },
-}));
-
-function createWrapper(props: Record<string, any> = {}) {
-  return mount(ConditionBuilder, {
-    global: { plugins: [i18n] },
-    props,
-  });
-}
-
-describe("ConditionBuilder", () => {
-  afterEach(() => vi.clearAllMocks());
-
-  it("seeds an empty V2 group with one blank condition when no initial rule", () => {
-    const wrapper = createWrapper();
-    const g = (wrapper.vm as any).conditionGroup;
-    expect(g.filterType).toBe("group");
-    expect(Array.isArray(g.conditions)).toBe(true);
-    expect(g.conditions).toHaveLength(1);
-    expect(g.conditions[0].column).toBe("");
-  });
-
-  it("loads a saved V2 rule as-is", () => {
-    const saved = {
-      filterType: "group",
-      logicalOperator: "AND",
-      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
-    };
-    const wrapper = createWrapper({ initialConditions: saved });
-    const g = (wrapper.vm as any).conditionGroup;
-    expect(g.conditions[0].column).toBe("level");
-  });
-
-  it("normalizes lowercase operators when normalizeOperators is true", () => {
-    const saved = {
-      filterType: "group",
-      logicalOperator: "AND",
-      conditions: [{ filterType: "condition", column: "msg", operator: "contains", value: "x" }],
-    };
-    const wrapper = createWrapper({ initialConditions: saved, normalizeOperators: true });
-    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
-  });
-
-  it("canonicalizes operator spelling on load even without normalizeOperators", () => {
-    // ensureIds maps backend spellings to the select's option values on every
-    // load path now, so the select never renders empty for a saved operator.
-    const saved = {
-      filterType: "group",
-      logicalOperator: "AND",
-      conditions: [{ filterType: "condition", column: "msg", operator: "contains", value: "x" }],
-    };
-    const wrapper = createWrapper({ initialConditions: saved });
-    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
-  });
-
-  it("submit resolves { version, conditions } for a valid rule", async () => {
-    const saved = {
-      filterType: "group",
-      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
-    };
-    const wrapper = createWrapper({ initialConditions: saved });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload.version).toBe(2);
-    expect(payload.conditions.conditions[0].column).toBe("level");
-  });
-
-  // Optional mode (Workflows dummy node): submit never blocks — it returns the rule
-  // with a `complete` flag so the host can save an incomplete rule as a placeholder.
-  it("optional: returns complete:true and the payload for a valid rule", async () => {
-    const saved = {
-      filterType: "group",
-      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
-    };
-    const wrapper = createWrapper({ initialConditions: saved, optional: true });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload.version).toBe(2);
-    expect(payload.complete).toBe(true);
-    expect(payload.conditions.conditions[0].column).toBe("level");
-  });
-
-  it("optional: returns complete:false (not null) for an incomplete rule", async () => {
-    const wrapper = createWrapper({
-      initialConditions: {
-        filterType: "group",
-        conditions: [{ filterType: "condition", column: "", operator: "" }],
-      },
-      optional: true,
-    });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload).not.toBeNull();
-    expect(payload.version).toBe(2);
-    expect(payload.complete).toBe(false);
-  });
-
-  it("does not add a complete flag in the default (non-optional) payload", async () => {
-    const saved = {
-      filterType: "group",
-      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
-    };
-    const wrapper = createWrapper({ initialConditions: saved });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload).toEqual({ version: 2, conditions: expect.any(Object) });
-    expect("complete" in payload).toBe(false);
-  });
-
-  it("normalizes dotted columns on submit when normalizeColumnNames is on", async () => {
-    const saved = {
-      filterType: "group",
-      conditions: [
-        { filterType: "condition", column: "data.alert.name", operator: "=", value: "x" },
-        {
-          filterType: "group",
-          conditions: [
-            { filterType: "condition", column: "row.some.field", operator: "=", value: "y" },
-          ],
-        },
-      ],
-    };
-    const wrapper = createWrapper({ initialConditions: saved, normalizeColumnNames: true });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload.conditions.conditions[0].column).toBe("data_alert_name");
-    // nested groups are normalized too
-    expect(payload.conditions.conditions[1].conditions[0].column).toBe("row_some_field");
-  });
-
-  it("leaves dotted columns untouched on submit when normalizeColumnNames is off", async () => {
-    const saved = {
-      filterType: "group",
-      conditions: [
-        { filterType: "condition", column: "data.alert.name", operator: "=", value: "x" },
-      ],
-    };
-    const wrapper = createWrapper({ initialConditions: saved });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload.conditions.conditions[0].column).toBe("data.alert.name");
-  });
-
-  // The zod schema now gates the save: an empty/incomplete rule fails
-  // validation, so submit() resolves null and the message renders inline under
-  // the FilterGroup (the old imperative error toast is gone).
-  it("submit resolves null and shows an inline error when the rule is empty", async () => {
-    const wrapper = createWrapper({
-      initialConditions: {
-        filterType: "group",
-        conditions: [{ filterType: "condition", column: "", operator: "" }],
-      },
-    });
-    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
-    await flushPromises();
-    expect(wrapper.find('[data-test="add-condition-error"]').exists()).toBe(true);
-    expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
-  });
-
-  it("passes fields through to FilterGroup as stream-fields", () => {
-    const fields = [{ label: "level", value: "level", type: "Utf8" }];
-    const wrapper = createWrapper({ fields });
-    expect(wrapper.findComponent({ name: "FilterGroup" }).props("streamFields")).toEqual(fields);
-  });
-
-  // ── Prop plumbing down to FilterGroup ─────────────────────────────────────
-  // Both of these are load-bearing and fail SILENTLY when dropped, which is how
-  // #13277 killed custom columns: the select kept rendering, it just stopped
-  // being creatable. FilterGroup is stubbed here, so these pin the first hop
-  // only — the second hop (FilterGroup -> FilterCondition) is pinned in
-  // FilterGroup.spec, and the create behaviour itself in FilterCondition.spec.
-
-  it("renders FilterGroup in FORM MODE (name-prefix=conditions)", () => {
-    // Without the prefix, FilterCondition falls out of name-binding and no leaf
-    // value ever reaches the form — the whole builder silently stops working.
-    const wrapper = createWrapper();
-    expect(wrapper.findComponent({ name: "FilterGroup" }).props("namePrefix")).toBe("conditions");
-  });
-
-  // The condition inputs sit in a node drawer, and this width governs the column
-  // select as well as the operator/value inputs. At 8.125rem a dotted trigger
-  // field ("meta.alert_start_time") truncates to an unreadable stub, which is the
-  // whole complaint — the select is wide enough to pick from, not to read.
-  it("gives the condition inputs room for long dotted field names", () => {
-    const wrapper = createWrapper();
-    const width = wrapper.findComponent({ name: "FilterGroup" }).props("conditionInputWidth");
-    const rem = Number(/\[([\d.]+)rem\]/.exec(String(width))?.[1] ?? 0);
-    expect(rem).toBeGreaterThanOrEqual(11);
-  });
-
-  it("passes allowCustomColumns through to FilterGroup", () => {
-    const wrapper = createWrapper({ allowCustomColumns: true });
-    expect(wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns")).toBe(true);
-  });
-
-  // Note the deliberate asymmetry: FilterGroup/FilterCondition default this to
-  // FALSE so alerts never get a creatable column select, but this flow-specific
-  // wrapper defaults it to TRUE — both of its consumers (pipeline + workflow
-  // Condition nodes) want custom columns, and the pipeline drawer's guidelines
-  // tell users to type one and press Enter.
-  it("defaults allowCustomColumns to true (flow nodes want custom columns)", () => {
-    const wrapper = createWrapper();
-    expect(wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns")).toBe(true);
-  });
-
-  it("still honours an explicit opt-out", () => {
-    const wrapper = createWrapper({ allowCustomColumns: false });
-    expect(wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns")).toBe(false);
-  });
-  // ── Ported from pipeline Condition.spec ───────────────────────────────────
-  // These behaviours moved here when pipelines and workflows were put back on
-  // this one shared body; the drawer spec now only covers its own chrome.
-
-  it("loads the V1-backend AND format", () => {
-    const wrapper = createWrapper({
-      initialConditions: {
-        and: [{ column: "level", operator: "=", value: "error" }],
-      },
-    });
-    const g = (wrapper.vm as any).conditionGroup;
-    expect(g.filterType).toBe("group");
-    expect(g.logicalOperator).toBe("AND");
-  });
-
-  it("loads the V1-backend OR format", () => {
-    const wrapper = createWrapper({
-      initialConditions: {
-        or: [{ column: "level", operator: "=", value: "error" }],
-      },
-    });
-    expect((wrapper.vm as any).conditionGroup.logicalOperator).toBe("OR");
-  });
-
-  it("updates the group when FilterGroup emits add-condition", async () => {
-    const wrapper = createWrapper();
-    const root = (wrapper.vm as any).conditionGroup;
-    const updated = {
-      ...JSON.parse(JSON.stringify(root)),
-      logicalOperator: "OR",
-    };
-    await wrapper.findComponent({ name: "FilterGroup" }).vm.$emit("add-condition", updated);
-    expect((wrapper.vm as any).conditionGroup.logicalOperator).toBe("OR");
-  });
-
-  // ── Schema validation matrix (was the drawer's "blocks submit" suite) ─────
-  const rule = (c: any) => ({
-    filterType: "group",
-    logicalOperator: "AND",
-    groupId: "g1",
-    conditions: Array.isArray(c) ? c : [c],
-  });
-  const cond = (o: any) => ({ filterType: "condition", id: "c1", ...o });
-
-  it.each([
-    ["an empty conditions array", rule([])],
-    ["an empty column", cond({ column: "", operator: "=", value: "x" })],
-    ["an empty operator", cond({ column: "lvl", operator: "", value: "x" })],
-    ["a column but no value", cond({ column: "lvl", operator: "=", value: "" })],
-  ])("blocks submit for %s", async (_label, c: any) => {
-    const wrapper = createWrapper({
-      initialConditions: Array.isArray(c?.conditions) ? c : rule(c),
-    });
-    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
-  });
-
-  it("blocks submit when ANY of several conditions is incomplete", async () => {
-    const wrapper = createWrapper({
-      initialConditions: rule([
-        cond({ column: "lvl", operator: "=", value: "error" }),
-        cond({ column: "svc", operator: "=", value: "" }),
-      ]),
-    });
-    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
-  });
-
-  it.each([
-    ["an empty-string value", cond({ column: "lvl", operator: "!=", value: '""' })],
-    ["a null value", cond({ column: "lvl", operator: "!=", value: "null" })],
-  ])("accepts %s as a complete condition", async (_label, c: any) => {
-    const wrapper = createWrapper({ initialConditions: rule(c) });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload).not.toBeNull();
-    expect(payload.version).toBe(2);
-  });
-
-  it("accepts a nested group as a valid condition", async () => {
-    const wrapper = createWrapper({
-      initialConditions: rule({
-        filterType: "group",
-        logicalOperator: "OR",
-        groupId: "g2",
-        conditions: [cond({ column: "lvl", operator: "=", value: "warn" })],
-      }),
-    });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload).not.toBeNull();
-  });
-
-  it("preserves ignore_case in the returned payload", async () => {
-    const wrapper = createWrapper({
-      initialConditions: rule(
-        cond({ column: "lvl", operator: "=", value: "error", ignore_case: true }),
-      ),
-    });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload.conditions.conditions[0].ignore_case).toBe(true);
-  });
+const leaf = (column: string, value: unknown, operator = "=", logicalOperator = "AND") => ({
+  filterType: "condition",
+  column,
+  operator,
+  value,
+  values: [],
+  logicalOperator,
+  id: `id-${column}`,
 });
 
-// Authoring-time unknown-column warning: only workflow callers pass
-// normalize-column-names (the payload envelope is known there), so the warning
-// must be inert for pipeline usage where stream columns are open-ended.
-describe("ConditionBuilder unknown-column warning", () => {
-  const FIELDS = [
-    { label: "meta.alert_name", value: "meta_alert_name", type: "Utf8" },
-    { label: "meta.severity", value: "meta_severity", type: "Utf8" },
-  ];
-  const treeWith = (column: string) => ({
-    filterType: "group",
-    logicalOperator: "AND",
-    conditions: [{ filterType: "condition", column, operator: "=", value: "critical" }],
-  });
-  const warnings = (wrapper: any) =>
-    wrapper.findAll('[data-test="condition-builder-unknown-column-warning"]');
+const v2 = (...conditions: unknown[]) => ({
+  filterType: "group",
+  logicalOperator: "AND",
+  groupId: "root-id",
+  conditions,
+});
 
-  it("warns for a typed column the trigger payload cannot resolve, with a suggestion", () => {
-    const wrapper = createWrapper({
-      fields: FIELDS,
-      initialConditions: treeWith("severity"),
-      normalizeColumnNames: true,
+const fields = [
+  { label: "level", value: "level", type: "Utf8" },
+  { label: "meta.alert_name", value: "meta_alert_name", type: "Utf8" },
+];
+
+let wrapper: VueWrapper | null = null;
+
+afterEach(() => {
+  wrapper?.unmount();
+  wrapper = null;
+  document.body.innerHTML = "";
+});
+
+function createWrapper(props: Record<string, unknown> = {}) {
+  wrapper = mount(ConditionBuilder, {
+    attachTo: document.body,
+    global: { plugins: [i18n] },
+    props: { fields, ...props },
+  });
+  return wrapper;
+}
+
+const submit = () => (wrapper!.vm as any).submit();
+const builder = () => wrapper!.findComponent({ name: "FilterBuilder" });
+
+describe("ConditionBuilder (pipeline + workflow host of the shared FilterBuilder)", () => {
+  describe("saved rules round-trip unchanged when untouched", () => {
+    const fixtures: Record<string, unknown> = {
+      "V2 with nested group, lowercase operator and ignore_case": v2(
+        leaf("level", "error", "contains"),
+        { ...leaf("service", "api", "Contains"), ignore_case: true },
+        {
+          filterType: "group",
+          logicalOperator: "OR",
+          groupId: "g1",
+          conditions: [leaf("status", 500, ">="), leaf("host", "a", "NotContains", "OR")],
+        },
+      ),
+      "V2 written by the backend (no ids)": {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "a",
+            operator: "=",
+            value: "1",
+            logicalOperator: "AND",
+          },
+        ],
+      },
+      "V1 backend {and: [...]}": { and: [{ column: "level", operator: "=", value: "error" }] },
+      "V0 flat list": [{ column: "level", operator: "=", value: "error" }],
+    };
+
+    for (const [name, saved] of Object.entries(fixtures)) {
+      it(`pipeline: ${name}`, async () => {
+        createWrapper({ initialConditions: saved, profile: "pipeline" });
+        await flushPromises();
+        const payload = await submit();
+        expect(JSON.stringify(payload.conditions)).toBe(JSON.stringify(saved));
+        // The backend reads a missing version as V1, the only shape a V0/V1 rule parses as.
+        if ((saved as any).filterType === "group") expect(payload.version).toBe(2);
+        else expect(payload).not.toHaveProperty("version");
+      });
+    }
+
+    it("pipeline: an edited V1 rule is converted and sent as V2", async () => {
+      createWrapper({
+        initialConditions: { and: [{ column: "level", operator: "=", value: "error" }] },
+        profile: "pipeline",
+      });
+      await flushPromises();
+      const next = v2(leaf("level", "warn"));
+      builder().vm.$emit("update:modelValue", next);
+      await flushPromises();
+      const payload = await submit();
+      expect(payload.version).toBe(2);
+      expect(payload.conditions).toEqual(next);
     });
-    const warns = warnings(wrapper);
-    expect(warns).toHaveLength(1);
-    expect(warns[0].text()).toContain("severity");
-    expect(warns[0].text()).toContain("meta.severity");
-  });
 
-  it("shows the warning without a suggestion when nothing near-matches", () => {
-    const wrapper = createWrapper({
-      fields: FIELDS,
-      initialConditions: treeWith("hostname"),
-      normalizeColumnNames: true,
+    it("workflow: an untouched V1 rule keeps its shape and is complete", async () => {
+      const saved = { or: [{ column: "meta_alert_name", operator: "=", value: "cpu" }] };
+      createWrapper({
+        initialConditions: saved,
+        profile: "workflow",
+        optional: true,
+        normalizeColumnNames: true,
+      });
+      const payload = await submit();
+      expect(payload).toEqual({ conditions: saved, complete: true });
     });
-    const warns = warnings(wrapper);
-    expect(warns).toHaveLength(1);
-    expect(warns[0].text()).not.toContain("?");
-  });
 
-  it("does not warn for a dropdown-picked (known) column", () => {
-    const wrapper = createWrapper({
-      fields: FIELDS,
-      initialConditions: treeWith("meta_severity"),
-      normalizeColumnNames: true,
+    it("workflow: keeps an underscore rule byte-identical", async () => {
+      const saved = v2(leaf("meta_alert_name", "cpu"));
+      createWrapper({
+        initialConditions: saved,
+        profile: "workflow",
+        optional: true,
+        normalizeColumnNames: true,
+      });
+      const payload = await submit();
+      expect(JSON.stringify(payload.conditions)).toBe(JSON.stringify(saved));
+      expect(payload.complete).toBe(true);
     });
-    expect(warnings(wrapper)).toHaveLength(0);
   });
 
-  it("does not warn for a custom path under a known payload root", () => {
-    const wrapper = createWrapper({
-      fields: FIELDS,
-      initialConditions: treeWith("meta_custom_runtime_field"),
-      normalizeColumnNames: true,
-    });
-    expect(warnings(wrapper)).toHaveLength(0);
+  it("renders the shared vertical builder with the page's own test ids", () => {
+    createWrapper({ initialConditions: v2(leaf("level", "error")) });
+    expect(wrapper!.find('[data-test="condition-builder-row-0"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="condition-builder-chip-level"]').exists()).toBe(true);
+    expect(builder().props("profile")).toBe("pipeline");
   });
 
-  it("stays inert without normalizeColumnNames (pipeline builders)", () => {
-    const wrapper = createWrapper({
-      fields: FIELDS,
-      initialConditions: treeWith("severity"),
-    });
-    expect(warnings(wrapper)).toHaveLength(0);
+  it("shows a flattened workflow column by its dotted label on the chip, as the picker does", () => {
+    createWrapper({ initialConditions: v2(leaf("meta_alert_name", "cpu")), profile: "workflow" });
+    expect(wrapper!.find('[data-test="condition-builder-chip-meta_alert_name-field"]').text()).toBe(
+      "meta.alert_name",
+    );
   });
 
-  it("stays inert when the payload shape is unknown (no fields)", () => {
-    const wrapper = createWrapper({
-      fields: [],
-      initialConditions: treeWith("severity"),
-      normalizeColumnNames: true,
-    });
-    expect(warnings(wrapper)).toHaveLength(0);
+  it("maps page fields onto builder fields, keeping the dotted label", () => {
+    createWrapper();
+    expect(builder().props("fields")).toEqual([
+      { name: "level", label: "level", type: "string" },
+      { name: "meta_alert_name", label: "meta.alert_name", type: "string" },
+    ]);
   });
 
-  it("never blocks submit — the payload is returned despite the warning", async () => {
-    const wrapper = createWrapper({
-      fields: FIELDS,
-      initialConditions: treeWith("severity"),
-      normalizeColumnNames: true,
+  it("pipeline: an empty rule blocks save and says why", async () => {
+    createWrapper();
+    await expect(submit()).resolves.toBeNull();
+    await flushPromises();
+    expect(wrapper!.find('[data-test="condition-builder-issues"]').text()).toContain(
+      "Add at least one filter",
+    );
+  });
+
+  it("pipeline: an unfinished condition blocks save with the fill-all message", async () => {
+    createWrapper({ initialConditions: v2(leaf("level", "")) });
+    await expect(submit()).resolves.toBeNull();
+    await flushPromises();
+    expect(wrapper!.find('[data-test="add-condition-error"]').exists()).toBe(true);
+  });
+
+  it("workflow: never blocks, flags an unfinished rule incomplete", async () => {
+    createWrapper({
+      initialConditions: v2(leaf("level", "")),
+      profile: "workflow",
       optional: true,
     });
-    const payload = await (wrapper.vm as any).submit();
-    expect(payload).not.toBeNull();
-    expect(payload.conditions.conditions[0].column).toBe("severity");
+    const payload = await submit();
+    expect(payload.complete).toBe(false);
+    expect(payload.conditions.conditions[0].column).toBe("level");
+  });
+
+  it("workflow: an unset rule saves as the backend's pass-through rule, flagged incomplete", async () => {
+    createWrapper({ profile: "workflow", optional: true });
+    const payload = await submit();
+    expect(payload.complete).toBe(false);
+    expect(payload.conditions.conditions).toEqual([
+      expect.objectContaining({ column: "", operator: "=", value: "" }),
+    ]);
+  });
+
+  it("writes the builder's edits back and normalizes dotted columns on submit", async () => {
+    createWrapper({ profile: "workflow", optional: true, normalizeColumnNames: true });
+    const edited = v2(leaf("meta.alert_name", ["a", "b"], "in"));
+    builder().vm.$emit("update:modelValue", edited);
+    await flushPromises();
+    const payload = await submit();
+    expect(payload.conditions.conditions[0]).toMatchObject({
+      column: "meta_alert_name",
+      operator: "in",
+      value: ["a", "b"],
+    });
+    expect(edited.conditions[0]).toMatchObject({ column: "meta.alert_name" });
+  });
+
+  it("exposes the live value for the drawer's discard check", async () => {
+    createWrapper({ initialConditions: v2(leaf("level", "error")) });
+    const next = v2(leaf("level", "warn"));
+    builder().vm.$emit("update:modelValue", next);
+    await flushPromises();
+    expect((wrapper!.vm as any).conditionGroup).toEqual(next);
+  });
+
+  describe("unknown-column warning (workflows)", () => {
+    it("warns for a column the payload cannot resolve, with a suggestion", () => {
+      createWrapper({
+        profile: "workflow",
+        optional: true,
+        normalizeColumnNames: true,
+        initialConditions: v2(leaf("alert_name", "x")),
+      });
+      const warning = wrapper!.find('[data-test="condition-builder-unknown-column-warning"]');
+      expect(warning.text()).toContain("alert_name");
+      expect(warning.text()).toContain("meta.alert_name");
+    });
+
+    it("stays inert without normalizeColumnNames (pipelines)", () => {
+      createWrapper({ initialConditions: v2(leaf("alert_name", "x")) });
+      expect(wrapper!.find('[data-test="condition-builder-unknown-column-warning"]').exists()).toBe(
+        false,
+      );
+    });
   });
 });

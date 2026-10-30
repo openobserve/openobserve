@@ -3,6 +3,9 @@
 // Covers: Label Filters, Operations, Options, Query Mode tabs, Add to Dashboard
 
 import { expect } from '@playwright/test';
+import { FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
+
+const LABEL_BUILDER = 'promql-label-filter-builder';
 
 // Keyed by page so every PageManager built on the same page shares one set of listeners instead of stacking more.
 const promqlTrackers = new WeakMap();
@@ -21,11 +24,9 @@ export class MetricsBuilderPage {
         this.streamSelector = '[data-test="index-dropdown-stream"]';
         this.fieldSearchInput = '[data-test="o-field-list-search-field"]';
 
-        // Label Filter selectors
-        this.addLabelFilterButton = '[data-test="promql-add-label-filter"]';
-        this.labelSelect = '[data-test="promql-label-select"]';
-        this.operatorSelect = '[data-test="promql-operator-select"]';
-        this.valueSelect = '[data-test="promql-value-select"]';
+        // Label filters are the shared FilterBuilder: its input opens the label list, each matcher is a chip.
+        this.labelBuilder = new FilterBuilderDriver(page, LABEL_BUILDER);
+        this.addLabelFilterButton = `[data-test="${LABEL_BUILDER}-input"]`;
 
         // Operations selectors
         this.addOperationButton = '[data-test="promql-add-operation"]';
@@ -74,17 +75,9 @@ export class MetricsBuilderPage {
         // OSelect popover search input (Reka ListboxFilter) — `${parent}-search`
         this.streamSearchInput = page.locator('[data-test="index-dropdown-stream-search"]');
 
-        // Label / operator / value popovers (OSelect)
-        this.labelPopover = page.locator('[data-test="promql-label-select-popover"]');
-        this.labelOptions = page.locator('[data-test="promql-label-select-option"]');
-        this.operatorPopover = page.locator('[data-test="promql-operator-select-popover"]');
-        this.operatorOptions = page.locator('[data-test="promql-operator-select-option"]');
-        this.valuePopover = page.locator('[data-test="promql-value-select-popover"]');
-        this.valueOptions = page.locator('[data-test="promql-value-select-option"]');
-
-        this.labelSelectLast = page.locator(this.labelSelect).last();
-        this.operatorSelectLast = page.locator(this.operatorSelect).last();
-        this.valueSelectLast = page.locator(this.valueSelect).last();
+        // The one list the label builder shows: labels, then operators, then values.
+        this.labelFilterPopover = this.labelBuilder.suggestions;
+        this.labelFilterOptions = this.labelFilterPopover.locator('[role="option"]');
 
         // Add filter / add operation buttons
         this.addLabelFilterBtn = page.locator(this.addLabelFilterButton);
@@ -97,8 +90,7 @@ export class MetricsBuilderPage {
         this.operationDialogOptions = this.operationDialog.locator('[data-test^="promql-operation-option-"]');
         this.operationDialogHeaders = this.operationDialog.locator('[data-test^="operations-list-category-"]');
 
-        // Filter count: data-test starts with promql-label-filter- but no remove
-        this.labelFilterChips = page.locator('[data-test^="promql-label-filter-"]:not([data-test*="remove"]):not([data-test*="menu"]):not([data-test*="popover"]):not([data-test*="option"])');
+        this.labelFilterChips = this.labelBuilder.chips;
         this.operationChips = page.locator('[data-test^="promql-operation-"]:not([data-test*="remove"]):not([data-test*="drag"]):not([data-test*="param"]):not([data-test*="menu"]):not([data-test*="popover"]):not([data-test*="option"])');
 
         // Options fields
@@ -191,15 +183,21 @@ export class MetricsBuilderPage {
      * @param {number} index - 0-based index
      */
     getLabelFilterButton(index) {
-        return this.page.locator(`[data-test="promql-label-filter-${index}"]`);
+        return this.labelFilterChips.nth(index);
     }
 
     getLabelFilterRemoveBtn(index) {
-        return this.page.locator(`[data-test="promql-label-filter-remove-${index}"]`);
+        return this.labelFilterChips.nth(index).locator('[data-test$="-remove"]');
     }
 
-    getLabelFilterMenu(index) {
-        return this.page.locator(`[data-test="promql-label-filter-${index}-menu"]`);
+    // The label/operator/value list, open while a chip is being added or edited.
+    getLabelFilterMenu(_index) {
+        return this.labelFilterPopover;
+    }
+
+    /** An option of the open label-filter list by its key: a label, an operator id (eq, regex…) or a value. */
+    getLabelFilterOption(key) {
+        return this.labelBuilder.suggestion(key);
     }
 
     getOperationButton(index) {
@@ -233,18 +231,6 @@ export class MetricsBuilderPage {
     getOperationParamOptionByValue(index, value) {
         // OSelect option key — prefer data-test-value
         return this.page.locator(`[data-test="promql-operation-param-${index}-option"][data-test-value="${value}"]`).first();
-    }
-
-    getLabelOptionByValue(value) {
-        return this.page.locator(`[data-test="promql-label-select-option"][data-test-value="${value}"]`).first();
-    }
-
-    getOperatorOptionByValue(value) {
-        return this.page.locator(`[data-test="promql-operator-select-option"][data-test-value="${value}"]`).first();
-    }
-
-    getValueOptionByValue(value) {
-        return this.page.locator(`[data-test="promql-value-select-option"][data-test-value="${value}"]`).first();
     }
 
     getPanelBarByTitle(title) {
@@ -498,128 +484,106 @@ export class MetricsBuilderPage {
     // ===== Label Filter Operations =====
 
     /**
-     * Click the add label filter button (+)
+     * Open the label list of the label-filter bar (a matcher is added once label, operator and value are picked)
      */
     async clickAddLabelFilter() {
-        await this.addLabelFilterBtn.click();
-        await this.addLabelFilterBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.labelBuilder.openForNew();
     }
 
     /**
-     * Open label filter menu at index. LabelFilterEditor chip menu is now an ODropdown.
+     * Open the label list of the chip at index, to change its label
      * @param {number} index - 0-based index
      */
     async openLabelFilterMenu(index) {
-        const filterBtn = this.getLabelFilterButton(index);
-        await filterBtn.click();
-        await this.getLabelFilterMenu(index).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.getLabelFilterButton(index).locator('[data-test$="-field"]').click();
+        await this.labelBuilder.waitForPicker();
+    }
+
+    // The key of the first option in the open list; the option's text also carries its type.
+    async firstOptionKey() {
+        const first = this.labelFilterOptions.first();
+        await first.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (!(await first.isVisible().catch(() => false))) return '';
+        const testId = await first.getAttribute('data-test');
+        return testId ? testId.slice(`${LABEL_BUILDER}-suggest-item-`.length) : '';
     }
 
     /**
-     * Select a label name from the label filter dropdown.
+     * Pick a label in the open list (typed, so labels not loaded yet can be used too)
      * @param {string} labelName
      */
     async selectLabel(labelName) {
-        await this.labelSelectLast.click();
-        await this.labelPopover.waitFor({ state: 'visible', timeout: 5000 });
-
-        // OSelect popover search: Ctrl+A → Backspace → fill (ListboxFilter → `${parent}-search`)
-        const popoverSearch = this.page.locator('[data-test="promql-label-select-search"]').first();
-        if (await popoverSearch.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await popoverSearch.press('ControlOrMeta+a').catch(() => {});
-            await popoverSearch.press('Backspace').catch(() => {});
-            await popoverSearch.fill(labelName);
-        }
-
-        const option = this.getLabelOptionByValue(labelName);
-        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await option.click();
-            await this.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-            return true;
-        }
-        return false;
+        await this.labelBuilder.pickField(labelName);
+        return true;
     }
 
     /**
-     * Select an operator from the operator dropdown
-     * @param {string} operator - one of: =, !=, =~, !~
+     * Pick an operator in the open list
+     * @param {string} operator - one of: =, !=, =~, !~, IN, NOT IN
      */
     async selectOperator(operator) {
-        await this.operatorSelectLast.click();
-        await this.operatorPopover.waitFor({ state: 'visible', timeout: 5000 });
-
-        const option = this.getOperatorOptionByValue(operator);
-        if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await option.click();
-            await this.operatorPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-            return true;
-        }
-        return false;
+        await this.labelBuilder.pickOperator(operator);
+        return true;
     }
 
     /**
-     * Select a value from the value dropdown
+     * Pick or type a value in the open list; regex patterns are typed
      * @param {string} value
      */
     async selectValue(value) {
-        await this.valueSelectLast.click();
-        await this.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-
-        // OSelect popover search: Ctrl+A → Backspace → fill (ListboxFilter → `${parent}-search`)
-        const popoverSearch = this.page.locator('[data-test="promql-value-select-search"]').first();
-        if (await popoverSearch.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await popoverSearch.press('ControlOrMeta+a').catch(() => {});
-            await popoverSearch.press('Backspace').catch(() => {});
-            await popoverSearch.fill(value);
-        }
-
-        const option = this.getValueOptionByValue(value);
-        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await option.click();
-            await this.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-            return true;
-        }
-        return false;
+        await this.labelBuilder.pickValue(value);
+        return true;
     }
 
-    /** Select the first available label value, gating on the async values fetch; returns the value or ''. */
+    /** Pick the first loaded value of the open value list; returns it, or '' when the label has none. */
     async selectFirstLabelValue() {
-        if (await this.isValueSelectDisabled()) return '';
-        await this.valueSelectLast.click();
-        await this.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-        // Values load async after the popover opens; wait for the first option to attach before reading, else a one-shot count races the fetch and selects nothing (→ metric{label=""} matches nothing).
-        await this.valueOptions.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-        if (await this.valueOptions.count() === 0) return '';
-        const value = (await this.valueOptions.first().textContent()).trim();
-        await this.valueOptions.first().click();
-        await this.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        const value = await this.firstOptionKey();
+        if (!value) return '';
+        await this.getLabelFilterOption(value).click();
         return value;
     }
 
     /**
-     * Remove a label filter at the given index
-     * @param {number} index - 0-based index
+     * Add `<first label> <operator> <first value>`; returns the label and value picked ('' when none loaded)
+     * @param {string} operator
      */
-    async removeLabelFilter(index) {
-        const removeBtn = this.getLabelFilterRemoveBtn(index);
-        await removeBtn.click();
-        await removeBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    async addFirstLabelFilter(operator = '=') {
+        await this.clickAddLabelFilter();
+        const label = await this.firstOptionKey();
+        if (!label) {
+            await this.labelBuilder.close();
+            return { label: '', value: '' };
+        }
+        await this.getLabelFilterOption(label).click();
+        await this.selectOperator(operator);
+        const value = await this.selectFirstLabelValue();
+        await this.labelBuilder.close();
+        return { label, value };
     }
 
     /**
-     * Get count of visible label filter items
+     * Remove the label filter chip at the given index
+     * @param {number} index - 0-based index
+     */
+    async removeLabelFilter(index) {
+        const before = await this.getLabelFilterCount();
+        await this.getLabelFilterRemoveBtn(index).click();
+        await expect(this.labelFilterChips).toHaveCount(before - 1, { timeout: 5000 });
+    }
+
+    /**
+     * Get count of label filter chips
      */
     async getLabelFilterCount() {
         return await this.labelFilterChips.count();
     }
 
     /**
-     * Get the text of a label filter button
+     * Get the text of a label filter chip (label, operator and value)
      * @param {number} index
      */
     async getLabelFilterText(index) {
-        const filterBtn = this.getLabelFilterButton(index);
-        return await filterBtn.textContent();
+        return await this.getLabelFilterButton(index).innerText();
     }
 
     /**
@@ -629,25 +593,8 @@ export class MetricsBuilderPage {
      * @param {string} value
      */
     async addCompleteLabelFilter(labelName, operator, value) {
-        await this.clickAddLabelFilter();
-        const filterCount = await this.getLabelFilterCount();
-        const newIndex = filterCount - 1;
-
-        // Open the new filter menu
-        await this.openLabelFilterMenu(newIndex);
-
-        // Select label
-        await this.selectLabel(labelName);
-
-        // Select operator
-        await this.selectOperator(operator);
-
-        // Select value
-        await this.selectValue(value);
-
-        // Close menu by pressing Escape — LabelFilterEditor chip menu = ODropdown post-migration
-        await this.page.keyboard.press('Escape');
-        await this.getLabelFilterMenu(newIndex).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.labelBuilder.addCondition({ field: labelName, operator, value });
+        await this.labelBuilder.close();
     }
 
     // ===== Operations =====
@@ -1082,10 +1029,10 @@ export class MetricsBuilderPage {
     }
 
     /**
-     * Check if label select dropdown has options loaded
+     * Check if the open label list has options loaded
      */
     async hasLabelOptions() {
-        return (await this.labelOptions.count()) > 0;
+        return (await this.labelFilterOptions.count()) > 0;
     }
 
     /**
@@ -1232,48 +1179,6 @@ export class MetricsBuilderPage {
         return await this.operationDialog
             .isVisible({ timeout: 2000 })
             .catch(() => false);
-    }
-
-    /**
-     * Check if value dropdown is disabled (no label selected)
-     */
-    async isValueSelectDisabled() {
-        await this.valueSelectLast.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
-        const isDisabled = await this.valueSelectLast.evaluate(el => {
-            // OSelect post-migration: the PopoverTrigger button (`-trigger`) is
-            // the element that carries the disabled state when `:disabled` is
-            // set on the OSelect. We also check ancestor data-disabled, native
-            // disabled attr, and the legacy disabled class for safety.
-            const hasDisabledClass = (node) => {
-                if (!node) return false;
-                const cls = node.className || '';
-                return cls.includes('disabled');
-            };
-            // Find the OSelect trigger inside the wrapper (post-migration) — the
-            // disabled flag binds to the PopoverTrigger button.
-            const trigger = el.querySelector('[data-test$="-trigger"]');
-            if (trigger) {
-                if (trigger.hasAttribute('disabled')) return true;
-                if (trigger.getAttribute('data-disabled') !== null) return true;
-                if (trigger.getAttribute('aria-disabled') === 'true') return true;
-                const cls = trigger.className || '';
-                if (cls.includes('data-[disabled]') || cls.includes('cursor-not-allowed') || cls.includes('disabled:')) {
-                    // class-based hint only; rely on actual attrs below
-                }
-            }
-            if (hasDisabledClass(el)) return true;
-            if (hasDisabledClass(el.parentElement)) return true;
-            if (el.getAttribute('aria-disabled') === 'true') return true;
-            if (el.getAttribute('data-disabled') === 'true') return true;
-            if (el.querySelector('[aria-disabled="true"]')) return true;
-            if (el.querySelector('[data-disabled]')) return true;
-            const input = el.querySelector('input');
-            if (input && input.disabled) return true;
-            const style = window.getComputedStyle(el);
-            if (style.pointerEvents === 'none') return true;
-            return false;
-        }).catch(() => false);
-        return isDisabled;
     }
 
     // ===== Query Verification =====

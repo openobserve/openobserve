@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { watch } from "vue";
 import {
   CREDENTIAL_PARAMS,
   MAX_FILTER_VALUES,
@@ -31,6 +32,8 @@ import type {
   StepRef,
   ViewCond,
 } from "@/utils/rum/productAnalyticsQueries";
+
+const VALUES_WAIT_MS = 30000;
 
 export interface FilterValueRow {
   value: string;
@@ -157,4 +160,35 @@ export function withConds(step: StepRef, conds: ViewCond[]): StepRef {
   return Object.keys(f).length
     ? { kind: step.kind, key: step.key, f }
     : { kind: step.kind, key: step.key };
+}
+
+const valuesOf = (state: FilterValuesState, search: string): string[] => {
+  const needle = search.trim().toLowerCase();
+  const rows = state.status === "ok" ? state.rows.map((row) => row.value) : [];
+  return needle ? rows.filter((v) => v.toLowerCase().includes(needle)) : rows;
+};
+
+/** A filter builder value loader over an owner-run values query whose rows arrive through `state`. */
+export function valuesLoader(
+  state: () => FilterValuesState,
+  request: (field: string) => void,
+): (field: string, search: string) => Promise<string[]> {
+  return (field, search) => {
+    const now = state();
+    const done = now.field === field && (now.status === "ok" || now.status === "error");
+    request(field);
+    if (done) return Promise.resolve(valuesOf(now, search));
+    // The rows come a render later; idle for this field means the owner had nothing to run.
+    return new Promise((resolve) => {
+      const finish = (rows: string[]) => {
+        stop();
+        clearTimeout(timer);
+        resolve(rows);
+      };
+      const timer = setTimeout(() => finish([]), VALUES_WAIT_MS);
+      const stop = watch(state, (next) => {
+        if (next.field === field && next.status !== "loading") finish(valuesOf(next, search));
+      });
+    });
+  };
 }

@@ -68,6 +68,7 @@ const grid = vi.hoisted(() => {
     loadLabelNames: vi.fn(),
     loadLabelValues: vi.fn(),
     addLabelFilter: vi.fn(async () => {}),
+    replaceLabelFilter: vi.fn(async () => {}),
     removeLabelFilter: vi.fn(),
     ensureSchemas: vi.fn(),
     setOverride: vi.fn(),
@@ -703,6 +704,11 @@ describe("MetricsExplorer wiring", () => {
       grid.labelFilters.value = [{ label: "pod", operator: "=", value: "api-1" }];
       await flushPromises();
       expect(filterRow(wrapper).exists()).toBe(true);
+    });
+
+    it("pads the row like the Logs query row, which holds its flush filter bar the same way", () => {
+      const wrapper = mountExplorer();
+      expect(filterRow(wrapper).classes()).toEqual(expect.arrayContaining(["px-1.5", "py-0.75"]));
     });
 
     it("is hidden in Visualize, where the PromQL query carries its own matchers", async () => {

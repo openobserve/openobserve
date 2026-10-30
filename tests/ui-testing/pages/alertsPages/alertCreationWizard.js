@@ -12,6 +12,7 @@ import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
 import MonacoEditorHelper from '../../playwright-tests/utils/MonacoEditorHelper.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
+import { FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
 
 export class AlertCreationWizard {
@@ -20,6 +21,7 @@ export class AlertCreationWizard {
         this.commonActions = commonActions;
         this.locators = locators;
         this.currentAlertName = '';
+        this.conditions = new FilterBuilderDriver(page, 'alert-conditions');
     }
 
     /**
@@ -215,39 +217,8 @@ export class AlertCreationWizard {
         await this._selectAlertType('Real-time');
 
         // ==================== STEP 2: CONDITIONS ====================
-        await this.page.locator(this.locators.addConditionButton).first().click();
-        await this.page.waitForTimeout(500);
-
-        // Column selection with fallback to first available if specific column not found
-        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
-        await columnSelect.click();
-        await this.page.waitForTimeout(500);
-
-        let columnFound = false;
-        // Condition column dropdown is OSelect (Reka Listbox) post-migration.
-        const menuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(menuItems.first()).toBeVisible({ timeout: 5000 });
-
-        const columnItems = await menuItems.allTextContents();
-        testLogger.info('Available columns in dropdown', { columns: columnItems.slice(0, 10), requestedColumn: column });
-
-        const columnOption = menuItems.filter({ hasText: column }).first();
-        if (await columnOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await columnOption.click();
-            columnFound = true;
-        }
-
-        if (!columnFound) {
-            await menuItems.first().click();
-            testLogger.info('Selected first available column (fallback)', { requestedColumn: column });
-        }
-        await this.page.waitForTimeout(500);
-
-        await expect(this.page.locator(this.locators.operatorSelect).first()).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.operatorSelect).first().click();
-        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
-
-        await this.page.locator(this.locators.conditionValueInput).first().locator('input').fill(value);
+        // The builder offers only stream columns; a missing column falls back to the first listed one.
+        await this.conditions.addCondition(column, 'Contains', value);
 
         // ==================== ALERT SETTINGS ====================
         // Set silence notification to 0 for immediate alerts
@@ -333,33 +304,7 @@ export class AlertCreationWizard {
         await this._selectAlertType('Real-time');
 
         // ==================== STEP 2: CONDITIONS ====================
-        // Add condition - different buttons may be visible depending on state
-        const firstCondBtn = this.page.locator(this.locators.addFirstConditionButton);
-        if (await firstCondBtn.isVisible({ timeout: 3000 })) {
-            await firstCondBtn.click();
-        } else {
-            await this.page.locator(this.locators.addConditionButton).first().click();
-        }
-        await this.page.waitForTimeout(1000);
-
-        await expect(this.page.locator(this.locators.conditionColumnSelect).first()).toBeVisible({ timeout: 10000 });
-
-        // Select first available column (more resilient than specific column)
-        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
-        await columnSelect.click();
-        await this.page.waitForTimeout(500);
-        const visibleMenuDefaultsItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleMenuDefaultsItems.first()).toBeVisible({ timeout: 5000 });
-        await visibleMenuDefaultsItems.first().click();
-        await this.page.waitForTimeout(500);
-
-        const operatorSelect = this.page.locator(this.locators.operatorSelect).first();
-        await operatorSelect.click();
-        await this.page.waitForTimeout(500);
-        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
-        await this.page.waitForTimeout(500);
-
-        await this.page.locator(this.locators.conditionValueInput).first().locator('input').fill('test');
+        await this.conditions.addConditionOnListedField(0, 'Contains', 'test');
 
         // ==================== ALERT SETTINGS ====================
         // Set silence notification to 0 for immediate alerts
@@ -642,84 +587,14 @@ export class AlertCreationWizard {
         testLogger.info('Alert setup complete');
 
         // ==================== CONDITIONS (Multiple) ====================
-        // Add first condition
-        const firstCondBtn = this.page.locator(this.locators.addFirstConditionButton);
-        const addCondBtn = this.page.locator(this.locators.addConditionButton).first();
-
-        if (await firstCondBtn.isVisible({ timeout: 3000 })) {
-            await firstCondBtn.click();
-            testLogger.info('Clicked initial Add Condition button');
-        } else if (await addCondBtn.isVisible({ timeout: 3000 })) {
-            await addCondBtn.click();
-            testLogger.info('Clicked Add Condition button (conditions already exist)');
-        }
-        await this.page.waitForTimeout(1000);
-
-        await expect(this.page.locator(this.locators.conditionColumnSelect).first()).toBeVisible({ timeout: 10000 });
-        testLogger.info('First condition visible');
-
-        // Configure first condition using first available column
-        const columnSelect1 = this.page.locator(this.locators.conditionColumnSelect).first();
-        await columnSelect1.click();
-        await this.page.waitForTimeout(500);
-        const visibleMenu1Items = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleMenu1Items.first()).toBeVisible({ timeout: 5000 });
-        await visibleMenu1Items.first().click();
-        await this.page.waitForTimeout(500);
-        testLogger.info('Selected column for first condition');
-
-        const operatorSelect1 = this.page.locator(this.locators.operatorSelect).first();
-        await expect(operatorSelect1).toBeVisible({ timeout: 5000 });
-        await operatorSelect1.click();
-        await this.page.waitForTimeout(500);
-        await expect(this.page.getByRole('option', { name: 'Contains', exact: true })).toBeVisible({ timeout: 5000 });
-        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
-        await this.page.waitForTimeout(500);
-
-        // Use 'test' as value - matches the log field from ingested validation data
-        const valueInput1 = this.page.locator(this.locators.conditionValueInput).first().locator('input');
-        await valueInput1.fill('test');
+        // 'test' and 'validation' match the log field of the ingested validation data.
+        await this.conditions.addConditionOnListedField(0, 'Contains', 'test');
         testLogger.info('Added first condition with Contains operator');
-
-        // Add second condition
-        await expect(this.page.locator(this.locators.addConditionButton).first()).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.addConditionButton).first().click();
-        await this.page.waitForTimeout(1000);
-
-        await expect(this.page.locator(this.locators.conditionColumnSelect).nth(1)).toBeVisible({ timeout: 10000 });
-        testLogger.info('Second condition visible');
-
-        // Configure second condition using second available column
-        const columnSelect2 = this.page.locator(this.locators.conditionColumnSelect).nth(1);
-        await columnSelect2.click();
-        await this.page.waitForTimeout(500);
-        const visibleMenu2Items = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleMenu2Items.first()).toBeVisible({ timeout: 5000 });
-        // Use nth(1) if available, otherwise first - to get a different column
-        const columnCount = await visibleMenu2Items.count();
-        if (columnCount > 1) {
-            await visibleMenu2Items.nth(1).click();
-        } else {
-            await visibleMenu2Items.first().click();
-        }
-        await this.page.waitForTimeout(500);
-        testLogger.info('Selected column for second condition');
-
-        const operatorSelect2 = this.page.locator(this.locators.operatorSelect).nth(1);
-        await expect(operatorSelect2).toBeVisible({ timeout: 5000 });
-        await operatorSelect2.click();
-        await this.page.waitForTimeout(500);
-        await expect(this.page.getByRole('option', { name: 'Contains', exact: true })).toBeVisible({ timeout: 5000 });
-        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
-        await this.page.waitForTimeout(500);
-
-        // Use 'validation' as value - matches the log field from ingested validation data
-        const valueInput2 = this.page.locator(this.locators.conditionValueInput).nth(1).locator('input');
-        await valueInput2.fill('validation');
+        await this.conditions.addConditionOnListedField(1, 'Contains', 'validation');
         testLogger.info('Added second condition with Contains operator');
 
-        // Verify AND operator is shown between conditions (default)
-        await expect(this.page.getByText('AND', { exact: true }).first()).toBeVisible({ timeout: 5000 });
+        // The second line joins with AND by default.
+        await this.conditions.expectConnector('1', 'AND');
         testLogger.info('Verified AND operator between conditions');
 
         // ==================== ALERT SETTINGS ====================
@@ -1007,115 +882,20 @@ export class AlertCreationWizard {
         // Select real-time alert type via dropdown (v3 UI)
         await this._selectAlertType('Real-time');
 
-        // Add first condition
-        const firstCondBtn = this.page.locator(this.locators.addFirstConditionButton);
-        if (await firstCondBtn.isVisible({ timeout: 3000 })) {
-            await firstCondBtn.click();
-        } else {
-            await this.page.locator(this.locators.addConditionButton).first().click();
-        }
-        await this.page.waitForTimeout(1000);
-
-        await expect(this.page.locator(this.locators.conditionColumnSelect).first()).toBeVisible({ timeout: 10000 });
-
-        // Configure first condition
-        const columnSelect1 = this.page.locator(this.locators.conditionColumnSelect).first();
-        await columnSelect1.click();
-        await this.page.waitForTimeout(500);
-        const visibleMenuToggleItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleMenuToggleItems.first()).toBeVisible({ timeout: 5000 });
-        await visibleMenuToggleItems.first().click();
-        await this.page.waitForTimeout(500);
-
-        const operatorSelect1 = this.page.locator(this.locators.operatorSelect).first();
-        await operatorSelect1.click();
-        await this.page.waitForTimeout(500);
-        await expect(this.page.getByRole('option', { name: 'Contains', exact: true })).toBeVisible({ timeout: 5000 });
-        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
-        await this.page.waitForTimeout(500);
-
-        const valueInput1 = this.page.locator(this.locators.conditionValueInput).first().locator('input');
-        await valueInput1.fill('test');
+        await this.conditions.addConditionOnListedField(0, 'Contains', 'test');
         testLogger.info('Added first condition');
-
-        // Add second condition
-        await expect(this.page.locator(this.locators.addConditionButton).first()).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.addConditionButton).first().click();
-        await this.page.waitForTimeout(1000);
-
-        await expect(this.page.locator(this.locators.conditionColumnSelect).nth(1)).toBeVisible({ timeout: 10000 });
+        await this.conditions.addConditionOnListedField(1, 'Contains', 'validation');
         testLogger.info('Added second condition');
 
-        // Verify AND operator is visible (default)
-        await expect(this.page.getByText('AND', { exact: true }).first()).toBeVisible();
+        await this.conditions.expectConnector('1', 'AND');
         testLogger.info('Verified AND operator is default between conditions');
 
-        // Try to toggle operator to OR
-        // v3 UI may have different toggle mechanisms than v2:
-        //   1. [data-test="alert-conditions-toggle-operator-btn"] (v2-style button)
-        //   2. Clickable AND chip/label between condition rows (v3-style chip)
-        //   3. Operator dropdown/select (v3-style select)
-        let toggleSuccessful = false;
-        let message = '';
-
-        // Attempt 1: Try primary data-test toggle button (v2 fallback)
-        const toggleBtn = this.page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
-        if (await toggleBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await toggleBtn.click();
-            await this.page.waitForTimeout(500);
-            try {
-                await expect(this.page.getByText('OR', { exact: true }).first()).toBeVisible({ timeout: 5000 });
-                toggleSuccessful = true;
-                message = 'Successfully toggled from AND to OR via data-test toggle button';
-                testLogger.info(message);
-            } catch (e) { /* fall through to next attempt */ }
-        }
-
-        // Attempt 2: Try clicking the AND text/chip directly (v3 UI — clickable chip)
-        if (!toggleSuccessful) {
-            try {
-                const andLabel = this.page.getByText('AND', { exact: true }).first();
-                if (await andLabel.isVisible({ timeout: 2000 }).catch(() => false)) {
-                    await andLabel.click();
-                    await this.page.waitForTimeout(500);
-                    const orLabel = this.page.getByText('OR', { exact: true }).first();
-                    if (await orLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
-                        toggleSuccessful = true;
-                        message = 'Successfully toggled from AND to OR via AND label click';
-                        testLogger.info(message);
-                    }
-                }
-            } catch (e) {
-                testLogger.warn('AND label click fallback failed', { error: e.message });
-            }
-        }
-
-        // Attempt 3: Try clicking on the operator area and selecting from popover
-        if (!toggleSuccessful) {
-            try {
-                // TODO(data-test): step-conditions AND/OR operator toggle has no stable data-test in web/src/components/alerts/conditions/; add one to the operator toggle button to drop these class/text fallbacks.
-                const operatorSelect = this.page.locator('.step-conditions .alert-conditions-operator, .step-conditions .condition-operator-toggle, .step-conditions [class*="operator-toggle"]').first();
-                if (await operatorSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-                    await operatorSelect.click();
-                    await this.page.waitForTimeout(500);
-                    // Check if a popover appeared with OR option
-                    const orOption = this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'OR' }).first();
-                    if (await orOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-                        await orOption.click();
-                        toggleSuccessful = true;
-                        message = 'Successfully toggled via operator popover';
-                        testLogger.info(message);
-                    }
-                }
-            } catch (e) {
-                testLogger.warn('Operator popover fallback failed', { error: e.message });
-            }
-        }
-
-        if (!toggleSuccessful) {
-            message = 'Toggle operator button not found in v3 UI - tried data-test, AND label, and operator dropdown selectors';
-            testLogger.warn(message);
-        }
+        await this.conditions.toggleConnector('1');
+        const toggleSuccessful = (await this.conditions.connectors.first().textContent())?.trim() === 'OR';
+        const message = toggleSuccessful
+            ? 'Successfully toggled from AND to OR via the connector chip'
+            : 'Connector chip did not switch to OR';
+        testLogger.info(message);
 
         // Cancel alert creation
         await this.page.locator(this.locators.alertBackButton).click();
@@ -1129,10 +909,7 @@ export class AlertCreationWizard {
      * Add a condition group (AND/OR) during alert creation in Step 2
      */
     async addConditionGroup() {
-        const addGroupBtn = this.page.locator('[data-test="alert-conditions-add-condition-group-btn"]');
-        await addGroupBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await addGroupBtn.click();
-        await this.page.waitForTimeout(500);
+        await this.conditions.addGroup();
         testLogger.info('Added condition group');
     }
 
@@ -1140,10 +917,7 @@ export class AlertCreationWizard {
      * Toggle the AND/OR operator for conditions
      */
     async toggleConditionOperator() {
-        const toggleBtn = this.page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
-        await toggleBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await toggleBtn.click();
-        await this.page.waitForTimeout(500);
+        await this.conditions.toggleConnector('1');
         testLogger.info('Toggled condition operator');
     }
 
@@ -1152,10 +926,7 @@ export class AlertCreationWizard {
      * @param {number} index - Index of the condition to delete (0-based)
      */
     async deleteCondition(index = 0) {
-        const deleteBtn = this.page.locator('[data-test="alert-conditions-delete-condition-btn"]').nth(index);
-        await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await deleteBtn.click();
-        await this.page.waitForTimeout(500);
+        await this.conditions.removeChipAt(index);
         testLogger.info('Deleted condition', { index });
     }
 
@@ -1568,28 +1339,8 @@ export class AlertCreationWizard {
 
         // ==================== CONDITIONS + AGGREGATION (Alert Rules tab) ====================
         // Builder tab should be active by default for logs
-        // Add a condition first
-        await this.page.locator(this.locators.addConditionButton).first().click();
-        await this.page.waitForTimeout(500);
-
-        // Select a known string column to avoid type_coercion errors
-        // (picking an Int64 column like _timestamp with "Contains"/LIKE causes DataFusion errors)
-        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
-        await columnSelect.click();
-        await this.page.waitForTimeout(500);
-        const visibleMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        const levelOption = visibleMenuItems.filter({ hasText: 'level' });
-        await expect(levelOption.first()).toBeVisible({ timeout: 5000 });
-        await levelOption.first().click();
-        await this.page.waitForTimeout(500);
-
-        // Select operator
-        await this.page.locator(this.locators.operatorSelect).first().click();
-        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
-        await this.page.waitForTimeout(300);
-
-        // Fill condition value
-        await this.page.locator(this.locators.conditionValueInput).first().locator('input').fill('test');
+        // A string column avoids type_coercion errors ("Contains" on an Int64 column like _timestamp fails in DataFusion).
+        await this.conditions.addCondition('level', 'Contains', 'test');
         testLogger.info('Added condition');
 
         // Aggregation is now controlled through function dropdown in v3 UI

@@ -67,6 +67,7 @@ impl From<AlertError> for Response {
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
             | AlertError::ProtectedStream(_)
+            | AlertError::InvalidCondition(_)
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other

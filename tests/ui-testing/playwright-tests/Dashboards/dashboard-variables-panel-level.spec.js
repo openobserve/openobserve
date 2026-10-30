@@ -424,11 +424,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await filterValueInput.waitFor({ state: "visible", timeout: 5000 });
     await filterValueInput.click();
 
-    // OCombobox opens on focus; wait briefly for options to appear
-    const hasDropdown = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
-    const optionTexts = hasDropdown
-      ? await scopedVars.getFilterValueOptionTexts()
-      : [];
+    await expect(scopedVars.getFilterValueList()).toBeVisible({ timeout: 10000 });
+    const optionTexts = await scopedVars.getFilterValueOptionTexts();
 
     // Panel1's variable should NOT be in the list
     expect(optionTexts).not.toContain(panelVar1);

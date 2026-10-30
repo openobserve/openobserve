@@ -1400,7 +1400,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     expect(body).toMatchObject({ pages: [{ op: "eq", value: "/health" }] });
   });
 
-  it("re-applying an unchanged is rule from its chip keeps it an eq rule", async () => {
+  it("an untouched is rule saves back as an eq rule", async () => {
     const rule = { field: "geo_info_country", op: "eq", values: ["XX"] };
     settingsApi.getAppSettings.mockImplementation(async () => ({
       data: appSettings({ sessions: [rule] }),
@@ -1408,11 +1408,10 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await mountAt("/product-analytics/overview?app=web&period=7d");
     await openDrawer();
     const d = drawer()!;
-    d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-rule-0-chip"]')!.click();
-    const apply = () =>
-      document.querySelector<HTMLElement>('[data-test="rum-analytics-funnel-field-picker-apply"]');
-    await until(() => expect(apply()).not.toBeNull());
-    apply()!.click();
+    expect(
+      d.querySelector('[data-test="rum-analytics-exclusions-rules-chip-geo_info_country"]'),
+    ).not.toBeNull();
+    botSwitch(d).click();
     await settle();
     await saveDrawer(d);
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);

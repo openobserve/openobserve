@@ -264,7 +264,7 @@ describe("FunnelLayoutRail", () => {
     const section = aside.find('[data-test="rum-analytics-funnel-filter-all"]');
     expect(section.text()).toContain("Filter all steps");
     await section
-      .find('[data-test="rum-analytics-funnel-filter-geo_info_country"] button')
+      .find('[data-test="rum-analytics-funnel-filter-builder-chip-geo_info_country-remove"]')
       .trigger("click");
     const next = w.emitted("update:def")!.at(-1)![0] as FunnelDef;
     expect(next).not.toHaveProperty("f");
@@ -641,13 +641,14 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     expect(w.emitted("include-hidden")).toHaveLength(1);
   });
 
-  it("asks the owner for a field's values when a filter field is picked", async () => {
+  it("asks the owner for a field's values when the filter builder wants them", async () => {
     const w = mountLayout(defWith([]), { filterFields: ["geo_info_country", "usr_email"] });
-    await w.find('[data-test="rum-analytics-funnel-add-filter-btn"]').trigger("click");
-    await w.vm.$nextTick();
-    const field = w.find('[data-test="rum-analytics-funnel-field-picker-field-usr_email"]');
-    expect(field.exists()).toBe(true);
-    await field.trigger("click");
+    const builder = w.findComponent({ name: "FilterBuilder" });
+    expect(builder.props("fields").map((f: { name: string }) => f.name)).toEqual([
+      "geo_info_country",
+      "usr_email",
+    ]);
+    void builder.props("loadValues")("usr_email", "");
     expect(w.emitted("filter-values")).toEqual([["usr_email"]]);
   });
 
@@ -667,13 +668,9 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
       expect(picker(w).find(`[data-test="${PICKER}-apply"]`).exists()).toBe(false);
     });
 
-    it("the exclusion popover opens to the right of the rail, like the filter popover", () => {
+    it("the exclusion popover opens to the right of the rail", () => {
       const w = mountLayout(defWith([]));
-      const filter = popoverAround(w, "rum-analytics-funnel-add-filter-btn");
-      const exclusion = popoverAround(w, ADD);
-      expect(filter?.props("side")).toBe("right");
-      expect(exclusion?.props("side")).toBe("right");
-      expect(exclusion?.attributes("content-class")).toBe(filter?.attributes("content-class"));
+      expect(popoverAround(w, ADD)?.props("side")).toBe("right");
     });
 
     it("applying from the picker appends the exclusion and closes the popover", async () => {

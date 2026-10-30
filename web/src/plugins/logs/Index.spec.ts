@@ -997,6 +997,19 @@ describe("Logs Index", async () => {
     spy.mockRestore();
   });
 
+  it("Should grow the query pane with the filter builder, shrink it back, and keep a larger dragged height", async () => {
+    wrapper.vm.filterBuilderGrowth = 54;
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(83 + 54);
+    wrapper.vm.filterBuilderGrowth = 0;
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(83);
+    wrapper.vm.splitterModel = 300;
+    wrapper.vm.filterBuilderGrowth = 24;
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(300);
+  });
+
   it("Should navigate to the Search History route on showSearchHistoryfn", async () => {
     // Search History is now a standalone route (was an `action=history` overlay).
     const pushSpy = vi.spyOn(wrapper.vm.router, "push");

@@ -15,39 +15,28 @@
         >{{ t(`onlineEvals.job.${purpose}.hint.${targetScope}`) }}</span
       >
     </div>
-    <div
-      class="[&_.el-border]:border-border-default min-w-0 [&_.el-border]:ms-0! [&_.el-border]:w-full [&_.el-border]:max-w-full [&_.group-container]:w-full [&>.el-border]:mt-0!"
-    >
-      <FilterGroup
-        :group="group"
-        :name-prefix="namePrefix"
-        :depth="0"
-        :stream-fields="streamFields"
-        :stream-fields-map="streamFieldsMap"
-        condition-input-width="w-37.5"
-        :allow-custom-columns="true"
-        module="alerts"
-        @add-condition="handleUpdate"
-        @add-group="handleUpdate"
-        @remove-group="handleRemove"
-        @input:update="handleInputUpdate"
-      />
-    </div>
+    <FilterBuilder
+      profile="eval"
+      :model-value="group"
+      :fields="filterFields"
+      :load-values="valueLoader"
+      :data-test="`job-condition-builder-${purpose}`"
+      @update:model-value="onChange"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, inject } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { streamValuesLoader } from "@/components/filterBar/streamValues";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import {
-  removeConditionGroup as removeAlertConditionGroup,
-  updateGroup as updateAlertConditionGroup,
-  type V2Group,
-} from "@/utils/alerts/alertDataTransforms";
-import { cloneDeep } from "lodash-es";
+import type { V2Group } from "@/utils/alerts/alertDataTransforms";
+import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import { DEFAULT_JOB_STREAM_FIELDS } from "../../utils/defaultStreamFields";
+import { createEmptyJobFilterGroup } from "../../utils/jobFilter";
 import type { EvalTargetScope } from "@/services/online-evals.service";
 
 const props = withDefaults(
@@ -57,6 +46,8 @@ const props = withDefaults(
     namePrefix?: string;
     purpose?: "filter" | "endSignal" | "selector";
     streamFields?: Array<{ label: string; value: string; type: string }>;
+    /** The traces stream the job reads; its recent values are suggested. */
+    stream?: string;
   }>(),
   {
     purpose: "filter",
@@ -68,56 +59,35 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 const form: any = inject(FORM_CONTEXT_KEY, null);
 
-const streamFields = computed(() =>
-  props.streamFields?.length ? props.streamFields : DEFAULT_JOB_STREAM_FIELDS,
+const valueLoader = computed(() =>
+  streamValuesLoader({
+    org: store?.state.selectedOrganization?.identifier,
+    streamType: "traces",
+    streamName: props.stream,
+  }),
 );
-const streamFieldsMap = computed(() =>
-  Object.fromEntries(streamFields.value.map((field) => [field.value, { type: field.type }])),
+
+const filterFields = computed<FilterField[]>(() =>
+  (props.streamFields?.length ? props.streamFields : DEFAULT_JOB_STREAM_FIELDS).map((field) => ({
+    name: field.value,
+    label: String(field.label ?? field.value),
+    type: toFilterFieldType(field.type),
+  })),
 );
 
-// Main job filters are form-owned. Completion and span-selector filters remain
-// controlled composites, so this adapter supports both modes.
-const formGroup =
-  form && props.namePrefix
-    ? form.useStore((s: any) => s.values?.[props.namePrefix as string])
-    : computed(() => undefined);
-const group = computed(() => (props.namePrefix ? formGroup.value : props.group));
+// Main job filters are form-owned; completion and span-selector filters are controlled by the parent.
+const isFormMode = Boolean(form && props.namePrefix);
+const formGroup = isFormMode
+  ? form.useStore((s: any) => s.values?.[props.namePrefix as string])
+  : computed(() => undefined);
+const group = computed(() => (isFormMode ? formGroup.value : props.group));
 
-const clonedFormTree = () => cloneDeep(form.state.values?.[props.namePrefix as string]);
-
-function handleUpdate(updatedGroup: any) {
-  const isFormMode = Boolean(form && props.namePrefix);
-  const conditions = isFormMode ? clonedFormTree() : cloneDeep(props.group);
-  if (!conditions) return;
-  const ctx = { formData: { query_condition: { conditions } } };
-  updateAlertConditionGroup(updatedGroup, ctx);
-  if (isFormMode) {
-    form.setFieldValue(props.namePrefix, ctx.formData.query_condition.conditions);
-  } else {
-    emit("update:group", ctx.formData.query_condition.conditions);
-  }
-}
-
-function handleRemove(groupId: string) {
-  const isFormMode = Boolean(form && props.namePrefix);
-  const conditions = isFormMode ? clonedFormTree() : cloneDeep(props.group);
-  if (!conditions) return;
-  const ctx = { formData: { query_condition: { conditions } } };
-  removeAlertConditionGroup(groupId, conditions, ctx);
-  if (isFormMode) {
-    form.setFieldValue(props.namePrefix, ctx.formData.query_condition.conditions);
-  } else {
-    emit("update:group", ctx.formData.query_condition.conditions);
-  }
-}
-
-function handleInputUpdate() {
-  // Leaf values are name-bound in form mode. Controlled composites still need
-  // to notify their parent after FilterGroup mutates a leaf.
-  if (!props.namePrefix && props.group) {
-    emit("update:group", { ...props.group });
-  }
+function onChange(next: unknown) {
+  const value = (next as V2Group | null) ?? createEmptyJobFilterGroup();
+  if (isFormMode) form.setFieldValue(props.namePrefix, value);
+  else emit("update:group", value);
 }
 </script>

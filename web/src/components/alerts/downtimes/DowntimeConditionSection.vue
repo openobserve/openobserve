@@ -53,25 +53,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </header>
       <p class="text-text-secondary text-xs">{{ t("alerts.downtimes.condition.caption") }}</p>
 
-      <!-- The builder owns its own form; its submit must not reach the page form. -->
-      <div @submit.stop.prevent>
-        <ConditionBuilder
-          :key="builderKey"
-          ref="builderRef"
-          :fields="columns"
-          :initial-conditions="initialTree"
-          module="alerts"
-          :allow-custom-columns="false"
-          :operators="DOWNTIME_OPERATORS"
-        />
-      </div>
+      <FilterBuilder
+        ref="builderRef"
+        profile="downtime"
+        :model-value="formTree"
+        :fields="fields"
+        :load-values="loadValues"
+        :value-hint="valueHint"
+        data-test="downtime-condition-builder"
+        @update:model-value="onChange"
+      />
       <p
-        v-if="conditionError"
+        v-if="chipError"
         class="text-input-error-text text-xs"
         role="alert"
         data-test="downtime-condition-error"
       >
-        {{ conditionError }}
+        {{ chipError }}
+      </p>
+      <p
+        v-else-if="partial"
+        class="text-text-secondary text-xs"
+        data-test="downtime-condition-partial"
+      >
+        {{ t("alerts.downtimes.resources.partial") }}
       </p>
 
       <DowntimeResourcePicker
@@ -84,35 +89,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject, provide, ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
+import { queryClient } from "@/composables/query/queryClient";
 import { semanticGroupsQuery } from "@/services/service_streams.queries";
+import type { DimensionCondition } from "@/services/downtimes";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import type { V2Group } from "@/utils/alerts/alertDataTransforms";
-import {
-  DOWNTIME_OPERATORS,
-  applyResources,
-  builderToCondition,
-  conditionToBuilder,
-  connectorsEqual,
-  emptyBuilderGroup,
-  normalizeConnectors,
-} from "@/utils/downtimes/conditionBridge";
+import { applyResources } from "@/utils/downtimes/conditionBridge";
+import { conditionError } from "@/utils/downtimes/conditionRules";
 import type { DowntimeFormValues } from "@/utils/downtimes/downtimeForm";
-import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
+import type { FilterField } from "@/utils/query/filterBar";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import DowntimeResourcePicker from "./DowntimeResourcePicker.vue";
-import { CONDITION_VALUE_SUGGEST_KEY } from "@/components/alerts/conditionOperators";
 import { useDowntimeValueSuggest } from "@/composables/downtimes/useDowntimeValueSuggest";
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
-    /** Bumped by the page when it loads a saved row, so the builder remounts on the new tree. */
+    /** Bumped by the page when it loads a saved row; the builder follows the form value itself. */
     resetToken?: number;
   }>(),
   { resetToken: 0 },
@@ -125,75 +123,59 @@ const form = inject(FORM_CONTEXT_KEY, null);
 const open = form.useStore((s: { values: DowntimeFormValues }) => s.values.condition_open);
 const formTree = form.useStore((s: { values: DowntimeFormValues }) => s.values.condition);
 const downtimeFolder = form.useStore((s: { values: DowntimeFormValues }) => s.values.folder_id);
-const errors = form.useStore(
-  (s: { fieldMeta?: Record<string, { errors?: unknown[] }> }) =>
-    s.fieldMeta?.condition?.errors ?? [],
+const submissionAttempts = form.useStore(
+  (s: { submissionAttempts?: number }) => s.submissionAttempts ?? 0,
 );
-const conditionError = computed(() =>
-  errors.value.length ? raw(String(firstFieldError(errors.value as never[]))) : null,
+const builderRef = ref<InstanceType<typeof FilterBuilder> | null>(null);
+
+// The builder states the same rules as the page schema, so a refused save is explained on its chips.
+watch(submissionAttempts, () => builderRef.value?.validate());
+
+// Rules the builder marks on a chip get their words here; the others it states itself.
+const CHIP_RULES: I18nKey[] = [
+  "alerts.downtimes.validation.loneStar",
+  "alerts.downtimes.validation.innerStar",
+  "alerts.downtimes.validation.pairKey",
+  "alerts.downtimes.validation.pairValue",
+];
+const chipError = computed(() => {
+  if (!submissionAttempts.value) return null;
+  const key = conditionError(formTree.value ?? null);
+  return key && CHIP_RULES.includes(key) ? t(key) : null;
+});
+
+const { loadValues, partial, isNotSeen } = useDowntimeValueSuggest(
+  queryClient,
+  orgId,
+  computed(() => downtimeFolder.value || undefined),
+  computed(() => formTree.value ?? null),
 );
 
-provide(
-  CONDITION_VALUE_SUGGEST_KEY,
-  useDowntimeValueSuggest(
-    orgId,
-    computed(() => downtimeFolder.value || undefined),
-  ),
-);
+const valueHint = (key: string, values: string[]) =>
+  isNotSeen(key, values) ? t("alerts.downtimes.resources.notSeen") : undefined;
 
 const semanticGroups = useQuery(() =>
   Object.assign(semanticGroupsQuery(orgId.value), { enabled: !!orgId.value }),
 );
-const columns = computed(() =>
-  (semanticGroups.data.value ?? []).map((g) => ({ label: g.display || g.id, value: g.id })),
+const fields = computed<FilterField[]>(() =>
+  (semanticGroups.data.value ?? []).map((g) => ({
+    name: g.id,
+    label: String(g.display || g.id),
+    type: "string",
+  })),
 );
 
-const builderKey = ref(0);
-const initialTree = ref<V2Group>(formTree.value ?? emptyBuilderGroup());
-const builderRef = ref<{ conditionGroup: V2Group; form: any } | null>(null);
-let lastSeen: V2Group | null = initialTree.value;
+const onChange = (next: unknown) =>
+  form?.setFieldValue("condition", (next as DimensionCondition | null) ?? null);
 
-const remountWith = (tree: V2Group) => {
-  initialTree.value = tree;
-  lastSeen = tree;
-  builderKey.value += 1;
-};
+const currentCondition = computed(() => formTree.value ?? null);
 
-watch(
-  () => props.resetToken,
-  () => remountWith(formTree.value ?? emptyBuilderGroup()),
-);
-
-// Bridge the builder's own form into the page form on every change.
-watch(
-  () => builderRef.value?.conditionGroup,
-  (next) => {
-    if (!next) return;
-    const normalized = normalizeConnectors(next, lastSeen);
-    lastSeen = normalized;
-    if (!connectorsEqual(normalized, next)) {
-      builderRef.value?.form.setFieldValue("conditions", normalized);
-    }
-    form?.setFieldValue("condition", normalized);
-  },
-  { deep: true },
-);
-
-const currentCondition = computed(() => builderToCondition(formTree.value));
-
-const openSection = () => {
-  const tree = formTree.value ?? emptyBuilderGroup();
-  form?.setFieldValue("condition", tree);
-  form?.setFieldValue("condition_open", true);
-  remountWith(tree);
-};
+const openSection = () => form?.setFieldValue("condition_open", true);
 
 // The tree stays in the form, so adding the block back restores it.
 const closeSection = () => form?.setFieldValue("condition_open", false);
 
 const applyRefinement = (key: string, values: string[]) => {
-  const tree = conditionToBuilder(applyResources(currentCondition.value, key, values));
-  form?.setFieldValue("condition", tree);
-  remountWith(tree);
+  form?.setFieldValue("condition", applyResources(currentCondition.value, key, values));
 };
 </script>

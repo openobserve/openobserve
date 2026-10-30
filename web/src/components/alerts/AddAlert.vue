@@ -333,8 +333,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :promqlCondition="formData.query_condition.promql_condition"
                     :triggerCondition="formData.trigger_condition"
                     @update:tab="updateTab"
-                    @update-group="updateGroup"
-                    @remove-group="removeConditionGroup"
                     @input:update="onInputUpdate"
                     @update:sqlQuery="updateSqlQuery"
                     @update:promqlQuery="updatePromqlQuery"

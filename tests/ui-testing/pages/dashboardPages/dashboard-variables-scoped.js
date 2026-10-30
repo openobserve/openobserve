@@ -5,6 +5,7 @@
 import { expect } from "@playwright/test";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
 import testLogger from "../../playwright-tests/utils/test-logger.js";
+import { FilterBuilderDriver } from "../generalPages/filterBuilderPage.js";
 import {
   SELECTORS,
   getVariableSelector,
@@ -27,6 +28,7 @@ import {
 export default class DashboardVariablesScoped {
   constructor(page) {
     this.page = page;
+    this.variableFilterBuilder = new FilterBuilderDriver(page, "dashboard-variable-filter-builder");
   }
 
   // ==========================================
@@ -878,64 +880,63 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Click the "Add Filter" button in the variable form
+   * Start a new query filter in the variable form (opens the filter builder's field list)
    */
   async clickAddFilter() {
-    await this.page.locator(SELECTORS.ADD_FILTER_BTN).click();
+    await this.variableFilterBuilder.openForNew();
   }
 
   /**
-   * Select a filter field name in the last filter row
-   * @param {string} fieldName - Field name / data-test-value of the option
+   * Pick the field of the filter being added
+   * @param {string} fieldName - Field name
    */
   async selectFilterName(fieldName) {
-    const filterNameSelector = this.page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
-    await filterNameSelector.waitFor({ state: "visible" });
-    await filterNameSelector.click();
-    await this.page
-      .locator('[data-test="dashboard-query-values-filter-name-selector-search"]')
-      .fill(fieldName);
-    await this.page
-      .locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${fieldName}"]`)
-      .click();
+    await this.variableFilterBuilder.pickField(fieldName);
   }
 
   /**
-   * Select a filter operator in the last filter row
-   * @param {string} operator - Operator data-test-value (e.g. "=")
+   * Pick the operator of the filter being added; the value list opens next
+   * @param {string} operator - Saved operator spelling (e.g. "=")
    */
   async selectFilterOperator(operator) {
-    const operatorSelector = this.page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
-    await operatorSelector.click();
-    await this.page
-      .locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${operator}"]`)
-      .click();
+    await this.variableFilterBuilder.pickOperator(operator);
   }
 
   /**
-   * Get the last filter-value OCombobox input locator
+   * The box the filter value is typed into: the popover search when the list has one, else the bar input
    * @returns {import('@playwright/test').Locator}
    */
   getFilterValueInput() {
-    return this.page
-      .locator('[data-test*="filter-value-selector"][data-test$="-input"]')
-      .last();
+    const dt = this.variableFilterBuilder.dataTest;
+    // The popover is portalled after the form, so the last match is its search whenever it has one.
+    return this.page.locator(`[data-test="${dt}-input"], [data-test="${dt}-suggest"] [data-test="${dt}-search"]`).last();
   }
 
   /**
-   * Get the filter-value dependency options locator
+   * The open value list of the filter being added
+   * @returns {import('@playwright/test').Locator}
+   */
+  getFilterValueList() {
+    return this.variableFilterBuilder.suggestions;
+  }
+
+  /**
+   * The value suggestions of the filter being added ($variables first)
    * @returns {import('@playwright/test').Locator}
    */
   getFilterValueOptions() {
-    return this.page.locator('[data-test*="filter-value-selector"][data-test$="-option"]');
+    return this.page.locator(
+      `[data-test="${this.variableFilterBuilder.dataTest}-suggest"] [role="option"]`
+    );
   }
 
   /**
-   * Get all filter-value dependency option text contents
+   * Text of each value suggestion, a `$variable` read as its bare name
    * @returns {Promise<string[]>}
    */
   async getFilterValueOptionTexts() {
-    return await this.getFilterValueOptions().allTextContents();
+    const texts = await this.getFilterValueOptions().allTextContents();
+    return texts.map((text) => text.trim().replace(/^\$/, ""));
   }
 
   /**
@@ -1286,95 +1287,13 @@ export default class DashboardVariablesScoped {
     // Wait for any pending DOM updates to complete
     await this.page.waitForLoadState('domcontentloaded');
 
-    const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-    await addFilterBtn.waitFor({ state: "visible", timeout: 10000 });
-    // Wait for element to be stable before clicking
-    await addFilterBtn.waitFor({ state: "attached", timeout: 5000 });
-    await addFilterBtn.click({ force: false, timeout: 15000 });
-
-    // Select the filter field name
-    const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
-    await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
-    await filterNameSelector.click();
-    const filterNameSearch = this.page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').last();
-    await filterNameSearch.waitFor({ state: "visible", timeout: 5000 });
-    await filterNameSearch.fill(filterFieldName);
-
-    const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterFieldName}"]`);
-    await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
-    await filterNameOption.click();
-
-    // Select the operator
-    const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
-    await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
-    await operatorSelector.click();
-
-    const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${operator}"]`);
-    await operatorOption.waitFor({ state: "visible", timeout: 10000 });
-    await operatorOption.click();
-
-    // Set the value to reference the dependency variable using $variableName syntax.
-    // OCombobox renders its inner input as [data-test="${name}-input"]; we target the last filter row's input.
-    // We MUST click the input before filling so that reka-ui's openOnClick fires and opens the portal dropdown.
-    const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
-    await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
-
-    /**
-     * Try to find and click the option with the given label inside the OCombobox portal.
-     * Returns true on success (onSelect fires immediately, no debounce). Returns false if option not found.
-     * @param {string} label - The data-test-label value to look for
-     */
-    const tryClickDropdownOption = async (label) => {
-      try {
-        const option = this.page.locator(
-          `[data-test*="filter-value-selector"][data-test$="-option"][data-test-label="${label}"]`
-        ).first();
-        await option.waitFor({ state: 'visible', timeout: 3000 });
-        await option.click();
-        return true;
-      } catch {
-        return false;
-      }
-    };
-
-    // Attempt 1: click to open, fill variable name (no $), click the matching option.
-    // onSelect() fires synchronously → filter.value = "$varName" with no debounce.
-    await filterValueInput.click();
-    await filterValueInput.fill(dependencyVariableName);
-
-    const optionsLocator = '[data-test*="filter-value-selector"][data-test$="-option"]';
-    const dropdownAppeared = await this.page.waitForFunction(
-      (sel) => document.querySelectorAll(sel).length > 0,
-      optionsLocator,
-      { timeout: 4000 }
-    ).then(() => true).catch(() => false);
-
-    let valueCommitted = false;
-
-    if (dropdownAppeared) {
-      valueCommitted = await tryClickDropdownOption(dependencyVariableName);
-    }
-
-    // Attempt 2: fill with $ prefix — searchRegex extracts the name and the same options appear.
-    // Then click the option so onSelect fires immediately (still no debounce).
-    if (!valueCommitted) {
-      await filterValueInput.clear();
-      await filterValueInput.click();
-      await filterValueInput.fill(`$${dependencyVariableName}`);
-
-      const fallbackDropdownAppeared = await this.page.waitForFunction(
-        (sel) => document.querySelectorAll(sel).length > 0,
-        optionsLocator,
-        { timeout: 4000 }
-      ).then(() => true).catch(() => false);
-
-      if (fallbackDropdownAppeared) {
-        valueCommitted = await tryClickDropdownOption(dependencyVariableName);
-      }
-    }
-
-    // Log final result
-    const finalInputValue = await filterValueInput.inputValue().catch(() => '');
+    await this.variableFilterBuilder.root.waitFor({ state: "visible", timeout: 10000 });
+    await this.variableFilterBuilder.addCondition({
+      field: filterFieldName,
+      operator,
+      value: `$${dependencyVariableName}`,
+    });
+    await this.variableFilterBuilder.close();
   }
 
   /**
@@ -1427,33 +1346,12 @@ export default class DashboardVariablesScoped {
    * Add filter configuration to variable
    */
   async addFilterToVariable(filterConfig) {
-    const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-    await addFilterBtn.waitFor({ state: "visible", timeout: 5000 });
-    await addFilterBtn.click();
-
-    const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
-    await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
-    await filterNameSelector.click();
-    const filterNameSearchInput = this.page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]');
-    await filterNameSearchInput.waitFor({ state: "visible", timeout: 5000 });
-    await filterNameSearchInput.fill(filterConfig.filterName);
-
-    const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterConfig.filterName}"]`);
-    await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
-    await filterNameOption.click();
-
-    const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
-    await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
-    await operatorSelector.click();
-
-    const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${filterConfig.operator}"]`);
-    await operatorOption.waitFor({ state: "visible", timeout: 10000 });
-    await operatorOption.click();
-
-    // OCombobox renders its inner input as [data-test="${name}-input"]; target the last filter row's input
-    const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
-    await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
-    await filterValueInput.fill(filterConfig.value);
+    await this.variableFilterBuilder.addCondition({
+      field: filterConfig.filterName,
+      operator: filterConfig.operator,
+      value: filterConfig.value,
+    });
+    await this.variableFilterBuilder.close();
   }
 
   /**

@@ -19,7 +19,7 @@ import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import type { AnnotationConditionGroup, AnnotationSource } from "@/ts/interfaces/dashboard";
 
-/** A root condition group (the alerts condition-tree shape FilterGroup.vue edits). */
+/** A root condition group (the engine V2 tree the condition builder edits). */
 const filterGroup = (
   conditions: AnnotationConditionGroup["conditions"] = [],
 ): AnnotationConditionGroup => ({ filterType: "group", logicalOperator: "AND", conditions });
@@ -157,7 +157,7 @@ describe("AnnotationSettings", () => {
     return wrapper;
   };
 
-  // Strips FilterGroup's fresh client-only ids so a saved tree can match a literal fixture.
+  // Strips client-only ids so a saved tree can match a literal fixture.
   const stripTreeIds = (node: unknown): unknown => {
     if (!node || typeof node !== "object") return node;
     const { id: _id, groupId: _groupId, ...rest } = node as Record<string, unknown>;
@@ -678,8 +678,10 @@ describe("AnnotationSettings", () => {
     await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
     await flushPromises();
 
-    const combobox = form().find('[data-test="alert-conditions-value-combobox"]');
-    expect(combobox.exists()).toBe(true);
+    const builder = form().findComponent({ name: "FilterBuilder" });
+    const offered = builder.props("extraValueSuggestions")("service") as string[];
+    expect(offered.length).toBeGreaterThan(0);
+    expect(offered.every((value) => value.startsWith("$"))).toBe(true);
   });
 
   it("offers a custom query's stream fields for the end time without a Run", async () => {

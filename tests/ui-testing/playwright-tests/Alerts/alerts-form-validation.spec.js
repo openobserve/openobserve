@@ -19,7 +19,7 @@ const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 // Self-seeded prerequisites
 //
 // The "Add Alert" button needs at least one template, and the wizard-based blocks
-// (FilterCondition / FieldsInput / QueryConfig / AlertSettings) pick a destination,
+// (condition builder / QueryConfig / AlertSettings) pick a destination,
 // so both must exist before they open the wizard.
 //
 // Rather than depend on some other spec having left a destination behind (an
@@ -350,156 +350,91 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // FilterCondition — alert wizard step 2 (QueryConfig)
-  // Requires at least one stream in the environment.
-  // Tests are skipped by default so they can be unskipped in appropriate CI
-  // environments where a live stream is guaranteed to exist.
+  // Condition builder — alert rules (QueryConfig), the shared FilterBuilder
+  // Requires at least one stream (e2e_automate) in the environment.
   // ═══════════════════════════════════════════════════════════════════════════
 
-  test.describe('FilterCondition form validation', { tag: ['@alertsFormValidation', '@P1'] }, () => {
+  test.describe('Condition builder form validation', { tag: ['@alertsFormValidation', '@P1'] }, () => {
     test.describe.configure({ mode: 'parallel' });
 
-    test('should render filter condition row with all required selectors', {
-      tag: ['@alertsFormValidation', '@P1'],
-    }, async ({ page }) => {
+    const openRules = async () => {
       await fvPage.openAddAlertWizard();
-
-      // Step 1 — select stream type and stream name before advancing
       await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
       await fvPage.selectWizardStreamType('Logs');
       await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
+      await fvPage.conditions.waitReady();
+    };
 
-      // The conditions group starts empty; add a condition row to render the
-      // column / operator / value selectors (FilterGroup → FilterCondition).
-      await fvPage.addFilterCondition();
+    test('should render the condition builder with a Where line and the field picker', {
+      tag: ['@alertsFormValidation', '@P1'],
+    }, async ({ page }) => {
+      await openRules();
 
-      const row0 = fvPage.getFieldsInputRowLocator(0);
-      await row0.waitFor({ state: 'visible', timeout: 10000 });
+      // An empty rule shows one "Where · Choose a field" line plus the add buttons.
+      await expect(fvPage.conditions.root.locator(fvPage.conditions.id('empty-row'))).toBeVisible();
+      await expect(fvPage.conditions.root.locator(fvPage.conditions.id('add-condition')).first()).toBeVisible();
+      await expect(fvPage.conditions.root.locator(fvPage.conditions.id('add-group')).first()).toBeVisible();
 
-      await expect(fvPage.getFilterConditionColumnPopoverLocator().first()).toBeVisible();
-      await expect(fvPage.getFilterConditionOperatorPopoverLocator().first()).toBeVisible();
-      await expect(fvPage.getFilterConditionValueFieldLocator().first()).toBeVisible();
+      // Opening it lists the stream's fields.
+      await fvPage.openFilterConditionColumnPopover();
+      await expect(fvPage.conditions.suggestList).toBeVisible();
     });
 
     test('should toggle AND/OR operator in filter condition', {
       tag: ['@alertsFormValidation', '@P1'],
     }, async ({ page }) => {
-      await fvPage.openAddAlertWizard();
+      await openRules();
 
-      // Step 1 — select stream type and stream name before advancing
-      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
-      await fvPage.selectWizardStreamType('Logs');
-      await fvPage.selectWizardStreamName('e2e_automate');
-      await fvPage.clickWizardNext();
+      // The AND/OR connector only appears in front of a non-first line, so add two.
+      await fvPage.addFilterCondition(0);
+      await fvPage.addFilterCondition(1);
 
-      // The AND/OR toggle only appears on a non-first condition row, so add two.
-      await fvPage.addFilterCondition();
-      await fvPage.addFilterCondition();
-
-      const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
-      await toggleBtn.waitFor({ state: 'visible', timeout: 10000 });
-
-      // Record the initial operator label text (and/or) on the second row
-      const operatorLabel = fvPage.getFilterConditionOperatorLabelLocator();
-      const initialText = (await operatorLabel.getAttribute('data-test-label')).trim();
-      expect(initialText.length).toBeGreaterThan(0);
-
-      // Toggle the operator
+      await fvPage.conditions.expectConnector('1', 'AND');
       await fvPage.clickFilterConditionToggleOperator();
-
-      // After toggle, the label should flip from the initial value
-      await expect(async () => {
-        const toggledText = (await operatorLabel.getAttribute('data-test-label')).trim();
-        expect(toggledText).not.toBe(initialText);
-      }).toPass({ timeout: 5000 });
-      testLogger.info('FilterCondition operator toggled from initial value', { from: initialText });
+      await fvPage.conditions.expectConnector('1', 'OR');
+      testLogger.info('Condition connector toggled from AND to OR');
     });
 
-    test('should show value error when condition submitted without value entered', {
+    test('should not keep a half-built condition', {
       tag: ['@alertsFormValidation', '@P1'],
     }, async ({ page }) => {
-      await fvPage.openAddAlertWizard();
+      await openRules();
 
-      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
-      await fvPage.selectWizardStreamType('Logs');
-      await fvPage.selectWizardStreamName('e2e_automate');
-      await fvPage.clickWizardNext();
+      // The picker commits a condition only once it has its value, so leaving early adds nothing.
+      await fvPage.openFilterConditionColumnPopover();
+      await fvPage.conditions.chooseField('');
+      await fvPage.conditions.closePicker();
 
-      await fvPage.addFilterCondition();
-      await fvPage.getFieldsInputRowLocator(0).waitFor({ state: 'visible', timeout: 10000 });
-
-      // Post-migration the alert form validates on SUBMIT (useOForm/revalidateLogic),
-      // not on blur. Submit with an empty condition value so the schema-driven
-      // "Field is required!" error surfaces inline on the value OFormInput (R3).
-      await fvPage.clickAlertSubmit();
-
-      // Value error should become visible
-      const valueError = fvPage.getFilterConditionValueErrorLocator().first();
-      await expect(valueError).toBeVisible({ timeout: 5000 });
-      await expect(valueError).toContainText('Field is required!');
-      testLogger.info('FilterCondition value error shown');
-    });
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // FieldsInput — condition row management (add / delete)
-  // Shares the alert-conditions-* namespace with FilterCondition.
-  // Requires at least one stream (e2e_automate) in the environment.
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  test.describe('FieldsInput condition management', { tag: ['@alertsFormValidation', '@P1'] }, () => {
-    test.describe.configure({ mode: 'parallel' });
-
-    test('should add a second condition row when Add Condition button is clicked', {
-      tag: ['@alertsFormValidation', '@P1'],
-    }, async ({ page }) => {
-      await fvPage.openAddAlertWizard();
-
-      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
-      await fvPage.selectWizardStreamType('Logs');
-      await fvPage.selectWizardStreamName('e2e_automate');
-      await fvPage.clickWizardNext();
-
-      // The conditions group starts empty — add the first row.
-      await fvPage.addFilterCondition();
-      const row0 = fvPage.getFieldsInputRowLocator(0);
-      await row0.waitFor({ state: 'visible', timeout: 10000 });
-      await expect(row0).toBeVisible();
-
-      // Click "Add Condition" to append a second row
-      await fvPage.addFilterCondition();
-
-      // Second row (index 1) should now exist
-      const row1 = fvPage.getFieldsInputRowLocator(1);
-      await expect(row1).toBeVisible({ timeout: 5000 });
-      testLogger.info('Second condition row added successfully');
+      await fvPage.conditions.expectChipCount(0);
+      await expect(fvPage.getConditionsErrorLocator()).toHaveCount(0);
+      testLogger.info('Half-built condition dropped');
     });
 
-    test('should remove a condition row when Delete button is clicked', {
+    test('should add a second condition line', {
       tag: ['@alertsFormValidation', '@P1'],
     }, async ({ page }) => {
-      await fvPage.openAddAlertWizard();
+      await openRules();
 
-      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
-      await fvPage.selectWizardStreamType('Logs');
-      await fvPage.selectWizardStreamName('e2e_automate');
-      await fvPage.clickWizardNext();
+      await fvPage.addFilterCondition(0);
+      await fvPage.conditions.expectChipCount(1);
+      await fvPage.addFilterCondition(1);
+      await fvPage.conditions.expectChipCount(2);
+      testLogger.info('Second condition added successfully');
+    });
 
-      // Add two rows so we have two, then delete the first.
-      await fvPage.addFilterCondition();
-      await fvPage.getFieldsInputRowLocator(0).waitFor({ state: 'visible', timeout: 10000 });
-      await fvPage.addFilterCondition();
-      await fvPage.getFieldsInputRowLocator(1).waitFor({ state: 'visible', timeout: 5000 });
+    test('should remove a condition when its remove button is clicked', {
+      tag: ['@alertsFormValidation', '@P1'],
+    }, async ({ page }) => {
+      await openRules();
 
-      // Delete the first condition row
-      const deleteBtn = fvPage.getFieldsInputDeleteConditionBtnLocator().first();
-      await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
-      await deleteBtn.click();
+      await fvPage.addFilterCondition(0);
+      await fvPage.addFilterCondition(1);
+      await fvPage.conditions.expectChipCount(2);
 
-      // After deletion only one row remains — row index 1 should no longer exist
-      await expect(fvPage.getFieldsInputRowLocator(1)).not.toBeVisible({ timeout: 5000 });
-      testLogger.info('Condition row deleted; only one row remains');
+      await fvPage.conditions.removeChipAt(0);
+      await fvPage.conditions.expectChipCount(1);
+      testLogger.info('Condition removed; one remains');
     });
   });
 

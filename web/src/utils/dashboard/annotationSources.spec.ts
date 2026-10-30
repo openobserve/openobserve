@@ -45,7 +45,7 @@ import { isValidAnnotationColumn } from "./validateAnnotationSources";
 
 const t = i18n.global.t as unknown as TranslateFn;
 
-/** Builds a leaf condition (the alerts condition-tree shape FilterGroup.vue edits). */
+/** Builds a leaf condition (the engine V2 tree the condition builder edits). */
 const leaf = (
   column: string,
   operator: string,

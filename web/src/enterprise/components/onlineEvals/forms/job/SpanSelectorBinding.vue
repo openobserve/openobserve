@@ -236,9 +236,7 @@ const form = useOForm<SpanSelectorForm>({
 });
 const formValues = form.useStore((state: any) => state.values as SpanSelectorForm);
 
-// The filter tree is form-owned (JobFilterBuilder renders in form mode via
-// name-prefix="filterGroup"), so every condition's leaf inputs bind to a
-// UNIQUE path filterGroup.conditions[i].*. Keep the schema's `filterReady`
+// The filter tree is form-owned (JobFilterBuilder writes it to `filterGroup`). Keep the schema's `filterReady`
 // flag in sync with it — the store replaces values immutably, so the ref
 // changes reference on every edit and a shallow watch sees it.
 const filterGroup = form.useStore(

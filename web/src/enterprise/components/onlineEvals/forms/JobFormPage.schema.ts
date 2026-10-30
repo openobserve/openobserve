@@ -54,11 +54,7 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
       scorerIds: z.array(z.string()),
       samplingMode: z.string().default("rate"),
       samplingValue: z.string().optional().default(""),
-      // The filter-builder tree (V2 group) is now FORM-OWNED: FilterGroup renders
-      // in form mode (name-prefix="filterGroup"), so its leaf column/operator/value
-      // name-bind straight into the form. No validation — an empty filter is valid
-      // (a job may match all spans); it's transformed into the `filterCondition`
-      // payload at submit.
+      // Not validated: an empty filter is valid, since a job may match every span.
       filterGroup: z.any(),
     })
     .superRefine((val, ctx) => {

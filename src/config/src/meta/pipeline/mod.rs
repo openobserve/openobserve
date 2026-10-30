@@ -393,6 +393,15 @@ impl Pipeline {
                         "DerivedStream source's TriggerCondition period missing or is 0"
                     ));
                 }
+                derived_stream
+                    .trigger_condition
+                    .validate_threshold_operator()
+                    .and_then(|_| {
+                        derived_stream
+                            .query_condition
+                            .validate_threshold_operators()
+                    })
+                    .map_err(|e| anyhow!("DerivedStream source: {e}"))?;
                 self.source = PipelineSource::Scheduled(derived_stream);
             }
             _ => return Err(anyhow!("Source must be either a StreamNode or QueryNode")),
@@ -410,6 +419,9 @@ impl Pipeline {
                 if has_empty_conditions {
                     return Err(anyhow!("ConditionNode must have non-empty conditions"));
                 }
+                condition_params
+                    .validate_operator_values()
+                    .map_err(|e| anyhow!("ConditionNode {}: {e}", node.id))?;
             }
 
             if let NodeData::Stream(stream_params) = &mut node.data {
@@ -1269,6 +1281,63 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_rejects_extended_operator_in_scheduled_source_trigger() {
+        let derived_stream = |operator| DerivedStream {
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            query_condition: QueryCondition {
+                sql: Some("SELECT * FROM test_stream".to_string()),
+                ..Default::default()
+            },
+            trigger_condition: TriggerCondition {
+                period: 5,
+                operator,
+                ..Default::default()
+            },
+            tz_offset: 0,
+            delay: None,
+            start_at: None,
+        };
+        let pipeline = |operator| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Scheduled(derived_stream(operator)),
+            kind: PipelineKind::User,
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Query(derived_stream(operator)),
+                    0.0,
+                    0.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new("test_org", "out", StreamType::Logs)),
+                    0.0,
+                    0.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge::new("1".to_string(), "2".to_string())],
+        };
+        let err = pipeline(crate::meta::alerts::Operator::NotIn)
+            .validate()
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("DerivedStream source"), "{err}");
+        let ok = pipeline(crate::meta::alerts::Operator::GreaterThanEquals).validate();
+        assert!(ok.as_ref().map_or_else(
+            |e| !e.to_string().contains("not supported in the"),
+            |_| true
+        ));
+    }
+
+    #[test]
     fn test_pipeline_get_metadata_by_stream_params() {
         let mut node = Node::new(
             "1".to_string(),
@@ -1850,6 +1919,7 @@ mod tests {
                         operator: crate::meta::alerts::Operator::EqualTo,
                         value: serde_json::json!("x"),
                         ignore_case: false,
+                        case_insensitive: None,
                     },
                 ),
             }),

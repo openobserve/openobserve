@@ -291,6 +291,9 @@ async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), an
 
         // for draft we allow invalid destination or functions
         if !is_draft {
+            node.data
+                .validate_operator_values()
+                .map_err(|e| anyhow::anyhow!("node {}: {e}", node.id))?;
             if let NodeData::Destination(ref destination) = node.data {
                 let (dest, _) = crate::alerts::destinations::get_with_template(
                     &workflow.org_id,

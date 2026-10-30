@@ -665,7 +665,7 @@ watch(folderDefault.folderId, (next, prev) => {
 // The permitted folder list answered empty, so a new downtime has nowhere to be filed.
 const noFolder = computed(() => !isEdit.value && folderDefault.folderId.value === null);
 
-// Edit and Duplicate load the saved row once; the condition builder remounts on it.
+// Edit and Duplicate load the saved row once; the condition builder follows the form value.
 const resetToken = ref(0);
 const loadedFrom = ref("");
 const loadRow = (row: DowntimeDetail) => {
@@ -788,10 +788,10 @@ const onSaveClick = (event: MouseEvent) => {
 const previewBody = ref<PreviewRequest | null>(null);
 let previewTimer: ReturnType<typeof setTimeout> | undefined;
 
-// A half-typed row keeps the last preview instead of blanking it.
+// A half-typed row, or an open block with no condition yet, keeps the last preview instead of blanking it.
 const conditionIncomplete = computed(() => {
-  const condition = buildCondition(values.value);
-  return !!condition && conditionError(condition) !== null;
+  const open = values.value.condition_open && values.value.modules.some(hasIdentity);
+  return open && conditionError(buildCondition(values.value) ?? null) !== null;
 });
 
 const previewInput = computed((): PreviewRequest | null => {

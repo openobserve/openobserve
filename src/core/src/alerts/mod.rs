@@ -1124,10 +1124,29 @@ impl ConditionExt for Condition {
                 return false;
             }
         };
+        if let Some(result) = config::meta::alerts::condition_ops::evaluate_extended(
+            &self.operator,
+            val,
+            &self.value,
+            self.extended_case_insensitive(),
+        ) {
+            return result;
+        }
         match val {
             Value::String(v) => {
-                let val = v.as_str();
                 let con_val = self.value.as_str().unwrap_or_default().trim_matches('"');
+                let (val, con_val) = if self.is_case_insensitive() {
+                    (
+                        std::borrow::Cow::Owned(v.to_lowercase()),
+                        std::borrow::Cow::Owned(con_val.to_lowercase()),
+                    )
+                } else {
+                    (
+                        std::borrow::Cow::Borrowed(v.as_str()),
+                        std::borrow::Cow::Borrowed(con_val),
+                    )
+                };
+                let (val, con_val) = (val.as_ref(), con_val.as_ref());
                 match self.operator {
                     Operator::EqualTo => val == con_val,
                     Operator::NotEqualTo => val != con_val,
@@ -1282,7 +1301,7 @@ impl ConditionGroupExt for config::meta::alerts::ConditionItem {
                     &v.column,
                     &v.operator,
                     &v.value,
-                    v.ignore_case.unwrap_or(false),
+                    v.in_memory_case_insensitive(),
                 )
                 .await
             }
@@ -1425,6 +1444,14 @@ async fn evaluate_condition(
             return false;
         }
     };
+    if let Some(result) = config::meta::alerts::condition_ops::evaluate_extended(
+        operator,
+        val,
+        condition_value,
+        ignore_case,
+    ) {
+        return result;
+    }
 
     match val {
         Value::String(v) => {
@@ -1515,6 +1542,7 @@ async fn condition_item_to_sql(
                 operator: v.operator,
                 value: v.value.clone(),
                 ignore_case: v.ignore_case.unwrap_or(false),
+                case_insensitive: v.case_insensitive,
             };
 
             let data_type = match schema.field_with_name(&condition.column) {
@@ -1731,6 +1759,12 @@ fn build_expr(
         }
         _ => {}
     }
+    if cond.operator.is_extended() {
+        return build_extended_expr(cond, &field_alias, field_type, is_string_type);
+    }
+    if cond.is_case_insensitive() && is_string_type {
+        return build_case_insensitive_expr(cond, &field_alias, field_type);
+    }
     let expr = match field_type {
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
             let val = if cond.value.is_string() {
@@ -1894,6 +1928,199 @@ fn build_expr(
     Ok(expr)
 }
 
+/// Case-folded string comparison for `case_insensitive`; legacy `ignore_case` never reaches SQL.
+fn build_case_insensitive_expr(
+    cond: &Condition,
+    field_alias: &str,
+    field_type: &DataType,
+) -> Result<String, anyhow::Error> {
+    let raw = if cond.value.is_string() {
+        cond.value.as_str().unwrap_or_default().to_string()
+    } else {
+        cond.value.to_string()
+    };
+    let lowered = sql_string_literal(&raw.to_lowercase());
+    let op = match cond.operator {
+        Operator::EqualTo => "=",
+        Operator::NotEqualTo => "!=",
+        Operator::GreaterThan => ">",
+        Operator::GreaterThanEquals => ">=",
+        Operator::LessThan => "<",
+        Operator::LessThanEquals => "<=",
+        Operator::Contains => {
+            return Ok(format!(
+                "str_match_ignore_case({field_alias}, '{}')",
+                sql_string_literal(&raw)
+            ));
+        }
+        // NOT LIKE keeps the NULL-row semantics of the case-sensitive not_contains.
+        Operator::NotContains => {
+            return Ok(format!(
+                "lower({field_alias}) NOT LIKE '%{}%'",
+                sql_like_literal(&raw.to_lowercase())
+            ));
+        }
+        _ => return Err(unsupported_operator(cond, field_type)),
+    };
+    Ok(format!("lower({field_alias}) {op} '{lowered}'"))
+}
+
+/// SQL for `in`, `not_in`, `starts_with`, `ends_with`, `re_match` and `re_not_match`.
+fn build_extended_expr(
+    cond: &Condition,
+    field_alias: &str,
+    field_type: &DataType,
+    is_string_type: bool,
+) -> Result<String, anyhow::Error> {
+    let fold = cond.extended_case_insensitive() && is_string_type;
+    let column = if fold {
+        format!("lower({field_alias})")
+    } else {
+        field_alias.to_string()
+    };
+    match cond.operator {
+        Operator::In | Operator::NotIn => {
+            let items = config::meta::alerts::condition_ops::list_values(&cond.value);
+            if items.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Column {} needs at least one value for operator [{}]",
+                    cond.column,
+                    cond.operator
+                ));
+            }
+            let literals = items
+                .iter()
+                .map(|item| sql_list_literal(cond, item, field_type, fold))
+                .collect::<Result<Vec<_>, _>>()?
+                .join(", ");
+            let keyword = if matches!(cond.operator, Operator::In) {
+                "IN"
+            } else {
+                "NOT IN"
+            };
+            Ok(format!("{column} {keyword} ({literals})"))
+        }
+        Operator::StartsWith | Operator::EndsWith if is_string_type => {
+            let needle = scalar_sql_text(&cond.value);
+            let needle = sql_like_literal(&if fold { needle.to_lowercase() } else { needle });
+            Ok(if matches!(cond.operator, Operator::StartsWith) {
+                format!("{column} LIKE '{needle}%'")
+            } else {
+                format!("{column} LIKE '%{needle}'")
+            })
+        }
+        Operator::ReMatch | Operator::ReNotMatch if is_string_type => {
+            let pattern = cond.value.as_str().unwrap_or_default();
+            let pattern = if cond.extended_case_insensitive() {
+                format!("(?i){pattern}")
+            } else {
+                pattern.to_string()
+            };
+            let func = if matches!(cond.operator, Operator::ReMatch) {
+                "re_match"
+            } else {
+                "re_not_match"
+            };
+            Ok(format!(
+                "{func}({field_alias}, '{}')",
+                sql_string_literal(&pattern)
+            ))
+        }
+        _ => Err(unsupported_operator(cond, field_type)),
+    }
+}
+
+/// One `IN (...)` item typed for the column, parsed the same way as the `=` operand.
+fn sql_list_literal(
+    cond: &Condition,
+    item: &Value,
+    field_type: &DataType,
+    fold: bool,
+) -> Result<String, anyhow::Error> {
+    let invalid = || {
+        anyhow::anyhow!(
+            "Column [{}] dataType is [{field_type}] but value is [{item}]",
+            cond.column
+        )
+    };
+    match field_type {
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
+            if !(item.is_string() || item.is_number() || item.is_boolean()) {
+                return Err(invalid());
+            }
+            let text = scalar_sql_text(item);
+            let text = if fold { text.to_lowercase() } else { text };
+            Ok(format!("'{}'", sql_string_literal(&text)))
+        }
+        DataType::Int16 | DataType::Int32 | DataType::Int64 => match item {
+            Value::Number(n) => match n.as_i64() {
+                Some(v) => Ok(v.to_string()),
+                None => n.as_f64().map(|v| v.to_string()).ok_or_else(invalid),
+            },
+            Value::String(s) => {
+                let s = s.trim();
+                match s.parse::<i64>() {
+                    Ok(v) => Ok(v.to_string()),
+                    Err(_) => s
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|v| v.is_finite())
+                        .map(|v| v.to_string())
+                        .ok_or_else(invalid),
+                }
+            }
+            _ => Err(invalid()),
+        },
+        DataType::Float32 | DataType::Float64 => match item {
+            Value::Number(n) => n.as_f64().map(|v| v.to_string()).ok_or_else(invalid),
+            Value::String(s) => s
+                .trim()
+                .parse::<f64>()
+                .map(|v| v.to_string())
+                .map_err(|_| invalid()),
+            _ => Err(invalid()),
+        },
+        DataType::Boolean => match item {
+            Value::Bool(b) => Ok(b.to_string()),
+            Value::String(s) => s
+                .parse::<bool>()
+                .map(|b| b.to_string())
+                .map_err(|_| invalid()),
+            _ => Err(invalid()),
+        },
+        _ => Err(unsupported_operator(cond, field_type)),
+    }
+}
+
+fn scalar_sql_text(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// Doubles single quotes so the value cannot end the SQL string literal.
+fn sql_string_literal(value: &str) -> String {
+    value.replace('\'', "''")
+}
+
+/// Backslash-escapes LIKE wildcards (DataFusion's default escape) and then the quotes.
+fn sql_like_literal(value: &str) -> String {
+    let escaped = value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    sql_string_literal(&escaped)
+}
+
+fn unsupported_operator(cond: &Condition, field_type: &DataType) -> anyhow::Error {
+    anyhow::anyhow!(
+        "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
+        cond.column,
+        cond.operator
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
@@ -1926,6 +2153,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -1933,6 +2161,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("api".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // AND before this item
                 }),
             ],
@@ -1961,6 +2190,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -1968,6 +2198,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::Or, // OR before this item
                 }),
             ],
@@ -1991,6 +2222,7 @@ mod tests {
                 operator: Operator::EqualTo,
                 value: Value::String("it's production".to_string()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2021,6 +2253,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Group {
@@ -2031,6 +2264,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("api".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And, /* Not used (first item in
                                                                      * group) */
                         }),
@@ -2039,6 +2273,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("web".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::Or, // OR before this item
                         }),
                     ],
@@ -2073,6 +2308,7 @@ mod tests {
                     operator: Operator::GreaterThan,
                     value: Value::Number(serde_json::Number::from(100)),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2080,6 +2316,7 @@ mod tests {
                     operator: Operator::GreaterThanEquals,
                     value: Value::Number(serde_json::Number::from_f64(50.5).unwrap()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // AND before this item
                 }),
             ],
@@ -2104,6 +2341,7 @@ mod tests {
                 operator: Operator::Contains,
                 value: Value::String("error".to_string()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2150,6 +2388,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2157,6 +2396,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("active".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // AND before this item
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2164,6 +2404,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("api".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::Or, // OR before this item
                 }),
             ],
@@ -2194,6 +2435,7 @@ mod tests {
                 operator: Operator::EqualTo,
                 value: Value::String("error".to_string()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2226,6 +2468,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Ignored because next is Group
                 }),
                 ConditionItem::Group {
@@ -2236,6 +2479,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("test".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And,
                         }),
                         ConditionItem::Condition(ConditionItemCondition {
@@ -2243,6 +2487,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("test2".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And,
                         }),
                     ],
@@ -2328,6 +2573,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::Or, // OR with next item
                 }),
                 ConditionItem::Group {
@@ -2338,6 +2584,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("test".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And, // AND with next in group
                         }),
                         ConditionItem::Condition(ConditionItemCondition {
@@ -2345,6 +2592,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("test2".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And,
                         }),
                     ],
@@ -2398,6 +2646,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Group {
@@ -2407,6 +2656,7 @@ mod tests {
                         operator: Operator::EqualTo,
                         value: Value::String("test".to_string()),
                         ignore_case: None,
+                        case_insensitive: None,
                         logical_operator: LogicalOperator::And,
                     })],
                 },
@@ -2415,6 +2665,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test2".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -2445,6 +2696,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Group {
@@ -2454,6 +2706,7 @@ mod tests {
                         operator: Operator::EqualTo,
                         value: Value::String("test".to_string()),
                         ignore_case: None,
+                        case_insensitive: None,
                         logical_operator: LogicalOperator::And,
                     })],
                 },
@@ -2462,6 +2715,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test2".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -2537,6 +2791,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("match".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first)
                 }),
                 ConditionItem::Group {
@@ -2547,6 +2802,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("match".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And, // Not used (first in group)
                         }),
                         ConditionItem::Condition(ConditionItemCondition {
@@ -2554,6 +2810,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("match".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And, // AND before this
                         }),
                         ConditionItem::Group {
@@ -2564,6 +2821,7 @@ mod tests {
                                     operator: Operator::EqualTo,
                                     value: Value::String("match".to_string()),
                                     ignore_case: None,
+                                    case_insensitive: None,
                                     logical_operator: LogicalOperator::And,
                                 }),
                                 ConditionItem::Condition(ConditionItemCondition {
@@ -2571,6 +2829,7 @@ mod tests {
                                     operator: Operator::EqualTo,
                                     value: Value::String("match".to_string()),
                                     ignore_case: None,
+                                    case_insensitive: None,
                                     logical_operator: LogicalOperator::And, // AND before this
                                 }),
                             ],
@@ -2582,6 +2841,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("match".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // AND before this
                 }),
             ],
@@ -2703,6 +2963,7 @@ mod tests {
                 operator: Operator::IsEmpty,
                 value: Value::String(String::new()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2730,6 +2991,7 @@ mod tests {
                 operator: Operator::IsNull,
                 value: Value::String(String::new()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2749,6 +3011,7 @@ mod tests {
             operator,
             value,
             ignore_case: false,
+            case_insensitive: None,
         }
     }
 
@@ -3402,5 +3665,494 @@ mod tests {
                 .to_string()
                 .contains("\"nope\" not found")
         );
+    }
+
+    fn make_ci_cond(column: &str, operator: Operator, value: Value) -> Condition {
+        Condition {
+            case_insensitive: Some(true),
+            ..make_cond(column, operator, value)
+        }
+    }
+
+    fn make_legacy_ic_cond(column: &str, operator: Operator, value: Value) -> Condition {
+        Condition {
+            ignore_case: true,
+            ..make_cond(column, operator, value)
+        }
+    }
+
+    #[test]
+    fn test_build_expr_legacy_ignore_case_keeps_main_sql() {
+        use config::utils::json::json;
+
+        for (op, value, ty) in [
+            (Operator::EqualTo, json!("Error"), DataType::Utf8),
+            (Operator::NotEqualTo, json!("o'k"), DataType::Utf8),
+            (Operator::GreaterThan, json!("b"), DataType::Utf8),
+            (Operator::Contains, json!("Err"), DataType::Utf8),
+            (Operator::NotContains, json!("5%_A"), DataType::Utf8),
+            (Operator::IsEmpty, json!(""), DataType::Utf8),
+            (Operator::EqualTo, json!(3), DataType::Int64),
+        ] {
+            let legacy = make_legacy_ic_cond("c", op, value.clone());
+            let plain = make_cond("c", op, value);
+            assert_eq!(
+                build_expr(&legacy, "", &ty).unwrap(),
+                build_expr(&plain, "", &ty).unwrap(),
+                "{op:?}"
+            );
+        }
+        let legacy = make_legacy_ic_cond("c", Operator::Contains, json!("Err"));
+        assert_eq!(
+            build_expr(&legacy, "", &DataType::Utf8).unwrap(),
+            r#"str_match("c", 'Err')"#
+        );
+    }
+
+    #[test]
+    fn test_build_expr_extended_operators_honour_legacy_ignore_case() {
+        use config::utils::json::json;
+
+        let cond = make_legacy_ic_cond("c", Operator::In, json!(["A"]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"lower("c") IN ('a')"#
+        );
+        let cond = make_legacy_ic_cond("c", Operator::ReMatch, json!("^a"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"re_match("c", '(?i)^a')"#
+        );
+    }
+
+    #[test]
+    fn test_build_having_expr_ignores_legacy_ignore_case() {
+        let mut agg = Aggregation {
+            group_by: None,
+            function: AggFunction::Max,
+            having: make_legacy_ic_cond("level", Operator::EqualTo, Value::from(5)),
+            warning_value: None,
+            multi_alert: false,
+        };
+        assert_eq!(
+            build_having_expr(&agg, &DataType::Utf8).unwrap(),
+            r#""alert_agg_value" = '5'"#
+        );
+        agg.having.case_insensitive = Some(true);
+        assert_eq!(
+            build_having_expr(&agg, &DataType::Utf8).unwrap(),
+            r#"lower("alert_agg_value") = '5'"#
+        );
+    }
+
+    #[tokio::test]
+    async fn test_legacy_ignore_case_entries_keep_main_sql_and_evaluation() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, true)]);
+        let v1: AlertConditionParams = serde_json::from_value(json!({
+            "and": [
+                {"column": "level", "operator": "=", "value": "ERROR", "ignore_case": true},
+                {"column": "level", "operator": "Contains", "value": "RR", "ignore_case": true}
+            ]
+        }))
+        .unwrap();
+        let v2: AlertConditionParams = serde_json::from_value(json!({
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "=",
+                     "value": "ERROR", "ignore_case": true, "logicalOperator": "AND"},
+                    {"filterType": "condition", "column": "level", "operator": "NotContains",
+                     "value": "DEBUG", "ignore_case": true, "logicalOperator": "AND"}
+                ]
+            }
+        }))
+        .unwrap();
+        assert_eq!(
+            v1.to_sql(&schema).await.unwrap(),
+            r#"("level" = 'ERROR' AND str_match("level", 'RR'))"#
+        );
+        assert_eq!(
+            v2.to_sql(&schema).await.unwrap(),
+            r#"("level" = 'ERROR' AND "level" NOT LIKE '%DEBUG%')"#
+        );
+        let row = json!({"level": "error"});
+        // Main: the V1 in-memory evaluator ignores ignore_case, the V2 one honours it.
+        assert!(!v1.evaluate(row.as_object().unwrap()).await);
+        assert!(v2.evaluate(row.as_object().unwrap()).await);
+        let row = json!({"level": "debug"});
+        assert!(!v2.evaluate(row.as_object().unwrap()).await);
+    }
+
+    #[tokio::test]
+    async fn test_case_insensitive_flag_on_v2_reaches_sql() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, true)]);
+        let v2: AlertConditionParams = serde_json::from_value(json!({
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "contains",
+                     "value": "Err", "case_insensitive": true, "logicalOperator": "AND"}
+                ]
+            }
+        }))
+        .unwrap();
+        assert_eq!(
+            v2.to_sql(&schema).await.unwrap(),
+            r#"(str_match_ignore_case("level", 'Err'))"#
+        );
+        assert!(
+            v2.evaluate(json!({"level": "ERROR"}).as_object().unwrap())
+                .await
+        );
+    }
+
+    #[test]
+    fn test_build_expr_old_operators_without_ignore_case_are_byte_identical() {
+        use config::utils::json::json;
+
+        let utf8 = DataType::Utf8;
+        let cases = [
+            (Operator::EqualTo, json!("it's"), &utf8, r#""c" = 'it''s'"#),
+            (Operator::NotEqualTo, json!("a"), &utf8, r#""c" != 'a'"#),
+            (Operator::GreaterThan, json!(5), &utf8, r#""c" > '5'"#),
+            (Operator::LessThanEquals, json!("b"), &utf8, r#""c" <= 'b'"#),
+            (
+                Operator::Contains,
+                json!("err"),
+                &utf8,
+                r#"str_match("c", 'err')"#,
+            ),
+            (
+                Operator::NotContains,
+                json!("50%_x"),
+                &utf8,
+                r#""c" NOT LIKE '%50%_x%'"#,
+            ),
+            (
+                Operator::IsEmpty,
+                json!(""),
+                &utf8,
+                r#"("c" IS NULL OR "c" = '')"#,
+            ),
+            (Operator::EqualTo, json!(3), &DataType::Int64, r#""c" = 3"#),
+            (
+                Operator::GreaterThan,
+                json!("2.5"),
+                &DataType::Float64,
+                r#""c" > 2.5"#,
+            ),
+            (
+                Operator::NotEqualTo,
+                json!(true),
+                &DataType::Boolean,
+                r#""c" != true"#,
+            ),
+        ];
+        for (op, value, ty, expected) in cases {
+            let cond = make_cond("c", op, value);
+            assert_eq!(build_expr(&cond, "", ty).unwrap(), expected, "{op:?}");
+        }
+    }
+
+    #[test]
+    fn test_build_expr_ignore_case_on_strings() {
+        use config::utils::json::json;
+
+        let utf8 = DataType::Utf8;
+        let cases = [
+            (Operator::EqualTo, json!("Error"), r#"lower("c") = 'error'"#),
+            (
+                Operator::NotEqualTo,
+                json!("O'K"),
+                r#"lower("c") != 'o''k'"#,
+            ),
+            (
+                Operator::GreaterThanEquals,
+                json!("B"),
+                r#"lower("c") >= 'b'"#,
+            ),
+            (
+                Operator::Contains,
+                json!("Err"),
+                r#"str_match_ignore_case("c", 'Err')"#,
+            ),
+            (
+                Operator::NotContains,
+                json!("5%_A"),
+                r#"lower("c") NOT LIKE '%5\%\_a%'"#,
+            ),
+        ];
+        for (op, value, expected) in cases {
+            let cond = make_ci_cond("c", op, value);
+            assert_eq!(build_expr(&cond, "", &utf8).unwrap(), expected, "{op:?}");
+        }
+        let cond = make_ci_cond("c", Operator::EqualTo, json!(3));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Int64).unwrap(),
+            r#""c" = 3"#
+        );
+    }
+
+    #[test]
+    fn test_build_expr_in_and_not_in_are_type_aware() {
+        use config::utils::json::json;
+
+        let cond = make_cond("c", Operator::In, json!(["a", "it's", 5]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#""c" IN ('a', 'it''s', '5')"#
+        );
+        let cond = make_ci_cond("c", Operator::NotIn, json!(["A", "b"]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"lower("c") NOT IN ('a', 'b')"#
+        );
+        let cond = make_cond("c", Operator::In, json!([200, "404", 1.0]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Int64).unwrap(),
+            r#""c" IN (200, 404, 1)"#
+        );
+        let cond = make_cond("c", Operator::NotIn, json!("1.5"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Float64).unwrap(),
+            r#""c" NOT IN (1.5)"#
+        );
+        let cond = make_cond("c", Operator::In, json!([true, "false"]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Boolean).unwrap(),
+            r#""c" IN (true, false)"#
+        );
+        let cond = make_cond("c", Operator::In, json!([]));
+        assert!(build_expr(&cond, "", &DataType::Utf8).is_err());
+        let cond = make_cond("c", Operator::In, json!(["x"]));
+        assert!(build_expr(&cond, "", &DataType::Int64).is_err());
+    }
+
+    #[test]
+    fn test_build_expr_starts_and_ends_with_escape_wildcards() {
+        use config::utils::json::json;
+
+        let cond = make_cond("c", Operator::StartsWith, json!("50%_o'k\\"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#""c" LIKE '50\%\_o''k\\%'"#
+        );
+        let cond = make_ci_cond("c", Operator::EndsWith, json!(".LOG"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"lower("c") LIKE '%.log'"#
+        );
+        let cond = make_cond("c", Operator::StartsWith, json!("1"));
+        assert!(build_expr(&cond, "", &DataType::Int64).is_err());
+    }
+
+    #[test]
+    fn test_build_expr_regex_operators() {
+        use config::utils::json::json;
+
+        let cond = make_cond("c", Operator::ReMatch, json!("^GET '/api"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"re_match("c", '^GET ''/api')"#
+        );
+        let cond = make_ci_cond("c", Operator::ReNotMatch, json!("timeout|refused"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"re_not_match("c", '(?i)timeout|refused')"#
+        );
+        let cond = make_cond("c", Operator::ReMatch, json!("5.."));
+        assert!(build_expr(&cond, "", &DataType::Int64).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_like_escapes_are_honoured_by_datafusion() {
+        use std::sync::Arc;
+
+        use arrow::{array::StringArray, record_batch::RecordBatch};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+
+        let schema = Arc::new(Schema::new(vec![Field::new("c", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![
+                Some("50%_off"),
+                Some("50a_off"),
+                Some("500 off"),
+                Some("Path\\X"),
+                None,
+            ]))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        let count = |cond: Condition| {
+            let ctx = ctx.clone();
+            async move {
+                let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+                let df = ctx
+                    .sql(&format!("SELECT c FROM t WHERE {expr}"))
+                    .await
+                    .unwrap();
+                df.collect()
+                    .await
+                    .unwrap()
+                    .iter()
+                    .map(|b| b.num_rows())
+                    .sum::<usize>()
+            }
+        };
+        use config::utils::json::json;
+        assert_eq!(
+            count(make_cond("c", Operator::StartsWith, json!("50%"))).await,
+            1
+        );
+        assert_eq!(
+            count(make_cond("c", Operator::EndsWith, json!("_off"))).await,
+            2
+        );
+        assert_eq!(
+            count(make_cond("c", Operator::EndsWith, json!("h\\X"))).await,
+            1
+        );
+        assert_eq!(
+            count(make_ci_cond("c", Operator::StartsWith, json!("PATH"))).await,
+            1
+        );
+        assert_eq!(
+            count(make_ci_cond("c", Operator::NotContains, json!("%_"))).await,
+            3
+        );
+        assert_eq!(
+            count(make_ci_cond("c", Operator::In, json!(["50%_OFF"]))).await,
+            1
+        );
+        assert_eq!(
+            count(make_cond("c", Operator::NotIn, json!(["50%_off"]))).await,
+            3
+        );
+    }
+
+    #[tokio::test]
+    async fn test_evaluate_condition_extended_operators() {
+        use config::utils::json::json;
+
+        let row = json!({"level": "Error", "code": 503, "ok": false, "path": "/api/v1/users"});
+        let row = row.as_object().unwrap();
+        let eval = |column: &'static str, op: Operator, value: Value, ic: bool| async move {
+            evaluate_condition(row, column, &op, &value, ic).await
+        };
+        assert!(eval("level", Operator::In, json!(["Error", "warn"]), false).await);
+        assert!(!eval("level", Operator::In, json!(["error"]), false).await);
+        assert!(eval("level", Operator::In, json!(["error"]), true).await);
+        assert!(eval("code", Operator::In, json!(["503", 504]), false).await);
+        assert!(eval("code", Operator::NotIn, json!([200]), false).await);
+        assert!(eval("ok", Operator::In, json!([false]), false).await);
+        assert!(eval("path", Operator::StartsWith, json!("/API"), true).await);
+        assert!(!eval("path", Operator::StartsWith, json!("/API"), false).await);
+        assert!(eval("path", Operator::EndsWith, json!("users"), false).await);
+        assert!(eval("path", Operator::ReMatch, json!("^/api/v[0-9]+/"), false).await);
+        assert!(eval("path", Operator::ReNotMatch, json!("^/API"), false).await);
+        assert!(!eval("path", Operator::ReNotMatch, json!("^/API"), true).await);
+    }
+
+    #[tokio::test]
+    async fn test_negated_operators_on_a_missing_field_match_not_equal_to() {
+        use config::utils::json::json;
+
+        let row = json!({"other": "x"});
+        let row = row.as_object().unwrap();
+        // `!=` on a missing field is false today; every negated operator follows it.
+        for op in [
+            Operator::NotEqualTo,
+            Operator::NotContains,
+            Operator::NotIn,
+            Operator::ReNotMatch,
+        ] {
+            assert!(
+                !evaluate_condition(row, "absent", &op, &json!(["a"]), false).await,
+                "{op:?}"
+            );
+            assert!(
+                !evaluate_condition(row, "absent", &op, &json!("a"), false).await,
+                "{op:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_v1_condition_honours_case_insensitive_and_extended_operators() {
+        use config::utils::json::json;
+
+        let row = json!({"level": "ERROR"});
+        let row = row.as_object().unwrap();
+        let cond = make_cond("level", Operator::EqualTo, json!("error"));
+        assert!(!cond.evaluate(row).await);
+        let cond = make_legacy_ic_cond("level", Operator::EqualTo, json!("error"));
+        assert!(!cond.evaluate(row).await);
+        let cond = make_legacy_ic_cond("level", Operator::StartsWith, json!("err"));
+        assert!(cond.evaluate(row).await);
+        let cond = make_ci_cond("level", Operator::EqualTo, json!("error"));
+        assert!(cond.evaluate(row).await);
+        let cond = make_ci_cond("level", Operator::Contains, json!("RR"));
+        assert!(cond.evaluate(row).await);
+        let cond = make_cond("level", Operator::In, json!(["WARN", "ERROR"]));
+        assert!(cond.evaluate(row).await);
+        let cond = make_ci_cond("level", Operator::ReMatch, json!("^err"));
+        assert!(cond.evaluate(row).await);
+    }
+
+    #[tokio::test]
+    async fn test_saved_v1_and_v2_alert_conditions_still_evaluate_and_build() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![
+            Field::new("level", DataType::Utf8, true),
+            Field::new("code", DataType::Int64, true),
+        ]);
+        let v1: AlertConditionParams = serde_json::from_value(json!({
+            "or": [
+                {"column": "level", "operator": "=", "value": "error", "ignore_case": false},
+                {"and": [
+                    {"column": "code", "operator": ">=", "value": "500", "ignore_case": false},
+                    {"column": "level", "operator": "Contains", "value": "warn", "ignore_case": false}
+                ]}
+            ]
+        }))
+        .unwrap();
+        let v2: AlertConditionParams = serde_json::from_value(json!({
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "NotContains",
+                     "value": "debug", "logicalOperator": "AND"},
+                    {"filterType": "condition", "column": "code", "operator": "!=",
+                     "value": 200, "logicalOperator": "OR"}
+                ]
+            }
+        }))
+        .unwrap();
+        assert!(v1.validate_operator_values().is_ok());
+        assert!(v2.validate_operator_values().is_ok());
+        assert_eq!(
+            v2.to_sql(&schema).await.unwrap(),
+            r#"("level" NOT LIKE '%debug%' OR "code" != 200)"#
+        );
+        let row = json!({"level": "warning", "code": 503});
+        assert!(v1.evaluate(row.as_object().unwrap()).await);
+        assert!(v2.evaluate(row.as_object().unwrap()).await);
+        let row = json!({"level": "debug", "code": 200});
+        assert!(!v1.evaluate(row.as_object().unwrap()).await);
+        assert!(!v2.evaluate(row.as_object().unwrap()).await);
     }
 }

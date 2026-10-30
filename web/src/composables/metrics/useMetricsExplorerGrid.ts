@@ -2166,6 +2166,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     invalidateAll();
   };
 
+  /** Swaps one filter in place, so an edited chip keeps its position. */
+  const replaceLabelFilter = async (previous: LabelFilter, next: LabelFilter) => {
+    await ensureSchemas();
+    const key = labelFilterKey(previous);
+    const nextKey = labelFilterKey(next);
+    labelFilters.value = labelFilters.value
+      .filter((f) => labelFilterKey(f) === key || labelFilterKey(f) !== nextKey)
+      .map((f) => (labelFilterKey(f) === key ? next : f));
+    invalidateAll();
+  };
+
   /** By identity, not by label — several filters can share a label. */
   const removeLabelFilter = (filter: LabelFilter) => {
     const key = labelFilterKey(filter);
@@ -2423,6 +2434,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     loadLabelNames,
     loadLabelValues,
     addLabelFilter,
+    replaceLabelFilter,
     removeLabelFilter,
     ensureSchemas,
     isLabelEligible,
