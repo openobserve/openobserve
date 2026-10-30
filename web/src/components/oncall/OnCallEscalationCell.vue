@@ -28,12 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex min-w-0 flex-col gap-0.5" :data-test="`oncall-escalation-cell-${responseId}`">
-    <!-- Tone alone, no icon and no bar. Both restated what the headline already
-         says in words, and three severity signals on one cell competed with the
-         row's own priority rail for the same glance. One line, not two: the
-         detail sentence is the "why" behind the headline, not a second fact —
-         it lives in the hover, not stacked under it. -->
-    <span class="truncate" :class="toneClass" data-test="oncall-escalation-cell-level">
+    <!-- The one error tag, decided by the same progress the phrase reads, so the two cannot disagree. -->
+    <span v-if="phrase.kind === 'nobodyAnswered'" class="inline-flex">
+      <OTag
+        type="oncallResponseState"
+        value="exhausted"
+        size="sm"
+        data-test="oncall-escalation-cell-exhausted"
+      />
+      <OTooltip :content="tooltipContent" />
+    </span>
+    <span v-else class="truncate" :class="toneClass" data-test="oncall-escalation-cell-level">
       {{ headline }}
       <OTooltip :content="tooltipContent" />
     </span>
@@ -42,136 +47,156 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useStore } from "vuex";
 
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { useOnCallClock } from "@/composables/useOnCallClock";
-import type { EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
+import type { EscalationProgress, OnCallResponse } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { formatOnCallInstant, pagePhrase } from "@/utils/oncall";
 
-const props = defineProps<{
-  /** Only used for the `data-test` hooks, so each row's cell is addressable. */
-  responseId: string;
-  state: ResponseState;
-  /** Absent while the ladder position is still loading, or beyond the fetch cap. */
-  progress?: EscalationProgress | null;
-  /**
-   * False until the list's first escalation-progress fetch has completed.
-   * An absent `progress` is ambiguous on its own — "haven't asked yet" and
-   * "asked, and nothing has fired" both look like `null` — so this is what
-   * tells the two apart and keeps the headline blank rather than flashing
-   * "Not paged yet" before the real status arrives.
-   */
-  progressLoaded?: boolean;
-  /**
-   * Rungs the team's policy defines for this priority. Absent when the policy
-   * could not be read — the cell then says "Level 2" rather than inventing a
-   * total, because "Level 2 of 3" with a guessed 3 is worse than no denominator.
-   */
-  totalRungs?: number | null;
-  /** `acked_at - opened_at`, so a settled row can say how fast it was answered. */
-  ackedInMicros?: number | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** Only used for the `data-test` hooks, so each row's cell is addressable. */
+    responseId: string;
+    record: OnCallResponse;
+    /** Absent while the ladder position is still loading, beyond the fetch cap, or on a list that never fetches it. */
+    progress?: EscalationProgress | null;
+    /** False until the first progress fetch has answered, so an absent `progress` reads as blank, not "Not paged yet". */
+    progressLoaded?: boolean;
+    /** Rungs the team's policy defines for this priority; absent when the policy could not be read. */
+    totalRungs?: number | null;
+    /** The step the record says it reached, for a list with no progress per row. */
+    reachedStep?: number | null;
+  }>(),
+  { progress: null, progressLoaded: true, totalRungs: null, reachedStep: null },
+);
 
 const { t } = useI18nTyped();
+const store = useStore();
 const nowMicros = useOnCallClock();
 
-/// A page climbing the ladder is the only state worth shouting about; the three
-/// settled states recede so the escalating rows are what the eye lands on. Tone
-/// is now the cell's ONLY signal, which is why every state still has to have one.
+const phrase = computed(() =>
+  pagePhrase({
+    record: props.record,
+    progress: props.progress,
+    progressLoaded: props.progressLoaded,
+    totalRungs: props.totalRungs,
+    reachedStep: props.reachedStep,
+    nowMicros: nowMicros.value,
+  }),
+);
+
+/// Tone is the cell's only signal besides the words, so every phrase has one.
 const toneClass = computed(() => {
-  if (props.state === "resolved") return "text-text-secondary";
-  if (props.progress?.stopped_because === "snoozed") return "text-status-warning-text";
-  if (props.state === "acknowledged") return "text-text-body";
-  // Nothing was ever going to page here — the priority's policy has no rungs
-  // behind it — so this is not the "wake somebody now" state the error tone
-  // is reserved for.
-  if (props.totalRungs === 0) return "text-text-secondary";
+  switch (phrase.value.kind) {
+    case "resolved":
+    case "pagesNobody":
+    case "unknown":
+      return "text-text-secondary";
+    case "acknowledged":
+      return "text-text-body";
+    case "snoozed":
+    case "reachedNobody":
+      return "text-status-warning-text";
+    case "nobodyAnswered":
+    case "held":
+    case "notPaged":
+    case "paging":
+      return "text-status-error-text";
+  }
   return "text-status-error-text";
 });
 
-const firedCount = computed(() => props.progress?.fired.length ?? 0);
+function pagingLine(step: number, total: number | null, who: string[]): I18nText {
+  const names = raw(who.join(", "));
+  if (total === null) {
+    return who.length
+      ? t("oncall.escalationPagingStepOpen", { step, who: names })
+      : t("oncall.escalationPagingStepOpenOnly", { step });
+  }
+  return who.length
+    ? t("oncall.escalationPagingStep", { step, total, who: names })
+    : t("oncall.escalationPagingStepOnly", { step, total });
+}
 
-/// Distinct people the fired rungs reached. Deduplicated across rungs: a ladder
-/// that rang the same person twice reached one person, and counting two would
-/// promise a second pair of hands that never existed.
+const headline = computed<I18nText>(() => {
+  const p = phrase.value;
+  switch (p.kind) {
+    case "resolved":
+      return p.afterMicros === null
+        ? t("oncall.state_resolved")
+        : t("oncall.resolvedAfter", { duration: raw(formatMicrosDuration(p.afterMicros)) });
+    case "acknowledged":
+      return p.by
+        ? t("oncall.escalationAckedBy", { who: raw(p.by) })
+        : t("oncall.state_acknowledged");
+    case "snoozed":
+      return t("oncall.escalationSnoozedUntil", {
+        time: raw(formatOnCallInstant(p.until, nowMicros.value, store.state.timezone)),
+      });
+    case "nobodyAnswered":
+      return t("oncall.state_exhausted");
+    case "held":
+      return t("oncall.escalationHeld", { n: p.secondsLeft });
+    case "pagesNobody":
+      return t("oncall.escalationPagesNobody");
+    case "unknown":
+      return raw("");
+    case "notPaged":
+      return t("oncall.escalationNotStarted");
+    case "paging":
+      return pagingLine(p.step, p.total, p.who);
+    case "reachedNobody":
+      return p.total === null
+        ? t("oncall.escalationStepReachedNobodyOpen", { step: p.step })
+        : t("oncall.escalationStepReachedNobody", { step: p.step, total: p.total });
+  }
+  return raw("");
+});
+
+/// Distinct people the fired rungs reached, deduplicated across rungs.
 const peopleRung = computed(() => {
   const fired = props.progress?.fired ?? [];
-  return new Set(fired.flatMap((rung) => rung.targets)).size;
+  // Targets are role labels; only a server without the ledger field leaves `reached` absent.
+  return new Set(fired.flatMap((rung) => rung.reached ?? rung.targets)).size;
 });
 
-/// One or two words. The full sentences ("Escalation stopped — somebody owns
-/// this.") belong on the detail screen; in a table cell they truncate to
-/// nothing, which is what this column was doing.
-const headline = computed<I18nText>(() => {
-  if (props.state === "resolved") return t("oncall.escalationResolvedShort");
-  if (props.progress?.stopped_because === "snoozed") return t("oncall.escalationSnoozedShort");
-  if (props.state === "acknowledged") return t("oncall.escalationAcked");
-  // "Level 6 of 6" and "nobody is coming" are the same number and opposite
-  // situations. A finished ladder says so in words.
-  if (props.progress?.exhausted) return t("oncall.ladderFinished");
-  // "Not paged yet" implies a page is coming; a priority with no rungs never
-  // pages at all, which is a policy fact, not a pending one.
-  if (props.totalRungs === 0) return t("oncall.escalationPagesNobody");
-  // Still waiting on the first fetch: an absent `progress` here means "don't
-  // know yet", not "confirmed nothing fired" — say nothing rather than flash
-  // "Not paged yet" and then correct it a moment later.
-  if (!props.progress && !props.progressLoaded) return raw("");
-  if (firedCount.value === 0) return t("oncall.escalationNotStarted");
-  // Who is being woken RIGHT NOW, not just how far up the ladder we are — that
-  // is the name a responder checks against their own.
-  const paging = props.progress?.next_targets ?? [];
-  if (paging.length) {
-    return t("oncall.escalationClimbing", {
-      level: firedCount.value,
-      who: raw(paging.join(", ")),
-    });
-  }
-  return props.totalRungs
-    ? t("oncall.escalationLevel", { level: firedCount.value, total: props.totalRungs })
-    : t("oncall.escalationLevelOpen", { level: firedCount.value });
-});
-
-/// Relative, because "in 4m 12s" is the number being decided against — an
-/// absolute instant makes the reader do the arithmetic at the worst moment.
+/// Relative, because "in 4m 12s" is the number being decided against.
 const detail = computed<I18nText | "">(() => {
+  const record = props.record;
   const progress = props.progress;
-  // How fast it was answered is the useful fact once it IS answered — the
-  // ladder itself has nothing left to say.
-  if (props.state === "acknowledged" || props.state === "resolved") {
-    return props.ackedInMicros === null || props.ackedInMicros === undefined
-      ? ""
-      : t("oncall.escalationAckedIn", { duration: formatMicrosDuration(props.ackedInMicros) });
+  if (record.state === "acknowledged" || record.state === "resolved") {
+    return record.acked_at
+      ? t("oncall.escalationAckedIn", {
+          duration: formatMicrosDuration(record.acked_at - record.opened_at),
+        })
+      : "";
   }
   if (!progress) return "";
-  if (progress.stopped_because === "snoozed") return "";
-  // What the ladder spent before running out. "Exhausted" alone does not say
-  // whether it reached three people or nobody at all.
+  if (phrase.value.kind === "snoozed") return "";
   if (progress.exhausted) {
     return peopleRung.value > 0
       ? t(
           "oncall.ladderFinishedDetail",
-          { people: peopleRung.value, levels: props.totalRungs ?? firedCount.value },
+          { people: peopleRung.value, levels: props.totalRungs ?? progress.fired.length },
           peopleRung.value,
         )
       : t("oncall.ladderExhausted");
   }
   if (!progress.next_at || !progress.next_targets.length) return "";
-
   const remaining = progress.next_at - nowMicros.value;
   const when =
     remaining <= 0
       ? t("oncall.ladderImminent")
       : t("oncall.ladderIn", { duration: formatMicrosDuration(remaining) });
-  // Targets are the engine's own words for a rung ("the on-call", "the next
-  // on-call"), so they pass through verbatim rather than being re-derived here.
   return t("oncall.escalationTo", { who: raw(progress.next_targets.join(", ")), when });
 });
 
-/// What the hover says: the headline alone, or the headline plus the "why"
-/// that used to sit under it as a second line.
 const tooltipContent = computed<I18nText>(() =>
   detail.value ? raw(`${headline.value} — ${detail.value}`) : headline.value,
 );

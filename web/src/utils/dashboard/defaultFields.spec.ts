@@ -21,6 +21,8 @@ import {
   hasValueColumn,
   buildDefaultSqlFields,
   buildDefaultBuilderFields,
+  keepRawValueFields,
+  firstNumericField,
   SKIP_SEED_TYPES,
 } from "./defaultFields";
 
@@ -169,16 +171,181 @@ describe("defaultFields", () => {
       expect(y[0].functionName).toBe("count");
     });
 
+    it("node graph: seeds nothing, since its builder takes source, target and value", () => {
+      expect(buildDefaultBuilderFields("node-graph", "logs", logsSchema, "logs")).toEqual({
+        x: [],
+        y: [],
+      });
+    });
+
     it.each(SKIP_SEED_TYPES)("%s: seeds nothing (self-driven builder)", (type) => {
       const { x, y } = buildDefaultBuilderFields(type, "logs", logsSchema, "logs");
       expect(x).toHaveLength(0);
       expect(y).toHaveLength(0);
     });
 
+    it("funnel: seeds a count with no time label", () => {
+      const { x, y } = buildDefaultBuilderFields("funnel", "logs", logsSchema, "logs");
+      expect(x).toEqual([]);
+      expect(y[0].functionName).toBe("count");
+    });
+
     it("metrics stream with value column: seeds avg(value) y", () => {
       const grouped = [{ name: "m1", schema: [{ name: "value" }] }];
       const { y } = buildDefaultBuilderFields("bar", "metrics", grouped, "m1");
       expect(y[0].functionName).toBe("avg");
+    });
+
+    it("bar gauge seeds a count with no time label", () => {
+      const { x, y } = buildDefaultBuilderFields("bar-gauge", "logs", logsSchema, "logs");
+      expect(x).toEqual([]);
+      expect(y[0].functionName).toBe("count");
+    });
+  });
+
+  describe("firstNumericField", () => {
+    const schema = [
+      {
+        name: "demo_app",
+        schema: [
+          { name: "_timestamp", type: "Int64" },
+          { name: "ts", type: "Int64" },
+          { name: "host", type: "Utf8" },
+          { name: "enabled", type: "Boolean" },
+          { name: "latency_ms", type: "Float64" },
+          { name: "bytes", type: "Int64" },
+        ],
+      },
+      { name: "other", schema: [{ name: "first", type: "Int64" }] },
+    ];
+
+    it("picks the stream's first numeric column that is not a timestamp", () => {
+      expect(firstNumericField(schema, "demo_app", "ts")).toBe("latency_ms");
+      expect(firstNumericField(schema, "other")).toBe("first");
+    });
+
+    it("returns null when only timestamps are numeric", () => {
+      expect(
+        firstNumericField([{ name: "s", schema: [{ name: "_timestamp", type: "Int64" }] }]),
+      ).toBeNull();
+    });
+  });
+
+  describe("keepRawValueFields", () => {
+    const grouped = [
+      {
+        name: "app",
+        schema: [
+          { name: "_timestamp", type: "Int64" },
+          { name: "ts", type: "Int64" },
+          { name: "took", type: "Float64" },
+        ],
+      },
+    ];
+    const query = (y: any[], customQuery = false) => ({
+      customQuery,
+      fields: { stream: "app", y },
+    });
+    const field = (column: string, isDerived = false) => ({
+      column,
+      isDerived,
+      args: [{ type: "field", value: { field: column } }],
+    });
+
+    it("drops timestamp y fields and falls back to the first numeric column", () => {
+      const q = query([field("_timestamp"), field("ts")]);
+      keepRawValueFields(q, grouped, "ts");
+      expect(q.fields.y.map((y: any) => y.column)).toEqual(["took"]);
+      expect(q.fields.y[0].functionName).toBeNull();
+    });
+
+    it("keeps numeric and derived y fields as they are", () => {
+      const q = query([field("took"), field("_timestamp", true)]);
+      keepRawValueFields(q, grouped);
+      expect(q.fields.y.map((y: any) => y.column)).toEqual(["took", "_timestamp"]);
+    });
+
+    it("leaves a custom query's y empty instead of guessing a column", () => {
+      const q = query([field("_timestamp")], true);
+      keepRawValueFields(q, grouped);
+      expect(q.fields.y).toEqual([]);
+    });
+  });
+
+  describe("buildDefaultBuilderFields for distribution", () => {
+    const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+
+    it("seeds nothing without a numeric column", () => {
+      expect(buildDefaultBuilderFields("distribution", "logs", logsSchema, "logs")).toEqual({
+        x: [],
+        y: [],
+      });
+    });
+
+    it("starts from the first numeric column that is not a timestamp", () => {
+      const schema = [
+        {
+          name: "demo_app",
+          schema: [
+            { name: "_timestamp", type: "Int64" },
+            { name: "ts", type: "Int64" },
+            { name: "host", type: "Utf8" },
+            { name: "enabled", type: "Boolean" },
+            { name: "latency_ms", type: "Float64" },
+            { name: "bytes", type: "Int64" },
+          ],
+        },
+        { name: "other", schema: [{ name: "first", type: "Int64" }] },
+      ];
+      const { x, y } = buildDefaultBuilderFields("distribution", "logs", schema, "demo_app", "ts");
+      expect(x).toEqual([]);
+      expect(y).toHaveLength(1);
+      expect(y[0]).toMatchObject({
+        alias: "y_axis_1",
+        column: "latency_ms",
+        functionName: null,
+        args: [{ type: "field", value: { field: "latency_ms" } }],
+      });
+      expect(firstNumericField(schema, "other")).toBe("first");
+      expect(
+        firstNumericField([{ name: "s", schema: [{ name: "_timestamp", type: "Int64" }] }]),
+      ).toBeNull();
+    });
+  });
+  describe("buildDefaultBuilderFields for a treemap", () => {
+    const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+
+    it("seeds a count with no time label", () => {
+      const { x, y } = buildDefaultBuilderFields("treemap", "logs", logsSchema, "logs");
+      expect(x).toEqual([]);
+      expect(y[0].functionName).toBe("count");
+    });
+  });
+  describe("buildDefaultBuilderFields for sunburst", () => {
+    const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+
+    it("seeds a count with no time label", () => {
+      const seeded = buildDefaultBuilderFields("sunburst", "logs", logsSchema, "logs");
+      expect(seeded.x).toEqual([]);
+      expect(seeded.y[0].functionName).toBe("count");
+    });
+  });
+  describe("buildDefaultBuilderFields for the alert list", () => {
+    it("seeds nothing", () => {
+      const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+      expect(buildDefaultBuilderFields("alert-list", "logs", logsSchema, "logs")).toEqual({
+        x: [],
+        y: [],
+      });
+    });
+  });
+  describe("buildDefaultBuilderFields for the flame graph", () => {
+    it("seeds nothing", () => {
+      const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+      expect(buildDefaultBuilderFields("flame-graph", "logs", logsSchema, "logs")).toEqual({
+        x: [],
+        y: [],
+      });
     });
   });
 });

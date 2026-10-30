@@ -525,11 +525,6 @@ const api = {
   renameFleet: (orgId: string, id: string, name: string) =>
     http().patch<Fleet>(fleetPath(orgId, id), { name }),
   deleteFleet: (orgId: string, id: string) => http().delete(fleetPath(orgId, id)),
-  moveCollectors: (orgId: string, collectorIds: string[], toFleet: string) =>
-    http().post<{ moved: number }>(`/api/${orgId}/fleet/fleets/move`, {
-      collector_ids: collectorIds,
-      to_fleet: toFleet,
-    }),
   getFleetSettings: (orgId: string, id: string) =>
     http().get<FleetSettings>(`${fleetPath(orgId, id)}/settings`),
   updateFleetSettings: (orgId: string, id: string, body: FleetSettings) =>
