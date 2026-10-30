@@ -842,6 +842,18 @@ describe("OnCallResponses", () => {
       expect(checklist.props("hasDestinations")).toBe(false);
     });
 
+    it("does not count a Jira destination, which a policy cannot pick", async () => {
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      destinations.list.mockResolvedValue({
+        data: [{ name: "Jira OPS", destination_type_name: "jira" }],
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
+      expect(checklist.props("hasDestinations")).toBe(false);
+    });
+
     /// A server without the coverage-gap endpoint used to read as "zero gaps",
     /// which ticked the rotation step and hid the checklist on an org whose
     /// team had no rotation at all.

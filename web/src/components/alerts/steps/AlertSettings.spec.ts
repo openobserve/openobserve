@@ -355,8 +355,8 @@ describe("AlertSettings — Notify on recovery summary for Jira", () => {
     { name: "ops-jira", type: "http", destination_type_name: "jira" },
     { name: "ops-slack", type: "http", destination_type_name: "slack" },
   ];
-  const planText = (destinations: string[], recoveryDestinations: string[] = []) => {
-    const host = mount(
+  const mountPlan = (destinations: string[], recoveryDestinations: string[] = []) =>
+    mount(
       defineComponent({
         components: { OForm, AlertSettings },
         setup: () => ({
@@ -381,8 +381,10 @@ describe("AlertSettings — Notify on recovery summary for Jira", () => {
       }),
       { global: { plugins: [makeStore(), i18n] } },
     );
-    return host.findAll('[data-test^="alert-notify-on-recovery-plan-"]').map((row) => row.text());
-  };
+  const planText = (destinations: string[], recoveryDestinations: string[] = []) =>
+    mountPlan(destinations, recoveryDestinations)
+      .findAll('[data-test^="alert-notify-on-recovery-plan-"]')
+      .map((row) => row.text());
   const comment = t("alerts.alertSettings.recoveryJiraComment");
   const message = t("alerts.alertSettings.recoveryChatMessage");
 
@@ -396,6 +398,13 @@ describe("AlertSettings — Notify on recovery summary for Jira", () => {
 
   it("says the same when the recovery is redirected to Jira", () => {
     expect(planText(["ops-slack"], ["ops-jira"])).toEqual([`ops-jira — ${comment}`]);
+  });
+
+  it("shows the template hint only when a destination renders the template", () => {
+    const hint = '[data-test="alert-notify-on-recovery-hint"]';
+    expect(mountPlan(["ops-jira"]).find(hint).exists()).toBe(false);
+    expect(mountPlan(["ops-slack"], ["ops-jira"]).find(hint).exists()).toBe(false);
+    expect(mountPlan(["ops-jira", "ops-slack"]).find(hint).exists()).toBe(true);
   });
 });
 

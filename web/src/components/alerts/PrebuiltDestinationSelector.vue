@@ -232,15 +232,11 @@ const unavailableText = computed(() =>
 );
 
 const tiles = computed(() => [
-  ...filteredDestinationTypes.value.map((tile) => {
-    const description = t(tile.descriptionKey);
-    const tip = tile.disabled
-      ? unavailableText.value
-      : tile.id === "slack_app"
-        ? `${t("slackApp.destination.recommendedForAlertResponse")}. ${description}`
-        : description;
-    return { ...tile, short: t(tile.shortKey), tip: raw(tip) };
-  }),
+  ...filteredDestinationTypes.value.map((tile) => ({
+    ...tile,
+    short: t(tile.shortKey),
+    tip: tile.disabled ? unavailableText.value : t(tile.descriptionKey),
+  })),
   {
     id: "custom" as const,
     name: t("alerts.customDestination"),
