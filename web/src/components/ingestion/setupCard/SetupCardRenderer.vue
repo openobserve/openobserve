@@ -44,6 +44,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
 import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import type { FirstEventState, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
@@ -51,6 +52,8 @@ import FirstEventStatus from "../FirstEventStatus.vue";
 import { cliFlagArg, safeHttpUrl, sanitizeInput, shellQuote } from "./subs";
 import type {
   CardSubstitutions,
+  IngestTokenState,
+  RichCardCode,
   RichCardContent,
   RichCardInput,
   RichCardSetupMode,
@@ -79,10 +82,10 @@ const props = withDefaults(
     logoUrlDark?: string;
     /** Drop the hero — for a host page whose own header already names the card. */
     hideHero?: boolean;
-    /** False while the ingest passcode is still unknown. Token-bearing blocks stay hidden so copy cannot ship a blank credential. */
-    commandsReady?: boolean;
+    /** Blocks that carry the ingest token (those with a masked twin) wait for "ready". */
+    tokenState?: IngestTokenState;
   }>(),
-  { commandsReady: true },
+  { tokenState: "ready" },
 );
 
 const emit = defineEmits<{
@@ -99,7 +102,6 @@ const { isDark } = useTheme();
 const openTokenPicker = inject(OPEN_TOKEN_PICKER, null);
 
 const streamKind = computed(() => props.content.detect?.streamType);
-const showCommands = computed(() => props.commandsReady !== false);
 
 // Logo precedence per theme: manifest override → content (frontmatter) → none.
 // In dark mode the dark variant is preferred, falling back to the light logo.
@@ -267,7 +269,9 @@ const copyFirstSnippet = () => {
   const step = visibleSteps.value[index];
   if (!step) return;
   // A hidden command can't be copied; show the step and its warning instead.
-  if (missingRequired(activeVariant(step))) return scrollToStep(index);
+  if (missingRequired(activeVariant(step)) || tokenWithheld(displayCode(step))) {
+    return scrollToStep(index);
+  }
   const prefix = displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK;
   cardRoot.value?.querySelector<HTMLElement>(`[data-test="${prefix}-copy-btn"]`)?.click();
 };
@@ -327,6 +331,9 @@ const selectVariant = (key: string, variantId: unknown) => {
 };
 const displayCode = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.code : step.code;
+// copy writes `raw`, so a token block shown before the token is known hands out a 401 credential
+const tokenWithheld = (code?: RichCardCode) => !!code?.masked && props.tokenState !== "ready";
+const tokenLoading = (code?: RichCardCode) => !!code?.masked && props.tokenState === "loading";
 const currentVariantNote = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.note : undefined;
 
@@ -788,8 +795,18 @@ function fireConfetti() {
               <slot :name="`step-${step.id}-controls`" :step="step" />
             </div>
 
+            <OSkeleton
+              v-if="tokenLoading(displayCode(step)) && !missingRequired(activeVariant(step))"
+              type="rect"
+              class="my-3 h-20"
+              :data-test="`${displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK}-loading`"
+            />
             <OCodeBlock
-              v-if="showCommands && displayCode(step) && !missingRequired(activeVariant(step))"
+              v-else-if="
+                displayCode(step) &&
+                !missingRequired(activeVariant(step)) &&
+                !tokenWithheld(displayCode(step))
+              "
               :lang="displayCode(step)?.lang"
               :chrome="codeChrome(step)"
               :filename="displayCode(step)?.filename"
@@ -938,8 +955,14 @@ function fireConfetti() {
               class="step-desc"
               v-html="inlineMd(sectionDescription(extras.advanced))"
             ></p>
+            <OSkeleton
+              v-if="tokenLoading(extras.advanced.code)"
+              type="rect"
+              class="my-3 h-20"
+              data-test="ai-advanced-code-loading"
+            />
             <OCodeBlock
-              v-if="showCommands"
+              v-else-if="!tokenWithheld(extras.advanced.code)"
               :lang="extras.advanced.code.lang"
               :chrome="extras.advanced.code.filename ? 'editor' : 'terminal'"
               :filename="extras.advanced.code.filename"

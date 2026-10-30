@@ -25,12 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
 import useIngestion from "@/composables/useIngestion";
-import { useOrgCredential, type PasscodeRead } from "@/composables/useOrgCredential";
+import { useOrgCredential } from "@/composables/useOrgCredential";
 import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
 import analytics from "@/services/product_analytics";
@@ -43,7 +43,7 @@ import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue"
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import type { CardSubstitutions } from "./types";
+import type { CardSubstitutions, IngestTokenState } from "./types";
 import { getDataSourceCard } from "./registry";
 import { HOST_AGENT_SLUGS } from "./content/osAgent";
 
@@ -64,29 +64,9 @@ const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
 const { endpoint } = useIngestion();
+// Hosts and Kubernetes embed this card outside Ingestion, so it loads the credential itself.
 const credential = useOrgCredential();
 
-// Ingestion.vue already toasts an empty passcode. Infra pages that embed this card do not.
-const reportEmptyPasscode = (read: PasscodeRead | undefined) => {
-  if (read?.kind !== "empty") return;
-  if (router.currentRoute.value.matched.some((record) => record.name === "ingestion")) return;
-  toast({
-    variant: "error",
-    message: t("toastMessages.views.passcodeNotFound"),
-    timeout: 5000,
-  });
-};
-
-watch(
-  () => store.state.selectedOrganization?.identifier,
-  (orgId) => {
-    if (!orgId) return;
-    void credential.load().then(reportEmptyPasscode);
-  },
-  { immediate: true },
-);
-
-// Hosts embeds this card and never visits Ingestion, so the passcode load lives here.
 const subs = computed<CardSubstitutions>(() => {
   const email = store.state.userInfo?.email ?? "";
   const passcode = store.state.organizationData?.organizationPasscode ?? "";
@@ -98,10 +78,11 @@ const subs = computed<CardSubstitutions>(() => {
   };
 });
 
-// Copy writes the raw command. Hide it until a passcode exists, or the block is a 401 token.
-const commandsReady = computed(
-  () => credential.ready.value && !!store.state.organizationData?.organizationPasscode,
-);
+// a settled read can still carry no token, so readiness alone does not make the commands usable
+const tokenState = computed<IngestTokenState>(() => {
+  if (!credential.ready.value) return "loading";
+  return store.state.organizationData?.organizationPasscode ? "ready" : "unavailable";
+});
 
 const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
 
@@ -243,19 +224,27 @@ const onStepAction = async (actionId: string) => {
       data-test="data-source-setup-card-passcode-forbidden"
       :content="t('ingestion.passcodeForbiddenMessage')"
     />
-    <SetupCardRenderer
-      v-else-if="content"
-      :content="content"
-      :subs="subs"
-      :commands-ready="commandsReady"
-      data-test="data-source-setup-card"
-      @detected="onDetected"
-      @step-action="onStepAction"
-    >
-      <template v-if="$slots['hero-under-title']" #hero-under-title>
-        <slot name="hero-under-title" />
-      </template>
-    </SetupCardRenderer>
+    <template v-else-if="content">
+      <OBanner
+        v-if="tokenState === 'unavailable'"
+        variant="warning"
+        class="mb-2"
+        data-test="data-source-setup-card-passcode-unavailable"
+        :content="t('ingestion.passcodeUnavailableMessage')"
+      />
+      <SetupCardRenderer
+        :content="content"
+        :subs="subs"
+        :token-state="tokenState"
+        data-test="data-source-setup-card"
+        @detected="onDetected"
+        @step-action="onStepAction"
+      >
+        <template v-if="$slots['hero-under-title']" #hero-under-title>
+          <slot name="hero-under-title" />
+        </template>
+      </SetupCardRenderer>
+    </template>
     <template v-else>
       <CredentialCodeBlock v-if="fallbackContent" :slug="slug" :content="fallbackContent" />
       <IngestionDocLink v-if="fallbackDocUrl" :href="fallbackDocUrl" />
