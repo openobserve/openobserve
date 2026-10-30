@@ -140,7 +140,7 @@ export const CATALOG: CatalogItem[] = [
   }),
   r("kubeletstats", "Kubelet stats", "hub", {
     collection_interval: "20s",
-    endpoint: "https://${env:K8S_NODE_NAME}:10250",
+    endpoint: "https://${env:K8S_NODE_IP}:10250",
     auth_type: "serviceAccount",
     insecure_skip_verify: "true",
   }),

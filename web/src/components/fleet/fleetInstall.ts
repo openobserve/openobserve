@@ -26,7 +26,13 @@ export const GATEWAY_RELEASE = "otel-fleet-collector-gateway";
 /** Environment every install command gives the collector. */
 export const INSTALL_ENV = ["O2_ENDPOINT", "O2_TOKEN"];
 /** Environment only the Helm chart adds: the pod's downward API plus its clusterName value. */
-export const HELM_ENV = ["K8S_NODE_NAME", "K8S_POD_NAME", "K8S_NAMESPACE", "K8S_CLUSTER_NAME"];
+export const HELM_ENV = [
+  "K8S_NODE_NAME",
+  "K8S_NODE_IP",
+  "K8S_POD_NAME",
+  "K8S_NAMESPACE",
+  "K8S_CLUSTER_NAME",
+];
 
 export const INSTALL_PLATFORMS: InstallPlatform[] = [
   "linux",

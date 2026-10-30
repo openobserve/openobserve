@@ -143,8 +143,9 @@ describe("installCommand", () => {
     );
   });
 
-  it("lists the chart's cluster name variable as Helm-provided", () => {
+  it("lists the chart's cluster name and node IP variables as Helm-provided", () => {
     expect(HELM_ENV).toContain("K8S_CLUSTER_NAME");
+    expect(HELM_ENV).toContain("K8S_NODE_IP");
   });
 
   it("ignores the role outside Kubernetes", () => {
