@@ -15,6 +15,12 @@ export function normalizeSeverity(severity) {
   return LEGACY_SEVERITIES.get(value) ?? "p3";
 }
 
+// A value normalizeSeverity had to guess at says nothing about how bad the finding really is.
+export function isKnownSeverity(severity) {
+  const value = String(severity ?? "").trim().toLowerCase();
+  return SEVERITIES.includes(value) || LEGACY_SEVERITIES.has(value);
+}
+
 // Lower is more severe, so ascending sorts put p0 first.
 export function severityRank(severity) {
   return SEVERITIES.indexOf(normalizeSeverity(severity));

@@ -5,6 +5,7 @@ import { SEVERITIES, SEVERITY_CAPS, normalizeSeverity, severityRank } from "./se
 export { insertAfterCallout } from "./comments.mjs";
 
 const MAX_FALLBACK_FINDINGS = 15;
+const NO_ISSUES_RE = /<no-issues(?:\s[^<>]*)?>[\s\S]*?<\/no-issues>|<no-issues(?:\s[^<>]*)?\/>/;
 const SEVERITY_GLYPH = { p0: "🔴", p1: "🟠", p2: "🟡", p3: "🔵" };
 const SEVERITY_SECTION = {
   p0: "#### 🔴 P0 · Blockers",
@@ -73,9 +74,9 @@ export function parseFindings(xmlText) {
   return findings;
 }
 
-// "No findings" must be stated: empty or free-form output is a reviewer that said nothing, not one that found nothing.
+// "No findings" must be stated in full: empty, free-form or cut-off output is a reviewer that said nothing, not one that found nothing.
 export function reviewerReported(text, findings) {
-  return findings.length > 0 || String(text ?? "").includes("<no-issues");
+  return findings.length > 0 || NO_ISSUES_RE.test(String(text ?? ""));
 }
 
 // Same shape as an entry of the coordinator's inline block.

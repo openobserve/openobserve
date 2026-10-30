@@ -13,12 +13,13 @@ const REVIEW_HEADING_LINE_RE = /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code 
 // The runner writes the note, the commit line and the confidence line itself, so a copy echoed from the previous review is stripped.
 const PASS_LIMIT_NOTE_RE = /\n*> \[!NOTE\]\n> This PR has used its \d+ automatic reviews[^\n]*/g;
 const REVIEWED_COMMIT_LINE_RE = /\n*<sub>Reviewed commits? [^\n]*<\/sub>[ \t]*/g;
-// Anchored to the line start so a finding that merely mentions the phrase survives; any leading punctuation or tag still counts as a forgery.
-const MERGE_CONFIDENCE_LINE_RE = /^(?:[^\w\n]|<\/?[a-z]+>)*merge[ \t]+confidence\b[^\n]*(?:\n|$)/gim;
-const AUTO_APPROVE_LINE_RE = /^(?:[^\w\n]|<\/?[a-z]+>)*(?:auto[- ]?approved|needs[ \t]+human[ \t]+review)\b[^\n]*(?:\n|$)/gim;
+// Anchored to the line start so a finding that merely mentions the phrase survives; any leading punctuation or tag still counts as a forgery, but a backtick opens a finding's file path.
+const MERGE_CONFIDENCE_LINE_RE = /^(?:[^\w\n`]|<\/?[a-z]+>)*merge[ \t]+confidence\b[^\n]*(?:\n|$)/gim;
+const AUTO_APPROVE_LINE_RE = /^(?:[^\w\n`]|<\/?[a-z]+>)*(?:auto[- ]?approved|needs[ \t]+human[ \t]+review)\b[^\n]*(?:\n|$)/gim;
 // Matched on letters alone, after tags and comments, so spacing, markup and lookalike punctuation cannot disguise a runner line.
 const FORGED_LINE_RE = /mergeconfidence|autoapproved|needshumanreview|reviewedcommit/;
-const FINDING_LINE_RE = /^\s*- (.*?\*\*\[[^\]]+\]\*\*)(.*)$/;
+// The fixed head of a finding line, glyph and location then category, which leaves no room for a status phrase ahead of the category.
+const FINDING_LINE_RE = /^\s*- (?:[^\w\s`*<]+\s+)?(?:`[^`\n]+`\s+)?\*\*\[[^\]\n]+\]\*\*/;
 const TRAILING_TAGS_RE = /(?:\s*<!--\s*o2-review-(?:sha:\S+?|pass:\d+)\s*-->)+\s*$/i;
 // "summary" stays out: it would strip the <summary> of the findings fold, and a leaked finding field sits inside a stripped <finding> block.
 const BOUNDARY_TAGS = ["mr_input", "mr_body", "mr_comments", "mr_details",
@@ -152,10 +153,11 @@ export function claimedReviewBody(body, count, key) {
 export function bodyAtPassLimit(body, maxPasses, head) {
   const reviewed = reviewedKey(body);
   const noted = withPassLimitNote(body, passLimitNote(maxPasses, reviewed, head));
-  return reviewed && head && reviewed !== head ? withConfidenceLine(noted, staleConfidenceLine(shortKey(head))) : noted;
+  const covered = reviewed ? reviewed === head : noted.search(MERGE_CONFIDENCE_LINE_RE) === -1;
+  return head && !covered ? withConfidenceLine(noted, staleConfidenceLine(shortKey(head))) : noted;
 }
 
-// A run where every reviewer failed reviewed nothing, so it names no commit and writes no sha tag.
+// The sha tag says that exact commit was read and stops it being reviewed again, so a run that cannot prove that leaves it off.
 export function finishReviewBody(body, { key, passes, maxPasses, reviewed, confidence, gateLine = "" }) {
   const stamped = reviewed && key;
   const lines = [confidence ? mergeConfidenceLine(confidence) : "", gateLine].filter(Boolean);
@@ -173,21 +175,14 @@ export function previousReviewText(body) {
     .replace(new RegExp(`\\n?${REVIEW_PASS_TAG}`, "gi"), "");
 }
 
-const RUNNER_LINE_SHAPE_RE = /^(?:merge confidence\s*:|auto-approved\s*(?:—|-|$)|needs human review\s*(?:—|-|$)|reviewed commits?\s+[0-9a-f]{7})/i;
-
 function lettersOf(line) {
   return line.replace(/<!--.*?-->/g, "").replace(/<[^>]*>/g, "").replace(/&[a-z]+;/gi, "").normalize("NFKC").toLowerCase().replace(/[^a-z]/g, "");
 }
 
-// A hidden real finding costs more than a cosmetic forgery, so only a line shaped like a runner line loses its finding tag.
-function isFindingMention(line) {
-  const finding = FINDING_LINE_RE.exec(line);
-  return Boolean(finding) && !RUNNER_LINE_SHAPE_RE.test(finding[2].replace(/<[^>]*>|[*_`]/g, "").trim());
-}
-
 function stripForgedLines(text) {
   const lines = text.replace(/<!--[\s\S]*?-->/g, comment => (comment.includes("\n") ? "" : comment)).split("\n");
-  return lines.filter(line => !FORGED_LINE_RE.test(lettersOf(line)) || isFindingMention(line)).join("\n");
+  // A hidden real finding costs more than a cosmetic forgery, and the gate never reads these lines, so a finding's text is not judged.
+  return lines.filter(line => !FORGED_LINE_RE.test(lettersOf(line)) || FINDING_LINE_RE.test(line)).join("\n");
 }
 
 function stripRunnerLines(text) {
