@@ -41,6 +41,7 @@ use crate::{
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
+pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
 
 pub async fn ingest(
     thread_id: usize,
@@ -579,6 +580,55 @@ mod tests {
         assert_eq!(
             prepare(json::json!({"_timestamp": max_ts + 1}), None),
             Err(get_future_discard_error().to_string())
+        );
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_fails_only_the_stream_whose_key_is_too_long() {
+        let long_name = "b".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let body = format!(
+            "{{\"index\": {{\"_index\": \"test_bulk_key_len_ok\", \"_id\": \"1\"}}}}\n{{\"message\": \"a\"}}\n\
+             {{\"index\": {{\"_index\": \"{long_name}\", \"_id\": \"2\"}}}}\n{{\"message\": \"b\"}}\n"
+        );
+        let resp = ingest(
+            1,
+            "test_org_id",
+            Bytes::from(body),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Logs, &long_name)
+                .is_some();
+        let rejected: Vec<&BulkResponseItem> = resp
+            .items
+            .iter()
+            .flat_map(|item| item.values())
+            .filter(|item| {
+                item.error
+                    .as_ref()
+                    .is_some_and(|e| e.err_type == STREAM_NAME_TOO_LONG)
+            })
+            .collect();
+        if bounded {
+            assert_eq!(rejected.len(), 1);
+            assert_eq!(rejected[0]._id, "2");
+            assert_eq!(rejected[0]._index, long_name);
+        } else {
+            assert!(rejected.is_empty());
+        }
+        // not set: Fluent Bit retries a whole chunk on it, duplicating the other streams' rows
+        assert!(!resp.errors);
+        assert!(
+            infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_key_len_ok").await
+        );
+        assert_eq!(
+            infra::schema::exists("test_org_id", StreamType::Logs, &long_name).await,
+            !bounded
         );
     }
 
