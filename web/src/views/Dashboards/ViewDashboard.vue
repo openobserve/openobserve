@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OPageLayout
         bleed
+        :loading="!currentDashboardData.data?.dashboardId"
         :main-panel="false"
         :header-class="
           kioskMode

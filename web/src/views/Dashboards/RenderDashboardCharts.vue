@@ -198,16 +198,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    Mounting everything up front froze large dashboards. -->
               <div
                 v-else-if="!shouldMountPanel(item.id)"
-                class="drag-cancel flex h-full flex-col p-2"
+                class="drag-cancel flex h-full flex-col"
                 :data-test="`dashboard-panel-placeholder-${item.id}`"
               >
-                <OTruncatedText
-                  class="text-text-secondary text-sm"
-                  :data-test="`dashboard-placeholder-title-${item.id}`"
-                >
-                  {{ getPanelTitle(item) }}
-                </OTruncatedText>
-                <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
+                <PanelBar class="w-full">
+                  <OTruncatedText as="div" :data-test="`dashboard-placeholder-title-${item.id}`">
+                    {{ getPanelTitle(item) }}
+                  </OTruncatedText>
+                </PanelBar>
+                <div class="min-h-0 flex-1 p-2">
+                  <OSkeleton class="h-full" />
+                </div>
               </div>
               <!-- Panel with Panel-Level Variables -->
               <div v-else class="panel-with-variables flex h-full flex-col">
@@ -404,6 +405,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import type { LayoutMode } from "@/components/dashboards/layoutMode";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 
 // Must match the cellHeight GridStack is initialised with below.
 const DEFAULT_CELL_HEIGHT_PX = 17;
@@ -525,6 +528,8 @@ export default defineComponent({
     TabList,
     ODialog,
     OTruncatedText,
+    OSkeleton,
+    PanelBar,
   },
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();

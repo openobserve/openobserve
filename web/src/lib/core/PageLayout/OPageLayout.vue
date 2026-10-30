@@ -50,6 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     a dashboard) scrolls internally at full height. Turn on only
                     for a page whose entire body should scroll (a long form).
 
+  loading         — the page's own data is not there yet: the title and body show the
+                    standard skeleton, and the body fades in once it flips false.
+                    Leave it unset on a page that has nothing to wait for.
+
   v-model:sidebarWidth — bidirectional bind for the rail width (resizable mode).
 -->
 <template>
@@ -71,7 +75,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title-overflow="titleOverflow"
           :overflow-first="overflowFirst"
         >
-          <template v-if="!!slots.title" #title><slot name="title" /></template>
+          <template v-if="loading || !!slots.title" #title>
+            <OSkeleton
+              v-if="loading"
+              type="text"
+              class="inline-block h-4 w-48 align-middle"
+              data-test="o-page-layout-title-skeleton"
+            />
+            <slot v-else name="title" />
+          </template>
           <template v-if="!!slots['title-prefix']" #title-prefix
             ><slot name="title-prefix"
           /></template>
@@ -113,9 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OContent
         :bleed="bleed"
         :y="padY"
-        class="flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+        :class="[BODY_ENTER, 'flex min-h-0 w-full flex-1 flex-col overflow-hidden']"
       >
-        <slot />
+        <PageBody />
       </OContent>
       <ODrawer
         v-model:open="mobileSidebarOpen"
@@ -140,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       unit="px"
       :limits="splitterLimits"
       :horizontal="false"
-      class="min-h-0 flex-1 overflow-hidden"
+      :class="[BODY_ENTER, 'min-h-0 flex-1 overflow-hidden']"
     >
       <template #before>
         <div
@@ -159,13 +171,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #after>
         <OContent :bleed="bleed" :y="padY" class="flex h-full w-full flex-col overflow-hidden">
-          <slot />
+          <PageBody />
         </OContent>
       </template>
     </OSplitter>
 
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
-    <div v-else-if="!!slots.sidebar" class="flex min-h-0 flex-1">
+    <div v-else-if="!!slots.sidebar" :class="[BODY_ENTER, 'flex min-h-0 flex-1']">
       <aside
         class="border-border-default flex h-full shrink-0 flex-col overflow-hidden border-e"
         :style="{ width: sidebarWidth + 'px' }"
@@ -173,13 +185,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="sidebar" />
       </aside>
       <OContent as="section" :bleed="bleed" :y="padY" class="h-full min-w-0 flex-1 overflow-hidden">
-        <slot />
+        <PageBody />
       </OContent>
     </div>
 
     <!-- ── Body: constrained reading column (no sidebar) ────────── -->
-    <ConstrainedPage v-else-if="constrained" :size="contentSize" class="min-h-0 flex-1">
-      <slot />
+    <ConstrainedPage
+      v-else-if="constrained"
+      :size="contentSize"
+      :class="[BODY_ENTER, 'min-h-0 flex-1']"
+    >
+      <PageBody />
     </ConstrainedPage>
 
     <!-- ── Body: main only (no sidebar) ─────────────────────────── -->
@@ -187,18 +203,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       :bleed="bleed"
       :y="padY"
-      :class="
-        scroll ? 'min-h-0 flex-1 overflow-auto' : 'flex min-h-0 flex-1 flex-col overflow-hidden'
-      "
+      :class="[
+        BODY_ENTER,
+        scroll ? 'min-h-0 flex-1 overflow-auto' : 'flex min-h-0 flex-1 flex-col overflow-hidden',
+      ]"
     >
-      <slot />
+      <PageBody />
     </OContent>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { ref, computed, watch, useSlots, provide } from "vue";
+import { ref, computed, watch, useSlots, provide, h } from "vue";
+import OReveal from "@/lib/feedback/Reveal/OReveal.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OPageSkeleton from "@/lib/feedback/Skeleton/OPageSkeleton.vue";
 import { useRouter } from "vue-router";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
@@ -253,6 +273,8 @@ const props = withDefaults(
     contentSize?: "sm" | "md" | "lg" | "xl";
     // Header wrapper override (rare)
     headerClass?: string;
+    /** The page's data is still loading: skeleton title + body, then a fade-in. */
+    loading?: boolean;
   }>(),
   {
     tabsBelow: false,
@@ -266,6 +288,7 @@ const props = withDefaults(
     constrained: false,
     contentSize: "lg",
     headerClass: undefined,
+    loading: undefined,
   },
 );
 
@@ -305,6 +328,23 @@ const hasHeader = computed(
     !!slots.actions ||
     !!slots["header-tabs"],
 );
+
+// The route view already fades the whole page in, so the body adds only the slide and the header stays still.
+const BODY_ENTER =
+  "motion-safe:animate-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 motion-safe:ease-out";
+
+// Only a page that passes `loading` gets the wrapper, so every other page keeps its children as direct flex items.
+const PageBody = () =>
+  props.loading === undefined
+    ? slots.default?.()
+    : h(
+        OReveal,
+        { ready: !props.loading, class: "flex min-h-0 flex-1 flex-col" },
+        {
+          default: () => slots.default?.(),
+          skeleton: () => h(OPageSkeleton, { class: props.bleed ? "px-page-edge" : undefined }),
+        },
+      );
 
 const internalWidth = ref(props.sidebarWidth);
 

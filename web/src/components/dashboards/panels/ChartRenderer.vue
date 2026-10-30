@@ -120,6 +120,7 @@ import {
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
+import { hasSeriesData } from "@/utils/dashboard/hasSeriesData";
 import {
   heatmapHoverTime,
   heatmapSyncPointer,
@@ -180,6 +181,9 @@ echarts.use([
 
 // Right-click reads a y-axis value, so only cartesian series types can answer it
 const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+
+// Covers the repaints a panel makes right after its first result (final stream chunk, legend sizing).
+const FIRST_PAINT_SETTLE_MS = 600;
 
 interface LineSeriesOption {
   type?: string;
@@ -445,13 +449,24 @@ export default defineComponent({
     // Registered before setOption, so it runs ahead of the tooltip's own zr handler and the tooltip reads this move's time.
     const trackPointer = () => chart?.getZr().on("mousemove", reportPointerTime);
 
-    const chartOptions = (options: Record<string, unknown>) =>
-      withChartFont(
+    // Unanimated until just after the first data paint: the container's fade is the reveal, so growing from zero would draw it twice.
+    let revealEndsAt: number | null = null;
+    const isRevealing = (options: Record<string, any>) => {
+      if (revealEndsAt === null && hasSeriesData(options)) {
+        revealEndsAt = performance.now() + FIRST_PAINT_SETTLE_MS;
+      }
+      return revealEndsAt === null || performance.now() < revealEndsAt;
+    };
+
+    const chartOptions = (options: Record<string, unknown>) => {
+      const built = withChartFont(
         withLineStrokeEvents(
           { aria: { enabled: !props.label }, ...keepRowWindow(options) },
           props.findLineOnContextMenu,
         ),
       );
+      return isRevealing(built) ? { ...built, animation: false } : built;
+    };
 
     // The data point nearest the cursor along x, for a right-click on a line's stroke between points.
     const nearestDataIndex = (seriesIndex: number, data: unknown[], cursorX: number) => {

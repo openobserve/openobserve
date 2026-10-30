@@ -176,9 +176,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @open="firstDataNotice.open"
                 @dismiss="firstDataNotice.dismiss"
               />
+              <!-- Enter-only fade; the body's slide lives in OPageLayout so the header stays put. -->
               <router-view v-slot="{ Component }">
                 <keep-alive :include="KEPT_ALIVE_VIEWS">
-                  <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                  <component
+                    :is="Component"
+                    class="motion-safe:animate-in motion-safe:fade-in-40 h-full motion-safe:duration-200 motion-safe:ease-out"
+                    @sendToAiChat="sendToAiChat"
+                  />
                 </keep-alive>
               </router-view>
             </div>
