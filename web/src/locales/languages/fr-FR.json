@@ -19749,7 +19749,7 @@
       "retriesMaxHint": "Maximum {max}. Les nouvelles tentatives s'exécutent dans le même travail, donc toute la séquence doit tenir dans le budget de vérification.",
       "retriesMaxBrowserHint": "Maximum {max} pour les vérifications de navigateur. Chaque tentative relance le parcours sur chaque appareil, donc un nombre plus élevé dépasserait le délai de la sonde et signalerait une défaillance que votre site n'a jamais connue.",
       "retryDelay": "Attendre",
-      "retryDelaySuffix": "secondes entre deux tentatives.",
+      "retryDelaySuffix": "secondes entre les tentatives.",
       "schedule": "Programmation",
       "scheduleLater": "Planifier plus tard",
       "scheduleLaterTooltip": "Choisissez une date et une heure futures pour activer le chèque.",
@@ -25196,6 +25196,7 @@
     "simulatorLadder": "échelle {priority}",
     "simulatorLadderEnds": "{rungs}, se termine à {at}",
     "simulatorReachableNow": "{channels} · maintenant",
+    "simulatorSendsNothing": "Cette priorité n'envoie rien qu'ils puissent recevoir",
     "simulatorSendTest": "Envoyer une notification de test",
     "unroutedNoneTitle": "Aucune alerte non routée",
     "unroutedNone": "Chaque alerte déclenchée a atteint une équipe.",
@@ -25434,8 +25435,7 @@
     "scopeClaimServiceEverywhere": "{service} contacte cette équipe dans chaque cluster et espace de noms, quel que soit le propriétaire de ce qui l'entoure.",
     "scopeClaimServiceHere": "{service} contacte cette équipe uniquement dans {scope}. Ailleurs, cela revient au propriétaire du périmètre environnant.",
     "scopeNothingDiscovered": "Rien n'a encore été découvert, il n'y a donc aucun parc parmi lequel choisir. Utilisez le mode Avancé pour définir la règle par champ, ou envoyez d'abord de la télémétrie.",
-    "scopeAdvancedHint": "Correspond à n'importe quel champ et valeur, y compris ceux que les niveaux ci-dessus ne couvrent pas.",
-    "simulatorSendsNothing": "Cette priorité n'envoie rien qu'ils puissent recevoir"
+    "scopeAdvancedHint": "Correspond à n'importe quel champ et valeur, y compris ceux que les niveaux ci-dessus ne couvrent pas."
   },
   "paidUsage": {
     "consentTitle": "Activer l'utilisation payante de l'IA ?",
@@ -26547,6 +26547,15 @@
     "saveFailed": "Impossible d'enregistrer le compte. Réessayez.",
     "disconnectFailed": "Le compte n'a pas pu être déconnecté. Réessayez.",
     "connected": "Connecté",
+    "statusChecking": "Vérification…",
+    "statusBroken": "Ne fonctionne pas",
+    "statusUnchecked": "Vérification impossible",
+    "cardMeta": "Depuis {number} · Compte {account}",
+    "deploymentMeta": "Depuis {number}",
+    "uncheckedNow": "{provider} est injoignable pour le moment.",
+    "trial": "Compte d'essai : les SMS et appels n'atteignent que les numéros vérifiés dans {provider}.",
+    "cantText": "Ce numéro ne peut pas envoyer de SMS",
+    "cantCall": "Ce numéro ne peut pas passer d'appels",
     "fromNumber": "Numéro expéditeur",
     "press4": "Touches d'appel (4 accuser réception, 6 résoudre, 8 escalader)",
     "press4Available": "Disponible",
@@ -26555,6 +26564,7 @@
     "update": "Mettre à jour",
     "disconnect": "Déconnecter",
     "deploymentTitle": "Le compte {provider} de ce déploiement",
+    "deploymentOwner": "Défini par l'opérateur, il n'y a donc rien à configurer ici.",
     "useOwn": "Utiliser plutôt votre propre compte {provider}",
     "connectTitle": "Connecter {provider}",
     "updateTitle": "Mettre à jour {provider}",
@@ -26562,6 +26572,7 @@
     "accountSid": "SID du compte",
     "authToken": "Jeton d'authentification",
     "tokenKeep": "Laisser vide pour conserver le jeton actuel",
+    "tokenNewAccount": "Un autre compte nécessite son propre jeton d'authentification",
     "fromHelp": "Un numéro de ce compte {provider}, avec l'indicatif du pays.",
     "connect": "Connecter",
     "checking": "Vérification auprès de {provider}…",
@@ -26575,21 +26586,10 @@
       "tokenRequired": "Un jeton d'authentification est requis pour se connecter.",
       "noMasterKey": "Demandez à votre opérateur de définir {variable}.",
       "accountRejected": "{provider} n'a pas accepté ce compte. Vérifiez le SID du compte et le jeton d'authentification, et que le compte est actif.",
-      "unreadable": "Le compte du fournisseur téléphonique de cette organisation n'a pas pu être lu.",
       "fromNotOnAccount": "Ce numéro n'appartient pas à ce compte {provider}. Utilisez-en un de Phone Numbers → Active numbers dans {provider}.",
-      "unavailable": "{provider} est injoignable. Réessayez."
-    },
-    "statusChecking": "Vérification…",
-    "statusBroken": "Ne fonctionne pas",
-    "statusUnchecked": "Vérification impossible",
-    "cardMeta": "Depuis {number} · Compte {account}",
-    "deploymentMeta": "Depuis {number}",
-    "uncheckedNow": "{provider} est injoignable pour le moment.",
-    "trial": "Compte d'essai : les SMS et appels n'atteignent que les numéros vérifiés dans {provider}.",
-    "cantText": "Ce numéro ne peut pas envoyer de SMS",
-    "cantCall": "Ce numéro ne peut pas passer d'appels",
-    "deploymentOwner": "Défini par l'opérateur, il n'y a donc rien à configurer ici.",
-    "tokenNewAccount": "Un autre compte nécessite son propre jeton d'authentification"
+      "unavailable": "{provider} est injoignable. Réessayez.",
+      "unreadable": "Le compte du fournisseur téléphonique de cette organisation n'a pas pu être lu."
+    }
   },
   "slackApp": {
     "prereq": {

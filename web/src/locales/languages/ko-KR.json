@@ -19749,7 +19749,7 @@
       "retriesMaxHint": "최대 {max}. 재시도는 동일한 작업 내에서 실행되므로 전체 시퀀스가 검사 예산에 맞아야 합니다.",
       "retriesMaxBrowserHint": "브라우저 검사의 최대값은 {max}입니다. 각 시도는 모든 기기에서 여정을 다시 실행하므로, 더 많으면 프로브 시간 초과를 초과하여 사이트에 실제로 없던 실패를 보고하게 됩니다.",
       "retryDelay": "대기 시간",
-      "retryDelaySuffix": "재시도 간격 (초)",
+      "retryDelaySuffix": "재시도 간격(초).",
       "schedule": "일정",
       "scheduleLater": "나중에 예약",
       "scheduleLaterTooltip": "확인을 활성화할 미래 날짜 및 시간을 선택합니다.",
@@ -25196,6 +25196,7 @@
     "simulatorLadder": "{priority} 사다리",
     "simulatorLadderEnds": "{rungs}, 마지막은 {at}",
     "simulatorReachableNow": "{channels} · 지금",
+    "simulatorSendsNothing": "이 우선순위는 받을 수 있는 것을 아무것도 보내지 않습니다",
     "simulatorSendTest": "테스트 호출 보내기",
     "unroutedNoneTitle": "라우팅되지 않은 항목 없음",
     "unroutedNone": "발생한 모든 알림이 팀에 도달했습니다.",
@@ -25434,8 +25435,7 @@
     "scopeClaimServiceEverywhere": "{service}는 주변 클러스터와 네임스페이스를 누가 소유하든 모든 클러스터와 네임스페이스에서 이 팀을 호출합니다.",
     "scopeClaimServiceHere": "{service}는 {scope}에서만 이 팀을 호출합니다. 다른 곳에서는 해당 범위를 소유한 팀에게 전달됩니다.",
     "scopeNothingDiscovered": "아직 발견된 항목이 없어 선택할 수 있는 대상이 없습니다. 고급을 사용해 필드로 규칙을 작성하거나, 먼저 일부 텔레메트리를 보내십시오.",
-    "scopeAdvancedHint": "상위 수준에서 다루지 않는 필드와 값을 포함하여 모든 필드와 값에 매칭할 수 있습니다.",
-    "simulatorSendsNothing": "이 우선순위는 받을 수 있는 것을 아무것도 보내지 않습니다"
+    "scopeAdvancedHint": "상위 수준에서 다루지 않는 필드와 값을 포함하여 모든 필드와 값에 매칭할 수 있습니다."
   },
   "paidUsage": {
     "consentTitle": "유료 AI 사용을 켜시겠습니까?",
@@ -26547,6 +26547,15 @@
     "saveFailed": "계정을 저장하지 못했습니다. 다시 시도하세요.",
     "disconnectFailed": "계정 연결을 해제할 수 없습니다. 다시 시도하세요.",
     "connected": "연결됨",
+    "statusChecking": "확인 중…",
+    "statusBroken": "작동하지 않음",
+    "statusUnchecked": "확인할 수 없음",
+    "cardMeta": "발신 {number} · 계정 {account}",
+    "deploymentMeta": "발신 {number}",
+    "uncheckedNow": "지금은 {provider}에 연결할 수 없습니다.",
+    "trial": "평가판 계정: 문자와 통화는 {provider}에서 인증된 번호로만 전달됩니다.",
+    "cantText": "이 번호는 문자를 보낼 수 없습니다",
+    "cantCall": "이 번호는 전화를 걸 수 없습니다",
     "fromNumber": "발신 번호",
     "press4": "통화 키 (4 확인, 6 해결, 8 에스컬레이션)",
     "press4Available": "사용 가능",
@@ -26555,6 +26564,7 @@
     "update": "업데이트",
     "disconnect": "연결 해제",
     "deploymentTitle": "이 배포의 {provider} 계정",
+    "deploymentOwner": "운영자가 설정하므로 여기서 구성할 항목이 없습니다.",
     "useOwn": "대신 자체 {provider} 계정 사용",
     "connectTitle": "{provider} 연결",
     "updateTitle": "{provider} 업데이트",
@@ -26562,6 +26572,7 @@
     "accountSid": "계정 SID",
     "authToken": "인증 토큰",
     "tokenKeep": "현재 토큰을 유지하려면 비워 두세요",
+    "tokenNewAccount": "다른 계정에는 해당 계정의 인증 토큰이 필요합니다",
     "fromHelp": "이 {provider} 계정의 번호이며, 국가 코드를 포함합니다.",
     "connect": "연결",
     "checking": "{provider} 확인 중…",
@@ -26575,21 +26586,10 @@
       "tokenRequired": "연결하려면 인증 토큰이 필요합니다.",
       "noMasterKey": "운영자에게 {variable} 설정을 요청하세요.",
       "accountRejected": "{provider}가 이 계정을 허용하지 않았습니다. 계정 SID와 인증 토큰, 그리고 계정이 활성 상태인지 확인하세요.",
-      "unreadable": "이 조직의 전화 제공업체 계정을 읽을 수 없습니다.",
       "fromNotOnAccount": "이 번호는 이 {provider} 계정의 번호가 아닙니다. {provider}의 Phone Numbers → Active numbers에 있는 번호를 사용하세요.",
-      "unavailable": "{provider}에 연결할 수 없습니다. 다시 시도하세요."
-    },
-    "statusChecking": "확인 중…",
-    "statusBroken": "작동하지 않음",
-    "statusUnchecked": "확인할 수 없음",
-    "cardMeta": "발신 {number} · 계정 {account}",
-    "deploymentMeta": "발신 {number}",
-    "uncheckedNow": "지금은 {provider}에 연결할 수 없습니다.",
-    "trial": "평가판 계정: 문자와 통화는 {provider}에서 인증된 번호로만 전달됩니다.",
-    "cantText": "이 번호는 문자를 보낼 수 없습니다",
-    "cantCall": "이 번호는 전화를 걸 수 없습니다",
-    "deploymentOwner": "운영자가 설정하므로 여기서 구성할 항목이 없습니다.",
-    "tokenNewAccount": "다른 계정에는 해당 계정의 인증 토큰이 필요합니다"
+      "unavailable": "{provider}에 연결할 수 없습니다. 다시 시도하세요.",
+      "unreadable": "이 조직의 전화 제공업체 계정을 읽을 수 없습니다."
+    }
   },
   "slackApp": {
     "prereq": {

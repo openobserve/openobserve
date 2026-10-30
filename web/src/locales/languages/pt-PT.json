@@ -19749,7 +19749,7 @@
       "retriesMaxHint": "Máximo {max}. As tentativas são executadas no mesmo job, portanto toda a sequência deve caber no orçamento da verificação.",
       "retriesMaxBrowserHint": "Máximo {max} para verificações de navegador. Cada tentativa reexecuta a jornada em todos os dispositivos, por isso mais tentativas excederiam o tempo limite da sonda e reportariam uma falha que o seu site nunca teve.",
       "retryDelay": "Aguarde",
-      "retryDelaySuffix": "segundos entre as novas tentativas.",
+      "retryDelaySuffix": "segundos entre tentativas.",
       "schedule": "Agendamento",
       "scheduleLater": "Agende mais tarde",
       "scheduleLaterTooltip": "Escolha uma data e hora futuras para ativar a verificação.",
@@ -25196,6 +25196,7 @@
     "simulatorLadder": "Escalonamento {priority}",
     "simulatorLadderEnds": "{rungs}, termina em {at}",
     "simulatorReachableNow": "{channels} · agora",
+    "simulatorSendsNothing": "Esta prioridade não envia nada que possam receber",
     "simulatorSendTest": "Enviar um acionamento de teste",
     "unroutedNoneTitle": "Nada sem equipa",
     "unroutedNone": "Todos os alertas disparados chegaram a uma equipa.",
@@ -25434,8 +25435,7 @@
     "scopeClaimServiceEverywhere": "{service} aciona esta equipa em todos os clusters e namespaces, independentemente de quem possua os que estão à volta.",
     "scopeClaimServiceHere": "{service} aciona esta equipa apenas em {scope}. Noutros locais, cabe a quem possui o âmbito à volta.",
     "scopeNothingDiscovered": "Ainda nada foi descoberto, por isso não há ativos para escolher. Use Avançado para escrever a regra por campo ou envie alguma telemetria primeiro.",
-    "scopeAdvancedHint": "Corresponder a qualquer campo e valor, incluindo os que os níveis acima não abrangem.",
-    "simulatorSendsNothing": "Esta prioridade não envia nada que possam receber"
+    "scopeAdvancedHint": "Corresponder a qualquer campo e valor, incluindo os que os níveis acima não abrangem."
   },
   "paidUsage": {
     "consentTitle": "Ativar o uso pago de IA?",
@@ -26547,6 +26547,15 @@
     "saveFailed": "A conta não pôde ser guardada. Tente novamente.",
     "disconnectFailed": "Não foi possível desligar a conta. Tente novamente.",
     "connected": "Ligado",
+    "statusChecking": "A verificar…",
+    "statusBroken": "Não está a funcionar",
+    "statusUnchecked": "Não foi possível verificar",
+    "cardMeta": "De {number} · Conta {account}",
+    "deploymentMeta": "De {number}",
+    "uncheckedNow": "Não foi possível contactar o {provider} neste momento.",
+    "trial": "Conta de teste: SMS e chamadas só chegam a números verificados no {provider}.",
+    "cantText": "Este número não pode enviar SMS",
+    "cantCall": "Este número não pode fazer chamadas",
     "fromNumber": "Número de origem",
     "press4": "Teclas de chamada (4 assumir, 6 resolver, 8 escalar)",
     "press4Available": "Disponível",
@@ -26555,6 +26564,7 @@
     "update": "Atualizar",
     "disconnect": "Desligar",
     "deploymentTitle": "Conta {provider} desta implementação",
+    "deploymentOwner": "Definido pelo operador, pelo que não há nada para configurar aqui.",
     "useOwn": "Use a sua própria conta {provider} em vez disso",
     "connectTitle": "Ligar {provider}",
     "updateTitle": "Atualizar {provider}",
@@ -26562,6 +26572,7 @@
     "accountSid": "SID da conta",
     "authToken": "Token de autenticação",
     "tokenKeep": "Deixe em branco para manter o token atual",
+    "tokenNewAccount": "Uma conta diferente precisa do seu próprio token de autenticação",
     "fromHelp": "Um número desta conta {provider}, com indicativo de país.",
     "connect": "Ligar",
     "checking": "A verificar com {provider}…",
@@ -26575,21 +26586,10 @@
       "tokenRequired": "Um token de autenticação é obrigatório para ligar.",
       "noMasterKey": "Peça ao seu operador para definir {variable}.",
       "accountRejected": "{provider} não aceitou esta conta. Verifique o SID da conta e o token de autenticação, e se a conta está ativa.",
-      "unreadable": "Não foi possível ler a conta do fornecedor de telefonia desta organização.",
       "fromNotOnAccount": "Este número não pertence a esta conta {provider}. Use um de Phone Numbers → Active numbers no {provider}.",
-      "unavailable": "Não foi possível contactar o {provider}. Tente novamente."
-    },
-    "statusChecking": "A verificar…",
-    "statusBroken": "Não está a funcionar",
-    "statusUnchecked": "Não foi possível verificar",
-    "cardMeta": "De {number} · Conta {account}",
-    "deploymentMeta": "De {number}",
-    "uncheckedNow": "Não foi possível contactar o {provider} neste momento.",
-    "trial": "Conta de teste: SMS e chamadas só chegam a números verificados no {provider}.",
-    "cantText": "Este número não pode enviar SMS",
-    "cantCall": "Este número não pode fazer chamadas",
-    "deploymentOwner": "Definido pelo operador, pelo que não há nada para configurar aqui.",
-    "tokenNewAccount": "Uma conta diferente precisa do seu próprio token de autenticação"
+      "unavailable": "Não foi possível contactar o {provider}. Tente novamente.",
+      "unreadable": "Não foi possível ler a conta do fornecedor de telefonia desta organização."
+    }
   },
   "slackApp": {
     "prereq": {

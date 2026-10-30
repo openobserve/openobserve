@@ -19749,7 +19749,7 @@
       "retriesMaxHint": "Maksimum {max}. Yeniden denemeler aynı iş içinde çalışır, bu nedenle tüm sıra kontrol bütçesine sığmalıdır.",
       "retriesMaxBrowserHint": "Tarayıcı kontrolleri için maksimum {max}. Her deneme, her cihazda yolculuğu yeniden çalıştırır; bu nedenle daha fazlası denetim zaman aşımını aşar ve sitenizin hiç yaşamadığı bir hatayı raporlar.",
       "retryDelay": "Bekle",
-      "retryDelaySuffix": "saniye tekrar denemeler arasında.",
+      "retryDelaySuffix": "yeniden denemeler arasındaki saniye.",
       "schedule": "Zamanlama",
       "scheduleLater": "Daha sonra planlayın",
       "scheduleLaterTooltip": "Çeki etkinleştirmek için gelecekteki bir tarih ve saat seçin.",
@@ -25196,6 +25196,7 @@
     "simulatorLadder": "{priority} merdiveni",
     "simulatorLadderEnds": "{rungs}, {at}'da biter",
     "simulatorReachableNow": "{channels} · şimdi",
+    "simulatorSendsNothing": "Bu öncelik, alabilecekleri hiçbir şey göndermiyor",
     "simulatorSendTest": "Test çağrısı gönder",
     "unroutedNoneTitle": "Yönlendirilmemiş hiçbir şey yok",
     "unroutedNone": "Tetiklenen her uyarı bir ekibe ulaştı.",
@@ -25434,8 +25435,7 @@
     "scopeClaimServiceEverywhere": "{service}, etrafındaki küme ve ad alanlarının sahibi kim olursa olsun, her küme ve ad alanında bu ekibi çağırır.",
     "scopeClaimServiceHere": "{service} bu ekibi yalnızca {scope} içinde çağırır. Başka yerlerde, çevresindeki kapsamın sahibine düşer.",
     "scopeNothingDiscovered": "Henüz hiçbir şey keşfedilmedi, bu yüzden seçebileceğiniz bir alan yok. Kuralı alana göre yazmak için Gelişmiş'i kullanın veya önce biraz telemetri gönderin.",
-    "scopeAdvancedHint": "Üst seviyelerin kapsamadığı alan ve değerler de dahil olmak üzere herhangi bir alan ve değerle eşleştirin.",
-    "simulatorSendsNothing": "Bu öncelik, alabilecekleri hiçbir şey göndermiyor"
+    "scopeAdvancedHint": "Üst seviyelerin kapsamadığı alan ve değerler de dahil olmak üzere herhangi bir alan ve değerle eşleştirin."
   },
   "paidUsage": {
     "consentTitle": "Ücretli Yapay Zeka kullanımı açılsın mı?",
@@ -26547,6 +26547,15 @@
     "saveFailed": "Hesap kaydedilemedi. Tekrar deneyin.",
     "disconnectFailed": "Hesabın bağlantısı kesilemedi. Tekrar deneyin.",
     "connected": "Bağlandı",
+    "statusChecking": "Kontrol ediliyor…",
+    "statusBroken": "Çalışmıyor",
+    "statusUnchecked": "Kontrol edilemedi",
+    "cardMeta": "Gönderen {number} · Hesap {account}",
+    "deploymentMeta": "Gönderen {number}",
+    "uncheckedNow": "{provider} şu anda erişilemiyor.",
+    "trial": "Deneme hesabı: SMS ve aramalar yalnızca {provider} içinde doğrulanmış numaralara ulaşır.",
+    "cantText": "Bu numara SMS gönderemez",
+    "cantCall": "Bu numara arama yapamaz",
     "fromNumber": "Gönderen numara",
     "press4": "Arama tuşları (4 üstlen, 6 çöz, 8 eskalasyon)",
     "press4Available": "Kullanılabilir",
@@ -26555,6 +26564,7 @@
     "update": "Güncelle",
     "disconnect": "Bağlantıyı kes",
     "deploymentTitle": "Bu dağıtımın {provider} hesabı",
+    "deploymentOwner": "Operatör tarafından ayarlandığı için burada yapılandırılacak bir şey yok.",
     "useOwn": "Bunun yerine kendi {provider} hesabınızı kullanın",
     "connectTitle": "{provider} Bağla",
     "updateTitle": "{provider} Güncelle",
@@ -26562,6 +26572,7 @@
     "accountSid": "Hesap SID",
     "authToken": "Kimlik doğrulama token'ı",
     "tokenKeep": "Mevcut token'ı korumak için boş bırakın",
+    "tokenNewAccount": "Farklı bir hesap kendi kimlik doğrulama belirtecini gerektirir",
     "fromHelp": "Bu {provider} hesabından bir numara, ülke koduyla.",
     "connect": "Bağla",
     "checking": "{provider} ile kontrol ediliyor…",
@@ -26575,21 +26586,10 @@
       "tokenRequired": "Bağlanmak için bir kimlik doğrulama token'ı gereklidir.",
       "noMasterKey": "Operatörünüzden {variable} ayarlamasını isteyin.",
       "accountRejected": "{provider} bu hesabı kabul etmedi. Hesap SID'sini ve kimlik doğrulama token'ını ve hesabın etkin olduğunu kontrol edin.",
-      "unreadable": "Bu kuruluşun telefon sağlayıcısı hesabı okunamadı.",
       "fromNotOnAccount": "Bu numara bu {provider} hesabına ait değil. {provider} içinde Phone Numbers → Active numbers listesinden birini kullanın.",
-      "unavailable": "{provider} erişilemedi. Tekrar deneyin."
-    },
-    "statusChecking": "Kontrol ediliyor…",
-    "statusBroken": "Çalışmıyor",
-    "statusUnchecked": "Kontrol edilemedi",
-    "cardMeta": "Gönderen {number} · Hesap {account}",
-    "deploymentMeta": "Gönderen {number}",
-    "uncheckedNow": "{provider} şu anda erişilemiyor.",
-    "trial": "Deneme hesabı: SMS ve aramalar yalnızca {provider} içinde doğrulanmış numaralara ulaşır.",
-    "cantText": "Bu numara SMS gönderemez",
-    "cantCall": "Bu numara arama yapamaz",
-    "deploymentOwner": "Operatör tarafından ayarlandığı için burada yapılandırılacak bir şey yok.",
-    "tokenNewAccount": "Farklı bir hesap kendi kimlik doğrulama belirtecini gerektirir"
+      "unavailable": "{provider} erişilemedi. Tekrar deneyin.",
+      "unreadable": "Bu kuruluşun telefon sağlayıcısı hesabı okunamadı."
+    }
   },
   "slackApp": {
     "prereq": {

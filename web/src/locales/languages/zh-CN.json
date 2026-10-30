@@ -19749,7 +19749,7 @@
       "retriesMaxHint": "最大值为 {max}。重试在同一作业内运行，因此整个序列必须符合检查预算。",
       "retriesMaxBrowserHint": "浏览器检查的最大值为 {max}。每次尝试都会在每个设备上重新运行测试流程，因此更多尝试会超出探测超时，并报告您的网站从未发生过的故障。",
       "retryDelay": "等待",
-      "retryDelaySuffix": "秒（两次重试之间）。",
+      "retryDelaySuffix": "重试之间的秒数。",
       "schedule": "计划",
       "scheduleLater": "稍后安排",
       "scheduleLaterTooltip": "选择未来的日期和时间来激活支票。",
@@ -25196,6 +25196,7 @@
     "simulatorLadder": "{priority} 升级阶梯",
     "simulatorLadderEnds": "{rungs},结束于 {at}",
     "simulatorReachableNow": "{channels} · 现在",
+    "simulatorSendsNothing": "此优先级不会发送他们能接收的任何内容",
     "simulatorSendTest": "发送测试通知",
     "unroutedNoneTitle": "没有未路由的告警",
     "unroutedNone": "所有已触发的告警都已被团队接收。",
@@ -25434,8 +25435,7 @@
     "scopeClaimServiceEverywhere": "{service} 在每个集群和命名空间中都会呼叫此团队，无论周边由谁负责。",
     "scopeClaimServiceHere": "{service} 仅在 {scope} 中呼叫此团队；其他位置则归属于它所在作用域的所有者。",
     "scopeNothingDiscovered": "尚未发现任何内容，因此没有数据资产可供选择。请使用高级模式按字段编写规则，或先发送一些遥测数据。",
-    "scopeAdvancedHint": "可匹配任意字段和值，包括上述层级未涵盖的内容。",
-    "simulatorSendsNothing": "此优先级不会发送他们能接收的任何内容"
+    "scopeAdvancedHint": "可匹配任意字段和值，包括上述层级未涵盖的内容。"
   },
   "paidUsage": {
     "consentTitle": "开启付费 AI 使用？",
@@ -26547,6 +26547,15 @@
     "saveFailed": "无法保存账户。请重试。",
     "disconnectFailed": "无法断开该账户。请重试。",
     "connected": "已连接",
+    "statusChecking": "正在检查…",
+    "statusBroken": "无法使用",
+    "statusUnchecked": "无法检查",
+    "cardMeta": "来自 {number} · 账户 {account}",
+    "deploymentMeta": "来自 {number}",
+    "uncheckedNow": "暂时无法连接 {provider}。",
+    "trial": "试用账户：短信和电话只能发送到在 {provider} 中验证过的号码。",
+    "cantText": "此号码无法发送短信",
+    "cantCall": "此号码无法拨打电话",
     "fromNumber": "主叫号码",
     "press4": "通话按键（4 确认，6 解决，8 升级）",
     "press4Available": "可用",
@@ -26555,6 +26564,7 @@
     "update": "更新",
     "disconnect": "断开连接",
     "deploymentTitle": "此部署的 {provider} 账户",
+    "deploymentOwner": "由操作员设置，因此此处无需配置。",
     "useOwn": "改为使用您自己的 {provider} 账户",
     "connectTitle": "连接 {provider}",
     "updateTitle": "更新 {provider}",
@@ -26562,6 +26572,7 @@
     "accountSid": "账户 SID",
     "authToken": "认证令牌",
     "tokenKeep": "留空则保留当前令牌",
+    "tokenNewAccount": "不同的账户需要它自己的认证令牌",
     "fromHelp": "此 {provider} 账户中的号码，需带国家代码。",
     "connect": "连接",
     "checking": "正在与 {provider} 校验…",
@@ -26575,21 +26586,10 @@
       "tokenRequired": "连接需要认证令牌。",
       "noMasterKey": "请联系运维人员设置 {variable}。",
       "accountRejected": "{provider} 未接受该账户。请检查 Account SID 和认证令牌，并确认账户处于活跃状态。",
-      "unreadable": "无法读取此组织的电话提供商账户。",
       "fromNotOnAccount": "此号码不属于此 {provider} 账户。请使用 {provider} 中 Phone Numbers → Active numbers 下的号码。",
-      "unavailable": "无法连接 {provider}，请重试。"
-    },
-    "statusChecking": "正在检查…",
-    "statusBroken": "无法使用",
-    "statusUnchecked": "无法检查",
-    "cardMeta": "来自 {number} · 账户 {account}",
-    "deploymentMeta": "来自 {number}",
-    "uncheckedNow": "暂时无法连接 {provider}。",
-    "trial": "试用账户：短信和电话只能发送到在 {provider} 中验证过的号码。",
-    "cantText": "此号码无法发送短信",
-    "cantCall": "此号码无法拨打电话",
-    "deploymentOwner": "由操作员设置，因此此处无需配置。",
-    "tokenNewAccount": "不同的账户需要它自己的认证令牌"
+      "unavailable": "无法连接 {provider}，请重试。",
+      "unreadable": "无法读取此组织的电话提供商账户。"
+    }
   },
   "slackApp": {
     "prereq": {
