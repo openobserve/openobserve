@@ -36,7 +36,7 @@ fn is_idle_expired(last_activity_micros: i64, now_micros: i64, timeout_seconds: 
 pub const USER_SESSION_KEY: &str = "/user_sessions/";
 
 pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
-    let idle_timeout = config::get_config().common.session_idle_timeout;
+    let idle_timeout = config::get_config().auth.session_idle_timeout;
     // Until last activity is persisted, cached tokens cannot establish idleness.
     // Validate against the authoritative DB timestamp whenever idle timeout is enabled.
     if idle_timeout <= 0 {
@@ -173,7 +173,7 @@ pub async fn set_with_expiry(
 /// Refreshes a session only after a separate, authenticated user-activity request.
 /// Never call this from ordinary API polling or the session lookup path.
 pub async fn record_user_activity(session_id: &str) -> Result<bool, anyhow::Error> {
-    let idle_timeout = config::get_config().common.session_idle_timeout;
+    let idle_timeout = config::get_config().auth.session_idle_timeout;
     if idle_timeout <= 0 {
         return Ok(false);
     }
