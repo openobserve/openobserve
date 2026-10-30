@@ -790,6 +790,9 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
             "Organization identifier {org_id} is reserved"
         ));
     }
+    if let Some(violation) = infra::file_list::org_id_violation(org_id) {
+        return Err(anyhow::anyhow!(violation));
+    }
     Ok(())
 }
 
@@ -1694,6 +1697,15 @@ mod tests {
                 "expected {org_id:?} to be rejected"
             );
         }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_follows_the_org_column_limit() {
+        let fits = "o".repeat(infra::file_list::ORG_ID_MAX_LEN);
+        assert!(validate_auto_created_org_id(&fits).is_ok());
+        let long_org = format!("{fits}o");
+        let bounded = infra::file_list::org_id_violation(&long_org).is_some();
+        assert_eq!(validate_auto_created_org_id(&long_org).is_err(), bounded);
     }
 
     #[test]
