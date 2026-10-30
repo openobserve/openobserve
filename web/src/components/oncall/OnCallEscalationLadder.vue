@@ -23,9 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the transports and the verification state.
 
   One line per rung, and the ending is the rail's last rung rather than a panel
-  beside it. Channels and per-person verdicts are spent only where something is
-  wrong: a healthy ladder is read to check its SHAPE, and listing every address
-  and transport on it buried the one rung that would reach nobody.
+  beside it. Channels are said once per priority, on its chip, because they
+  belong to the priority and never to a step or a person. Per-person verdicts
+  are spent only where something is wrong: a healthy ladder is read to check its
+  SHAPE, and listing every address on it buried the one rung that would reach
+  nobody.
 -->
 <template>
   <div class="relative flex flex-col gap-4" data-test="oncall-escalation-ladder">
@@ -33,27 +35,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          from this strip is one nobody would think to check. The edit button
          rides along on the same row rather than a title above it — this
          strip already says what is being edited. -->
-    <span class="flex flex-wrap items-center gap-2">
-      <OButton
-        v-for="group in groups"
-        :key="group.key"
-        :variant="group.variant"
-        size="xs"
-        :data-test="`oncall-ladder-priority-${group.key}`"
-        @click="emit('update:selected', group.selects)"
+    <!-- One line: only the chips wrap, inside their own group, so the buttons never drop below them. -->
+    <span class="flex items-start gap-2" data-test="oncall-ladder-strip">
+      <span
+        class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+        data-test="oncall-ladder-priorities"
       >
-        {{ group.label }}
-        <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
-      </OButton>
-      <OButton
-        variant="outline"
-        size="xs"
-        class="ms-auto"
-        data-test="oncall-policy-edit"
-        @click="emit('edit')"
-      >
-        {{ t("oncall.edit") }}
-      </OButton>
+        <OButton
+          v-for="group in groups"
+          :key="group.key"
+          :variant="group.variant"
+          size="xs"
+          :data-test="`oncall-ladder-priority-${group.key}`"
+          @click="emit('update:selected', group.selects)"
+        >
+          {{ group.label }}
+          <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
+        </OButton>
+      </span>
+      <span class="flex shrink-0 items-center gap-2" data-test="oncall-ladder-actions">
+        <OButton
+          v-if="canConfigure"
+          variant="outline"
+          size="xs"
+          :disabled="!sendTestReady"
+          data-test="oncall-ladder-send-test"
+          @click="emit('send-test')"
+        >
+          {{ t("oncall.ladderSendTest") }}
+        </OButton>
+        <OButton variant="outline" size="xs" data-test="oncall-policy-edit" @click="emit('edit')">
+          {{ t("oncall.edit") }}
+        </OButton>
+      </span>
     </span>
 
     <OInnerLoading v-if="loading" showing />
@@ -200,7 +214,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { rungProblem, speakTarget } from "@/utils/oncall";
+import { channelList, rungProblem, speakTarget } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
@@ -215,6 +229,8 @@ const props = withDefaults(
     selected?: string;
     preview?: EscalationPreview | null;
     loading?: boolean;
+    /** May send a test page, which needs config access. */
+    canConfigure?: boolean;
   }>(),
   {
     priorities: () => [],
@@ -223,6 +239,7 @@ const props = withDefaults(
     selected: "P1",
     preview: null,
     loading: false,
+    canConfigure: false,
   },
 );
 
@@ -230,6 +247,7 @@ const emit = defineEmits<{
   (e: "update:selected", priority: string): void;
   (e: "edit"): void;
   (e: "open-members"): void;
+  (e: "send-test"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -249,15 +267,28 @@ const numberOf = (entry: TeamRungSummary) => Number(entry.priority.slice(1));
 
 /// What makes two priorities the same ladder. `null` means UNKNOWN — without
 /// the policy we cannot claim two ladders match, so nothing folds. `p1_parallel`
-/// is part of the shape: the same steps fired at once are a different ladder.
+/// is part of the shape: the same steps fired at once are a different ladder,
+/// and the same steps sent on other channels are too.
 function ladderKey(entry: TeamRungSummary): string | null {
   if (!entry.pages_anyone) return "silent";
   if (!props.policy) return null;
   const priority = numberOf(entry);
   const rung = props.policy.rungs.find((candidate) => candidate.priority === priority);
   if (!rung) return null;
-  return JSON.stringify([priority === 1 && props.policy.p1_parallel === true, rung.steps]);
+  return JSON.stringify([
+    priority === 1 && props.policy.p1_parallel === true,
+    rung.steps,
+    [...rung.channels].sort(),
+  ]);
 }
+
+/// `send_test_page` pages the earliest step (delays are unique per priority) of the requested priority, so the preview must be that priority's and its first step must reach somebody.
+const sendTestReady = computed(() => {
+  const preview = props.preview;
+  if (!preview?.pages_anyone || preview.priority !== props.selected) return false;
+  const first = [...preview.rungs].sort((a, b) => a.after_micros - b.after_micros)[0];
+  return !!first?.recipients.length;
+});
 
 interface PriorityGroup {
   key: string;
@@ -307,15 +338,15 @@ const groups = computed<PriorityGroup[]>(() => {
   });
 });
 
-/// "3 rungs · 20m" for one priority, and for a folded run the only fact that is
-/// still true of every member of it.
+/// "Email, SMS · 3 steps · 20m" for one priority; a folded run keeps the channels, which the fold guarantees they share.
 function summaryFor(entry: TeamRungSummary, folded: number): I18nText {
   if (!entry.pages_anyone) return t("oncall.reachPagesNobody");
-  if (folded > 1) return t("oncall.ladderSameLadder");
-  const rungs = String(t("oncall.reachRungs", { count: entry.rungs }, entry.rungs));
-  return entry.nobody_after_micros
-    ? raw(`${rungs} · ${formatMicrosDuration(entry.nobody_after_micros)}`)
-    : raw(rungs);
+  const channels = channelList(entry.channels, t);
+  const parts = channels ? [channels] : [];
+  if (folded > 1) return raw([...parts, String(t("oncall.ladderSameLadder"))].join(" · "));
+  parts.push(String(t("oncall.policyChipSteps", { count: entry.rungs }, entry.rungs)));
+  if (entry.nobody_after_micros) parts.push(formatMicrosDuration(entry.nobody_after_micros));
+  return raw(parts.join(" · "));
 }
 
 /// Kept to a few characters — this is a rail, not a column. "0m" rather than

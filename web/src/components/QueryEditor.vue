@@ -99,8 +99,9 @@
         :free-text-decorations="freeTextDecorations ?? null"
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
+        :recent-queries="recentQueries ?? []"
         @update:query="handleQueryUpdate"
-        @user-edit="emit('user-edit')"
+        @user-edit="(isBlank: boolean, wasBlank: boolean) => emit('user-edit', isBlank, wasBlank)"
         @run-query="emit('run-query')"
         @focus="handleEditorFocus"
         @blur="handleEditorBlur"
@@ -189,6 +190,7 @@ interface Props {
   freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
   filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
   valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
+  recentQueries?: string[]; // The user's recent queries, offered as clock rows while typing
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -226,7 +228,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   "update:query": [query: string, origin?: QueryChangeOrigin];
-  "user-edit": [];
+  "user-edit": [isBlank: boolean, wasBlank: boolean];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
   "run-query": [];

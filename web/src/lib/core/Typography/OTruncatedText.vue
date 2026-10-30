@@ -11,6 +11,7 @@ const props = withDefaults(defineProps<TruncatedTextProps>(), {
   as: "span",
   lines: 1,
   tooltip: undefined,
+  tooltipClass: undefined,
 });
 
 defineSlots<TruncatedTextSlots>();
@@ -38,7 +39,12 @@ const tooltipContent = computed(() => (props.tooltip === false ? undefined : pro
     :data-o-tooltip-off="tooltip === false ? '' : undefined"
   >
     <!-- First child on purpose: with no element before it, the tooltip attaches to this root. -->
-    <OTooltip v-if="tooltip !== false" overflow-only :content="tooltipContent" />
+    <OTooltip
+      v-if="tooltip !== false"
+      overflow-only
+      :content="tooltipContent"
+      :class="tooltipClass"
+    />
     <slot />
   </component>
 </template>

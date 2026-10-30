@@ -271,10 +271,7 @@ describe("OnCallScheduleEditor drafts", () => {
 
     byTest("oncall-rotation-delete")!.click();
     await flushPromises();
-    const confirm = wrapper!
-      .findAllComponents({ name: "ConfirmDialog" })
-      .find((dialog) => dialog.vm.$attrs["data-test"] === "oncall-rotation-remove-confirm")!;
-    confirm.vm.$emit("update:ok");
+    wrapper!.findComponent({ name: "OnCallRemoveRotationDialog" }).vm.$emit("confirm");
     await flushPromises();
 
     expect(service.setSchedule).toHaveBeenCalledTimes(1);
@@ -296,10 +293,7 @@ describe("OnCallScheduleEditor drafts", () => {
 
     byTest("oncall-rotation-delete")!.click();
     await flushPromises();
-    wrapper!
-      .findAllComponents({ name: "ConfirmDialog" })
-      .find((dialog) => dialog.vm.$attrs["data-test"] === "oncall-rotation-remove-confirm")!
-      .vm.$emit("update:ok");
+    wrapper!.findComponent({ name: "OnCallRemoveRotationDialog" }).vm.$emit("confirm");
     await flushPromises();
 
     expect(readEditorDraft(teammate)).not.toBeNull();
