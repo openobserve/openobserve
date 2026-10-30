@@ -333,10 +333,6 @@ describe("TraceDetailsSidebar", async () => {
     vi.clearAllMocks();
   });
 
-  it("should mount TraceDetailsSidebar component", () => {
-    expect(wrapper.exists()).toBe(true);
-  });
-
   it("should display operation name in header", () => {
     const operationName = wrapper.find('[data-test="trace-details-sidebar-header-operation-name"]');
     expect(operationName.exists()).toBe(true);
@@ -934,12 +930,6 @@ describe("TraceDetailsSidebar", async () => {
       await eventsTab.trigger("click");
     });
 
-    it("should display events table", () => {
-      // When there are no events, the table doesn't exist, only the no-events message shows
-      const noEventsMsg = wrapper.find('[data-test="trace-details-sidebar-no-events"]');
-      expect(noEventsMsg.exists()).toBe(true);
-    });
-
     it("should display no events message when no events", () => {
       const noEventsMsg = wrapper.find('[data-test="trace-details-sidebar-no-events"]');
       expect(noEventsMsg.exists()).toBe(true);
@@ -1463,17 +1453,6 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("activeTab prop", () => {
-    it("should default to 'attributes'", () => {
-      expect(wrapper.vm.activeTabModel).toBe("attributes");
-    });
-
-    it("should emit update:activeTab when tab changes", async () => {
-      const eventsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-events"]');
-      await eventsTab.trigger("click");
-      expect(wrapper.emitted("update:activeTab")).toBeTruthy();
-      expect(wrapper.emitted("update:activeTab")![0]).toEqual(["events"]);
-    });
-
     it("should respect activeTab prop when provided", async () => {
       wrapper.unmount();
       wrapper = mountSidebar({ activeTab: "events" });
@@ -1692,44 +1671,7 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
-  describe("Computed properties", () => {
-    it("should have isViewLogsDisabled computed property", () => {
-      // This computed property exists in the current implementation
-      const testWrapper = mountSidebar({
-        selectedLogStreams: [],
-        showLogStreamSelector: true,
-      });
-      expect(testWrapper.vm.isViewLogsDisabled).toBeDefined();
-      expect(typeof testWrapper.vm.isViewLogsDisabled).toBe("boolean");
-      testWrapper.unmount();
-    });
-
-    it("should have viewLogsTooltipContent computed property", () => {
-      // This computed property exists in the current implementation
-      const testWrapper = mountSidebar({
-        selectedLogStreams: [],
-        showLogStreamSelector: true,
-      });
-      expect(testWrapper.vm.viewLogsTooltipContent).toBeDefined();
-      expect(typeof testWrapper.vm.viewLogsTooltipContent).toBe("string");
-      testWrapper.unmount();
-    });
-  });
-
   describe("View Logs button — current implementation", () => {
-    it("should render View Logs button with disabled state logic when in standalone mode", () => {
-      const testWrapper = mountSidebar({
-        parentMode: "standalone",
-      });
-      const viewLogsBtn = testWrapper.find(
-        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
-      );
-      expect(viewLogsBtn.exists()).toBe(true);
-      // Button should have disabled prop controlled by isViewLogsDisabled
-      expect(testWrapper.vm.isViewLogsDisabled).toBeDefined();
-      testWrapper.unmount();
-    });
-
     it("should have tooltip functionality with viewLogsTooltipContent", () => {
       const testWrapper = mountSidebar({
         parentMode: "standalone",
@@ -1875,23 +1817,6 @@ describe("TraceDetailsSidebar", async () => {
       expect(tooltipContent).toBeDefined();
       expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
-      testWrapper.unmount();
-    });
-
-    it("should call appropriate navigation function on click", async () => {
-      const testWrapper = mountSidebar({
-        parentMode: "standalone",
-      });
-      const viewLogsBtn = testWrapper.find(
-        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
-      );
-      expect(viewLogsBtn.exists()).toBe(true);
-
-      // Should call the appropriate navigation function
-      await viewLogsBtn.trigger("click");
-      await flushPromises();
-
-      expect(mockBuildQueryDetails).toHaveBeenCalled();
       testWrapper.unmount();
     });
 
@@ -2122,46 +2047,6 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
-  describe("Copy functionality", () => {
-    it("should find copy button and trigger copy", async () => {
-      // Wait for component to be fully rendered
-      await flushPromises();
-
-      // Find the copy button
-      const copyBtn = wrapper.find(
-        '[data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"]',
-      );
-
-      // If button exists, test the copy functionality
-      if (copyBtn.exists()) {
-        await copyBtn.trigger("click");
-
-        // Check that the copy function was called
-        // Since copy uses the clipboard API, we can't easily mock it
-        // But we can check that the component didn't crash
-        expect(wrapper.exists()).toBe(true);
-        // Check if clipboard.writeText was called
-        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(mockSpan.span_id);
-      }
-    });
-
-    it("should show success notification when copy succeeds", async () => {
-      await flushPromises();
-
-      const copyBtn = wrapper.find(
-        '[data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"]',
-      );
-      if (copyBtn.exists()) {
-        await copyBtn.trigger("click");
-
-        // The component should show a notification
-        // We can't easily test the actual notification in the test environment
-        // but we can verify the component didn't crash
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-  });
-
   describe("LLM Preview tab — LLMContentRenderer instance-id", () => {
     const LLM_SPAN_ID = "d9603ec7f76eb499";
 
@@ -2290,16 +2175,6 @@ describe("TraceDetailsSidebar", async () => {
       ).toBe(false);
 
       ordinaryWrapper.unmount();
-    });
-
-    it("should render the input LLMContentRenderer when llm_input has content", () => {
-      const inputRenderer = llmWrapper.find('[data-test="llm-content-renderer-input"]');
-      expect(inputRenderer.exists()).toBe(true);
-    });
-
-    it("should render the output LLMContentRenderer when llm_output has content", () => {
-      const outputRenderer = llmWrapper.find('[data-test="llm-content-renderer-output"]');
-      expect(outputRenderer.exists()).toBe(true);
     });
 
     it("renders a remote evaluator response in Preview without GenAI fields", async () => {

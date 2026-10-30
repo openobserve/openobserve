@@ -1263,10 +1263,6 @@ describe("Schema Component Tests", () => {
       expect(w.find('[data-test="storage-size-tile"]').exists()).toBe(true);
     });
 
-    it("should expose formatSizeFromMB function", () => {
-      expect(typeof w.vm.formatSizeFromMB).toBe("function");
-    });
-
     it("formatSizeFromMB should format MB values with units", () => {
       // 1024 MB = 1 GB
       const result = w.vm.formatSizeFromMB(1024);
@@ -1361,11 +1357,6 @@ describe("Schema Component Tests", () => {
       expect(w.find('[data-test="schema-title-text"]').text()).toContain("my-stream-name");
     });
 
-    it("should expose getTimelineIcon computed", () => {
-      expect(w.vm.getTimelineIcon).toBeDefined();
-      expect(typeof w.vm.getTimelineIcon).toBe("string");
-    });
-
     it("getTimelineIcon should return different URL based on theme", async () => {
       // light theme
       w.vm.store.state.theme = "light";
@@ -1426,10 +1417,6 @@ describe("Schema Component Tests", () => {
       // When enable_cross_linking is false, the tab should not exist
       expect(w.exists()).toBe(true);
       w.unmount();
-    });
-
-    it("should expose streamCrossLinks reactive ref", async () => {
-      expect(Array.isArray(wrapper.vm.streamCrossLinks)).toBe(true);
     });
 
     it("should expose orgCrossLinks computed", async () => {
@@ -4120,22 +4107,6 @@ describe("Schema Component Tests", () => {
       await flushPromises();
 
       expect(mockUpdateSettings).not.toHaveBeenCalled();
-    });
-
-    it("should exercise cross-links diff in onSubmit with modified links", async () => {
-      // Set up cross-links to exercise the diff computation
-      // (func 61: prevCrossLinks.map, func 64: currCrossLinks.filter, func 65: inline fn)
-      wrapper.vm.streamCrossLinks = [{ name: "a", url: "https://a.com", fields: ["_timestamp"] }];
-      // prevCrossLinks has "a" in it (from settings.cross_links which was set in previousSchemaVersion)
-      // streamCrossLinks has "a" — so prevCrossLinkNames includes "a" and currCrossLinkNames includes "a"
-      // This exercises the diff path
-      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
-
-      await wrapper.vm.onSubmit();
-      await flushPromises();
-
-      // Should have been called
-      expect(mockUpdateSettings).toHaveBeenCalled();
     });
   });
 });

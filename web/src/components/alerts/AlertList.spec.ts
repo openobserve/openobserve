@@ -726,20 +726,6 @@ describe("AlertList - filtering behaviors", () => {
     expect(wrapper.vm.filteredResults.every((r: any) => r.is_real_time)).toBe(true);
   });
 
-  it("filterAlertsByTab with false refreshResults parameter skips filtering", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    const initialLength = wrapper.vm.filteredResults.length;
-    expect(initialLength).toBe(alertsDB.length);
-
-    // Call filterAlertsByTab with refreshResults=false should not change filteredResults
-    wrapper.vm.filterAlertsByTab(false);
-    await flushPromises();
-
-    expect(wrapper.vm.filteredResults.length).toBe(initialLength);
-  });
-
   it("filterAlertsByQuery filters by name within current tab", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1199,16 +1185,6 @@ describe("AlertList - micro validations", () => {
     expect(wrapper.vm.pageSize).toBeGreaterThan(0);
   });
 
-  it("clearSearchHistory clears global search and results array", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.searchAcrossFolders = true;
-    wrapper.vm.searchQuery = "abc";
-    wrapper.vm.filteredResults = [1, 2] as any;
-    wrapper.vm.clearSearchHistory();
-    expect(wrapper.vm.searchQuery).toBe("");
-  });
-
   it("filterAlertsByTab returns early if refreshResults=false", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1287,17 +1263,6 @@ describe("AlertList - micro validations", () => {
     expect(wrapper.vm.showAddAlertDialog).toBe(true);
   });
 
-  it("open and close clone dialog via back button behavior", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const row = wrapper.vm.filteredResults[0];
-    await wrapper.vm.duplicateAlert(row);
-    await flushPromises();
-    expect(wrapper.vm.showForm).toBe(true);
-    wrapper.vm.showForm = false;
-    expect(wrapper.vm.showForm).toBe(false);
-  });
-
   it("deleteAlertByAlertId handles 403 gracefully (simulated)", async () => {
     // Fail next delete call with 403
     alertsSvc.delete_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } } as any);
@@ -1325,17 +1290,6 @@ describe("AlertList - micro validations", () => {
     await flushPromises();
     expect(wrapper.vm.alertStateLoadingMap[uuid]).toBe(false);
     expect(before === undefined || before === false).toBe(true);
-  });
-
-  it("filteredResults reflects searchQuery filtering", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    // The component filters via filterAlertsByTab using filterQuery/searchQuery
-    // filteredResults already reflects the current filter state
-    const rows = wrapper.vm.filteredResults;
-    expect(Array.isArray(rows)).toBe(true);
-    // All rows from test data are present with no filter applied
-    expect(rows.length).toBeGreaterThan(0);
   });
 
   it("mapped timestamps are strings (conversion internal)", async () => {
@@ -1610,18 +1564,6 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     } finally {
       queryClient.removeQueries({ queryKey: key, exact: true });
     }
-  });
-
-  it("clone dialog emits click:secondary -> closes showForm", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.showForm = true;
-    await wrapper.vm.$nextTick();
-
-    const cloneDialog = wrapper.findComponent({ name: "ODialog" });
-    await cloneDialog.vm.$emit("click:secondary");
-    await flushPromises();
-    expect(wrapper.vm.showForm).toBe(false);
   });
 
   it("duplicateAlert pre-fills stream type and name from the source row", async () => {

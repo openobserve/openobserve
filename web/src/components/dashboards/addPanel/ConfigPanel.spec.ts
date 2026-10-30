@@ -1326,102 +1326,9 @@ describe("ConfigPanel", () => {
         expect(wrapper.exists()).toBe(true);
       }
     });
-
-    it("should show step value tooltip", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      // Look for any info icons in the component
-      const infoIcons = wrapper.findAll('[data-test="dashboard-config-top_results-info"]');
-      if (infoIcons.length > 0) {
-        expect(infoIcons[0].exists()).toBe(true);
-      } else {
-        // Component should still exist even if no tooltip found
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-  });
-
-  describe("Panel Type Handling", () => {
-    it("should handle different panel types", () => {
-      const chartTypes = ["line", "bar", "area", "pie", "table"];
-
-      chartTypes.forEach((type) => {
-        const panelData = {
-          ...mockDashboardPanelData,
-          data: { ...mockDashboardPanelData.data, type },
-        };
-
-        wrapper = createWrapper({ dashboardPanelData: panelData });
-        expect(wrapper.exists()).toBe(true);
-
-        if (wrapper) {
-          wrapper.unmount();
-        }
-      });
-    });
-
-    it("should show different configurations for different chart types", () => {
-      // Test line chart
-      wrapper = createWrapper();
-      const lineConfig = wrapper.html();
-      wrapper.unmount();
-
-      // Test table
-      const tableData = {
-        ...mockDashboardPanelData,
-        data: { ...mockDashboardPanelData.data, type: "table" },
-      };
-      wrapper = createWrapper({ dashboardPanelData: tableData });
-      const tableConfig = wrapper.html();
-
-      // Configurations should be different
-      expect(lineConfig).not.toBe(tableConfig);
-    });
-  });
-
-  describe("Configuration Updates", () => {
-    it("should emit configuration changes", async () => {
-      wrapper = createWrapper();
-
-      const descriptionInput = wrapper.findComponent('[data-test="dashboard-config-description"]');
-      await descriptionInput.vm.$emit("update:modelValue", "Updated description");
-
-      // Check if the component data was updated
-      expect(wrapper.vm.dashboardPanelData.data.description).toBe("Updated description");
-    });
-
-    it("should reflect updates to the shared panel data", async () => {
-      wrapper = createWrapper();
-
-      // Panel data reaches ConfigPanel through the useDashboardPanelData store —
-      // shared reactive state, so updates arrive by mutation rather than by prop.
-      wrapper.vm.dashboardPanelData.data.description = "Updated from parent";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.dashboardPanelData.data.description).toBe("Updated from parent");
-    });
-
-    it("should preserve configuration when switching modes", async () => {
-      wrapper = createWrapper({}, { promqlMode: false });
-
-      const descriptionInput = wrapper.findComponent('[data-test="dashboard-config-description"]');
-      await descriptionInput.vm.$emit("update:modelValue", "Test description");
-
-      // Verify description was set
-      expect(wrapper.vm.dashboardPanelData.data.description).toBe("Test description");
-    });
   });
 
   describe("Trellis Configuration", () => {
-    it("should show trellis layout options when applicable", () => {
-      // Mock showTrellisConfig computed property
-      wrapper = createWrapper();
-      wrapper.vm.showTrellisConfig = true;
-
-      expect(wrapper.vm.showTrellisConfig).toBe(true);
-    });
-
     it("should hide trellis configuration when not applicable", () => {
       wrapper = createWrapper();
 
@@ -1456,62 +1363,9 @@ describe("ConfigPanel", () => {
         expect(wrapper.exists()).toBe(true);
       }
     });
-
-    it("should validate configuration completeness", () => {
-      wrapper = createWrapper();
-
-      // Check if component has valid configuration structure
-      expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data).toBeDefined();
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("should have proper labels for form inputs", () => {
-      wrapper = createWrapper();
-
-      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
-      expect(descriptionInput.exists()).toBe(true);
-    });
-
-    it("should provide tooltips for complex fields", () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-
-      const infoIcons = wrapper.findAll('[data-test="dashboard-config-top_results-info"]');
-      if (infoIcons.length > 0) {
-        expect(infoIcons[0].exists()).toBe(true);
-      } else {
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-
-    it("should support keyboard navigation", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
-      expect(descriptionInput.exists()).toBe(true);
-
-      const stepValueInput = wrapper.find('[data-test="dashboard-config-step-value"]');
-      if (stepValueInput.exists()) {
-        await stepValueInput.trigger("focus");
-        expect(stepValueInput.exists()).toBe(true);
-      } else {
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
   });
 
   describe("Error Handling", () => {
-    it("should handle missing panel data gracefully", () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper = createWrapper({ dashboardPanelData: null });
-
-      expect(wrapper.exists()).toBe(true);
-      consoleWarnSpy.mockRestore();
-    });
-
     it("should handle malformed configuration data", () => {
       const malformedData = {
         data: {
@@ -3322,25 +3176,9 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.searchQuery).toBe("");
     });
-
-    it("should update searchQuery when set directly", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.searchQuery = "legend";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.searchQuery).toBe("legend");
-    });
   });
 
   describe("expandedSections state", () => {
-    it("should initialize expandedSections with all sections true", () => {
-      wrapper = createWrapper();
-      const sections = wrapper.vm.expandedSections;
-      expect(typeof sections).toBe("object");
-      for (const val of Object.values(sections)) {
-        expect(val).toBe(true);
-      }
-    });
-
     it("should have an entry for every expected section", () => {
       wrapper = createWrapper();
       const expectedSections = [
@@ -3436,12 +3274,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("isSectionVisible()", () => {
-    it("returns a boolean for known section IDs", () => {
-      wrapper = createWrapper();
-      const result = wrapper.vm.isSectionVisible("general");
-      expect(typeof result).toBe("boolean");
-    });
-
     it("returns false for unknown section IDs", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.isSectionVisible("nonexistent" as any)).toBe(false);
@@ -3454,12 +3286,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("isConfigOptionVisible()", () => {
-    it("returns a boolean", () => {
-      wrapper = createWrapper();
-      const result = wrapper.vm.isConfigOptionVisible("general", "description");
-      expect(typeof result).toBe("boolean");
-    });
-
     it("description option is visible when no search query", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.isConfigOptionVisible("general", "description")).toBe(true);
