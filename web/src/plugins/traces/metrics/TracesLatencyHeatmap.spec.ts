@@ -479,4 +479,123 @@ describe("TracesLatencyHeatmap", () => {
       });
     }
   });
+
+  describe("drawn selection", () => {
+    const BOX = { start: 1, end: 2, start1: 0, end1: 1 };
+    const SELECTED = {
+      timeStartUs: START + 10 * S,
+      timeEndUs: START + 30 * S,
+      durationLoUs: 100_000,
+      durationHiUs: 500_000,
+    };
+    const popoverStub = {
+      OPopover: {
+        name: "OPopover",
+        props: ["open"],
+        emits: ["update:open"],
+        // Models reka's trigger, which toggles the popover on a click of its child.
+        template:
+          '<div><div @click="$emit(\'update:open\', !open)"><slot name="trigger" /></div><div v-if="open"><slot /></div></div>',
+      },
+    };
+    const close = async () => {
+      wrapper.findComponent({ name: "OPopover" }).vm.$emit("update:open", false);
+      await settle();
+    };
+    const drawn = () => wrapper.find('[data-test="traces-latency-heatmap-selection"]');
+    const action = (name: string) =>
+      wrapper.find(`[data-test="traces-latency-heatmap-selection-${name}"]`);
+    // The parent stores what the heatmap emits and hands it back, as TracesMetricsDashboard does.
+    const drawBox = async () => {
+      wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("updated:dataZoom", BOX);
+      await wrapper.setProps({ selection: wrapper.emitted("select")!.at(-1)![0] });
+      await settle();
+    };
+
+    it("keeps the box drawn after the chart resets its zoom brush", async () => {
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      expect(drawn().exists()).toBe(false);
+      await drawBox();
+      expect(wrapper.emitted("select")).toEqual([[SELECTED]]);
+      expect(drawn().exists()).toBe(true);
+      expect(drawn().classes()).toContain("border-accent");
+      // The chart's own option never carries the box, so the reset after a zoom cannot erase it.
+      expect(JSON.stringify(options(wrapper))).not.toContain("markArea");
+    });
+
+    it("summarises the selection with its span count, duration band and time window", async () => {
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      await drawBox();
+      expect(action("count").text()).toBe("40 spans selected");
+      expect(action("range").text()).toBe("100ms–500ms · 10:00:10–10:00:30");
+    });
+
+    it.each([
+      ["filter", "filter", "Filter to selection"],
+      ["drill-down", "drill-down", "Drill down"],
+      ["clear", "clear", "Clear selection"],
+    ])("emits %s from its popover action", async (name, event, label) => {
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      await drawBox();
+      expect(action(name).text()).toBe(label);
+      await action(name).trigger("click");
+      expect(wrapper.emitted(event)).toHaveLength(1);
+    });
+
+    it("lets a drag that starts inside the box reach the chart, so a smaller box can be drawn", async () => {
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      await drawBox();
+      expect(drawn().element.tagName).not.toBe("BUTTON");
+      expect(drawn().classes()).toContain("pointer-events-none");
+    });
+
+    it("reopens the popover from the box's corner control, a labelled button, after it was dismissed", async () => {
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      await drawBox();
+      await close();
+      expect(action("count").exists()).toBe(false);
+      const reopen = action("reopen");
+      expect(reopen.element.tagName).toBe("BUTTON");
+      expect(reopen.attributes("aria-label")).toBe("Show selection actions");
+      expect(reopen.classes()).toContain("pointer-events-auto");
+      expect(drawn().element.contains(reopen.element)).toBe(true);
+      await reopen.trigger("click");
+      await settle();
+      expect(action("count").exists()).toBe(true);
+    });
+
+    it("groups the span count's digits, as the Drill down panel does", async () => {
+      respond({
+        hits: [{ ...HITS[0], span_count: 460_122 }, HITS[1]],
+        histogram_interval: 10,
+      });
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      await drawBox();
+      expect(action("count").text()).toBe(`${(460_122).toLocaleString()} spans selected`);
+    });
+
+    it("closes the popover once the selection is filtered", async () => {
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      await drawBox();
+      await action("filter").trigger("click");
+      await settle();
+      expect(wrapper.emitted("filter")).toHaveLength(1);
+      expect(action("count").exists()).toBe(false);
+    });
+
+    it("erases the box once the parent drops the selection", async () => {
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      await drawBox();
+      await wrapper.setProps({ selection: null });
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it("forgets the box when a new search reloads the grid", async () => {
+      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      await drawBox();
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      expect(drawn().exists()).toBe(false);
+    });
+  });
 });

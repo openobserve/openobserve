@@ -36,19 +36,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="h-40 min-w-0 px-1 py-0.5 md:h-auto md:flex-1">
-          <TracesLatencyHeatmap :request="heatmapRequest" @select="onHeatmapSelect" />
+          <TracesLatencyHeatmap
+            :request="heatmapRequest"
+            :selection="heatmapSelection"
+            @select="onHeatmapSelect"
+            @filter="heatmapSelection && onHeatmapFilter(heatmapSelection)"
+            @drill-down="onHeatmapDrillDown"
+            @clear="onHeatmapClear"
+          />
         </div>
       </div>
     </transition>
 
-    <Teleport v-if="showComparison" defer to="#traces-drill-down-page">
-      <TracesComparison
-        :selection="comparisonSelection"
-        :streamName="streamName"
-        @close="showComparison = false"
-        @apply-filter="onComparisonApply"
-      />
-    </Teleport>
+    <TracesComparison
+      v-if="showComparison"
+      :selection="comparisonSelection"
+      :streamName="streamName"
+      :preset-context="presetContext"
+      @close="showComparison = false"
+      @apply-filter="onComparisonApply"
+    />
   </div>
 </template>
 
@@ -63,7 +70,7 @@ import metrics from "./metrics.json";
 import { deepCopy } from "@/utils/zincutils";
 import type { MetricsRangeFilter } from "@/ts/interfaces/traces/trace.types";
 import TracesLatencyHeatmap, { type LatencyHeatmapRequest } from "./TracesLatencyHeatmap.vue";
-import type { ComparisonSelection } from "./traceComparison";
+import type { ComparisonSelection, PresetContext } from "./traceComparison";
 import {
   buildLatencyHeatmapSql,
   chartInterval,
@@ -149,6 +156,8 @@ const currentTimeObj = ref({
 
 const dashboardData = ref(null);
 const heatmapRequest = ref<LatencyHeatmapRequest | null>(null);
+// The box drawn on the heatmap; it is applied only from its popover.
+const heatmapSelection = shallowRef<LatencyHeatmapSelection | null>(null);
 
 const showComparison = ref(false);
 // The comparison is a snapshot of the search that opened it, so a new search closes it.
@@ -159,9 +168,14 @@ watch(
   },
 );
 const comparisonSelection = shallowRef<ComparisonSelection | null>(null);
+const presetContext = shallowRef<PresetContext | null>(null);
 let comparisonEntry: MetricsRangeFilter | null = null;
 // The range the charts were last loaded for, which a selection's baseline describes.
 let chartsRange: TimeRange | null = null;
+// The editor text the charts ran with; with auto-run off the editor may hold an unrun edit.
+let chartsFilter = "";
+// The range the open comparison measured, which its Filter/Exclude restores.
+let comparisonRange: TimeRange | null = null;
 // Store the original time range before selection for baseline comparison
 const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
 
@@ -217,6 +231,8 @@ const loadDashboard = async () => {
       endTime: effectiveTimeRange.value.endTime,
     };
     chartsRange = { ...effectiveTimeRange.value };
+    chartsFilter = searchObj.data.editorValue ?? "";
+    heatmapSelection.value = null;
     convertedDashboard.tabs[0].panels.forEach(
       (
         panel: { title?: string; config: Record<string, unknown>; queries: { query: string }[] },
@@ -314,7 +330,72 @@ const onDataZoom = async ({
   await applySelection(panelTitle, data?.id ?? panelTitle, { start, end }, null, null, null, null);
 };
 
-const onHeatmapSelect = async (selection: LatencyHeatmapSelection) => {
+const onHeatmapSelect = (selection: LatencyHeatmapSelection) => {
+  heatmapSelection.value = selection;
+};
+
+const currentEntry = (panelTitle: MetricsRangeFilter["panelTitle"]) => {
+  const entry = [...rangeFilters.value.values()].find((f) => f.panelTitle === panelTitle);
+  return entry &&
+    isRangeSelectionCurrent(entry, {
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      stream: searchObj.data.stream.selectedStream.value,
+      searchMode: searchObj.meta.searchMode,
+      editorText: searchObj.data.editorValue ?? "",
+    })
+    ? entry
+    : undefined;
+};
+
+const isAppliedBox = (entry: MetricsRangeFilter | undefined, box: LatencyHeatmapSelection) =>
+  !!entry &&
+  entry.timeStart === box.timeStartUs &&
+  entry.timeEnd === box.timeEndUs &&
+  entry.start === (box.durationLoUs || null) &&
+  entry.end === box.durationHiUs;
+
+const onHeatmapDrillDown = () => {
+  const box = heatmapSelection.value;
+  if (!box) return;
+  // A box applied before the charts reload is still drawn on them, so it is checked against the editor.
+  if (isAppliedBox(currentEntry("Duration"), box)) {
+    openComparison();
+    return;
+  }
+  const range = chartsRange ?? effectiveTimeRange.value;
+  comparisonEntry = null;
+  comparisonRange = { ...range };
+  comparisonSelection.value = {
+    kind: "duration",
+    windowStartUs: box.timeStartUs,
+    windowEndUs: box.timeEndUs,
+    rangeStartUs: range.startTime,
+    rangeEndUs: range.endTime,
+    durationLoUs: box.durationLoUs || null,
+    durationHiUs: box.durationHiUs,
+    filter: decodeFilter(chartsFilter),
+  };
+  showComparison.value = true;
+};
+
+const onHeatmapClear = () => {
+  const box = heatmapSelection.value;
+  heatmapSelection.value = null;
+  const entry = currentEntry("Duration");
+  const range = originalTimeRangeBeforeSelection.value;
+  if (!box || !isAppliedBox(entry, box) || !entry || !range) return;
+  emit("time-range-selected", {
+    start: instantToPickerMs(Math.floor(range.startTime / 1_000_000) * 1000, store.state.timezone),
+    end: instantToPickerMs(Math.ceil(range.endTime / 1_000_000) * 1000, store.state.timezone),
+  });
+  searchObj.meta.metricsRangeFilters.clear();
+  clearOriginalTimeRange();
+  rangeFiltersVersion.value++;
+  emit("editor-filter-set", entry.baselineFilter);
+};
+
+const onHeatmapFilter = async (selection: LatencyHeatmapSelection) => {
   const { timeStartUs, timeEndUs, durationLoUs: lo, durationHiUs: hi } = selection;
   // The picker keeps whole seconds; rounding outwards keeps a mid-second clamped edge from emptying the range.
   const pickerRange = {
@@ -390,20 +471,29 @@ const COMPARISON_KINDS: Record<string, ComparisonSelection["kind"]> = {
   Rate: "rate",
 };
 
-// Opens on the selection the table shows; a stale or missing one opens the no-selection state.
+// An applied box still waiting for Run counts as current, and so does one the charts ran before a staged edit.
 const openComparison = () => {
   const entry = [...rangeFilters.value.values()][0];
+  const shown = chartsRange ?? effectiveTimeRange.value;
+  presetContext.value = {
+    rangeStartUs: shown.startTime,
+    rangeEndUs: shown.endTime,
+    filter: decodeFilter(chartsFilter),
+  };
   const range = originalTimeRangeBeforeSelection.value ?? effectiveTimeRange.value;
   const current =
     entry &&
-    isRangeSelectionCurrent(entry, {
-      startTime: searchObj.data.datetime.startTime,
-      endTime: searchObj.data.datetime.endTime,
-      stream: searchObj.data.stream.selectedStream.value,
-      searchMode: searchObj.meta.searchMode,
-      editorText: searchObj.data.editorValue ?? "",
-    });
+    [searchObj.data.editorValue ?? "", chartsFilter].some((editorText) =>
+      isRangeSelectionCurrent(entry, {
+        startTime: searchObj.data.datetime.startTime,
+        endTime: searchObj.data.datetime.endTime,
+        stream: searchObj.data.stream.selectedStream.value,
+        searchMode: searchObj.meta.searchMode,
+        editorText,
+      }),
+    );
   comparisonEntry = current ? entry : null;
+  comparisonRange = { ...(current ? range : shown) };
   comparisonSelection.value =
     current && COMPARISON_KINDS[entry.panelTitle]
       ? {
@@ -422,7 +512,10 @@ const openComparison = () => {
 
 const onComparisonApply = async (term: string) => {
   const entry = comparisonEntry;
-  const range = originalTimeRangeBeforeSelection.value ?? effectiveTimeRange.value;
+  // Without a stored selection the panel compared the editor's own filter, so the term joins it.
+  const base = entry?.baselineFilter ?? searchObj.data.editorValue ?? "";
+  const range =
+    comparisonRange ?? originalTimeRangeBeforeSelection.value ?? effectiveTimeRange.value;
   // R holds instants, not chart wall-clock values, so it converts like a heatmap box.
   emit("time-range-selected", {
     start: instantToPickerMs(Math.floor(range.startTime / 1_000_000) * 1000, store.state.timezone),
@@ -431,9 +524,10 @@ const onComparisonApply = async (term: string) => {
   searchObj.meta.metricsRangeFilters.clear();
   clearOriginalTimeRange();
   rangeFiltersVersion.value++;
+  heatmapSelection.value = null;
   // The picker updates the search range in a watcher; searching before the tick would use the selection's window.
   await nextTick();
-  emit("editor-filter-run", composeFilter(entry?.baselineFilter ?? "", term));
+  emit("editor-filter-run", composeFilter(base, term));
 };
 
 const clearOriginalTimeRange = () => {
