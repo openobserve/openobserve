@@ -434,7 +434,7 @@ pub async fn ack_complete<C: ConnectionTrait>(
 ) -> Result<Option<String>, errors::Error> {
     // `AND status = 1` makes the ack idempotent: only a job still in the Claimed
     // state can be completed. Without it a duplicate ack succeeded, the caller
-    // called `increment_jobs_done` a second time for one job, `jobs_done`
+    // called `finalize_run` a second time for one job, `jobs_done`
     // overshot `job_count`, and the run was declared complete on a PARTIAL set of
     // results — the roll-up status computed from whichever jobs happened to have
     // finished.
@@ -447,7 +447,7 @@ pub async fn ack_complete<C: ConnectionTrait>(
     // the row back to Pending, another agent leases it, and the row is at status 1
     // again — so the EVICTED holder's late ack still matches and overwrites the
     // new holder's result, or lands before it and gets overwritten. Either way one
-    // job produced two results and `increment_jobs_done` ran twice for it.
+    // job produced two results and `finalize_run` ran twice for it.
     //
     // `claimed_by` closes that: only the agent the row is currently leased to can
     // complete it. The lease already stamps `claimed_by`, so this compares against
@@ -498,7 +498,7 @@ pub async fn ack_complete<C: ConnectionTrait>(
         return Ok(None);
     }
 
-    // Fetch run_id so caller can call synthetics_runs::increment_jobs_done.
+    // Fetch run_id so caller can call synthetics_runs::finalize_run.
     let select_sql = "SELECT run_id FROM synthetics_jobs WHERE id = $1";
     let rows = conn
         .query_all(Statement::from_sql_and_values(
@@ -675,7 +675,7 @@ pub enum DispatchFailureOutcome {
     /// the SDK can also fail reading a response for an invocation that ran fine.
     /// Without this the requeue reset a finished job to Pending, it was leased
     /// again, and the check ran a second time — producing a duplicate result and a
-    /// second `increment_jobs_done` for one job.
+    /// second `finalize_run` for one job.
     ///
     /// Enforced by the compiler rather than a test: the dispatcher matches all three
     /// variants with no wildcard arm, so adding this one made "handle it" mandatory.
@@ -701,7 +701,7 @@ pub async fn fail_dispatch<C: ConnectionTrait>(
         // dispatch can be judged failed after the probe has already acked — a
         // Lambda that reports and then panics is exactly that — and without the
         // guard the requeue reset a COMPLETED job to Pending, so it was leased and
-        // run again: duplicate result, and `increment_jobs_done` twice for one job.
+        // run again: duplicate result, and `finalize_run` twice for one job.
         let sql = r#"
             UPDATE synthetics_jobs
             SET status = 0, claimed_by = NULL, claimed_at = NULL, lease_expires_at = NULL

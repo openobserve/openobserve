@@ -201,12 +201,13 @@ async fn apply_last_check_status<C: sea_orm::ConnectionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
-    status: i32,
+    streaks: &table::synthetics_checks::StatusStreaks,
 ) -> Result<()> {
-    if !table::synthetics_checks::update_last_check_status(conn, id, status).await? {
+    if !table::synthetics_checks::apply_replicated_streaks(conn, id, streaks).await? {
         log::debug!(
-            "[SUPER_CLUSTER:DB] synthetics check {org_id}/{id} status {status} was already \
-             current, or the check is not in this region"
+            "[SUPER_CLUSTER:DB] synthetics check {org_id}/{id} status {} was already current, \
+             older than the local run, or the check is not in this region",
+            streaks.last_check_status
         );
     }
     Ok(())
@@ -337,8 +338,21 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
                 )));
             }
         }
-        SyntheticsMessage::SetLastCheckStatus { org_id, id, status } => {
-            apply_last_check_status(conn, &org_id, &id, status).await?;
+        SyntheticsMessage::SetLastCheckStatus {
+            org_id,
+            id,
+            status,
+            down_runs,
+            up_runs,
+            run_ts,
+        } => {
+            let streaks = table::synthetics_checks::StatusStreaks {
+                last_check_status: status,
+                down_runs,
+                up_runs,
+                run_ts,
+            };
+            apply_last_check_status(conn, &org_id, &id, &streaks).await?;
         }
         SyntheticsMessage::MoveToFolder {
             org_id,
@@ -635,6 +649,9 @@ mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            status_down_runs: 0,
+            status_up_runs: 0,
+            status_run_ts: 0,
             owner: None,
             created_at: 0,
             updated_at: 0,
@@ -656,6 +673,70 @@ mod tests {
             .last_check_status
     }
 
+    /// A message from a producer without the streak fields: `run_ts` defaults to 0.
+    fn status_only(status: i32) -> infra::table::synthetics_checks::StatusStreaks {
+        infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: status,
+            ..Default::default()
+        }
+    }
+
+    async fn stored_streaks(
+        db: &sea_orm::DatabaseConnection,
+    ) -> infra::table::synthetics_checks::StatusStreaks {
+        infra::table::synthetics_checks::get_status_streaks(db, "check-1")
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    #[test]
+    fn a_message_without_the_streak_fields_still_decodes() {
+        let msg: SyntheticsMessage = serde_json::from_value(serde_json::json!({
+            "SetLastCheckStatus": {"org_id": "org1", "id": "check-1", "status": 3}
+        }))
+        .unwrap();
+        assert!(matches!(
+            msg,
+            SyntheticsMessage::SetLastCheckStatus {
+                status: 3,
+                run_ts: 0,
+                down_runs: 0,
+                up_runs: 0,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_late_or_repeated_streak_message_is_a_no_op() {
+        let db = db_with_a_check(0).await;
+        let newer = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 3,
+            down_runs: 2,
+            up_runs: 0,
+            run_ts: 200,
+        };
+        apply_last_check_status(&db, "org1", "check-1", &newer)
+            .await
+            .unwrap();
+        assert_eq!(stored_streaks(&db).await, newer);
+
+        let older = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 1,
+            down_runs: 0,
+            up_runs: 1,
+            run_ts: 100,
+        };
+        apply_last_check_status(&db, "org1", "check-1", &older)
+            .await
+            .unwrap();
+        apply_last_check_status(&db, "org1", "check-1", &newer)
+            .await
+            .unwrap();
+        assert_eq!(stored_streaks(&db).await, newer);
+    }
+
     /// The bug this variant exists for: only the region that ran the check
     /// writes `last_check_status`, so before this the LIST in every other region
     /// said "Unknown" for a check whose own detail page — federated search over
@@ -664,7 +745,7 @@ mod tests {
     async fn a_status_message_lands_on_the_local_row() {
         let db = db_with_a_check(0).await;
 
-        apply_last_check_status(&db, "org1", "check-1", 1)
+        apply_last_check_status(&db, "org1", "check-1", &status_only(1))
             .await
             .unwrap();
 
@@ -679,7 +760,7 @@ mod tests {
         let db = db_with_a_check(0).await;
 
         for _ in 0..3 {
-            apply_last_check_status(&db, "org1", "check-1", 3)
+            apply_last_check_status(&db, "org1", "check-1", &status_only(3))
                 .await
                 .unwrap();
         }
@@ -695,7 +776,7 @@ mod tests {
     async fn a_status_for_a_check_that_is_not_here_is_not_an_error() {
         let db = db_with_a_check(1).await;
 
-        apply_last_check_status(&db, "org1", "no-such-check", 3)
+        apply_last_check_status(&db, "org1", "no-such-check", &status_only(3))
             .await
             .expect("a missing row must be acked, not redelivered forever");
 
@@ -715,6 +796,9 @@ mod tests {
             org_id: "org1".to_string(),
             id: "check-1".to_string(),
             status: 1,
+            down_runs: 0,
+            up_runs: 0,
+            run_ts: 0,
         })
         .unwrap();
         let msg = Message::new(

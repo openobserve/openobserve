@@ -43,8 +43,10 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct CheckStateRow {
     pub id: String,
-    pub last_check_status: i32,
-    pub consecutive_failures: i32,
+    /// Consecutive Down run verdicts.
+    pub down_runs: i32,
+    /// Consecutive Up run verdicts.
+    pub up_runs: i32,
     pub last_triggered_at: i64,
 }
 
@@ -117,8 +119,8 @@ pub async fn get_check_states<C: ConnectionTrait>(
     let mut q = synthetics_checks::Entity::find()
         .select_only()
         .column(synthetics_checks::Column::Id)
-        .column(synthetics_checks::Column::LastCheckStatus)
-        .column(synthetics_checks::Column::ConsecutiveFailures)
+        .column(synthetics_checks::Column::StatusDownRuns)
+        .column(synthetics_checks::Column::StatusUpRuns)
         .column(synthetics_checks::Column::LastTriggeredAt)
         .column(synthetics_checks::Column::UpdatedAt)
         .filter(synthetics_checks::Column::Id.is_in(check_ids.iter().cloned()));
@@ -132,19 +134,17 @@ pub async fn get_check_states<C: ConnectionTrait>(
     let mut max_updated = since.unwrap_or(0);
     let out = rows
         .into_iter()
-        .map(
-            |(id, last_check_status, consecutive_failures, last_triggered_at, updated_at)| {
-                if updated_at > max_updated {
-                    max_updated = updated_at;
-                }
-                CheckStateRow {
-                    id,
-                    last_check_status,
-                    consecutive_failures,
-                    last_triggered_at,
-                }
-            },
-        )
+        .map(|(id, down_runs, up_runs, last_triggered_at, updated_at)| {
+            if updated_at > max_updated {
+                max_updated = updated_at;
+            }
+            CheckStateRow {
+                id,
+                down_runs,
+                up_runs,
+                last_triggered_at,
+            }
+        })
         .collect();
     Ok((out, max_updated))
 }
