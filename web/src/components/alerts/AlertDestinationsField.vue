@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :locked-workflow-names="lockedTargetNames"
         :placeholder="placeholder"
         :error="!!error"
+        :wrap="wrap"
         @update:destinations="emit('update:destinations', $event)"
         @update:workflows="emit('update:workflows', $event)"
         @refresh="refreshTargets"
@@ -135,8 +136,10 @@ const props = withDefaults(
      *  checks): the Workflows group and its fetch are skipped even on
      *  enterprise, so the picker cannot offer options that would not save. */
     supportsWorkflows?: boolean;
+    /** Let the controls wrap inside a column narrower than the row (opt-in). */
+    wrap?: boolean;
   }>(),
-  { supportsWorkflows: true, notifiesNobody: false, showStatus: false, targetRequired: false },
+  { supportsWorkflows: true, notifiesNobody: false, showStatus: false, wrap: false },
 );
 
 const emit = defineEmits<{

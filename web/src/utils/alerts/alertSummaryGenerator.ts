@@ -402,7 +402,7 @@ function forecastPhrase(forecast: any, kind: "summary" | "trigger", t: SummaryTr
 /**
  * Generate a plain English summary of the alert
  */
-function generatePlainEnglishSummary(
+export function generatePlainEnglishSummary(
   formData: any,
   destinations: any[],
   isRealTime: boolean,
