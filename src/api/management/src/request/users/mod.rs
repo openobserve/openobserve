@@ -830,6 +830,34 @@ pub async fn authentication(
     }
 }
 
+/// POST /auth/activity: refresh only the caller's own native browser session.
+/// A normal API request never refreshes the idle timer.
+#[cfg(not(feature = "enterprise"))]
+pub async fn native_session_activity(headers: HeaderMap) -> Response {
+    use axum_extra::extract::cookie::CookieJar;
+
+    if get_config().common.session_idle_timeout <= 0 {
+        return StatusCode::NO_CONTENT.into_response();
+    }
+    let jar = CookieJar::from_headers(&headers);
+    let Some(cookie) = jar.get("auth_tokens") else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+    let decoded = base64::decode(cookie.value()).unwrap_or_default();
+    let tokens: AuthTokens = json::from_str(&decoded).unwrap_or_default();
+    let Some(session_id) = tokens.access_token.strip_prefix("session ") else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+    // Require a live session, then atomically update only if it has not timed out.
+    if openobserve_core::session::get_session(session_id).await.is_none() {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    match db::session::record_user_activity(session_id).await {
+        Ok(true) => StatusCode::NO_CONTENT.into_response(),
+        _ => StatusCode::UNAUTHORIZED.into_response(),
+    }
+}
+
 #[derive(serde::Deserialize)]
 pub struct PresignedURLGenerator {
     #[serde(default = "default_exp_in")]
