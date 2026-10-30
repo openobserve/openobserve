@@ -7616,6 +7616,7 @@
       "aggRangeDesc": "Różnica między maksimum a minimum",
       "aggDiffLabel": "Różnica:",
       "aggDiffDesc": "Różnica między ostatnią a pierwszą",
+      "aggInstantNote": "W przypadku wykresu kołowego lub pierścieniowego dotyczy to zapytań zwracających kilka próbek, takich jak zapytania zakresowe. Zapytanie natychmiastowe z pojedynczą próbką zachowuje tę próbkę, więc mieszanie obu rodzajów pokazuje zredukowane wartości obok wartości surowych.",
       "geoLatTooltip": "Nazwa etykiety metryki zawierającej wartości szerokości geograficznej. Domyślnie: \"latitude\" lub \"lat\"",
       "geoLonTooltip": "Nazwa etykiety metryki zawierającej wartości długości geograficznej. Domyślnie: \"longitude\" lub \"lon\"",
       "geoWeightTooltip": "Nazwa etykiety metryki zawierającej wartości wagi. Domyślnie: \"weight\"",

@@ -7616,6 +7616,7 @@
       "aggRangeDesc": "최대값과 최소값의 차이",
       "aggDiffLabel": "차이:",
       "aggDiffDesc": "마지막 값과 첫 번째 값의 차이",
+      "aggInstantNote": "파이 또는 도넛 차트에서는 여러 샘플을 반환하는 쿼리(예: 범위 쿼리)에 적용됩니다. 단일 샘플의 즉시 쿼리는 해당 샘플을 유지하므로, 둘을 혼합하면 원시 값 옆에 축소된 값이 표시됩니다.",
       "geoLatTooltip": "위도 값을 포함하는 메트릭 레이블 이름. 기본값: \"latitude\" 또는 \"lat\"",
       "geoLonTooltip": "경도 값을 포함하는 메트릭 레이블 이름. 기본값: \"longitude\" 또는 \"lon\"",
       "geoWeightTooltip": "가중치 값을 포함하는 메트릭 레이블 이름. 기본값: \"weight\"",

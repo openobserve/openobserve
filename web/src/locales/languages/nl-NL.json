@@ -7616,6 +7616,7 @@
       "aggRangeDesc": "Verschil tussen max en min",
       "aggDiffLabel": "Verschil:",
       "aggDiffDesc": "Verschil tussen laatste en eerste",
+      "aggInstantNote": "Op een cirkel- of ringdiagram geldt dit voor query's die meerdere samples retourneren, zoals Range-query's. Een Instant-query met één sample behoudt dat sample, dus als je beide combineert, zie je verlaagde waarden naast ruwe waarden.",
       "geoLatTooltip": "Naam van het metrieklabel met latitude-waarden. Standaard: \"latitude\" of \"lat\"",
       "geoLonTooltip": "Naam van het metrieklabel met longitude-waarden. Standaard: \"longitude\" of \"lon\"",
       "geoWeightTooltip": "Naam van het metrieklabel met weight-waarden. Standaard: \"weight\"",

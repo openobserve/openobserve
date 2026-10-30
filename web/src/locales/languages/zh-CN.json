@@ -7616,6 +7616,7 @@
       "aggRangeDesc": "最大值与最小值之差",
       "aggDiffLabel": "差值：",
       "aggDiffDesc": "最后一个与第一个之差",
+      "aggInstantNote": "在饼图或环形图中，这会应用于返回多个样本的查询，例如 Range 查询。仅返回单个样本的 Instant 查询会保留该样本，因此混用两者时，会在原始值旁显示聚合后的值。",
       "geoLatTooltip": "包含纬度值的度量标签名称。默认值：\"latitude\" 或 \"lat\"",
       "geoLonTooltip": "包含经度值的度量标签名称。默认值：\"longitude\" 或 \"lon\"",
       "geoWeightTooltip": "包含权重值的度量标签名称。默认值：\"weight\"",
