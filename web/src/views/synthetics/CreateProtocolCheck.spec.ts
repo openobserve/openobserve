@@ -56,6 +56,7 @@ vi.mock("vue-router", () => ({
     replace: vi.fn(),
   }),
   onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/synthetics", async (importOriginal) => {

@@ -38,7 +38,8 @@ export function resetOnCallPermissions(): void {
 
 function isDenied(err: unknown): boolean {
   const status = (err as { response?: { status?: number } } | null)?.response?.status;
-  return status === 403 || status === 401;
+  // 08-rbac: only an observed 403 closes a control; a 401 is the session, which the http layer handles.
+  return status === 403;
 }
 
 export function useOnCallPermissions(): OnCallPermissions {
