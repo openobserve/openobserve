@@ -84,6 +84,10 @@ const emit = defineEmits<{
   "update:open": [boolean];
   /** Forwards reka's initial-focus event so a consumer can redirect it (call `preventDefault()` to opt out of the default first-tabbable focus). */
   "open-auto-focus": [Event];
+  /** Forwards reka's outside pointerdown; `preventDefault()` keeps the popover open, e.g. for a panel it owns outside its content. */
+  "pointer-down-outside": [Event];
+  /** Forwards reka's outside focus; `preventDefault()` keeps the popover open. */
+  "focus-outside": [Event];
 }>();
 
 // Vue boolean-casts an absent `open` prop to `false`, which would lock
@@ -175,11 +179,13 @@ function handlePointerDownOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }
+  emit("pointer-down-outside", event);
 }
 function handleFocusOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }
+  emit("focus-outside", event);
 }
 
 // Close on ancestor scroll so the portal never floats detached from its trigger.

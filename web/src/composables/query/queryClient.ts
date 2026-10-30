@@ -53,6 +53,8 @@ declare module "@tanstack/query-core" {
       invalidates?: readonly (readonly unknown[])[];
       /** Resolve `mutateAsync` only once the `invalidates` refetches land, so the caller reads fresh data next. */
       awaitInvalidation?: boolean;
+      /** Scopes marked stale without a refetch: each refetches the next time a reader mounts it. */
+      stales?: readonly (readonly unknown[])[];
       /**
        * Scopes whose *inactive* entries are dropped outright. Use after a
        * delete: invalidation alone leaves the deleted entity's detail query
@@ -92,6 +94,12 @@ export const queryClient = new QueryClient({
       const refetches: Promise<void>[] = (meta.invalidates ?? []).map((key) =>
         queryClient.invalidateQueries({ queryKey: key }),
       );
+      for (const key of meta.invalidates ?? []) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+      for (const key of meta.stales ?? []) {
+        void queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
+      }
       if (meta.successMessage) {
         notifyMutation("success", meta.successMessage);
       }

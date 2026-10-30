@@ -241,6 +241,7 @@ mod m20261025_000003_add_mute_targets_to_downtimes;
 mod m20261025_000004_create_slack_alert_messages;
 mod m20261025_000005_add_held_action_to_slack_link_requests;
 mod m20261026_000001_backfill_v1_rca_pointer;
+mod m20261027_000001_alter_query_history;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
 mod m20261030_000001_create_org_domain_ownership_table;
@@ -503,6 +504,20 @@ pub(crate) async fn backfill_v1_rca_pointer(db: &sea_orm::DatabaseConnection) ->
         .await
 }
 
+/// Apply the query_history table and its columns, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_query_history_table(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20261004_000001_create_query_history::Migration
+        .up(&manager)
+        .await?;
+    m20261027_000001_alter_query_history::Migration
+        .up(&manager)
+        .await
+}
+
 pub struct Migrator;
 
 #[async_trait::async_trait]
@@ -734,6 +749,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
             Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
             Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
+            Box::new(m20261027_000001_alter_query_history::Migration),
             Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
             Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
         ]
@@ -829,8 +845,9 @@ mod tests {
         ),
         (127, "m20261028_000001_add_group_label_set_to_alert_states"),
         (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
+        (129, "m20261027_000001_alter_query_history"),
         (
-            129,
+            130,
             "m20261030_000002_create_org_domain_ownership_req_table",
         ),
     ];

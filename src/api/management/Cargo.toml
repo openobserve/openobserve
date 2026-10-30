@@ -42,7 +42,8 @@ vectorscan = [
     "search_service/vectorscan",
     "stream/vectorscan",
 ]
-profiling = ["openobserve-core/profiling"]
+cpu-profiling = ["openobserve-core/cpu-profiling"]
+profiling = ["cpu-profiling", "openobserve-core/profiling"]
 
 [dependencies]
 anyhow.workspace = true

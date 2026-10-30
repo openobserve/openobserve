@@ -28,7 +28,7 @@ use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::org_domains;
-#[cfg(feature = "profiling")]
+#[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
@@ -954,12 +954,14 @@ pub fn basic_routes() -> Router {
     router = router.nest("/node", node_routes);
 
     // Debug/profiling routes with auth
-    #[cfg(feature = "profiling")]
+    #[cfg(feature = "cpu-profiling")]
     {
-        let debug_routes = Router::new()
+        let debug_routes = Router::new().route("/profile/cpu", get(profiling::cpu_profile));
+        #[cfg(feature = "profiling")]
+        let debug_routes = debug_routes
             .route("/profile/memory", get(profiling::memory_profile))
-            .route("/profile/stats", get(profiling::jemalloc_stats))
-            .route("/profile/cpu", get(profiling::cpu_profile))
+            .route("/profile/stats", get(profiling::jemalloc_stats));
+        let debug_routes = debug_routes
             .layer(middleware::from_fn(password_policy_middleware))
             .layer(middleware::from_fn(auth_middleware));
 
@@ -1378,7 +1380,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/savedviews", get(search::saved_view::get_views).post(search::saved_view::create_view))
         .route("/{org_id}/savedviews/{view_id}", get(search::saved_view::get_view).put(search::saved_view::update_view).delete(search::saved_view::delete_view))
 
-        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
+        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).delete(query_history::clear).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
         .route("/{org_id}/query_history/{id}", patch(query_history::star).delete(query_history::delete).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
 
         // Functions
@@ -4367,6 +4369,29 @@ mod tests {
         assert!(
             json.contains("/{org_id}/query_functions"),
             "query_functions is missing from the OpenAPI surface"
+        );
+    }
+
+    #[test]
+    fn query_history_list_publishes_both_response_shapes() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let ok = &spec["paths"]["/api/{org_id}/query_history"]["get"]["responses"]["200"];
+        assert_eq!(
+            ok["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/QueryHistoryListResponse"
+        );
+        let shapes = spec["components"]["schemas"]["QueryHistoryListResponse"]["oneOf"]
+            .as_array()
+            .expect("the list response is a oneOf");
+        let shapes = serde_json::to_string(shapes).unwrap();
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryEntry"),
+            "{shapes}"
+        );
+        assert!(shapes.contains("\"type\":\"array\""), "{shapes}");
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryCountResponse"),
+            "{shapes}"
         );
     }
 

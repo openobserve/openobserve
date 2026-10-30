@@ -99,6 +99,7 @@ const mockChartData = ref(undefined as any);
 const mockShowLegendsDialog = ref(false);
 const mockNoticeProps = ref<Record<string, unknown>>({});
 const mockRunQuery = vi.fn();
+const mockHandleChartApiError = vi.fn();
 
 // Mock usePanelEditor composable
 vi.mock("./composables/usePanelEditor", () => ({
@@ -129,7 +130,7 @@ vi.mock("./composables/usePanelEditor", () => ({
     currentPanelData: ref({}),
     initChartData: vi.fn(),
     runQuery: mockRunQuery,
-    handleChartApiError: vi.fn(),
+    handleChartApiError: mockHandleChartApiError,
     handleLastTriggeredAtUpdate: vi.fn(),
     handleLimitNumberOfSeriesWarningMessage: vi.fn(),
     handleIsPartialDataUpdate: vi.fn(),
@@ -1036,6 +1037,28 @@ describe("PanelEditor.vue", () => {
         },
         { name: "end_time", value: mockDashboardPanelData.meta.dateTime.end_time.getTime() },
       ]);
+    });
+  });
+
+  describe("renderer errors", () => {
+    beforeEach(() => {
+      mockChartData.value = {};
+      mockHandleChartApiError.mockClear();
+    });
+
+    it("shows the renderer's error and hands it to the page as renderer-error", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "metrics" },
+        global: mountGlobal,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const failure = { message: "parse error: unexpected <EOF>", code: 400 };
+      renderer.vm.$emit("error", failure);
+      expect(mockHandleChartApiError).toHaveBeenCalledWith(failure);
+      expect(wrapper.emitted("renderer-error")).toEqual([[failure]]);
+
+      renderer.vm.$emit("error", { message: "", code: "" });
+      expect(wrapper.emitted("renderer-error")?.[1]).toEqual([{ message: "", code: "" }]);
     });
   });
 });
