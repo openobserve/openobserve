@@ -13,17 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { enableAutoUnmount, mount, flushPromises } from "@vue/test-utils";
 import { ref } from "vue";
 import store from "@/test/unit/helpers/store";
-import i18n from "@/locales";
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
   record: vi.fn(),
   star: vi.fn(),
   remove: vi.fn(),
+  clear: vi.fn(),
 }));
 vi.mock("@/services/query_history", () => ({ default: api }));
 
@@ -32,22 +32,44 @@ vi.mock("@/composables/useBreakpoint", () => ({
   default: () => ({ isMobile: ref(breakpoint.mobile) }),
 }));
 
+const push = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push, resolve: () => ({ href: "/web/metrics" }) }),
+}));
+
 import QueryHistoryDrawer from "./QueryHistoryDrawer.vue";
 
-const ENTRIES = [
+enableAutoUnmount(afterEach);
+
+const NOW_US = Date.now() * 1000;
+
+// v1.1.x rows: no key, no window; the migration gave them source metrics and updated_at.
+const LEGACY = [
   {
     id: "e2",
+    source: "metrics",
     query: "rate(x[5m])",
+    query_key: null,
+    streams: [],
     context: { metrics_data: "blob-2", time_range: { period: "6h" }, chart_type: "bar" },
+    status: "ok",
     starred: true,
-    created_at: 2_000_000,
+    run_count: 1,
+    created_at: NOW_US,
+    updated_at: NOW_US,
   },
   {
     id: "e1",
+    source: "metrics",
     query: "up",
+    query_key: null,
+    streams: [],
     context: { metrics_data: "blob-1", time_range: { from: 1000, to: 2000 }, chart_type: "line" },
+    status: "ok",
     starred: false,
-    created_at: 1_000_000,
+    run_count: 1,
+    created_at: NOW_US - 1,
+    updated_at: NOW_US - 1,
   },
 ];
 
@@ -58,240 +80,122 @@ const mountDrawer = () =>
       stubs: {
         ODrawer: {
           props: ["open", "size"],
-          emits: ["update:open"],
-          template: `<div>
-            <span @click="$emit('update:open', true)"><slot name="trigger" /></span>
-            <div v-if="open" data-test="drawer" :data-size="size"><slot /></div>
-          </div>`,
+          template: `<div v-if="open" data-stub="drawer" :data-size="size"><slot /></div>`,
         },
-        OTable: {
-          props: ["data"],
-          emits: ["row-click"],
-          template: `<div>
-            <div v-for="row in data" :key="row.id" :data-test="'row-' + row.id" @click="$emit('row-click', row, $event)">
-              <slot name="cell-query" :row="row" />
-              <slot name="cell-actions" :row="row" />
-            </div>
-          </div>`,
+        ODropdown: { template: `<div @click.stop><slot name="trigger" /><slot /></div>` },
+        ODropdownItem: {
+          emits: ["select"],
+          template: `<button v-bind="$attrs" @click="$emit('select')"><slot /></button>`,
         },
         OTimeCell: true,
         OTooltip: true,
-        OSearchInput: {
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-          template:
-            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-        },
-        OSwitch: {
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-          template:
-            '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-        },
       },
     },
   });
 
-const open = async (wrapper: any) => {
-  await wrapper.find('[data-test="metrics-history-btn"]').trigger("click");
+const open = async (wrapper: ReturnType<typeof mountDrawer>) => {
+  (wrapper.vm as unknown as { show: () => void }).show();
   await flushPromises();
 };
 
-describe("QueryHistoryDrawer", () => {
+describe("QueryHistoryDrawer (Metrics on the shared drawer)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     breakpoint.mobile = false;
-    api.list.mockResolvedValue({ data: ENTRIES });
-    api.star.mockResolvedValue({ data: {} });
-    api.remove.mockResolvedValue({ data: {} });
+    api.list.mockResolvedValue({ data: LEGACY });
   });
 
-  it("fetches nothing until opened, then lists the entries in server (newest-first) order", async () => {
+  it("fetches nothing until opened, then lists this page's rows newest first", async () => {
     const wrapper = mountDrawer();
     await flushPromises();
     expect(api.list).not.toHaveBeenCalled();
 
     await open(wrapper);
-    expect(api.list).toHaveBeenCalledWith("default", { limit: 50, offset: 0 });
-    const rows = wrapper.findAll('[data-test^="row-"]').map((r) => r.attributes("data-test"));
-    expect(rows).toEqual(["row-e2", "row-e1"]);
+    expect(api.list).toHaveBeenCalledWith("default", { source: "metrics", limit: 50, offset: 0 });
+    const rows = wrapper
+      .findAll('[data-test^="recent-searches-drawer-row-"]')
+      .map((r) => r.attributes("data-test"));
+    expect(rows).toEqual(["recent-searches-drawer-row-e2", "recent-searches-drawer-row-e1"]);
   });
 
-  it("asks the server for starred entries only when the toggle is on", async () => {
+  it("re-runs a v1.1.x row with its stored panel and range", async () => {
     const wrapper = mountDrawer();
     await open(wrapper);
 
-    await wrapper.find('[data-test="metrics-history-starred-only"]').setValue(true);
+    await wrapper.find('[data-test="recent-searches-drawer-row-e2"]').trigger("click");
     await flushPromises();
-    expect(api.list).toHaveBeenLastCalledWith("default", { starred: true, limit: 50, offset: 0 });
+    expect(wrapper.emitted("load")?.[0]?.[0]).toEqual({
+      metricsData: "blob-2",
+      timeRange: expect.objectContaining({ valueType: "relative", relativeTimePeriod: "6h" }),
+      run: true,
+    });
+    expect(wrapper.find('[data-stub="drawer"]').exists()).toBe(false);
   });
 
-  it("searches on the server", async () => {
+  it("loads a v1.1.x absolute row without running", async () => {
     const wrapper = mountDrawer();
     await open(wrapper);
 
-    await wrapper.find('[data-test="metrics-history-search"]').setValue("rate");
+    await wrapper.find('[data-test="recent-searches-load-e1"]').trigger("click");
     await flushPromises();
-    expect(api.list).toHaveBeenLastCalledWith("default", { q: "rate", limit: 50, offset: 0 });
+    expect(wrapper.emitted("load")?.[0]?.[0]).toEqual({
+      metricsData: "blob-1",
+      timeRange: expect.objectContaining({ valueType: "absolute", startTime: 1000, endTime: 2000 }),
+      run: false,
+    });
   });
 
   it("stars, unstars and deletes through the entry routes", async () => {
+    api.star.mockResolvedValue({ data: {} });
+    api.remove.mockResolvedValue({ data: {} });
     const wrapper = mountDrawer();
     await open(wrapper);
 
-    await wrapper.find('[data-test="metrics-history-star-e1"]').trigger("click");
+    await wrapper.find('[data-test="recent-searches-star-e1"]').trigger("click");
     await flushPromises();
     expect(api.star).toHaveBeenCalledWith("default", "e1", true);
-
-    await wrapper.find('[data-test="metrics-history-star-e2"]').trigger("click");
+    await wrapper.find('[data-test="recent-searches-star-e2"]').trigger("click");
     await flushPromises();
     expect(api.star).toHaveBeenCalledWith("default", "e2", false);
-
-    await wrapper.find('[data-test="metrics-history-delete-e1"]').trigger("click");
-    await flushPromises();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await wrapper.find('[data-test="recent-searches-delete-e1"]').trigger("click");
+      vi.advanceTimersByTime(6000);
+      await flushPromises();
+    } finally {
+      vi.useRealTimers();
+    }
     expect(api.remove).toHaveBeenCalledWith("default", "e1");
-    // A row action is not a load.
     expect(wrapper.emitted("load")).toBeUndefined();
   });
 
-  it("loads a clicked entry and closes", async () => {
+  it("opens another page's row on that page instead of loading it here", async () => {
     const wrapper = mountDrawer();
-    await open(wrapper);
-
-    await wrapper.find('[data-test="row-e2"]').trigger("click");
-    await flushPromises();
-
-    expect(wrapper.emitted("load")?.[0]?.[0]).toMatchObject({
-      metricsData: "blob-2",
-      timeRange: { valueType: "relative", relativeTimePeriod: "6h" },
-    });
-    expect(wrapper.find('[data-test="drawer"]').exists()).toBe(false);
-  });
-
-  describe("loading past the first page", () => {
-    const page = (from: number, count: number) =>
-      Array.from({ length: count }, (_, i) => ({
-        ...ENTRIES[1],
-        id: `p${from + i}`,
-        created_at: 1_000_000 - (from + i),
-      }));
-    const loadMore = (wrapper: any) => wrapper.find('[data-test="metrics-history-load-more"]');
-
-    it("fetches the next page by offset and appends it", async () => {
-      api.list.mockImplementation((_org: string, params: any) =>
-        Promise.resolve({ data: params.offset ? page(50, 7) : page(0, 50) }),
-      );
-      const wrapper = mountDrawer();
-      await open(wrapper);
-      expect(wrapper.findAll('[data-test^="row-"]')).toHaveLength(50);
-
-      await loadMore(wrapper).trigger("click");
-      await flushPromises();
-      expect(api.list).toHaveBeenLastCalledWith("default", { limit: 50, offset: 50 });
-      const rows = wrapper.findAll('[data-test^="row-"]').map((r) => r.attributes("data-test"));
-      expect(rows).toHaveLength(57);
-      expect(rows[0]).toBe("row-p0");
-      expect(rows[50]).toBe("row-p50");
-      // The short page was the last one.
-      expect(loadMore(wrapper).exists()).toBe(false);
-    });
-
-    it("offers no more when the first page is already short", async () => {
-      const wrapper = mountDrawer();
-      await open(wrapper);
-      expect(loadMore(wrapper).exists()).toBe(false);
-    });
+    (wrapper.vm as unknown as { restore: (...args: unknown[]) => void }).restore(
+      {
+        ...LEGACY[0],
+        id: "logs-row",
+        source: "logs",
+        query: "level = 'error'",
+        streams: ["k8s"],
+        context: { page: { stream: "k8s" } },
+      },
+      "now",
+      true,
+    );
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "/logs",
+        query: expect.objectContaining({ type: "search_history_re_apply" }),
+      }),
+    );
+    expect(wrapper.emitted("load")).toBeUndefined();
   });
 
   it("goes full screen on mobile", async () => {
     breakpoint.mobile = true;
     const wrapper = mountDrawer();
     await open(wrapper);
-    expect(wrapper.find('[data-test="drawer"]').attributes("data-size")).toBe("full");
-  });
-});
-
-// The real OTable: it owns the #empty slot and the cell slots, so a stub would hide a wrong slot.
-describe("QueryHistoryDrawer with the real OTable", () => {
-  const DrawerStub = {
-    props: ["open", "size"],
-    emits: ["update:open"],
-    template: `<div>
-      <span @click="$emit('update:open', true)"><slot name="trigger" /></span>
-      <div v-if="open" data-test="drawer"><slot /></div>
-    </div>`,
-  };
-  const mountReal = () =>
-    mount(QueryHistoryDrawer, {
-      global: { plugins: [i18n, store], stubs: { ODrawer: DrawerStub } },
-    });
-  const emptyTitle = (wrapper: any) => wrapper.find('[data-test="metrics-history-empty"]').text();
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    breakpoint.mobile = false;
-    api.list.mockResolvedValue({ data: [] });
-  });
-
-  it("says there are no queries yet when nothing filters the list", async () => {
-    const wrapper = mountReal();
-    await open(wrapper);
-    await vi.waitFor(() => expect(emptyTitle(wrapper)).toContain("No queries yet"));
-  });
-
-  it("says no queries match when a search finds nothing", async () => {
-    const wrapper = mountReal();
-    await open(wrapper);
-    const search = wrapper.find('[data-test="metrics-history-search"]');
-    await (search.element.tagName === "INPUT" ? search : search.find("input")).setValue("nomatch");
-    await vi.waitFor(() =>
-      expect(api.list).toHaveBeenCalledWith("default", expect.objectContaining({ q: "nomatch" })),
-    );
-    await vi.waitFor(() =>
-      expect(emptyTitle(wrapper)).toContain("No queries match the search or starred filter"),
-    );
-  });
-
-  it("folds the row actions into a kebab on a phone, whose Star and Delete reach the entry routes", async () => {
-    breakpoint.mobile = true;
-    api.list.mockResolvedValue({ data: ENTRIES });
-    api.star.mockResolvedValue({ data: {} });
-    api.remove.mockResolvedValue({ data: {} });
-    const wrapper = mount(QueryHistoryDrawer, {
-      attachTo: document.body,
-      global: { plugins: [i18n, store], stubs: { ODrawer: DrawerStub } },
-    });
-    await open(wrapper);
-    const more = () => wrapper.find('[data-test="metrics-history-more-e1"]');
-    await vi.waitFor(() => expect(more().exists()).toBe(true));
-    expect(more().classes()).toContain("md:hidden");
-    expect(wrapper.find('[data-test="metrics-history-delete-e1"]').classes()).toContain(
-      "max-md:hidden",
-    );
-    expect(wrapper.find('[data-test="metrics-history-star-e1"]').classes()).toContain(
-      "max-md:hidden",
-    );
-
-    // The menu is portalled to <body>, outside the wrapper.
-    const pick = async (dataTest: string) => {
-      await more().trigger("keydown", { key: "Enter" });
-      await flushPromises();
-      const item = await vi.waitFor(() => {
-        const el = document.querySelector<HTMLElement>(`[data-test="${dataTest}"]`);
-        expect(el).not.toBeNull();
-        return el!;
-      });
-      expect(item.classList.contains("md:hidden")).toBe(false);
-      item.click();
-      await flushPromises();
-    };
-
-    await pick("metrics-history-star-e1-menu");
-    expect(api.star).toHaveBeenCalledWith("default", "e1", true);
-
-    await pick("metrics-history-delete-e1-menu");
-    expect(api.remove).toHaveBeenCalledWith("default", "e1");
-    expect(wrapper.emitted("load")).toBeUndefined();
-    wrapper.unmount();
+    expect(wrapper.find('[data-stub="drawer"]').attributes("data-size")).toBe("full");
   });
 });
