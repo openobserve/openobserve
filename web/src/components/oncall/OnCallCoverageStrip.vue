@@ -138,8 +138,10 @@ const props = withDefaults(
     days?: number;
     /** Instant the strip starts from, in micros. Defaults to now. */
     fromMicros?: number | null;
+    /** People a page would not reach; holding a shift does not make them cover. */
+    unreachable?: string[];
   }>(),
-  { rotations: () => [], timezone: "UTC", days: 14, fromMicros: null },
+  { rotations: () => [], timezone: "UTC", days: 14, fromMicros: null, unreachable: () => [] },
 );
 
 const { t } = useI18nTyped();
@@ -152,7 +154,7 @@ const start = computed(() => props.fromMicros ?? Date.now() * 1000);
 const end = computed(() => start.value + props.days * MICROS_PER_DAY);
 const span = computed(() => end.value - start.value);
 
-type Cover = "both" | "primary" | "none";
+type Cover = "both" | "primary" | "unreachable" | "none";
 
 interface Sample {
   cover: Cover;
@@ -161,6 +163,10 @@ interface Sample {
   /** Second staffed rotation's holder, if any — the "behind them" of `coverAt`. */
   secondary: string | null;
 }
+
+const unreachableSet = computed(
+  () => new Set(props.unreachable.map((email) => email.toLowerCase())),
+);
 
 /// Three states rather than a person per band: at a fortnight's zoom the
 /// question is "is anybody on, and is anybody behind them", not "who". The
@@ -175,19 +181,34 @@ function sampleAt(at: number): Sample {
   const staffed = props.rotations
     .map((rotation) => resolveHolder(rotation, at, props.timezone).member)
     .filter((member): member is string => Boolean(member));
-  const cover: Cover = staffed.length === 0 ? "none" : staffed.length > 1 ? "both" : "primary";
-  return { cover, primary: staffed[0] ?? null, secondary: staffed[1] ?? null };
+  const reachable = staffed.filter((member) => !unreachableSet.value.has(member.toLowerCase()));
+  return {
+    cover: coverOf(staffed.length, reachable.length),
+    primary: staffed[0] ?? null,
+    secondary: staffed[1] ?? null,
+  };
 }
+
+function coverOf(staffed: number, reachable: number): Cover {
+  if (staffed === 0) return "none";
+  if (reachable === 0) return "unreachable";
+  return reachable > 1 ? "both" : "primary";
+}
+
+/// A stretch nothing reachable covers — what the summary warns about.
+const isHole = (cover: Cover) => cover === "none" || cover === "unreachable";
 
 const TONE: Record<Cover, ScheduleBand["tone"]> = {
   both: "covered",
   primary: "partial",
+  unreachable: "unreachable",
   none: "gap",
 };
 
 const COVER_LABEL: Record<Cover, string> = {
   both: "oncall.coverTwoRotations",
   primary: "oncall.coverOneRotation",
+  unreachable: "oncall.coverage_unreachable",
   none: "oncall.coverNobody",
 };
 
@@ -349,7 +370,7 @@ const tracks = computed<ScheduleTrack[]>(() => {
       width: (run.to - run.from) / span.value,
       // Only the gap carries text: a fortnight of cover labelled fourteen times
       // is noise, and the band a reader is hunting for is the empty one.
-      label: run.cover === "none" ? label : raw(""),
+      label: isHole(run.cover) ? label : raw(""),
       ariaLabel: t("oncall.coverageStripAria", {
         who: label,
         from: raw(clock(run.from)),
@@ -365,10 +386,22 @@ const tracks = computed<ScheduleTrack[]>(() => {
 /// The first stretch with nobody on call. Read off the SAME runs the bands are
 /// drawn from, never resolved a second way: a sentence that disagreed with the
 /// picture above it would be worse than no sentence.
-const firstGap = computed<Run | null>(() => runs.value.find((run) => run.cover === "none") ?? null);
+const firstGap = computed<Run | null>(() => {
+  const first = runs.value.findIndex((run) => isHole(run.cover));
+  if (first < 0) return null;
+  // Adjacent holes are one hole: "until" must name when reachable cover returns, not when one kind of hole becomes another.
+  let last = first;
+  while (last + 1 < runs.value.length && isHole(runs.value[last + 1].cover)) last += 1;
+  const stretch = runs.value.slice(first, last + 1);
+  return {
+    from: stretch[0].from,
+    to: stretch[stretch.length - 1].to,
+    cover: stretch.some((run) => run.cover === "unreachable") ? "unreachable" : "none",
+  };
+});
 
 /// Cover the moment the strip starts, which is now.
-const coveredNow = computed(() => runs.value[0]?.cover !== "none");
+const coveredNow = computed(() => !isHole(runs.value[0]?.cover ?? "none"));
 
 /// "Cover drops in 5d 3h — Fri 22 Aug 18:00, for 12h", or the calm version.
 ///
@@ -391,6 +424,11 @@ const summary = computed<I18nText>(() => {
   );
   const length = formatMicrosDuration(gap.to - gap.from);
 
+  if (!coveredNow.value && gap.cover === "unreachable") {
+    return gap.to >= end.value
+      ? t("oncall.coverageUnreachableNowOpen", { days: props.days })
+      : t("oncall.coverageUnreachableNow", { when: raw(rangeStamp(gap.to)) });
+  }
   if (!coveredNow.value) {
     // A hole that runs to the end of the window has no known return: saying
     // cover comes back at the edge of what we drew would invent a shift.
@@ -482,6 +520,16 @@ const legend = computed<LegendEntry[]>(() => [
     swatch: "bg-badge-success-solid-bg",
   },
   { key: "primary", label: t("oncall.coverOneRotation"), swatch: "bg-badge-warning-solid-bg" },
+  // Only when the window has some: a fourth swatch for a state nobody is in is noise.
+  ...(runs.value.some((run) => run.cover === "unreachable")
+    ? [
+        {
+          key: "unreachable" as const,
+          label: t("oncall.coverage_unreachable"),
+          swatch: "bg-badge-error-solid-bg",
+        },
+      ]
+    : []),
   { key: "none", label: t("oncall.coverNobody"), swatch: "bg-schedule-gap-bg" },
 ]);
 </script>

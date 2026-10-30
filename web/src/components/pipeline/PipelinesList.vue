@@ -154,6 +154,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
+          <template #cell-name="{ row }">
+            <span class="inline-flex min-w-0 items-center gap-2">
+              <OTruncatedText :data-test="`pipeline-list-name-cell-${row.name}`">{{
+                row.name
+              }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="pipelineDrafts.ids.has(row.pipeline_id)"
+                :saved-at="pipelineDrafts.savedAt(row.pipeline_id)"
+                :data-test="`pipeline-list-${row.name}-draft-dot`"
+              />
+            </span>
+          </template>
+
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
               <OButton
@@ -554,6 +567,10 @@ import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDia
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -667,6 +684,11 @@ const resumePipelineDialogMeta: any = ref({
 });
 
 const { pipelineObj } = useDragAndDrop(t);
+const pipelineDrafts = useEditorDraftIds("pipeline");
+const dropPipelineDrafts = (ids: string[]) => {
+  const org = store.state.selectedOrganization.identifier;
+  ids.forEach((entityId) => deleteEditorDraftsFor({ kind: "pipeline", org, entityId }));
+};
 
 const oTableRef: any = ref(null);
 // Plain ref, not URL/store-backed: PipelinesList stays mounted across pipelineEditor/import/history/backfill child-route navigation, so this alone survives the round trip.
@@ -1194,6 +1216,7 @@ const deletePipeline = async () => {
       org_id,
     })
     .then(async () => {
+      dropPipelineDrafts([pipeline_id]);
       toast({
         message: t("toastMessages.pipeline.pipelineDeletedSuccessfully"),
         variant: "success",
@@ -1489,6 +1512,7 @@ const bulkDeletePipelines = async () => {
     // Handle response based on successful/unsuccessful arrays
     if (response.data) {
       const { successful = [], unsuccessful = [] } = response.data;
+      dropPipelineDrafts(successful.map(String));
       const successCount = successful.length;
       const failCount = unsuccessful.length;
 
@@ -1518,6 +1542,7 @@ const bulkDeletePipelines = async () => {
         });
       }
     } else {
+      dropPipelineDrafts(payload.ids);
       // Fallback success message
       toast({
         variant: "success",

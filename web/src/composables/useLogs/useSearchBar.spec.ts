@@ -21,6 +21,7 @@ import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
 import searchState from "./searchState";
 import { resetLogsAutoRunForTests, useLogsAutoRun } from "./logsAutoRun";
+import { REFRESH_QUERY_ORIGIN } from "./logsRowNav";
 import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
 
@@ -249,6 +250,28 @@ describe("useSearchBar Composable", () => {
       const searchObj = prime(false);
       await (wrapper.vm as any).getQueryData(true);
       expect(searchObj.meta.showDetailTab).toBe(false);
+    });
+
+    it("an auto-refresh query keeps the drawer and drops only the stale row index", async () => {
+      const searchObj = prime(false);
+      await (wrapper.vm as any).getQueryData(false, { origin: REFRESH_QUERY_ORIGIN });
+      expect(searchObj.meta.showDetailTab).toBe(true);
+      expect(searchObj.meta.resultGrid.navigation).toEqual({
+        currentRowIndex: null,
+        selectionActive: true,
+        pendingPageSelection: null,
+      });
+      expect(mockGetDataThroughStream).toHaveBeenCalledWith(false, undefined, {
+        reuseSchema: false,
+      });
+    });
+
+    it("an auto-refresh query with the drawer closed still drops the selection", async () => {
+      const searchObj = prime(false);
+      searchObj.meta.showDetailTab = false;
+      await (wrapper.vm as any).getQueryData(false, { origin: REFRESH_QUERY_ORIGIN });
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBeNull();
+      expect(searchObj.meta.resultGrid.navigation.selectionActive).toBe(false);
     });
   });
 

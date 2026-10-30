@@ -299,13 +299,6 @@ pub struct TriggerData {
     pub query_took: Option<i64>,
     pub scheduler_trace_id: Option<String>,
     pub time_in_queue_ms: Option<i64>,
-    // Deduplication tracking fields
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dedup_enabled: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dedup_suppressed: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dedup_count: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grouped: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -403,9 +396,6 @@ impl Default for TriggerData {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
@@ -466,9 +456,6 @@ impl TriggerData {
             query_took: Some(0),
             scheduler_trace_id: Some(String::new()),
             time_in_queue_ms: Some(0),
-            dedup_enabled: Some(false),
-            dedup_suppressed: Some(false),
-            dedup_count: Some(0),
             grouped: Some(false),
             group_size: Some(0),
             actual_value: Some(0.0),
@@ -1911,9 +1898,6 @@ mod tests {
             query_took: Some(500),
             scheduler_trace_id: Some("trace123".to_string()),
             time_in_queue_ms: Some(100),
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
@@ -2498,11 +2482,8 @@ mod tests {
         let data = TriggerData::default();
         let json = serde_json::to_value(&data).unwrap();
         let obj = json.as_object().unwrap();
-        // These 6 fields have skip_serializing_if = "Option::is_none"
+        // These 3 fields have skip_serializing_if = "Option::is_none"
         assert!(!obj.contains_key("skipped_alerts_count"));
-        assert!(!obj.contains_key("dedup_enabled"));
-        assert!(!obj.contains_key("dedup_suppressed"));
-        assert!(!obj.contains_key("dedup_count"));
         assert!(!obj.contains_key("grouped"));
         assert!(!obj.contains_key("group_size"));
     }
@@ -2511,9 +2492,6 @@ mod tests {
     fn test_trigger_data_skip_serializing_if_some_fields() {
         let data = TriggerData {
             skipped_alerts_count: Some(3),
-            dedup_enabled: Some(true),
-            dedup_suppressed: Some(false),
-            dedup_count: Some(5),
             grouped: Some(true),
             group_size: Some(10),
             ..TriggerData::default()
@@ -2522,9 +2500,6 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("skipped_alerts_count"));
         assert_eq!(obj["skipped_alerts_count"], serde_json::json!(3_i64));
-        assert!(obj.contains_key("dedup_enabled"));
-        assert!(obj.contains_key("dedup_suppressed"));
-        assert!(obj.contains_key("dedup_count"));
         assert!(obj.contains_key("grouped"));
         assert!(obj.contains_key("group_size"));
     }

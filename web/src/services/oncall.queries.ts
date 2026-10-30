@@ -565,10 +565,18 @@ export const removeTeamMemberMutation = (org: string, teamId: string) =>
     meta: { invalidates: teamWriteScopes(org, teamId), silentError: true },
   });
 
+/// Every client schedule write is a human's, so none of it is the untouched default; one place, so no caller can forget.
 export const setTeamScheduleMutation = (org: string, teamId: string) =>
   mutationOptions({
     mutationFn: (data: { timezone: string; rotations: Rotation[] }) =>
-      oncallService.setSchedule({ org_identifier: org, team_id: teamId, data }),
+      oncallService.setSchedule({
+        org_identifier: org,
+        team_id: teamId,
+        data: {
+          ...data,
+          rotations: data.rotations.map((rotation) => ({ ...rotation, source: undefined })),
+        },
+      }),
     meta: { invalidates: teamWriteScopes(org, teamId), silentError: true },
   });
 

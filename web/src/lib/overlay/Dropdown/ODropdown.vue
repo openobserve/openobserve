@@ -304,7 +304,7 @@ onBeforeUnmount(() => {
           'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
-          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
+          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
           // Typography
           'text-dropdown-item-text text-sm',
           // Animation — clip-path reveal: the menu is unveiled at full size from

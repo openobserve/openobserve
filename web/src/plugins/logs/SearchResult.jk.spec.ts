@@ -26,7 +26,8 @@ import {
 } from "@/composables/useLogs/logsAutoRun";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { searchState } from "@/composables/useLogs/searchState";
-import { logsRowNavAnnouncement } from "@/composables/useLogs/logsRowNav";
+import { logsRowNavAnnouncement, REFRESH_QUERY_ORIGIN } from "@/composables/useLogs/logsRowNav";
+import { sharedLineRecord } from "@/composables/useLogs/useLogPermalink";
 import { useShortcuts, resetManager } from "@/lib/vue-shortcut-manager";
 import StreamService from "@/services/stream";
 import streamsModule from "@/stores/streams";
@@ -60,7 +61,9 @@ const rows = (page: number) =>
     _stream_name: "app",
   }));
 
-const hostApi: { getQueryData: (isPagination?: boolean) => Promise<unknown> } = {
+const hostApi: {
+  getQueryData: (isPagination?: boolean, options?: { origin?: string }) => Promise<unknown>;
+} = {
   getQueryData: async () => undefined,
 };
 
@@ -513,6 +516,70 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBe(2);
     expect(activeRows()).toEqual(["o2-table-row-2"]);
     expect(drawerText()).toContain("p1-row1");
+  });
+
+  describe("auto refresh with the drawer open", () => {
+    const refresh = async () => {
+      hostApi.getQueryData(false, { origin: REFRESH_QUERY_ORIGIN });
+      await flushPromises();
+    };
+    const openRow1 = async () => {
+      resultsRow(1)!.click();
+      await vi.waitFor(() => expect(drawerText()).toContain("p1-row1"));
+    };
+    const newer = { _timestamp: 1_700_000_000_000_001, message: "newest", _stream_name: "app" };
+
+    it("keeps the record and moves the index to where it lands in the new hits", async () => {
+      await openRow1();
+      await refresh();
+      expect(searchObj.meta.showDetailTab).toBe(true);
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBeNull();
+      expect(activeRows()).toEqual([]);
+      await deliverPage([newer, ...rows(1)]);
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBe(2);
+      expect(drawerText()).toContain("p1-row1");
+    });
+
+    it("keeps the record with no index when it has left the results", async () => {
+      await openRow1();
+      await refresh();
+      await deliverPage(rows(2));
+      expect(searchObj.meta.showDetailTab).toBe(true);
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBeNull();
+      expect(drawerText()).toContain("p1-row1");
+      expect(wrapper.findComponent(SearchResult).vm.navDisabledReason).toBe("resultsChanged");
+    });
+
+    it("a refresh that never completes leaves no stale index behind", async () => {
+      searchObj.meta.resultGrid.navigation.selectionActive = true;
+      await openRow1();
+      await refresh();
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBeNull();
+      expect(activeRows()).toEqual([]);
+    });
+
+    it("a refresh that swaps the results for the error state never reopens an empty drawer", async () => {
+      await openRow1();
+      await refresh();
+      searchObj.data.errorMsg = "boom";
+      await flushPromises();
+      expect(drawer()).toBeNull();
+      searchObj.data.errorMsg = "";
+      await flushPromises();
+      expect(wrapper.findComponent(SearchResult).exists()).toBe(true);
+      expect(searchObj.meta.showDetailTab).toBe(false);
+      expect(drawer()).toBeNull();
+    });
+
+    it("a drawer opened from a shared line reports changed results once the link is cleared", async () => {
+      sharedLineRecord.value = { ...rows(1)[1] };
+      await vi.waitFor(() => expect(drawerText()).toContain("p1-row1"));
+      await refresh();
+      expect(sharedLineRecord.value).toBeNull();
+      await deliverPage(rows(2));
+      expect(searchObj.meta.showDetailTab).toBe(true);
+      expect(wrapper.findComponent(SearchResult).vm.navDisabledReason).toBe("resultsChanged");
+    });
   });
 
   it("stale results keep J/K inside the page but block the edge with the run hint (AC5.7)", async () => {
