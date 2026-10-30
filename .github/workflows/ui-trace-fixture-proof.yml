@@ -1,0 +1,88 @@
+name: Trace fixture sample proof
+on:
+  push:
+    branches: [bench/ui-trace-fixture-proof-20261031]
+    paths:
+      - .github/workflows/ui-trace-fixture-proof.yml
+      - .github/ui-trace-fixture-proof/**
+permissions:
+  contents: read
+jobs:
+  measure:
+    if: github.repository == 'openobserve/openobserve' && !github.event.repository.private
+    runs-on: ubicloud-standard-8
+    timeout-minutes: 12
+    env:
+      TZ: UTC
+    steps:
+      - name: Start job budget
+        shell: bash
+        run: |
+          echo "PROOF_JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/trace-fixture-evidence" "$RUNNER_TEMP/trace-fixture-artifact"
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Fetch pinned sources
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          timeout 50s git fetch --no-tags origin 569270ac8513b42aa81bd8be97f1f63f562bb229 35935550400a172f6ef98cddec21660046ed7563
+          git diff --exit-code 35935550400a172f6ef98cddec21660046ed7563 -- web
+          uname -a > "$RUNNER_TEMP/trace-fixture-evidence/host.txt"
+          lscpu >> "$RUNNER_TEMP/trace-fixture-evidence/host.txt"
+          free -m >> "$RUNNER_TEMP/trace-fixture-evidence/host.txt"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.22.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: One locked dependency install
+        timeout-minutes: 3
+        working-directory: web
+        shell: bash
+        run: |
+          test "$(node --version)" = v24.22.0
+          test "$(npm --version)" = 11.19.1
+          /usr/bin/time -v -o "$RUNNER_TEMP/trace-fixture-evidence/install.resources.txt" timeout --signal=TERM --kill-after=5s 165s npm ci > "$RUNNER_TEMP/trace-fixture-evidence/install.log" 2>&1
+      - name: Four bounded covered trials
+        timeout-minutes: 9
+        shell: bash
+        run: |
+          elapsed=$(( $(date +%s) - PROOF_JOB_STARTED ))
+          remaining=$(( 600 - elapsed ))
+          if (( remaining > 480 )); then remaining=480; fi
+          if (( remaining <= 30 )); then echo "Insufficient trial budget"; exit 1; fi
+          timeout --signal=TERM --kill-after=10s "$(( remaining - 10 ))s" python3 .github/ui-trace-fixture-proof/run-proof.py --web "$GITHUB_WORKSPACE/web" --output "$RUNNER_TEMP/trace-fixture-evidence/proof" --overall-timeout "$remaining" 2>&1 | tee "$RUNNER_TEMP/trace-fixture-evidence/proof-driver.log"
+      - name: Verify restoration and record job timing
+        if: always()
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, time
+          from pathlib import Path
+          root = Path(os.environ['GITHUB_WORKSPACE'])
+          for name in ('TraceDetails.spec.ts', 'TraceDetailsSidebar.spec.ts'):
+              path = 'web/src/plugins/traces/' + name
+              data = subprocess.check_output(['git', 'show', '35935550400a172f6ef98cddec21660046ed7563:' + path], cwd=root, timeout=15)
+              (root / path).write_bytes(data)
+          data = {'elapsedSecondsBeforePackaging': time.time() - int(os.environ['PROOF_JOB_STARTED']), 'configuredRunner': 'ubicloud-standard-8', 'actualVmFamily': 'Requires Set up job log review; label alone is insufficient'}
+          (Path(os.environ['RUNNER_TEMP']) / 'trace-fixture-evidence/job-timing.json').write_text(json.dumps(data, indent=2) + '\n')
+          PY
+          git diff --exit-code 35935550400a172f6ef98cddec21660046ed7563 -- web
+          test -z "$(git status --porcelain -- web)"
+      - name: Package bounded evidence
+        if: always()
+        timeout-minutes: 1
+        shell: bash
+        run: python3 .github/ui-trace-fixture-proof/package-evidence.py "$RUNNER_TEMP/trace-fixture-evidence" "$RUNNER_TEMP/trace-fixture-artifact"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        timeout-minutes: 1
+        with:
+          name: trace-fixture-sample-${{ github.run_id }}
+          path: ${{ runner.temp }}/trace-fixture-artifact/
+          retention-days: 3
+          if-no-files-found: error

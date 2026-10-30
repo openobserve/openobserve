@@ -1,0 +1,2656 @@
+{
+  "source": "Pinned baseline two-file report; original report digest retained",
+  "sourceSha256": "26b72a5fc46efb759b48b3e0f012eebff387d3a2e70254b02156a4424753b7ff",
+  "identityFields": [
+    "file",
+    "project",
+    "name",
+    "mode",
+    "state"
+  ],
+  "normalization": "file relative to web; normalized Vitest project name; exact full reporter name, mode and result state. Sorted multiset preserves duplicate rows; no Vitest internal ID or absolute root. No name rewriting.",
+  "canonicalEncoding": "UTF-8 JSON list, ensure_ascii=False, sort_keys=True, separators=(comma,colon), no newline",
+  "canonicalSha256": "3e9c687754e44cf7a7c7914f09a00c779fc4b33aade51533d6210f5fda5c864b",
+  "count": 369,
+  "states": {
+    "passed": 366,
+    "skipped": 3
+  },
+  "files": [
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "cases": 205,
+      "states": {
+        "passed": 202,
+        "skipped": 3
+      }
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "cases": 164,
+      "states": {
+        "passed": 164
+      }
+    }
+  ],
+  "duplicateIdentityRows": 0,
+  "cases": [
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Bug fix: invalid span_id in URL query param > opens Preview when a URL-selected remote evaluator has a response",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Bug fix: invalid span_id in URL query param > opens Preview when a URL-selected span is an LLM evaluator span",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Bug fix: invalid span_id in URL query param > should open sidebar and scroll when span_id in URL matches a span in the trace",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Bug fix: invalid span_id in URL query param > should show error notification and close sidebar when span_id in URL does not exist in trace",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Bug fix: missing from/to in URL query params > collapses both bounds when only one is present",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Bug fix: missing from/to in URL query params > never sends NaN bounds to the details API",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Bug fix: missing from/to in URL query params > resolves a finite window when from/to are absent",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Bug fix: missing from/to in URL query params > still honours the URL window when from/to are present",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Component lifecycle > should clean up properly on unmount",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Component lifecycle > should setup trace details on mount",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: RUM session integration > should hide session replay button when hideSessionReplayButton prop is true",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: RUM session integration > should not show session replay button when no RUM session exists",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: RUM session integration > should show session replay button when a RUM session with a replay exists",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: Stream filtering integration > should filter streams when user types in search",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: filterStreamFn function > should filter streams by search value (lines 1871-1872)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: filterStreamFn function > should filter streams case-insensitively",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: filterStreamFn function > should handle undefined search value",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: filterStreamFn function > should return all streams when search value is empty",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: filterStreamFn function > should return empty array when no match found",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: openTraceDetails function > should set showSpanDetails and showTraceDetails to true (lines 1877-1878)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: openTraceDetails function > should work when values are already true",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: openTraceLink function > should call openTraceLink and verify trace details are reset (lines 1952-1953)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: openTraceLink function > should verify openTraceLink reprocesses trace data",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: redirectToLogs edge cases > should navigate to logs with correct parameters when selectedTrace exists",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: redirectToLogs edge cases > should return early when selectedTrace is not available (line 1815)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: redirectToSessionReplay edge cases > should navigate to session viewer when a RUM session with a replay exists",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: redirectToSessionReplay edge cases > should not navigate when no span has a replayable RUM session",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: routeToTracesList with datetime handling > should not navigate when in embedded mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: routeToTracesList with datetime handling > should use from/to for absolute datetime (lines 1939-1940)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: routeToTracesList with datetime handling > should use period for relative datetime (default case)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Coverage: routeToTracesList with datetime handling > uses real browser back when there's history to pop, instead of the hardcoded traces route",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Critical path > gives an orphan root no critical path even when it starts before the true root",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Critical path > is off by default and flips the waterfall overlay when toggled",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Critical path > persists the toggle across remounts",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Critical path > shows the toggle only on the Waterfall tab",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Critical path > stores each span's critical sections on its waterfall row",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Current functionality verification > comprehensive test: should verify current implementation is intact",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Current functionality verification > should have conditional disabled state and tooltip wrapper on View Logs button",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Current functionality verification > should have isViewLogsDisabled computed property",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Current functionality verification > should pass selected-log-streams and show-log-stream-selector props to TraceDetailsSidebar",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Current functionality verification > should use placeholder for log stream selector",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Data processing > should calculate trace position",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Data processing > should process span data correctly",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Hover span handlers > should clear hoveredSpanId when closeSidebar is called",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Hover span handlers > should clear hoveredSpanId when onUnhoverSpan is called",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Hover span handlers > should clear hoveredSpanId when updateSelectedSpan is called",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Hover span handlers > should set hoveredSpanId when onHoverSpan is called",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Integration: Mode switching scenarios > should build correct URL when expanding to full view with all params",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Integration: Mode switching scenarios > should handle transition from embedded to standalone via expand",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Integration: Mode switching scenarios > should open a new window when handleExpandToFullView is called in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > AC7.1: J ×5 from no selection visits R, A, A1, A2, B",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > AC7.2: with A collapsed, J from A goes to B and never selects A1",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > AC7.3: from a hidden A1, J goes to B and K goes to A",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > AC7.4: announces the position in the visible list",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > K with no selection does nothing",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > announces First span / Last span at the edges and keeps the selection",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > shortcutsActive toggling registers and releases the trace-detail scope",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > shortcutsActive=false registers nothing",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > stays finite on a trace whose parent links form a cycle",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > J/K follow the visible span order (item 4a §3.5) > the live region is a polite, atomic, visually hidden region",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Migrated filters drawer (ODrawer) > applies query and closes drawer when ODrawer emits click:primary",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Migrated filters drawer (ODrawer) > binds open via v-model:open to showFilterPopover state",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Migrated filters drawer (ODrawer) > closes drawer when ODrawer emits click:secondary (cancel)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Migrated filters drawer (ODrawer) > merges existing editorValue with localEditorValue on click:primary",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Migrated filters drawer (ODrawer) > renders the CodeQueryEditor inside the drawer default slot",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Migrated filters drawer (ODrawer) > renders the ODrawer with migrated props (width, title, button labels)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Migrated filters drawer (ODrawer) > uses localEditorValue alone when existing editorValue is empty",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should add new service names to selectedTrace",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should calculate start_time and end_time correctly",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should format action RUM events as spans",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should format error RUM events as spans with ERROR status",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should format resource RUM events as spans",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should format resource RUM events with error status codes as ERROR",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should format view RUM events as spans",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should generate fallback span ID for untraced resource events",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should handle RUM events with missing optional fields",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should handle multiple RUM events of different types",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should handle unknown event types with default operation name",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should not duplicate existing service names when service already in list",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should prefix view span IDs with rum_view_",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should return empty array when no events are provided",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 1: RUM Integration - formatRumEventsAsSpans > should use _oo_span_id as the span ID for traced resource events",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > Search navigation integration > should coordinate between nextMatch and handleIndexUpdate",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > Search navigation integration > should coordinate between prevMatch and handleIndexUpdate",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > Search navigation integration > should handle search result updates from child component",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleIndexUpdate function > should handle large index values",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleIndexUpdate function > should handle negative index values",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleIndexUpdate function > should handle zero index",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleIndexUpdate function > should overwrite previous index value",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleIndexUpdate function > should update currentIndex with new value",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleSearchResult function > should handle large search result values",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleSearchResult function > should handle negative values",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleSearchResult function > should handle zero search results",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleSearchResult function > should update searchResults multiple times",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > handleSearchResult function > should update searchResults with new value",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > nextMatch function > should call nextMatch on TraceTree ref when ref exists",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > nextMatch function > should handle case when TraceTree ref is null",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > nextMatch function > should handle case when TraceTree ref is undefined",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > nextMatch function > should not call nextMatch when ref does not exist",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > prevMatch function > should call prevMatch on TraceTree ref when ref exists",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > prevMatch function > should handle case when TraceTree ref is null",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > prevMatch function > should handle case when TraceTree ref is undefined",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Priority 3: Search Navigation > prevMatch function > should not call prevMatch when ref does not exist",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props validation and defaults > should have correct default values for all props",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props validation and defaults > should validate mode prop values",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Correlation-specific props > correlatedLogStream prop > should use correlatedLogStream when expanding to full view",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Correlation-specific props > currentTraceStreamName computed > should compute current trace stream name for correlation",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Correlation-specific props > enableCorrelationLinks prop > should pass enableCorrelationLinks to child components",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Correlation-specific props > serviceStreamsEnabled computed > should check if service streams feature is enabled",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Data props (embedded mode) > should process provided span list and build trace tree",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Data props (embedded mode) > should use spanListProp when provided",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Data props (embedded mode) > should use startTimeProp and endTimeProp for time range",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Data props (embedded mode) > should use streamNameProp when provided",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Data props (embedded mode) > should use traceIdProp when provided",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Data props (embedded mode) > should watch for spanListProp changes and rebuild tree",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Data props (embedded mode) > should watch for traceIdProp changes and fetch new data",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should emit close event when handleBackOrClose is called in embedded mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should emit spanSelected event when span is selected in embedded mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should make trace ID clickable in embedded mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should mount in embedded mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should not fetch data when spanListProp is provided",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should not show back button in embedded mode when showBackButton is false",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should not show close button in embedded mode when showCloseButton is false",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should not show share button in embedded mode when showShareButton is false",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should show expand button in embedded mode when showExpandButton is true",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should show open_in_new icon next to trace ID in embedded mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - embedded > should use provided spanListProp",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - standalone > should default to standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - standalone > should fetch data from API in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - standalone > should not show expand button in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - standalone > should show back button when showBackButton is true in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - standalone > should show close button when showCloseButton is true in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - standalone > should show share button when showShareButton is true in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: Mode control > mode prop - standalone > should use route query params for trace ID in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: UI visibility controls > showBackButton prop > should hide back button when false",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: UI visibility controls > showBackButton prop > should show back button when true in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: UI visibility controls > showCloseButton prop > should show close button when true in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: UI visibility controls > showExpandButton prop > should show expand button in embedded mode when true",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: UI visibility controls > showLogStreamSelector prop > should hide log stream selector when false",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: UI visibility controls > showLogStreamSelector prop > should show log stream selector when true (default)",
+      "mode": "skip",
+      "state": "skipped"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Props: UI visibility controls > showShareButton prop > should show share button when true in standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Search functionality > should handle next match navigation",
+      "mode": "skip",
+      "state": "skipped"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Search functionality > should handle previous match navigation",
+      "mode": "skip",
+      "state": "skipped"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Search functionality > should handle search query changes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Search functionality > should show search navigation buttons when there are results",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should drain a marker request aimed at a span that is not loaded",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should initialize sidebarActiveTab to 'attributes'",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should keep a manually chosen Events tab when navigating to another span",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should keep a tab chosen by hand after a marker click",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should keep sidebarActiveTab as 'attributes' when first selected span is not an LLM span",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should keep sidebarActiveTab as 'events' after a marker click",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should not let a stale marker request hijack the next span click",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should set sidebarActiveTab to 'preview' when first selected span is an LLM span",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Sidebar active tab > should still apply the default tab for an ordinary span click",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Span interaction > should cancel any in-flight span scroll when sidebar closes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Span interaction > should handle sidebar close",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Span interaction > should handle span selection",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Span interaction > should not throw on close when the trace tree ref is absent",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Span interaction > should render trace details sidebar when span is selected",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Span interaction > should render trace header component",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Span interaction > should render trace tree component",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Stream selection > should display stream selector with placeholder",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Stream selection > should handle view logs button click with conditional disabled state",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Stream selection > should have wrapper spans for conditional tooltips on View Logs button",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > defaults to the waterfall when nothing is persisted",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > drops unknown values from a persisted order and appends newly shipped tabs",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > falls back to the default when the persisted tab is unavailable for this trace",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > ignores a persisted tab that is no longer a known tab",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > ignores a reorder whose source tab is unknown",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > keeps hidden tabs in the persisted order so the arrangement survives",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > moves a tab after the drop target",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > moves a tab before the drop target and persists the new order",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > persists the active tab when it changes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > renders tabs in the persisted order",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > restores the persisted active tab on mount",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tab order and active-tab persistence > survives a corrupt persisted order",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Toolbar functionality > renders the copy buttons with their icon, not as empty buttons",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Toolbar functionality > should constrain the operation name so a long one ellipsises",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Toolbar functionality > should copy trace ID when copy button is clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Toolbar functionality > should display operation name in toolbar",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Toolbar functionality > should display span count",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Toolbar functionality > should display trace ID in toolbar",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Toolbar functionality > should navigate back to traces list when back button is clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Toolbar functionality > should show share link button",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > caps the graph label insets in a narrow chart",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > defaults to Tree View and switches to a graph series",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > detaches the tree tooltip when switching from Tree View to Graph View",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > does not attach the tree tooltip when Graph View is chosen during the setup delay",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > filters the graph to edges touching a match",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > filters the tree to matches and their ancestors from the search input",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > insets the graph series so nodes and their labels stay inside the chart",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > lays out a graph with finite positions in a tiny chart container",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > persists the chosen view across remounts",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > renders an empty chart when no service matches",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > renders the toggle and service search only on the Trace Graph tab",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > skips the custom tree tooltip in Graph View and restores it in Tree View",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Trace Graph view toggle and service search > truncates graph labels and hides overlapping ones",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > TraceTree hover integration > should pass hoveredSpanId prop to TraceTree child component",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Tree view: View Logs on a span > selects the span and runs the sidebar's own View Logs (which loads correlation)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Utility functions > should adjust opacity correctly",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Utility functions > should format time correctly",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > Utility functions > should get span kind correctly",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > effectiveSpanId > should return hoveredSpanId when hovering over a span",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > effectiveSpanId > should return selectedSpanId when not hovering",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetails.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetails > should mount TraceDetails component",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Attributes tab > should display attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Attributes tab > should display span ID in attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Attributes tab content > should display HTTP method in attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Attributes tab content > should display HTTP status code in attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Attributes tab content > should display attributes table",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > CSS verification — .vjs-tree presence > should reference .vjs-tree for LLM panel hover suppression",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Component props — selectedLogStreams and showLogStreamSelector > should accept selectedLogStreams prop",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Component props — selectedLogStreams and showLogStreamSelector > should accept showLogStreamSelector prop",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Error handling > should force component update when props change",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Error handling > should handle invalid events JSON gracefully",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Error handling > should handle invalid links JSON gracefully",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Error handling > should properly update when span props change",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Error tab > should pass span to TraceErrorTab stub",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Error tab > when hasExceptionEvents returns entries > should show error count badge on the tab",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > When events exist > When we search for a event > should display event rows that match the search query",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > When events exist > should display event rows",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > When events exist > should display events table",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > When events exist > should expand event when clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > When events exist > should not display no events message",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > attaches the resize observer when the timeline appears",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > clears the expanded event when the span changes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > distinguishes exceptions from ordinary events",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > does not render the timeline when the span has no events",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > draws mini-timeline markers with the shared severity vocabulary",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > drops events that fall outside the span window",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > expands the matching row when a marker is clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > expands the row named by focusEvent",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > expands the row named by focusEventIndex",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > ignores a null focusEventIndex",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > plots each event against the span's own duration",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > renders no markers when the event payload is malformed",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > renders one marker per cluster",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > shows an event that fires at the exact span end",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > event mini-timeline > uses the span window, not the trace window",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Events tab > should display no events message when no events",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > hides evaluation with the Preview tab for an ordinary span",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > renders a remote evaluator response in Preview without GenAI fields",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > resolves Prompt attribution by name and routes with the stable entity ID",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > should include the span_id in the input instance-id",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > should include the span_id in the output instance-id",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > should pass instance-id ending with -input to the input LLMContentRenderer",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > should pass instance-id ending with -output to the output LLMContentRenderer",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > should render the preview tab for an LLM span",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > LLM Preview tab — LLMContentRenderer instance-id > shows evaluation whenever the Preview tab is available",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links are not valid JSON > should display no links message",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links are of type array > should display link rows",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links are of type array > should display links table",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links are of type array > should not display no links message",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links exist > should display link rows",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links exist > should display links table",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links exist > should emit open-trace when a different trace link is clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links exist > should emit select-span when a same trace link is clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > When links exist > should not display no links message",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Links tab > should display no links message when no links",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Scores block — enterprise/cloud only (scoring itself is not an OSS feature) > hides the Scores block entirely on a true OSS build — _llm_scores can never be written to there",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Scores block — enterprise/cloud only (scoring itself is not an OSS feature) > shows the Scores label for an LLM span on an enterprise build",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Scores block — enterprise/cloud only (scoring itself is not an OSS feature) > still shows on a cloud build even with isEnterprise false — cloud registers the same enterprise backend",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Search highlighting > should highlight search terms in attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Search highlighting > should highlight search terms in service information",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Service information in Attributes tab > should display service information",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Service information in Attributes tab > should display service instance in attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Service information in Attributes tab > should display service name in attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > System instructions parsing (parsedSystemInstructions) > joins multiple parts with a newline",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > System instructions parsing (parsedSystemInstructions) > renders a `thinking`-typed part (a real-world alias for reasoning)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > System instructions parsing (parsedSystemInstructions) > renders a reasoning part, not just text parts",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > System instructions parsing (parsedSystemInstructions) > returns null when there are no system instructions",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > System instructions parsing (parsedSystemInstructions) > still renders a plain text part (regression check)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Tabs functionality > should have all required tabs",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Tabs functionality > should not show database tab when span has no db_ attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Tabs functionality > should report hasDbSpan as false when span has no db_ attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Tabs functionality > should report hasDbSpan as true when span has db_ attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Tabs functionality > should show database tab when span has db_ attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Tabs functionality > should switch tabs when clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > Tabs functionality > should switch to attributes tab by default when span has no db_ attributes",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should have conditional disabled state based on log stream selection in non-enterprise mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should have correct default tooltip content",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should have correct tooltip content in enterprise loading state",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should have correct tooltip content in non-enterprise mode with no streams selected",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should have tooltip functionality with viewLogsTooltipContent",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should not be disabled in enterprise mode regardless of log stream selection",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should not be disabled when selectedLogStreams has items in non-enterprise mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should not render View Logs button when parentMode is not standalone",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > View Logs button — current implementation > should show loading state for enterprise mode when correlationLoading is true",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > activeTab prop > should emit update:activeTab with the new tab value on click",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > activeTab prop > should respect activeTab prop when provided",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > apply-filter-immediately emit — getFilterValue called at the emit site > should emit apply-filter-immediately with the display string unchanged for span_id",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > apply-filter-immediately emit — getFilterValue called at the emit site > should emit apply-filter-immediately with the raw NS-string end_time, not the display string",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > apply-filter-immediately emit — getFilterValue called at the emit site > should emit apply-filter-immediately with the raw NS-string start_time, not the display string",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > correlateForMetrics — no data found > should set correlationError to noDataFound message when findRelatedTelemetry returns null",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS > should return raw start_time value when _start_time_ns is absent",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS > should return the display value unchanged for _timestamp when timestamp_column is @timestamp",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS > should return the display value unchanged for an arbitrary field not in the set",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS > should return the display value unchanged for non-RAW_VALUE_FILTER_FIELDS (e.g. span_id)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS > should return the raw string end_time from props.span, not the formatted display string",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS > should return the raw string start_time from props.span, not the formatted display string",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS > should return the raw value for the configured timestamp column (@timestamp)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFormattedSpanDetails — _start_time_ns / _end_time_ns are never injected > should not expose _start_time_ns or _end_time_ns for the standard mockSpan which carries neither key",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFormattedSpanDetails — _start_time_ns / _end_time_ns are never injected > should not render _end_time_ns in the attributes table",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > getFormattedSpanDetails — _start_time_ns / _end_time_ns are never injected > should not render _start_time_ns in the attributes table",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > hasSpanError > should be false for a normal span (mock default)",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > hasSpanError > should not show error icon in header when hasSpanError is false",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > hasSpanError > should show error icon in header when hasSpanError is true",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > service icon > should call getServiceIconDataUrl with the span service name",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > service icon > should render service icon img inside the service chip",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > service icon > should set icon src from getServiceIconDataUrl",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > should copy span ID when copy button is clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > should display duration",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > should display operation name in header",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > should display service name",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > should display span ID",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > should display start time",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > should emit close when close button is clicked",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > should show error notification when copy fails",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > span start offset > falls back to the axis start when no trace start is given",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > span start offset > measures the start from the trace root, not the waterfall axis start",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > spanHttpResendCount > should render resend count badge when count is greater than 0",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > spanHttpResendCount > should return null when http_request_resend_count is 0",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > spanHttpResendCount > should return null when http_request_resend_count is an invalid string",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > spanHttpResendCount > should return null when http_request_resend_count is not present",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > spanHttpResendCount > should return the count as number when http_request_resend_count is present",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is false (non-enterprise branch) > should call buildQueryDetails with the span and navigateToLogs",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is false (non-enterprise branch) > should not call loadSemanticGroups",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is true (enterprise branch) > should call loadSemanticGroups and navigate to /logs with query",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is true (enterprise branch) > should not call buildQueryDetails or navigateToLogs in enterprise path",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is true but no correlation was found > never reuses, applies or navigates with another span's lookup",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is true but no correlation was found > passes the whole trace's window (padded) for the trace-level fallback",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is true but no correlation was found > should not call navigateToCorrelatedLogs when nothing is correlated",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is true but no correlation was found > should toast a warning instead of navigating when nothing is correlated",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is true but no correlation was found > should toast the lookup failure reason when correlation could not be loaded",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > viewSpanLogs > when isEnterprise is true but no correlation was found > waits for an in-flight correlation lookup instead of reporting nothing",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar > wraps the header chips and keeps the action group from shrinking",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > detects once per span and lists the streams once",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > hides View Profile when listing the streams fails",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > hides View Profile when no stream has rows",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > hides View Profile when the search returns 403",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > lists profile streams and queries the span's ids over its window ± 60 s",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > navigates to the first matching stream's flame graph, preferring CPU",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > neither detects nor shows View Profile outside standalone mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > omits service_name from the navigation when the profile stream has none",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > runs at most three profile queries at a time",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > selects service_name only when the stream schema has it",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > shows View Profile only when a stream has matching samples",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > skips streams whose schema lacks trace_id or span_id without querying them",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span to profile link > stops probing for a span once another span is selected",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > a 1000µs span reads operationBandP50ToP75 (p50–p75) with the default-soft variant",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > a 2000µs span reads operationBandP75ToP90 (p75–p90) with the default-soft variant",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > a 4000µs span reads operationBandP90ToP99 (p90–p99) with the warning-soft variant",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > a 500µs span reads operationBandBelowP50 (< p50) with the default-soft variant",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > a 8000µs span reads operationBandP90ToP99 (p90–p99) with the warning-soft variant",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > a 8001µs span reads operationBandAboveP99 (> p99) with the error-soft variant",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > covers a span two hours into a long trace",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > falls back to the span's 10-minute bucket ± 1 h for another stream",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > falls back to the span's 10-minute bucket ± 1 h in embedded mode",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > falls back to the span's 10-minute bucket ± 1 h when the page has no saved bounds",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > formats a large sample count with thousands separators",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > hides the tag when n < 20",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > hides the tag when p50 == 0",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > hides the tag when the search fails",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > hides the tag when the search is still loading",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > puts p50, p75, p90, p99 and a labelled sample count on one tooltip line",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > queries the four percentiles with quoted service, operation and stream",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > serves sibling spans from one cached call, each with its own band",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > shares one call between sibling spans in the same 10-minute bucket",
+      "mode": "run",
+      "state": "passed"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "name": "TraceDetailsSidebar — span vs operation percentiles > uses the page's saved query bounds when the span's stream is the page stream",
+      "mode": "run",
+      "state": "passed"
+    }
+  ],
+  "baseline": {
+    "commit": "569270ac8513b42aa81bd8be97f1f63f562bb229",
+    "webTree": "a8263e721000c860456bbe9b5b9a3ef780660d70",
+    "files": {
+      "web/src/plugins/traces/TraceDetails.spec.ts": {
+        "blob": "c345fbb21ddeb40f1e3384f39af717c38e654e0c",
+        "sha256": "ffd080b517dfa7035a43124c94c63a4a347fe85829b32ee7d3b41d3abf23dfda",
+        "bytes": 136246
+      },
+      "web/src/plugins/traces/TraceDetailsSidebar.spec.ts": {
+        "blob": "c76e2aebb1b107c196329dabee93d7414fcd74d0",
+        "sha256": "fd061e798b722a1d44ef3b45a371f4ce432c8cdcc05b191656d4bfbc41678c28",
+        "bytes": 103413
+      }
+    }
+  },
+  "candidate": {
+    "commit": "35935550400a172f6ef98cddec21660046ed7563",
+    "webTree": "e31ae7cb42763fe78377266f056467d6a88a3423",
+    "files": {
+      "web/src/plugins/traces/TraceDetails.spec.ts": {
+        "blob": "bc85f036c38e9e396778e8a105d2227fe77ad1e2",
+        "sha256": "4d74d694bbb109f1c36c5db74f9f1c6c754dfd4b60fd9b69fe7a35de9b829136",
+        "bytes": 137471
+      },
+      "web/src/plugins/traces/TraceDetailsSidebar.spec.ts": {
+        "blob": "83d819de214a837b6d31c67ff90beda6391e0297",
+        "sha256": "4252e398d7a85f8bdf5eee86e19b2e5fc1f5ab0bb5cd64f50c1f145ef3436119",
+        "bytes": 104635
+      }
+    }
+  }
+}
