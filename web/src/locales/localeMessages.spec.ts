@@ -134,6 +134,9 @@ describe("interpolationTokens", () => {
   });
 });
 
+const sourceMessages = new Map(loadLocale(SOURCE_LOCALE));
+const sourceTokens = new Map<string, string[]>();
+
 describe.each(localeFiles)("%s", (file) => {
   const stem = file.replace(/\.json$/, "");
   const messages = loadLocale(stem);
@@ -152,18 +155,18 @@ describe.each(localeFiles)("%s", (file) => {
 
   if (stem !== SOURCE_LOCALE) {
     it("should only interpolate names en-US defines", () => {
-      const source = new Map(loadLocale(SOURCE_LOCALE));
       const unknown: string[] = [];
 
       for (const [key, value] of messages) {
-        const english = source.get(key);
+        const english = sourceMessages.get(key);
         // Keys en-US no longer has are pruned by the translation script, not here.
         if (english === undefined) continue;
 
         let defined: string[];
         let used: string[];
         try {
-          defined = interpolationTokens(english, key, SOURCE_LOCALE);
+          defined = sourceTokens.get(key) ?? interpolationTokens(english, key, SOURCE_LOCALE);
+          sourceTokens.set(key, defined);
           used = interpolationTokens(value, key, stem);
         } catch {
           continue; // already reported by the compile test above
