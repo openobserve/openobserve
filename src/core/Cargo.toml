@@ -48,9 +48,10 @@ vectorscan = [
 ]
 # Lets dependants' tests install a fake stream access checker; never enabled outside dev-dependencies.
 test-utils = []
+cpu-profiling = ["dep:pprof"]
 profiling = [
+    "cpu-profiling",
     "dep:jemalloc_pprof",
-    "dep:pprof",
     "dep:tikv-jemalloc-ctl",
 ]
 
