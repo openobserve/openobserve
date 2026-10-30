@@ -287,7 +287,7 @@ const fleetOptions = computed(() =>
   readableFleets.value.map((f) => ({ label: raw(f.name), value: f.id })),
 );
 const fleetRow = computed(() => readableFleets.value.find((f) => f.id === chosenFleet.value));
-const emptyFleet = computed(() => (fleetRow.value?.collectors ?? 0) === 0);
+const emptyFleet = computed(() => fleetRow.value?.collectors === 0);
 
 // The server refuses a schedule for a fleet with no members.
 watch(emptyFleet, (empty) => {
@@ -357,7 +357,8 @@ watch(
     }
     if (seeded.value || configsLoading || fleetsLoading || rolloutsLoading || listsUnusable) return;
     const ids = readableFleets.value.map((f) => f.id);
-    const fleet = props.fleetId ?? (ids.includes("default") ? "default" : (ids[0] ?? "default"));
+    // A guessed fleet would change what every new collector there receives, so only a sole one is picked.
+    const fleet = props.fleetId ?? (ids.length === 1 ? ids[0] : "");
     const config = props.config ?? desiredOf(fleet) ?? "";
     form.reset(blank(fleet, config, props.toVersion ?? defaultVersion(fleet, config)));
     seeded.value = true;

@@ -394,7 +394,12 @@ function nest(settings: Record<string, string>): Record<string, unknown> {
   return compact(out) as Record<string, unknown>;
 }
 
-const scalar = (v: string) => (/^[\w./-]+$/.test(v) ? v : JSON.stringify(v));
+const PLAIN = /^[\w./-]+$/;
+// A value typed in double quotes is text, so `"true"` stays a string instead of becoming a boolean.
+const QUOTED = /^"(?:[^"\\]|\\.)*"$/;
+const scalar = (v: string) => (PLAIN.test(v) || QUOTED.test(v) ? v : JSON.stringify(v));
+/** A string YAML would read back as a boolean, number or null unless it is quoted. */
+const readsAsTyped = (v: string) => PLAIN.test(v) && typeof load(v) !== "string";
 
 function emitList(key: string, items: unknown[], indent: number, lines: string[]) {
   const pad = " ".repeat(indent);
@@ -482,7 +487,7 @@ function flatten(obj: Record<string, unknown>): Record<string, string> | null {
         return Object.entries(v).every(([k, c]) =>
           visit(path ? `${path}.${pathKey(k)}` : pathKey(k), c),
         );
-    } else out[path] = String(v);
+    } else out[path] = typeof v === "string" && readsAsTyped(v) ? JSON.stringify(v) : String(v);
     return true;
   };
   if (!Object.keys(obj).length) return out;

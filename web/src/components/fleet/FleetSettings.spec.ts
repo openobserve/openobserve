@@ -453,12 +453,10 @@ describe("FleetSettings", () => {
       });
     });
 
-    it("links the alerts for fleets to the alert library", async () => {
+    it("promises no ready-made fleet alerts", async () => {
       await mountSettings();
-      expect(wrapper.find('[data-test="fleet-settings-alerts"]').text()).toContain(
-        "A rollout halted",
-      );
-      expect(wrapper.find('[data-test="fleet-settings-alert-library"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="fleet-settings-alerts"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="fleet-settings-alert-library"]').exists()).toBe(false);
     });
   });
 });

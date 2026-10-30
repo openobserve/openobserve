@@ -383,7 +383,7 @@ pub async fn list_fleets(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "CreateFleet",
-    summary = "Create a fleet; the creator receives full rights on it",
+    summary = "Create a fleet; roles grant access to it, as for dashboard folders",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateFleetRequest, content_type = "application/json"),
