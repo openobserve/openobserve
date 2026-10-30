@@ -44,6 +44,18 @@ export interface NodeNameRow {
   skipped: boolean;
 }
 
+export interface AnalyzeFact {
+  key: string;
+  label: I18nText;
+  value: string;
+  sub?: I18nText;
+}
+
+export interface AnalyzeNotice {
+  variant: "info" | "error";
+  text: I18nText;
+}
+
 export interface CategoryStyle {
   icon: IconName;
   labelKey: I18nKey;

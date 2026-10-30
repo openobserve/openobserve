@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="panelEl"
         class="bg-surface-base border-border-default rounded-surface absolute start-3 top-3 z-20 max-h-[calc(100%-1.5rem)] w-75 overflow-y-auto border p-3 shadow-md max-md:static max-md:max-h-none max-md:w-auto max-md:rounded-none max-md:border-0 max-md:border-b max-md:px-4 max-md:shadow-none"
       >
-        <PlanSummaryPanel :model="model" :summary="summary" :running="running" @run="emit('run')" />
+        <PlanSummaryPanel :model="model" :summary="summary" @analyze="emit('analyze')" />
       </aside>
       <div class="min-h-0 flex-1 max-md:h-[78vh] max-md:flex-none">
         <ProfileCanvas
@@ -63,10 +63,9 @@ const PANEL_GAP = 24;
 
 const props = defineProps<{
   profile: QueryProfile;
-  running: boolean;
 }>();
 
-const emit = defineEmits<{ run: [] }>();
+const emit = defineEmits<{ analyze: [] }>();
 
 const { isMobile } = useBreakpoint();
 

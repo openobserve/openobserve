@@ -30,7 +30,7 @@ function opId(name: string, index = 0) {
 
 function mountView() {
   return mount(QueryPlanView, {
-    props: { profile, running: false },
+    props: { profile },
     global: { plugins: [store, i18n] },
     attachTo: document.body,
   });
@@ -91,8 +91,8 @@ describe("QueryPlanView", () => {
     expect(pushdown).toContain("level = 'error'");
     expect(pushdown).toContain("k8s_namespace_name, level");
     expect(text("query-plan-where-s1")).toContain("Every querier and ingester");
-    await wrapper.find('[data-test="query-plan-run-profile"]').trigger("click");
-    expect(wrapper.emitted("run")).toHaveLength(1);
+    await wrapper.find('[data-test="query-plan-go-analyze"]').trigger("click");
+    expect(wrapper.emitted("analyze")).toHaveLength(1);
   });
 
   it("selects the scan first and shows its parsed details without metrics", async () => {

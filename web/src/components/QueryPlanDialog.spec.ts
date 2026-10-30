@@ -34,20 +34,40 @@ vi.mock("@/composables/useLogs/searchState", () => ({
 }));
 
 const mockStreamingSearch = vi.fn();
+const mockCancelStream = vi.fn();
 vi.mock("@/services/streaming_search", () => ({
-  default: { search: (...args: unknown[]) => mockStreamingSearch(...args) },
+  default: {
+    search: (...args: unknown[]) => mockStreamingSearch(...args),
+    cancelStream: (...args: unknown[]) => mockCancelStream(...args),
+  },
 }));
 
+let traceSeq = 0;
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
-  return { ...actual, generateTraceContext: vi.fn(() => ({ traceId: "mock-trace" })) };
+  return { ...actual, generateTraceContext: vi.fn(() => ({ traceId: `trace-${++traceSeq}` })) };
 });
+
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: unknown[]) => mockToast(...args),
+}));
 
 import QueryPlanDialog from "./QueryPlanDialog.vue";
 
 const SQL = "SELECT k8s_namespace_name,\n  count(*) AS cnt\nFROM app_logs";
 
+const SEARCH_OBJ = {
+  data: {
+    query: SQL,
+    stream: { streamType: "logs", selectedStream: ["app_logs"] },
+    datetime: { type: "relative", relativeTimePeriod: "15m", startTime: 1, endTime: 2 },
+    queryResults: { took: 1840 },
+  },
+};
+
 const oDialogStub = {
+  name: "ODialog",
   inheritAttrs: false,
   template: `<div data-test="o-dialog" v-if="open">
     <div data-test="o-dialog-title">{{ title }}</div>
@@ -58,8 +78,8 @@ const oDialogStub = {
 };
 
 const oButtonStub = {
-  template: '<button :disabled="loading" @click="$emit(\'click\')"><slot /></button>',
-  props: ["variant", "size", "loading", "iconLeft", "iconRight"],
+  template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+  props: ["variant", "size", "disabled", "iconLeft", "iconRight"],
   emits: ["click"],
 };
 
@@ -101,15 +121,41 @@ const PROFILE = {
   start_us: 1,
   end_us: 2,
   output_rows: 1,
-  plan: { name: "ProjectionExec", detail: "ProjectionExec", partitions: 1 },
+  plan: {
+    name: "RemoteScanExec",
+    detail: "RemoteScanExec",
+    partitions: 2,
+    remote: ["q-1", "i-0"].map((node_name, partition) => ({
+      partition,
+      node_name,
+      node_address: "",
+      role: node_name.startsWith("q") ? "querier" : "ingester",
+      start_us: 1,
+      end_us: 2,
+      first_batch_us: 0,
+      output_rows: 1,
+    })),
+  },
 };
 
-const PROFILE_SSE = sse({
+const PROFILE_SSE = `event: search_response_metadata\ndata: ${JSON.stringify({
+  results: { took: 2500, hits: [], total: 1 },
+})}\n\n${sse({
   hits: [
     { phase: 0, plan: "ProjectionExec\n", profile: JSON.stringify(PROFILE) },
     { phase: 1, plan: "DataSourceExec\n", profile: null },
   ],
-});
+})}`;
+
+function deferred() {
+  let resolve!: (v: unknown) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 function mountDialog(props: Record<string, unknown> = {}) {
   return mount(QueryPlanDialog, {
@@ -119,19 +165,17 @@ function mountDialog(props: Record<string, unknown> = {}) {
         ODialog: oDialogStub,
         OButton: oButtonStub,
         OToggleGroup: oToggleGroupStub,
-        OToggleGroupItem: { template: "<span><slot /></span>", props: ["value", "size"] },
-        OTooltip: true,
+        OToggleGroupItem: {
+          template: '<span class="toggle-item"><slot /></span>',
+          props: ["value", "size"],
+        },
         QueryPlanView: {
           name: "QueryPlanView",
-          template: '<div data-test="query-plan-view-stub" @click="$emit(\'run\')" />',
-          props: ["profile", "running"],
-          emits: ["run"],
+          template: '<div data-test="query-plan-view-stub" @click="$emit(\'analyze\')" />',
+          props: ["profile"],
+          emits: ["analyze"],
         },
-        QueryProfileView: stub("QueryProfileView", "query-profile-view", [
-          "profile",
-          "stream",
-          "sql",
-        ]),
+        QueryProfileView: stub("QueryProfileView", "query-profile-view", ["profile", "stream"]),
         QueryPlanText: stub("QueryPlanText", "query-plan-text", [
           "physicalPlan",
           "logicalPlan",
@@ -141,11 +185,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         MetricsSummaryCard: stub("MetricsSummaryCard", "metrics-summary-card", ["metrics"]),
       },
     },
-    props: {
-      modelValue: false,
-      searchObj: { data: { query: SQL, stream: { streamType: "logs" } } },
-      ...props,
-    },
+    props: { modelValue: false, searchObj: SEARCH_OBJ, ...props },
   });
 }
 
@@ -165,12 +205,39 @@ function sentSql(call: number) {
   return mockStreamingSearch.mock.calls[call][0].query.query.sql;
 }
 
+function find(wrapper: VueWrapper, dataTest: string) {
+  return wrapper.find(`[data-test="${dataTest}"]`);
+}
+
+async function click(wrapper: VueWrapper, dataTest: string) {
+  await find(wrapper, dataTest).trigger("click");
+  await flushPromises();
+}
+
+async function tick(wrapper: VueWrapper, ms: number) {
+  vi.advanceTimersByTime(ms);
+  await wrapper.vm.$nextTick();
+}
+
+async function openAndRun(response: string | Promise<unknown>) {
+  const wrapper = await openDialog();
+  await selectMode(wrapper, "analyze");
+  mockStreamingSearch.mockReturnValue(
+    typeof response === "string" ? Promise.resolve({ data: response }) : response,
+  );
+  await click(wrapper, "query-plan-analyze-run");
+  return wrapper;
+}
+
 describe("QueryPlanDialog", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     mockGetSearchQueryPayload.mockReset();
     mockStreamingSearch.mockReset();
+    mockCancelStream.mockReset();
+    mockCancelStream.mockResolvedValue({});
     mockGetSearchQueryPayload.mockReturnValue({ query: { sql: "SELECT * FROM logs" } });
     mockStreamingSearch.mockResolvedValue({ data: EXPLAIN_SSE });
   });
@@ -178,28 +245,33 @@ describe("QueryPlanDialog", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   describe("header", () => {
     it("renders nothing while closed", () => {
       wrapper = mountDialog();
-      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
+      expect(find(wrapper, "o-dialog").exists()).toBe(false);
     });
 
     it("shows the title and the SQL on one line that expands on click", async () => {
       wrapper = await openDialog();
-      expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe("Query plan");
-      const toggle = wrapper.find('[data-test="query-plan-sql-toggle"]');
+      expect(find(wrapper, "o-dialog-title").text()).toBe("Query plan");
+      const toggle = find(wrapper, "query-plan-sql-toggle");
       expect(toggle.text()).toBe("SELECT k8s_namespace_name, count(*) AS cnt FROM app_logs");
-      expect(wrapper.find('[data-test="query-plan-sql-full"]').exists()).toBe(false);
+      expect(find(wrapper, "query-plan-sql-full").exists()).toBe(false);
       await toggle.trigger("click");
-      expect(wrapper.find('[data-test="query-plan-sql-full"]').text()).toBe(SQL);
+      expect(find(wrapper, "query-plan-sql-full").text()).toBe(SQL);
     });
 
-    it("emits update:modelValue when the dialog closes", async () => {
+    it("orders the tabs Plan, Text, Analyze and has no run button", async () => {
       wrapper = await openDialog();
-      wrapper.findComponent(oDialogStub).vm.$emit("update:open", false);
-      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([false]);
+      expect(wrapper.findAll(".toggle-item").map((i) => i.text())).toEqual([
+        "Plan",
+        "Text",
+        "Analyze",
+      ]);
+      expect(find(wrapper, "query-plan-run-btn").exists()).toBe(false);
     });
   });
 
@@ -208,102 +280,203 @@ describe("QueryPlanDialog", () => {
       wrapper = await openDialog();
       expect(mockStreamingSearch).toHaveBeenCalledTimes(1);
       expect(sentSql(0)).toBe("EXPLAIN SELECT * FROM logs");
-      expect(wrapper.find('[data-test="query-plan-mode"]').attributes("data-value")).toBe("plan");
+      expect(find(wrapper, "query-plan-mode").attributes("data-value")).toBe("plan");
       const view = wrapper.findComponent({ name: "QueryPlanView" });
-      expect(view.exists()).toBe(true);
       expect(view.props("profile").plan.name).toBe("SortPreservingMergeExec");
-      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Analyze");
+    });
+
+    it("moves to the Analyze tab from the plan's call to action without running", async () => {
+      wrapper = await openDialog();
+      await click(wrapper, "query-plan-view-stub");
+      expect(find(wrapper, "query-plan-mode").attributes("data-value")).toBe("analyze");
+      expect(find(wrapper, "query-plan-analyze-start").exists()).toBe(true);
+      expect(mockStreamingSearch).toHaveBeenCalledTimes(1);
     });
 
     it("shows an error when the query has no SQL", async () => {
       mockGetSearchQueryPayload.mockReturnValue({ query: { sql: "" } });
       wrapper = await openDialog();
       expect(mockStreamingSearch).not.toHaveBeenCalled();
-      expect(wrapper.find('[data-test="query-plan-error"]').exists()).toBe(true);
+      expect(find(wrapper, "query-plan-error").exists()).toBe(true);
     });
 
     it("shows the request error", async () => {
       mockStreamingSearch.mockRejectedValue(new Error("network down"));
       wrapper = await openDialog();
-      expect(wrapper.find('[data-test="query-plan-error"]').text()).toContain("network down");
-    });
-
-    it("reports a missing plan when the response has none", async () => {
-      mockStreamingSearch.mockResolvedValue({ data: "event: progress\n\n" });
-      wrapper = await openDialog();
-      expect(wrapper.find('[data-test="query-plan-error"]').text()).toContain(
-        "No query plan found",
-      );
+      expect(find(wrapper, "query-plan-error").text()).toContain("network down");
     });
   });
 
-  describe("analyze mode", () => {
-    it("runs EXPLAIN ANALYZE from the Analyze button and shows the profile view", async () => {
+  describe("analyze tab", () => {
+    it("never sends a request when the tab is picked and shows the start card", async () => {
       wrapper = await openDialog();
-      mockStreamingSearch.mockResolvedValue({ data: PROFILE_SSE });
-      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
-      await flushPromises();
-      expect(sentSql(1)).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
-      expect(wrapper.find('[data-test="query-plan-mode"]').attributes("data-value")).toBe(
-        "analyze",
-      );
-      expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Re-run");
-    });
-
-    it("starts a run from the plan view's call to action", async () => {
-      wrapper = await openDialog();
-      mockStreamingSearch.mockResolvedValue({ data: PROFILE_SSE });
-      await wrapper.find('[data-test="query-plan-view-stub"]').trigger("click");
-      await flushPromises();
-      expect(sentSql(1)).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
-      expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
-    });
-
-    it("runs EXPLAIN ANALYZE when the Analyze mode is picked, keeping Plan usable meanwhile", async () => {
-      wrapper = await openDialog();
-      let resolve!: (v: unknown) => void;
-      mockStreamingSearch.mockReturnValue(new Promise((r) => (resolve = r)));
       await selectMode(wrapper, "analyze");
-      expect(mockStreamingSearch).toHaveBeenCalledTimes(2);
-      expect(wrapper.find('[data-test="query-plan-loading"]').exists()).toBe(true);
+      await selectMode(wrapper, "text");
+      await selectMode(wrapper, "analyze");
+      expect(mockStreamingSearch).toHaveBeenCalledTimes(1);
+      expect(find(wrapper, "query-plan-analyze-fact-stream").text()).toContain("app_logs");
+      expect(find(wrapper, "query-plan-analyze-fact-range").text()).toContain("Past 15 Minutes");
+      expect(find(wrapper, "query-plan-analyze-fact-took").text()).toContain("1.84s");
+      expect(find(wrapper, "query-plan-analyze-fact-nodes").text()).toContain("All nodes");
+      expect(find(wrapper, "query-plan-analyze-run").text()).toBe("Run EXPLAIN ANALYZE");
+      expect(find(wrapper, "query-plan-analyze-notice").exists()).toBe(false);
+    });
+
+    it("hides the last-search tile when the logs page has no timing", async () => {
+      wrapper = await openDialog({ searchObj: { data: { query: SQL } } });
+      await selectMode(wrapper, "analyze");
+      expect(find(wrapper, "query-plan-analyze-fact-took").exists()).toBe(false);
+      expect(find(wrapper, "query-plan-analyze-fact-range").exists()).toBe(false);
+    });
+
+    it("runs EXPLAIN ANALYZE and ticks the elapsed clock in the card and the tab", async () => {
+      const pending = deferred();
+      wrapper = await openAndRun(pending.promise);
+      expect(sentSql(1)).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
+      expect(find(wrapper, "query-plan-analyze-elapsed").text()).toBe("0:00");
+      expect(find(wrapper, "query-plan-analyze-running").text()).toContain(
+        "elapsed · last search took 1.84s",
+      );
+      await tick(wrapper, 65_000);
+      expect(find(wrapper, "query-plan-analyze-elapsed").text()).toBe("1:05");
+      expect(find(wrapper, "query-plan-mode-analyze-elapsed").text()).toBe("1:05");
+      expect(find(wrapper, "query-plan-analyze-cancel").exists()).toBe(true);
 
       await selectMode(wrapper, "plan");
-      expect(wrapper.find('[data-test="query-plan-view-stub"]').exists()).toBe(true);
+      expect(find(wrapper, "query-plan-view-stub").exists()).toBe(true);
+      expect(find(wrapper, "query-plan-mode-analyze-elapsed").exists()).toBe(true);
+    });
 
-      resolve({ data: PROFILE_SSE });
+    it("cancels on the server with the run's trace id and ignores the late response", async () => {
+      const pending = deferred();
+      wrapper = await openAndRun(pending.promise);
+      const traceId = mockStreamingSearch.mock.calls[1][0].traceId;
+      await tick(wrapper, 7_000);
+      await click(wrapper, "query-plan-analyze-cancel");
+      expect(mockCancelStream).toHaveBeenCalledWith({
+        org_identifier: store.state.selectedOrganization.identifier,
+        traceId,
+      });
+      expect(find(wrapper, "query-plan-analyze-notice").text()).toBe(
+        "Cancelled after 0:07. The query was stopped on every node.",
+      );
+      expect(vi.getTimerCount()).toBe(0);
+
+      pending.resolve({ data: PROFILE_SSE });
       await flushPromises();
-      await selectMode(wrapper, "analyze");
-      expect(mockStreamingSearch).toHaveBeenCalledTimes(2);
-      expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
+      expect(find(wrapper, "query-profile-view").exists()).toBe(false);
+      expect(find(wrapper, "query-plan-analyze-start").exists()).toBe(true);
+    });
+
+    it("still lands in cancelled when the cancel call itself fails", async () => {
+      mockCancelStream.mockRejectedValue(new Error("cancel failed"));
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      wrapper = await openAndRun(deferred().promise);
+      await click(wrapper, "query-plan-analyze-cancel");
+      expect(find(wrapper, "query-plan-analyze-notice").text()).toContain("Cancelled after");
+      errorSpy.mockRestore();
+    });
+
+    it("shows the server error, a hint and Try again on failure", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const pending = deferred();
+      wrapper = await openAndRun(pending.promise);
+      await tick(wrapper, 41_000);
+      pending.reject({ response: { data: { message: "query exceeded the memory limit." } } });
+      await flushPromises();
+      expect(find(wrapper, "query-plan-analyze-notice").text()).toBe(
+        "Failed after 0:41: query exceeded the memory limit. Narrow the time range or add filters, then try again.",
+      );
+      expect(find(wrapper, "query-plan-analyze-run").text()).toBe("Try again");
+      expect(find(wrapper, "query-plan-mode-analyze-failed").exists()).toBe(true);
+      errorSpy.mockRestore();
+    });
+
+    it("shows the results with the info bar and Re-run once done", async () => {
+      wrapper = await openAndRun(PROFILE_SSE);
+      expect(find(wrapper, "query-profile-view").exists()).toBe(true);
+      const summary = find(wrapper, "query-plan-analyze-bar-summary").text();
+      expect(summary).toMatch(/^Ran \d\d:\d\d:\d\d · took 2.50s · 2 nodes$/);
+      expect(find(wrapper, "query-plan-analyze-rerun").text()).toBe("Re-run");
+      expect(find(wrapper, "query-plan-mode-analyze-done").exists()).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     it("falls back to the metrics card and tree when the server sends no profile", async () => {
-      wrapper = await openDialog();
-      mockStreamingSearch.mockResolvedValue({ data: OLD_ANALYZE_SSE });
-      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
-      await flushPromises();
-      expect(wrapper.find('[data-test="query-plan-analyze-fallback"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="query-plan-tree"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(false);
+      wrapper = await openAndRun(OLD_ANALYZE_SSE);
+      expect(find(wrapper, "query-plan-analyze-fallback").exists()).toBe(true);
+      expect(find(wrapper, "metrics-summary-card").exists()).toBe(true);
+      expect(find(wrapper, "query-plan-tree").exists()).toBe(true);
+      expect(find(wrapper, "query-profile-view").exists()).toBe(false);
     });
 
-    it("shows the analyze error in the profile body only", async () => {
-      wrapper = await openDialog();
-      mockStreamingSearch.mockRejectedValue(new Error("boom"));
-      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
+    it("dims the previous results while re-running and keeps them when cancelled", async () => {
+      wrapper = await openAndRun(PROFILE_SSE);
+      const pending = deferred();
+      mockStreamingSearch.mockReturnValue(pending.promise);
+      await click(wrapper, "query-plan-analyze-rerun");
+      expect(find(wrapper, "query-plan-analyze-results").classes()).toContain("opacity-35");
+      expect(find(wrapper, "query-plan-analyze-running").text()).toContain(
+        "Re-running EXPLAIN ANALYZE",
+      );
+      expect(find(wrapper, "query-plan-analyze-running").text()).toContain(
+        "previous run took 2.50s",
+      );
+      await tick(wrapper, 3_000);
+      await click(wrapper, "query-plan-analyze-cancel");
+      expect(mockCancelStream).toHaveBeenCalledTimes(1);
+      expect(find(wrapper, "query-plan-analyze-results").classes()).not.toContain("opacity-35");
+      expect(find(wrapper, "query-profile-view").exists()).toBe(true);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Re-run cancelled after 0:03. Showing the previous results.",
+        }),
+      );
+
+      pending.resolve({ data: OLD_ANALYZE_SSE });
       await flushPromises();
-      expect(wrapper.find('[data-test="query-plan-error"]').text()).toContain("boom");
-      await selectMode(wrapper, "plan");
-      expect(wrapper.find('[data-test="query-plan-error"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="query-plan-view-stub"]').exists()).toBe(true);
+      expect(find(wrapper, "query-profile-view").exists()).toBe(true);
+    });
+  });
+
+  describe("closing", () => {
+    it("cancels a running analyze on the server and reopens fresh", async () => {
+      const pending = deferred();
+      wrapper = await openAndRun(pending.promise);
+      const traceId = mockStreamingSearch.mock.calls[1][0].traceId;
+      wrapper.findComponent({ name: "ODialog" }).vm.$emit("update:open", false);
+      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([false]);
+      await wrapper.setProps({ modelValue: false });
+      expect(mockCancelStream).toHaveBeenCalledWith(expect.objectContaining({ traceId }));
+      expect(vi.getTimerCount()).toBe(0);
+
+      mockStreamingSearch.mockResolvedValue({ data: EXPLAIN_SSE });
+      await wrapper.setProps({ modelValue: true });
+      await flushPromises();
+      pending.resolve({ data: PROFILE_SSE });
+      await flushPromises();
+      expect(find(wrapper, "query-plan-mode").attributes("data-value")).toBe("plan");
+      await selectMode(wrapper, "analyze");
+      expect(find(wrapper, "query-plan-analyze-start").exists()).toBe(true);
+    });
+
+    it("does not call cancel when nothing is running", async () => {
+      wrapper = await openAndRun(PROFILE_SSE);
+      await wrapper.setProps({ modelValue: false });
+      expect(mockCancelStream).not.toHaveBeenCalled();
+    });
+
+    it("cancels a running analyze when the dialog unmounts", async () => {
+      wrapper = await openAndRun(deferred().promise);
+      wrapper.unmount();
+      await flushPromises();
+      expect(mockCancelStream).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 
   describe("text mode", () => {
-    it("passes both plans and, after a run, the analyze output in phase order", async () => {
+    it("adds the analyze output only after a run is done, in phase order", async () => {
       wrapper = await openDialog();
       await selectMode(wrapper, "text");
       const text = () => wrapper.findComponent({ name: "QueryPlanText" });
@@ -311,43 +484,13 @@ describe("QueryPlanDialog", () => {
       expect(text().props("logicalPlan")).toBe(AGG_LOGICAL_PLAN);
       expect(text().props("analyzePlan")).toBeNull();
 
+      await selectMode(wrapper, "analyze");
       mockStreamingSearch.mockResolvedValue({ data: OLD_ANALYZE_SSE });
-      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
-      await flushPromises();
+      await click(wrapper, "query-plan-analyze-run");
       await selectMode(wrapper, "text");
       expect(text().props("analyzePlan")).toBe(
         "RemoteScanExec: metrics=[output_rows=5]\nDataSourceExec: metrics=[output_rows=5]",
       );
-    });
-  });
-
-  describe("reopening", () => {
-    it("returns to plan mode and drops the previous run", async () => {
-      wrapper = await openDialog();
-      mockStreamingSearch.mockResolvedValue({ data: PROFILE_SSE });
-      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
-      await flushPromises();
-      await wrapper.setProps({ modelValue: false });
-      mockStreamingSearch.mockResolvedValue({ data: EXPLAIN_SSE });
-      await wrapper.setProps({ modelValue: true });
-      await flushPromises();
-      expect(wrapper.find('[data-test="query-plan-mode"]').attributes("data-value")).toBe("plan");
-      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Analyze");
-    });
-
-    it("ignores a run that finishes after the dialog was reopened", async () => {
-      wrapper = await openDialog();
-      let resolve!: (v: unknown) => void;
-      mockStreamingSearch.mockReturnValue(new Promise((r) => (resolve = r)));
-      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
-      await wrapper.setProps({ modelValue: false });
-      mockStreamingSearch.mockResolvedValue({ data: EXPLAIN_SSE });
-      await wrapper.setProps({ modelValue: true });
-      await flushPromises();
-      resolve({ data: PROFILE_SSE });
-      await flushPromises();
-      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Analyze");
-      expect(wrapper.findComponent({ name: "QueryPlanView" }).exists()).toBe(true);
     });
   });
 });

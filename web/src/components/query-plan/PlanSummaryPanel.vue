@@ -129,21 +129,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
 
-    <div
-      class="bg-surface-subtle rounded-default flex flex-col items-start gap-2 p-3"
-      data-test="query-plan-run-cta"
-    >
-      <p class="text-text-body m-0 text-xs leading-normal">
-        {{ t("search.queryProfile.runCta") }}
+    <div class="flex flex-col items-start gap-2" data-test="query-plan-run-cta">
+      <p class="text-text-secondary m-0 text-xs leading-normal">
+        {{ t("search.queryProfile.planOnlyNote") }}
       </p>
       <OButton
-        variant="primary"
+        variant="outline"
         size="sm"
-        icon-left="play-arrow"
-        :loading="running"
-        data-test="query-plan-run-profile"
-        @click="emit('run')"
-        >{{ t("search.queryProfile.runAnalyze") }}</OButton
+        icon-left="speed"
+        icon-right="arrow-forward"
+        data-test="query-plan-go-analyze"
+        @click="emit('analyze')"
+        >{{
+          t("search.queryProfile.measureWithAnalyze", { command: raw("EXPLAIN ANALYZE") })
+        }}</OButton
       >
     </div>
   </div>
@@ -171,10 +170,9 @@ interface PushdownRow {
 const props = defineProps<{
   model: ProfileModel;
   summary: PlanSummary;
-  running: boolean;
 }>();
 
-const emit = defineEmits<{ run: [] }>();
+const emit = defineEmits<{ analyze: [] }>();
 
 const { t } = useI18nTyped();
 

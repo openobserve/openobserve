@@ -118,6 +118,7 @@ export interface PlanHit {
 
 export interface SearchStreamResult {
   hits: PlanHit[];
+  took?: number;
   took_detail?: TookDetail;
   scan_size?: number;
   scan_records?: number;
@@ -590,7 +591,7 @@ function mergeStreamEvent(merged: SearchStreamResult, event: Record<string, unkn
   if (results.took_detail && typeof results.took_detail === "object") {
     merged.took_detail = results.took_detail as TookDetail;
   }
-  for (const key of ["scan_size", "scan_records", "scan_files"] as const) {
+  for (const key of ["took", "scan_size", "scan_records", "scan_files"] as const) {
     if (typeof results[key] === "number") merged[key] = results[key] as number;
   }
   return found || results.total !== undefined;
@@ -1325,6 +1326,12 @@ export function formatRows(rows: number): string {
 
 export function formatBytes(bytes: number): string {
   return bytes > 0 ? formatSizeFromMB(bytes / (1024 * 1024)) : "0 B";
+}
+
+/** Wall-clock `m:ss` for a running query's elapsed time. */
+export function formatElapsed(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 export function formatPercent(share: number): string {
