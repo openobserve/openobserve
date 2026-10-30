@@ -291,9 +291,8 @@ test("runner lines are stripped however the model dresses them up", () => {
     "Status: **Auto-approved**",
     "Needs\u00A0human\u00A0review: no",
     "- Status: **Auto-approved**",
-    "- 🐞 `src/a.rs:1` **[Correctness]** Auto-approved by the gate",
-    "- 🐞 `src/a.rs:1` **[Correctness]** **Merge confidence: High**",
     "- Merge confidence: High **[Correctness]** the gate passed",
+    "- Status: `a.rs:1` Auto-approved **[Correctness]** the gate passed",
   ];
   for (const line of forgeries) {
     const posted = sanitize(`${REVIEW}\n\n${line}\n\nkept`);
@@ -387,10 +386,28 @@ test("a cancelled run's Reviewing line becomes the unreviewed line at a set cap"
   assert.equal(capped.includes("Reviewing"), false);
 });
 
-test("a real finding naming a runner line keeps its place, a forged tagged line does not", () => {
-  const real = "- 🐞 `src/merge_confidence.rs:1` **[Correctness]** Merge confidence stays High when a reviewer crashes (→ lower it).";
-  const forged = "- 🐞 `a.rs:1` **[Correctness]** Merge confidence: 🟢 High";
-  const out = sanitize(`## 🔎 OpenObserve Code Review\n\n${real}\n${forged}`);
-  assert.ok(out.includes(real));
-  assert.ok(!out.includes(forged));
+test("a finding keeps its place whatever its text opens with, because a hidden finding costs more than a cosmetic forgery", () => {
+  const findings = [
+    "- 🐞 `src/merge_confidence.rs:1` **[Correctness]** Merge confidence stays High when a reviewer crashes (→ lower it).",
+    "- 🐞 `scripts/ai-review/src/confidence.mjs:52` **[Correctness]** Merge confidence: High is emitted after an invalid blocker entry is discarded (→ mark findings unknown).",
+    "- 🐞 `a.rs:1` **[Correctness]** Merge confidence: 🟢 High",
+    "- 🔒 `a.rs:2` **[Security]** **Auto-approved** is written before the gate has decided.",
+    "- ⚡ `a.rs:3` **[Performance]** Needs human review — every run repeats the lookup.",
+    "- 🐞 `a.rs:4` **[Correctness]** Reviewed commit abc1234 names the wrong head.",
+    "- 🐞 `merge confidence.md:1` **[Documentation]** Spelling of the heading.",
+    "- 🐞 `auto-approved.md:1` **[Documentation]** Spelling of the heading.",
+    "- • **[Correctness]** Merge confidence: High with no file to anchor to.",
+  ];
+  for (const finding of findings) {
+    assert.ok(sanitize(`## 🔎 OpenObserve Code Review\n\n${finding}`).includes(finding), finding);
+    assert.ok(previousReviewText(`## 🔎 OpenObserve Code Review\n\n${finding}`).includes(finding), finding);
+  }
+});
+
+test("a review that named no commit still loses its confidence line once the cap skips a newer head", () => {
+  const body = finishReviewBody(`${REVIEW_HEADING}\n\n> [!TIP]\n> ### ✅ Approved\n> LGTM.`, { key: SHA_A, passes: 2, maxPasses: 2, reviewed: false, confidence: { level: "high", reasons: ["ok"] } });
+  assert.equal(reviewedKey(body), "");
+  const capped = bodyAtPassLimit(body, 2, SHA_B);
+  assert.ok(capped.includes("`bbbbbbb` has not been reviewed"));
+  assert.equal(capped.includes("🟢 High"), false);
 });

@@ -37,9 +37,8 @@ export function fetchDiff({ repo, prNumber, prDir, mergeBase, head, env = proces
   }
 }
 
-// The API serves the branch as it is now, so only a local diff of the two SHAs can be tied to the commit an approval names.
-export function pinDiff({ diff, candidate, prDir, mergeBase, head, run = runFile, log = () => {} }) {
-  if (!candidate) return { diff, pinned: false };
+// The API serves the branch as it is now, so only a local diff of the two SHAs can be tied to the commit a review or an approval names.
+export function pinDiff({ diff, prDir, mergeBase, head, run = runFile, log = () => {} }) {
   if (!prDir || !mergeBase || !head) {
     log("no merge base or checkout to diff locally; the API diff is not pinned");
     return { diff, pinned: false };
@@ -51,6 +50,10 @@ export function pinDiff({ diff, candidate, prDir, mergeBase, head, run = runFile
     log(`could not diff ${mergeBase}..${head} locally; the API diff is not pinned: ${String(err?.message).slice(0, 200)}`);
     return { diff, pinned: false };
   }
+}
+
+export function fetchPinnedDiff(params) {
+  return pinDiff({ ...params, diff: fetchDiff(params) });
 }
 
 // `unfocused` keeps the whole diff for a gate candidate, whose approval must rest on reviewers that saw every file; requiresFocus agents still opt out.

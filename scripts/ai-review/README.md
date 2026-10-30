@@ -45,13 +45,16 @@ records what it covered in a hidden `o2-review-sha` tag (the head SHA, plus the 
 paired review, so a new commit on either side is new) and shows it in a visible `Reviewed commit`
 line with the review number. A run whose head matches the tag skips before any model call, which
 covers a queued run, a re-label and a plain dispatch, including the paired dispatch from
-openobserve. A run in which every reviewer failed writes no tag, so that commit can be reviewed
-again.
+openobserve. The tag is only written when it is true: the diff the reviewers read is rebuilt locally
+from `MERGE_BASE_SHA` and `HEAD_SHA` (both sides of a paired review), because the API serves the
+branch as it is now. If that cannot be done, or no reviewer finished (each one failed or returned
+nothing parseable), the run writes no tag and names no commit, so that commit can be reviewed again.
+A run where no reviewer finished also reports `Not reviewed` and fails the check.
 
 There is no cap on reviews per PR unless the variable `AI_REVIEW_MAX_PASSES` is a positive integer;
 unset, empty, `0` or an invalid value means no cap. Reviews are counted either way, in a hidden
 `o2-review-pass` tag written before the reviewers start, so a run stopped by removing the label or
-by a draft conversion still counts. A run in which every reviewer failed gives its pass back. The
+by a draft conversion still counts. A run in which no reviewer finished gives its pass back. The
 paired pointer and the "key not set" notice keep the tag. When a cap is set and reached, later
 pushes skip before any model call and the limit note on the comment names the commit that was
 reviewed and the one that was not. If the bot's comments cannot be read (no reviewer app token, or
@@ -105,19 +108,19 @@ All of these are required:
    commands". `shadow` records that reason too, plus `eligible_ignoring_config`, so the data stays
    useful while the workflow sets `ci-full`.
 2. The raw diff has at most 100 changed lines and 5 files, with no binary file, mode change, symlink,
-   submodule or file path that cannot be read. For a PR within those limits the diff is rebuilt
-   locally from `MERGE_BASE_SHA` and `HEAD_SHA` in `./pr` before any reviewer starts, and the
-   reviewers and every size condition use that pinned diff. If it cannot be built the review carries
-   on with the API diff and the run is ineligible.
+   submodule or file path that cannot be read. The diff is rebuilt locally from `MERGE_BASE_SHA` and
+   `HEAD_SHA` in `./pr` before any reviewer starts, and the reviewers and every size condition use
+   that pinned diff. If it cannot be built the review carries on with the API diff and the run is
+   ineligible.
 3. Every raw file was reviewed: no filtered file, no truncation, and the diff agrees with the PR's
    `changed_files`, `additions` and `deletions`.
 4. No path, old or new, matches `SENSITIVE_PATHS`.
 5. Merge confidence is High, no reviewer reported a finding and none was kept, the findings were
-   counted, the coordinator did not fall back, and the review's decision callout is an approval.
+   counted (one inline block, every entry with a title and a known severity), the coordinator did not fall back, and the review's decision callout is an approval.
 6. The Security and Correctness reviewers ran and finished, as did every other selected reviewer,
    and each one that ran saw the whole filtered diff. Finished means the output parsed into findings
-   or stated `<no-issues>`; empty or free-form text does not count and also keeps confidence below
-   High. A PR within the size limit is forced to the `full` tier with `fileFocus` bypassed whenever
+   or held a complete `<no-issues>` element; empty, free-form or cut-off text does not count and also
+   keeps confidence below High. A PR within the size limit is forced to the `full` tier with `fileFocus` bypassed whenever
    the mode is not `off`; agents that require focus may still opt out when no file is in their domain.
 7. It is not a paired review, and the workflow proved that: only its "no open PR on this branch"
    path sets `REVIEW_PAIR_CLEAR`. A failed lookup, a missing token, a failed dispatch or
@@ -127,7 +130,9 @@ All of these are required:
    reviewers, review markers, invisible Unicode), matched after NFKC, lowercasing and whitespace
    folding, with a letters-only pass for spaced-out phrases. Added lines and file paths must be
    printable ASCII or tab; the title and body may carry emoji but no Cyrillic or Greek letters. A hit
-   disqualifies without proving intent, and the reason never echoes the text.
+   disqualifies without proving intent, and the reason never echoes the text. The title and body
+   checked are the exact ones given to the reviewers, and the PR re-read at the end must still match
+   them: an edit after the review started is ineligible, even one that removes a hit.
 10. There is no `no-auto-approve` label and no outstanding `CHANGES_REQUESTED` review.
 11. Re-read right before deciding, the PR head still equals the reviewed commit, the PR is open and
     not a draft, and its base branch is `main`.

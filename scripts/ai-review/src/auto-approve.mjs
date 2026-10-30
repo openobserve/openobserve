@@ -235,13 +235,21 @@ function hasOutstandingChangeRequest(reviews) {
   return [...latest.values()].includes("CHANGES_REQUESTED");
 }
 
-function textReasons({ pr, diff }) {
+function samePrText(reviewed, pr) {
+  return ["title", "body"].every(field => String(reviewed[field] ?? "") === String(pr[field] ?? ""));
+}
+
+// What the reviewers read is what counts: an injection edited out before this check has still reached them.
+function textReasons({ pr, diff, reviewedText }) {
   if (!pr || !diff) return ["suspicious text in the PR"];
   const changed = [...diff.paths, ...diff.addedLines];
+  const prose = [reviewedText?.title, reviewedText?.body, pr.title, pr.body];
   const reasons = [];
-  if (hasTripwire([pr.title, pr.body, ...changed])) reasons.push("suspicious text in the PR");
+  if (hasTripwire([...prose, ...changed])) reasons.push("suspicious text in the PR");
   if (hasNonAscii(changed)) reasons.push("non-ASCII text in the change");
-  if (hasLookalikeLetters([pr.title, pr.body])) reasons.push("lookalike letters in the title or body");
+  if (hasLookalikeLetters(prose)) reasons.push("lookalike letters in the title or body");
+  if (!reviewedText) reasons.push("the text given to the reviewers is unknown");
+  else if (!samePrText(reviewedText, pr)) reasons.push("the title or body changed after the review started");
   return reasons;
 }
 

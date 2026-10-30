@@ -31,9 +31,9 @@ on:
 
 permissions: {}
 
-# Workflow-level so an unlabeled or draft run, whose job is always skipped, still cancels the paid one; pushes queue so a paid run finishes; unrelated label edits get a private group and cancel nothing.
+# Workflow-level so an unlabeled or draft run, whose job is always skipped, still cancels the paid one; pushes queue so a paid run finishes; unrelated label edits and off-main dispatches, whose job always skips, get a private group and cancel nothing.
 concurrency:
-  group: ai-review-${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && github.event.label.name != 'ready-for-ci') && github.run_id || github.event.pull_request.number || inputs.pr_number }}
+  group: ai-review-${{ ((contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && github.event.label.name != 'ready-for-ci') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && github.run_id || github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: ${{ contains(fromJSON('["unlabeled","converted_to_draft"]'), github.event.action) }}
 
 jobs:
@@ -169,9 +169,8 @@ jobs:
           fi
           ent_repo=openobserve/o2-enterprise
           # Any lookup error falls back to reviewing here: a missed pairing costs a duplicate review, a failed step costs the review.
-          if ! ent_json="$(GH_TOKEN="$ENT_TOKEN" gh pr list --repo "$ent_repo" --head "$BRANCH" --state open \
-            --json number,isCrossRepository,isDraft,labels \
-            --jq '[.[] | select(.isCrossRepository == false)][0] // {}')"; then
+          if ! ent_json="$(GH_TOKEN="$ENT_TOKEN" gh api -X GET "repos/$ent_repo/pulls" -f state=open -f head="${ent_repo%%/*}:$BRANCH" \
+            --jq '.[0] // {} | {number, isDraft: .draft, labels}')"; then
             echo "::warning::Could not look up a paired $ent_repo PR; reviewing here."
             exit 0
           fi

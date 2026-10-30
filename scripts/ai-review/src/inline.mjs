@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { normalizeSeverity, severityRank } from "./severity.mjs";
+import { isKnownSeverity, normalizeSeverity, severityRank } from "./severity.mjs";
 
 export const INLINE_SEVERITIES = new Set(["p0", "p1", "p2"]);
 export const MAX_INLINE_COMMENTS = 10;
@@ -99,7 +99,7 @@ function findInlineBlocks(source) {
   return blocks;
 }
 
-// Cuts every inline block out of the coordinator output and parses the first one.
+// Cuts every inline block out of the coordinator output and parses the first one; a further block is never counted, so it makes the count unknown.
 export function extractInlineBlock(text) {
   const source = String(text ?? "");
   const blocks = findInlineBlocks(source);
@@ -110,7 +110,10 @@ export function extractInlineBlock(text) {
   const parsed = blocks[0].json;
   if (parsed === null) return { text: stripped, findings: [], error: "inline block is not valid JSON" };
   if (!Array.isArray(parsed)) return { text: stripped, findings: [], error: "inline block is not a JSON array" };
-  return { text: stripped, findings: parsed.map(normalizeFinding).filter(Boolean), error: null };
+  const findings = parsed.map(normalizeFinding).filter(Boolean);
+  // The list backs "no blockers", so a lost or ungraded entry makes the count unknown even though the rest still post.
+  const countable = blocks.length === 1 && findings.length === parsed.length && parsed.every(raw => isKnownSeverity(raw.severity));
+  return { text: stripped, findings, error: countable ? null : "inline block has entries that cannot be counted" };
 }
 
 export function normalizeTitle(title) {
