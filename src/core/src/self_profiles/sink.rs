@@ -15,11 +15,11 @@
 
 use std::time::Duration;
 
-use config::{META_ORG_ID, get_config, meta::otlp::OtlpRequestType};
+use config::{DEFAULT_STREAM_NAME, META_ORG_ID, get_config, meta::otlp::OtlpRequestType};
 use ingestion_common::{IngestUser, SystemJobType};
 use opentelemetry_proto::tonic::collector::profiles::v1development::ExportProfilesServiceRequest;
 
-use super::{STREAM_NAME, convert};
+use super::convert;
 
 const REMOTE_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const REMOTE_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -40,7 +40,7 @@ async fn ingest_local(request: ExportProfilesServiceRequest) -> Result<(), Strin
         META_ORG_ID,
         request,
         OtlpRequestType::HttpProtobuf,
-        Some(STREAM_NAME),
+        Some(DEFAULT_STREAM_NAME),
         IngestUser::SystemJob(SystemJobType::SelfReporting),
     )
     .await
@@ -62,7 +62,6 @@ async fn ingest_remote(
     let mut builder = client
         .post(url)
         .header(reqwest::header::CONTENT_TYPE, "application/x-protobuf")
-        .header(get_config().grpc.stream_header_key.as_str(), STREAM_NAME)
         .body(body);
     if !auth_header.is_empty() {
         builder = builder.header(reqwest::header::AUTHORIZATION, auth_header);
