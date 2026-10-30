@@ -1619,13 +1619,10 @@ async fn range_edit_sources(
     let family = TraceFamily::new(&link.org_id);
     let mut sources = Vec::new();
     // Values depend on the window only when a values query picks them.
-    let windows: Vec<&TimeRange> = if Defaults::new(dash, frozen.clone())
-        .pending_queries()
-        .is_empty()
-    {
-        ranges.iter().take(1).collect()
-    } else {
+    let windows: Vec<&TimeRange> = if Defaults::new(dash, frozen.clone()).has_pending() {
         ranges.iter().collect()
+    } else {
+        ranges.iter().take(1).collect()
     };
     for range in windows {
         let range_key = range.key();
