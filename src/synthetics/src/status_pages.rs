@@ -195,25 +195,36 @@ struct RebuilderState {
     /// Highest `updated_at` consumed so far (the delta watermark).
     watermark: i64,
     tick_count: u64,
-    /// Per check, the `last_triggered_at` of the last run this loop counted.
+    /// Per check, the `completed_at` of the last run this loop counted.
     seen_runs: HashMap<String, i64>,
 }
 
+/// How far back (by `scheduled_ts`) the rebuilder looks for completed runs.
+/// Only completions that are new since the previous tick matter, and a probe
+/// run completes within its job timeout (minutes), so an hour covers every
+/// normal result with room for a delayed tick. A run that completes later than
+/// this — a long-expired dead letter — ends as Error, which never advances a
+/// streak anyway.
+const RUN_COMPLETION_LOOKBACK_MICROS: i64 = 3_600_000_000;
+
 /// Records one tick's view of a check and says whether it is a new result.
 ///
-/// Streaks count RUNS, not rebuild ticks: the rebuilder ticks far more often
-/// than most checks run, so counting ticks confirmed a single DOWN as three
-/// failures. `CheckStateRow` carries no result timestamp, so the run marker is
-/// `last_triggered_at` (set when the scheduler fans out a run). A changed value
-/// means at least one new run since the last count; the status read alongside
-/// it may still be the previous run's, so counting can lag by one run but
-/// never multiplies.
+/// Streaks count completed RUNS, not rebuild ticks: the rebuilder ticks far
+/// more often than most checks run, so counting ticks confirmed a single DOWN
+/// as three failures. The marker is the check's latest
+/// `synthetics_runs.completed_at`, so one completed run counts exactly once.
+/// (`last_triggered_at` moves at dispatch, before the result exists, so it
+/// counted the previous result again when the next run was dispatched.) No
+/// completed run in the lookback window means nothing new to count.
 fn observe_run(
     down_streaks: &mut HashMap<String, i32>,
     seen_runs: &mut HashMap<String, i64>,
     s: &table::CheckStateRow,
 ) -> bool {
-    let fresh = seen_runs.insert(s.id.clone(), s.last_triggered_at) != Some(s.last_triggered_at);
+    let fresh = match s.last_completed_at {
+        Some(at) => seen_runs.insert(s.id.clone(), at) != Some(at),
+        None => false,
+    };
     if s.last_check_status == engine::CHECK_STATUS_DOWN {
         if fresh {
             *down_streaks.entry(s.id.clone()).or_insert(0) += 1;
@@ -368,7 +379,16 @@ async fn load(
         rt.check_state.retain(|id, _| mapped.contains(id.as_str()));
     }
     rt.watermark = rt.watermark.max(max_updated);
-    let states: Vec<table::CheckStateRow> = rt.check_state.values().cloned().collect();
+    let mut states: Vec<table::CheckStateRow> = rt.check_state.values().cloned().collect();
+    let keys: Vec<(String, String)> = states
+        .iter()
+        .map(|s| (s.org_id.clone(), s.id.clone()))
+        .collect();
+    let completions =
+        table::latest_run_completions(conn, &keys, now - RUN_COMPLETION_LOOKBACK_MICROS).await?;
+    for s in &mut states {
+        s.last_completed_at = completions.get(&s.id).copied();
+    }
 
     let mut snoozed: HashSet<String> = table::list_active_snoozes(conn, now)
         .await?
@@ -863,13 +883,48 @@ pub async fn run_domain_verifier() {}
 mod fast_pass_tests {
     use super::*;
 
-    fn row(id: &str, status: i32, run: i64) -> table::CheckStateRow {
+    fn row(id: &str, status: i32, completed: i64) -> table::CheckStateRow {
+        row_at(id, status, Some(completed))
+    }
+
+    fn row_at(id: &str, status: i32, completed: Option<i64>) -> table::CheckStateRow {
         table::CheckStateRow {
             id: id.into(),
+            org_id: "org".into(),
             last_check_status: status,
             consecutive_failures: 0,
-            last_triggered_at: run,
+            last_triggered_at: 0,
+            last_completed_at: completed,
         }
+    }
+
+    /// The double count Codex found: dispatching the next run used to move the
+    /// marker while the status still showed the previous result, so one DOWN
+    /// counted twice and `confirm_failures = 2` opened on a single failure.
+    #[test]
+    fn dispatch_without_completion_does_not_count_again() {
+        let (mut d, mut seen) = (HashMap::new(), HashMap::new());
+        let down = engine::CHECK_STATUS_DOWN;
+        assert!(observe_run(&mut d, &mut seen, &row("c", down, 100)));
+        // Next run dispatched (last_triggered_at moves), not yet completed.
+        let mut dispatched = row("c", down, 100);
+        dispatched.last_triggered_at = 999;
+        assert!(!observe_run(&mut d, &mut seen, &dispatched));
+        assert_eq!(d["c"], 1);
+    }
+
+    /// The latest completion falling out of the lookback window is not a new
+    /// result, and its return is not one either.
+    #[test]
+    fn no_completion_in_window_is_not_fresh() {
+        let (mut d, mut seen) = (HashMap::new(), HashMap::new());
+        let down = engine::CHECK_STATUS_DOWN;
+        assert!(!observe_run(&mut d, &mut seen, &row_at("c", down, None)));
+        assert!(!d.contains_key("c"));
+        assert!(observe_run(&mut d, &mut seen, &row("c", down, 100)));
+        assert!(!observe_run(&mut d, &mut seen, &row_at("c", down, None)));
+        assert!(!observe_run(&mut d, &mut seen, &row("c", down, 100)));
+        assert_eq!(d["c"], 1);
     }
 
     #[test]
