@@ -48,9 +48,11 @@ pub async fn run() {
     let cpu_secs = cfg.self_profiles.cpu_secs;
     let lock = Arc::new(Mutex::new(()));
     log::info!(
-        "[SELF-PROFILES] starting background loop: interval={}s cpu={}s url={}",
+        "[SELF-PROFILES] starting background loop: interval={}s cpu={}s memory={} stream={} url={}",
         cfg.self_profiles.interval_secs,
         cpu_secs,
+        memory_enabled(),
+        cfg.self_profiles.stream,
         if cfg.self_profiles.url.is_empty() {
             "local"
         } else {
@@ -73,32 +75,42 @@ pub async fn run() {
 }
 
 async fn run_cycle(cpu_secs: u64) -> Result<(), String> {
-    let host = config::get_config().common.instance_name.clone();
-    let extra = [("host.name", host.as_str())];
+    let cfg = config::get_config();
+    let extra = [
+        ("host.name", cfg.common.instance_name.as_str()),
+        ("cluster.name", cfg.common.cluster_name.as_str()),
+    ];
 
-    match sample::dump_cpu_profile(cpu_secs, CPU_FREQUENCY_HZ).await {
-        Ok(bytes) => match convert::pprof_bytes_to_otlp(&bytes, &extra) {
-            Ok(req) => {
-                if let Err(e) = sink::ingest(req).await {
-                    log::error!("[SELF-PROFILES] CPU ingest failed: {e}");
-                }
-            }
-            Err(e) => log::error!("[SELF-PROFILES] CPU convert failed: {e}"),
-        },
-        Err(e) => log::error!("[SELF-PROFILES] CPU sample failed: {e}"),
-    }
+    let cpu = sample::dump_cpu_profile(cpu_secs, CPU_FREQUENCY_HZ).await;
+    ingest_sample("CPU", cpu, &extra).await;
 
-    match sample::dump_memory_pprof().await {
-        Ok(bytes) => match convert::pprof_bytes_to_otlp(&bytes, &extra) {
-            Ok(req) => {
-                if let Err(e) = sink::ingest(req).await {
-                    log::error!("[SELF-PROFILES] memory ingest failed: {e}");
-                }
-            }
-            Err(e) => log::error!("[SELF-PROFILES] memory convert failed: {e}"),
-        },
-        Err(e) => log::error!("[SELF-PROFILES] memory sample failed: {e}"),
+    #[cfg(feature = "profiling")]
+    if memory_enabled() {
+        let memory = sample::dump_memory_pprof().await;
+        ingest_sample("memory", memory, &extra).await;
     }
 
     Ok(())
+}
+
+async fn ingest_sample(kind: &str, sampled: Result<Vec<u8>, String>, extra: &[(&str, &str)]) {
+    let bytes = match sampled {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            log::error!("[SELF-PROFILES] {kind} sample failed: {e}");
+            return;
+        }
+    };
+    match convert::pprof_bytes_to_otlp(&bytes, extra) {
+        Ok(req) => {
+            if let Err(e) = sink::ingest(req).await {
+                log::error!("[SELF-PROFILES] {kind} ingest failed: {e}");
+            }
+        }
+        Err(e) => log::error!("[SELF-PROFILES] {kind} convert failed: {e}"),
+    }
+}
+
+fn memory_enabled() -> bool {
+    cfg!(feature = "profiling") && config::get_config().self_profiles.memory_enabled
 }

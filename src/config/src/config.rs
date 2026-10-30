@@ -1127,7 +1127,7 @@ impl PublicAiChat {
 }
 
 /// Background self CPU/memory profile ingest into `_meta.self_profiles`.
-/// Gated at runtime by `enabled`; sampling code is compile-gated on `profiling`.
+/// Gated at runtime by `enabled`; CPU needs `cpu-profiling`, memory needs `profiling`.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct SelfProfiles {
     #[env_config(
@@ -1148,6 +1148,18 @@ pub struct SelfProfiles {
         help = "CPU sample duration in seconds within each self-profile cycle"
     )]
     pub cpu_secs: u64,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_MEMORY_ENABLED",
+        default = true,
+        help = "Also sample jemalloc heap profiles each cycle; needs the `profiling` build feature"
+    )]
+    pub memory_enabled: bool,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_STREAM",
+        default = "self_profiles",
+        help = "Profiles stream to write into, locally or on the remote ZO_SELF_PROFILES_URL"
+    )]
+    pub stream: String,
     #[env_config(
         name = "ZO_SELF_PROFILES_URL",
         default = "",

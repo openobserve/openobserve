@@ -28,19 +28,29 @@ const REMOTE_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 pub async fn ingest(request: ExportProfilesServiceRequest) -> Result<(), String> {
     let cfg = get_config();
     let url = cfg.self_profiles.url.trim();
+    let stream = stream_name(&cfg.self_profiles.stream);
     if url.is_empty() {
-        ingest_local(request).await
+        ingest_local(request, stream).await
     } else {
-        ingest_remote(request, url, cfg.self_profiles.auth_header.as_str()).await
+        ingest_remote(request, url, stream, cfg.self_profiles.auth_header.as_str()).await
     }
 }
 
-async fn ingest_local(request: ExportProfilesServiceRequest) -> Result<(), String> {
+fn stream_name(configured: &str) -> &str {
+    let stream = configured.trim();
+    if stream.is_empty() {
+        STREAM_NAME
+    } else {
+        stream
+    }
+}
+
+async fn ingest_local(request: ExportProfilesServiceRequest, stream: &str) -> Result<(), String> {
     crate::profiles::handle_otlp_request(
         META_ORG_ID,
         request,
         OtlpRequestType::HttpProtobuf,
-        Some(STREAM_NAME),
+        Some(stream),
         IngestUser::SystemJob(SystemJobType::SelfReporting),
     )
     .await
@@ -51,6 +61,7 @@ async fn ingest_local(request: ExportProfilesServiceRequest) -> Result<(), Strin
 async fn ingest_remote(
     request: ExportProfilesServiceRequest,
     url: &str,
+    stream: &str,
     auth_header: &str,
 ) -> Result<(), String> {
     let body = convert::encode_otlp_request(&request);
@@ -62,6 +73,7 @@ async fn ingest_remote(
     let mut builder = client
         .post(url)
         .header(reqwest::header::CONTENT_TYPE, "application/x-protobuf")
+        .header(get_config().grpc.stream_header_key.as_str(), stream)
         .body(body);
     if !auth_header.is_empty() {
         builder = builder.header(reqwest::header::AUTHORIZATION, auth_header);
@@ -78,4 +90,16 @@ async fn ingest_remote(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stream_name_falls_back_to_default_when_blank() {
+        assert_eq!(stream_name(""), STREAM_NAME);
+        assert_eq!(stream_name("  "), STREAM_NAME);
+        assert_eq!(stream_name(" cluster_a "), "cluster_a");
+    }
 }
