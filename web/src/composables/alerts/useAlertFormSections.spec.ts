@@ -1,11 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { ref } from "vue";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import { useAlertFormSections, checkEveryLabel, type FieldMetaMap } from "./useAlertFormSections";
-import { sectionOfField } from "@/components/alerts/alertFormSections";
+import { AGGREGATION_ENABLED_FIELD, sectionOfField } from "@/components/alerts/alertFormSections";
+import config from "@/aws-exports";
 
 const t = i18n.global.t as unknown as TranslateFn;
 
@@ -71,6 +72,30 @@ describe("useAlertFormSections", () => {
     expect(byId(items.value, "notify")).toMatchObject({ state: "none", summary: "Nobody yet" });
   });
 
+  describe("on-call delivery", () => {
+    const { isEnterprise, isCloud } = config;
+    afterEach(() => {
+      config.isEnterprise = isEnterprise;
+      config.isCloud = isCloud;
+    });
+
+    it("counts an on-call team as someone notified where on-call exists", () => {
+      config.isEnterprise = "true";
+      const { items } = setup(scheduled({ stream_name: "cpu", oncall_team: "team-1" }));
+      expect(byId(items.value, "notify")).toMatchObject({
+        state: "done",
+        summary: "1 destination",
+      });
+    });
+
+    it("ignores an on-call team where on-call does not exist", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const { items } = setup(scheduled({ stream_name: "cpu", oncall_team: "team-1" }));
+      expect(byId(items.value, "notify").summary).toBe("Nobody yet");
+    });
+  });
+
   it("counts invalid fields per section from the form's field meta", () => {
     const { items, errorCounts } = setup(scheduled({ stream_name: "k8s_logs", name: "x" }), {
       "trigger_condition.period": { errors: ["Required"] },
@@ -112,6 +137,7 @@ describe("sectionOfField", () => {
     expect(sectionOfField("trigger_condition.warning_threshold")).toBe("condition");
     expect(sectionOfField("pending_period_sec")).toBe("condition");
     expect(sectionOfField("destinations")).toBe("notify");
+    expect(sectionOfField(AGGREGATION_ENABLED_FIELD)).toBe("condition");
     expect(sectionOfField("trigger_condition.frequency")).toBe("schedule");
     expect(sectionOfField("row_template_type")).toBe("details");
   });

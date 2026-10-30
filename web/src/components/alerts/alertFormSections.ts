@@ -50,7 +50,11 @@ export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
   { id: "details", titleKey: "alerts.sections.details.title" },
 ];
 
+/** Change-tracking key for the measure on/off switch, which lives beside the form values. */
+export const AGGREGATION_ENABLED_FIELD = "aggregation_enabled";
+
 const FIELD_SECTION_PREFIXES: ReadonlyArray<[string, AlertSectionId]> = [
+  [AGGREGATION_ENABLED_FIELD, "condition"],
   ["stream_type", "watch"],
   ["stream_name", "watch"],
   ["is_real_time", "watch"],
