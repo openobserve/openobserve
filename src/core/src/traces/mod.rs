@@ -1724,8 +1724,12 @@ fn format_response(
     let partial = partial_success.rejected_spans > 0;
 
     let res = if partial {
-        partial_success.error_message =
-            "Some spans were rejected due to exceeding the allowed retention period".to_string();
+        // the retention checks set no reason of their own
+        if partial_success.error_message.is_empty() {
+            partial_success.error_message =
+                "Some spans were rejected due to exceeding the allowed retention period"
+                    .to_string();
+        }
         ExportTraceServiceResponse {
             partial_success: Some(partial_success),
         }
@@ -2337,6 +2341,55 @@ mod tests {
 
         let response = result.unwrap();
         assert_eq!(response.status(), http::StatusCode::PARTIAL_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn test_format_response_keeps_specific_error_message() {
+        use prost::Message;
+
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 2,
+                error_message: "Pipeline batch execution error: boom".to_string(),
+            };
+        let response = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+        )
+        .unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let decoded =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse::decode(
+                body,
+            )
+            .unwrap()
+            .partial_success
+            .unwrap();
+        assert_eq!(decoded.rejected_spans, 2);
+        assert_eq!(
+            decoded.error_message,
+            "Pipeline batch execution error: boom"
+        );
+
+        let generic = opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+            rejected_spans: 1,
+            error_message: String::new(),
+        };
+        let response =
+            super::format_response(generic, config::meta::otlp::OtlpRequestType::Grpc).unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let decoded =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse::decode(
+                body,
+            )
+            .unwrap()
+            .partial_success
+            .unwrap();
+        assert!(decoded.error_message.contains("retention period"));
     }
 
     #[test]
