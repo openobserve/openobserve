@@ -364,9 +364,9 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
     const [api, web] = options.series[0].data;
     expect(api.name).toBe("api");
     expect(api.itemStyle.color).toBe(OVERRIDE_COLOR);
-    expect(api.label.formatter()).toBe("66.7%");
+    expect(api.label.formatter({ name: "api" })).toBe("66.7%");
     expect(web.label).toBeUndefined();
-    expect(options.series[0].label.formatter({ percent: 33 })).toBe("33%");
+    expect(options.series[0].label.formatter({ name: "web", percent: 33 })).toBe("33%");
     const html = options.tooltip.formatter({ marker: "", name: "api", value: 600 });
     expect(html).toContain(`${DISPLAY} : <b>${fmt(600, "bytes", 1)}</b>`);
     expect(options.tooltip.formatter({ marker: "", name: "web", value: 300 })).toContain(
@@ -379,11 +379,11 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
     const options = await runSQL(piePanel(overrides), [rows]);
     const api = options.series[0].data[0];
     expect(options.legend.selected).toEqual({});
-    expect(api.label.formatter()).toBe("66.7%");
+    expect(api.label.formatter({ name: "api" })).toBe("66.7%");
     options.legend.selected = { api: true, web: false };
-    expect(api.label.formatter()).toBe("100.0%");
+    expect(api.label.formatter({ name: "api" })).toBe("100.0%");
     options.legend.selected = {};
-    expect(api.label.formatter()).toBe("66.7%");
+    expect(api.label.formatter({ name: "api" })).toBe("66.7%");
   });
 
   it("multi-query: applies to the merged slices", async () => {

@@ -14,15 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getSeriesColor } from "../../colorPalette";
-import { createSeriesOverrideLookup, pieShareLabel } from "../../seriesOverrides";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { chartColor } from "@/utils/chartTheme";
 import {
   getChartDimensions,
   applyPieDonutChartAlignment,
   applyPieDonutCenterAdjustment,
   calculatePieChartContainer,
-  MAX_SEATS_PRECISION,
   pieLegendPercentDecimals,
+  piePercentPrecision,
 } from "../../legendConfiguration";
 import { type SQLContext } from "../shared/types";
 import { escapeHtml } from "@/utils/html";
@@ -47,6 +47,14 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     getPieChartRadius,
   } = ctx;
   const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+  const percentDecimals = piePercentPrecision(panelSchema?.config);
+  // A slice with its own decimals gets its exact share from applySeriesOverrides, not ECharts' rounding.
+  const sliceLabel = (params: { name: string; percent?: number }): string => {
+    const overrideDecimals = seriesOverrides.get(params.name)?.decimals;
+    const decimals =
+      overrideDecimals === undefined ? percentDecimals : pieLegendPercentDecimals(overrideDecimals);
+    return `${Number(params.percent ?? 0).toFixed(decimals)}%`;
+  };
 
   if (panelSchema.type === "pie") {
     // Add more padding for pie chart
@@ -81,10 +89,6 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         }
       },
     };
-    const percentDecimals = Math.min(
-      pieLegendPercentDecimals(panelSchema.config?.decimals),
-      MAX_SEATS_PRECISION,
-    );
     //generate trace based on the y axis keys
     options.series = yAxisKeys?.map((key: any) => {
       const seriesObj = {
@@ -111,10 +115,13 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         },
         label: {
           show: true,
-          formatter: pieShareLabel(percentDecimals),
+          formatter: sliceLabel,
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
         },
+        // Fixed decimals widen the labels, so colliding ones and slivers are hidden as on a PromQL pie.
+        labelLayout: { hideOverlap: true },
+        minShowLabelAngle: 3,
         percentPrecision: percentDecimals,
       };
       return seriesObj;
@@ -222,10 +229,6 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         }
       },
     };
-    const percentDecimals = Math.min(
-      pieLegendPercentDecimals(panelSchema.config?.decimals),
-      MAX_SEATS_PRECISION,
-    );
     //generate trace based on the y axis keys
     options.series = yAxisKeys?.map((key: any) => {
       const seriesObj = {
@@ -252,10 +255,13 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         },
         label: {
           show: true,
-          formatter: pieShareLabel(percentDecimals),
+          formatter: sliceLabel,
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
         },
+        // Fixed decimals widen the labels, so colliding ones and slivers are hidden as on a PromQL pie.
+        labelLayout: { hideOverlap: true },
+        minShowLabelAngle: 3,
         percentPrecision: percentDecimals,
       };
       return seriesObj;
