@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" style="color-scheme:light dark">
+  <path d="M32.00 14.00A18 18 0 0 1 38.16 48.91L34.74 39.52A8 8 0 0 0 32.00 24.00Z" fill="#006BFF" stroke="#FFFFFF" stroke-width="1" style="stroke:light-dark(#FFFFFF,#131313)"/>
+  <path d="M38.16 48.91A18 18 0 0 1 14.00 32.00L24.00 32.00A8 8 0 0 0 34.74 39.52Z" fill="#0ED290" stroke="#FFFFFF" stroke-width="1" style="stroke:light-dark(#FFFFFF,#131313)"/>
+  <path d="M14.00 32.00A18 18 0 0 1 32.00 14.00L32.00 24.00A8 8 0 0 0 24.00 32.00Z" fill="#FE9738" stroke="#FFFFFF" stroke-width="1" style="stroke:light-dark(#FFFFFF,#131313)"/>
+  <path d="M32.00 3.00A29 29 0 0 1 61.00 32.00L50.00 32.00A18 18 0 0 0 32.00 14.00Z" fill="#4D97FF" stroke="#FFFFFF" stroke-width="1" style="stroke:light-dark(#FFFFFF,#131313)"/>
+  <path d="M61.00 32.00A29 29 0 0 1 41.92 59.25L38.16 48.91A18 18 0 0 0 50.00 32.00Z" fill="#80B5FF" stroke="#FFFFFF" stroke-width="1" style="stroke:light-dark(#FFFFFF,#131313)"/>
+  <path d="M41.92 59.25A29 29 0 0 1 13.36 54.22L20.43 45.79A18 18 0 0 0 38.16 48.91Z" fill="#56E0B1" stroke="#FFFFFF" stroke-width="1" style="stroke:light-dark(#FFFFFF,#131313)"/>
+  <path d="M13.36 54.22A29 29 0 0 1 3.00 32.00L14.00 32.00A18 18 0 0 0 20.43 45.79Z" fill="#9AEDD1" stroke="#FFFFFF" stroke-width="1" style="stroke:light-dark(#FFFFFF,#131313)"/>
+  <path d="M3.00 32.00A29 29 0 0 1 32.00 3.00L32.00 14.00A18 18 0 0 0 14.00 32.00Z" fill="#FEB574" stroke="#FFFFFF" stroke-width="1" style="stroke:light-dark(#FFFFFF,#131313)"/>
+</svg>

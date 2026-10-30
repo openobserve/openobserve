@@ -56,7 +56,8 @@ test.describe("Cloud API smoke", () => {
         expect(stored.recovery_destinations).toEqual(recovery);
         expect(stored.context_attributes).toEqual({ team: "qa" });
         expect(stored.tags).toEqual(["cloud-api-smoke"]);
-        expect(stored.deduplication.fingerprint_fields).toEqual(["level"]);
+        // Deduplication was removed; the legacy field the payload still sends is dropped.
+        expect(stored).not.toHaveProperty("deduplication");
         // The API omits an unset warning threshold rather than sending null.
         if (realtime) expect(stored.trigger_condition).not.toHaveProperty("warning_threshold");
         else expect(stored.trigger_condition.warning_threshold).toBe(2);
@@ -84,15 +85,14 @@ test.describe("Cloud API smoke", () => {
       const payload = smoke.alertPayload(`smoke_clear_${id}`, STREAM, created.destination);
       created.alertId = await smoke.createAlert(payload);
 
-      testLogger.step("Clear recovery destinations, tags, context, runbook and dedup");
+      testLogger.step("Clear recovery destinations, tags, context and runbook");
       await smoke.updateAlert(created.alertId, smoke.clearedAlert(await smoke.getAlert(created.alertId)));
       const cleared = await smoke.getAlert(created.alertId);
       expect(cleared.recovery_destinations).toEqual([]);
       expect(cleared.context_attributes).toEqual({});
-      // The API omits empty tags, an unset runbook and disabled dedup instead of sending empties.
+      // The API omits empty tags and an unset runbook instead of sending empties.
       expect(cleared).not.toHaveProperty("tags");
       expect(cleared).not.toHaveProperty("runbook_url");
-      expect(cleared).not.toHaveProperty("deduplication");
 
       testLogger.step("Fill them again");
       await smoke.updateAlert(created.alertId, { ...cleared, ...payload });
@@ -100,7 +100,6 @@ test.describe("Cloud API smoke", () => {
       expect(refilled.recovery_destinations).toEqual([created.destination]);
       expect(refilled.tags).toEqual(["cloud-api-smoke"]);
       expect(refilled.context_attributes).toEqual({ team: "qa" });
-      expect(refilled.deduplication.fingerprint_fields).toEqual(["level"]);
       expect(refilled.runbook_url).toBe("https://example.com/runbooks/cloud-api-smoke");
     }
   );

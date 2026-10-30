@@ -41,7 +41,11 @@ import {
   stateTimelineDrilldownSeries,
   stateTimelineSourceRecord,
 } from "@/utils/dashboard/convertStateTimelineData";
+import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
+
+// A click on these lands on a named item (slice, bar, tile), not on a named series.
+const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst", "funnel"];
 
 export function usePanelDrilldown({
   panelSchema,
@@ -67,6 +71,7 @@ export function usePanelDrilldown({
   showErrorNotification,
   t,
   onExemplarClick,
+  hideChartTooltip,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -92,6 +97,7 @@ export function usePanelDrilldown({
   showErrorNotification: any;
   t: TranslateFn;
   onExemplarClick?: (params: any) => void | Promise<void>;
+  hideChartTooltip?: () => void;
 }) {
   // Cross-linking: store cross-links from result_schema response
   const { getStream } = useStreams(t);
@@ -241,7 +247,7 @@ export function usePanelDrilldown({
       return { __name: row ?? params?.name, __value: value, __axisValue: column };
     }
     return {
-      __name: ["pie", "donut"].includes(panelSchema.value.type) ? params?.name : params?.seriesName,
+      __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
       __value: value,
       __axisValue: params?.value?.[0] ?? params?.name,
     };
@@ -594,6 +600,8 @@ export function usePanelDrilldown({
     }
     // A host map group header has a tooltip but is no cell to drill into.
     if (panelSchema.value.type === "hostmap" && params?.seriesIndex !== 0) return;
+    // A treemap breadcrumb navigates the tiles and carries no series name or value.
+    if (params?.selfType === "breadcrumb") return;
     const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
     // Query-source markers are read-only and explain themselves on hover.
     const isQueryMarker = isMarker && !!params?.data?.annotationDetails?.source;
@@ -609,8 +617,9 @@ export function usePanelDrilldown({
           handleAddAnnotation(queryMarkerStart(params?.data?.annotationDetails), null);
         } else {
           // A segment's start is its zoned x value, the same unit the other charts pass.
-          const segmentStart =
-            panelSchema.value.type === "state-timeline" ? params?.value?.[0] : undefined;
+          const segmentStart = isRowTimeline(panelSchema.value.type)
+            ? params?.value?.[0]
+            : undefined;
           handleAddAnnotation(
             segmentStart ?? (params?.data?.[0] || params?.data?.time || params?.data?.name),
             null,
@@ -629,7 +638,7 @@ export function usePanelDrilldown({
     // Store click parameters for drilldown (including cross-links)
     const crossLinkItems = getCrossLinkDrilldownItems();
     // A state timeline's drilldown reads a segment, so an annotation click only opens the annotation.
-    const annotationOnly = hasAnnotation && panelSchema.value.type === "state-timeline";
+    const annotationOnly = hasAnnotation && isRowTimeline(panelSchema.value.type);
     const shouldShowDrilldown = !annotationOnly && (hasDrilldown || crossLinkItems.length > 0);
 
     if (shouldShowDrilldown) {
@@ -651,6 +660,8 @@ export function usePanelDrilldown({
 
     // Handle popup displays with priority
     if (shouldShowDrilldown) {
+      // An item tooltip sits at the cursor, right where the menu opens, and would cover it.
+      hideChartTooltip?.();
       // Show drilldown popup first
       drilldownPopUpRef.value.style.display = "block";
       await nextTick();
@@ -746,7 +757,7 @@ export function usePanelDrilldown({
         } else {
           // Non-table: find value from raw query data or chart click
           const chartType = panelSchema.value?.type;
-          const isPieOrDonut = ["pie", "donut"].includes(chartType);
+          const isPieOrDonut = NAMED_ITEM_TYPES.includes(chartType);
           const dataIndex = drilldownParams[0]?.dataIndex;
           const xAxisData = panelData.value?.options?.xAxis?.[0]?.data;
 
@@ -768,7 +779,7 @@ export function usePanelDrilldown({
             ? drilldownParams[0]?.name
             : drilldownParams[0]?.seriesName;
 
-          if (chartType === "state-timeline") {
+          if (isRowTimeline(chartType)) {
             Object.assign(
               record,
               stateTimelineSourceRecord(panelSchema.value, data.value, drilldownParams[0]),
@@ -871,7 +882,7 @@ export function usePanelDrilldown({
           : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
-        const isStateTimeline = queryDetails.type === "state-timeline";
+        const isStateTimeline = isRowTimeline(queryDetails.type);
         const cell =
           queryDetails.type === "hostmap" ? hostmapDrilldownSeries(drilldownParams[0]) : null;
         const segment = isStateTimeline ? stateTimelineDrilldownSeries(drilldownParams[0]) : null;
@@ -955,7 +966,7 @@ export function usePanelDrilldown({
           // Handle different chart types
           if (panelSchema.value.type == "table") {
             drilldownVariables.row = getTableRowVariable();
-          } else if (panelSchema.value.type == "sankey") {
+          } else if (isFlowChart(panelSchema.value.type)) {
             if (drilldownParams[0].dataType == "node") {
               drilldownVariables.node = {
                 __name: drilldownParams[0]?.data?.rawName ?? drilldownParams[0]?.name ?? "",
@@ -1067,7 +1078,7 @@ export function usePanelDrilldown({
       // if chart type is 'table' then we need to pass the table name
       if (panelSchema.value.type == "table") {
         drilldownVariables.row = getTableRowVariable();
-      } else if (panelSchema.value.type == "sankey") {
+      } else if (isFlowChart(panelSchema.value.type)) {
         // if dataType is node then set node data
         // else set edge data
         if (drilldownParams[0].dataType == "node") {
@@ -1084,7 +1095,7 @@ export function usePanelDrilldown({
             __value: drilldownParams[0]?.data?.value ?? "",
           };
         }
-      } else if (panelSchema.value.type == "state-timeline") {
+      } else if (isRowTimeline(panelSchema.value.type)) {
         drilldownVariables.series = stateTimelineDrilldownSeries(drilldownParams[0]);
       } else if (panelSchema.value.type == "hostmap") {
         drilldownVariables.series = hostmapDrilldownSeries(drilldownParams[0]);

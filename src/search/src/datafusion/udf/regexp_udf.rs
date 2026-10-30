@@ -19,14 +19,13 @@ use arrow_schema::{Field, FieldRef, Fields};
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayData, ArrayRef, BooleanArray, StringArray, StructArray,
-            as_large_list_array, as_list_array, as_string_array,
+            Array, ArrayRef, BooleanArray, GenericStringBuilder, OffsetSizeTrait, StructArray,
+            as_string_array,
         },
         datatypes::DataType,
     },
     common::cast::as_generic_string_array,
     error::{DataFusionError, Result},
-    functions::regex::regexpmatch::regexp_match,
     logical_expr::{
         ReturnFieldArgs, ScalarFunctionArgs, ScalarFunctionImplementation, ScalarUDF,
         ScalarUDFImpl, Signature, TypeSignature::Exact, Volatility,
@@ -284,7 +283,6 @@ impl ScalarUDFImpl for RegxpMatchToFields {
     }
 
     fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
-        // 1. Get result from datafusion native regexp_match() function
         let len = args
             .args
             .iter()
@@ -295,80 +293,39 @@ impl ScalarUDFImpl for RegxpMatchToFields {
 
         // All-scalar input still carries one row to match.
         let inferred_length = len.unwrap_or(1);
-        let args_array = args
-            .args
-            .iter()
-            .map(|arg| arg.clone().into_array(inferred_length))
-            .collect::<Result<Vec<_>>>()?;
+        let haystack = args.args[0].clone().into_array(inferred_length)?;
+        let haystack_type = haystack.data_type();
+        if !matches!(haystack_type, DataType::Utf8 | DataType::LargeUtf8) {
+            return Err(DataFusionError::Execution(format!(
+                "Unsupported data type {haystack_type:?} for function regexp_match"
+            )));
+        }
 
-        let result = match &args_array[0].data_type() {
-            DataType::Utf8 => regexp_match(&args_array)?,
-            DataType::LargeUtf8 => regexp_match(&args_array)?,
-            other => {
-                return Err(DataFusionError::Execution(format!(
-                    "Unsupported data type {other:?} for function regexp_match"
-                )));
-            }
-        };
-
-        let (ret_data_type, regexp_pattern) = match &args.args[1] {
-            ColumnarValue::Scalar(ScalarValue::Utf8(Some(pattern))) => {
-                (DataType::Utf8, pattern.to_string().replace('"', ""))
-            }
-            ColumnarValue::Scalar(ScalarValue::LargeUtf8(Some(pattern))) => {
-                (DataType::LargeUtf8, pattern.to_string().replace('"', ""))
-            }
+        let raw_pattern = match &args.args[1] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(pattern)))
+            | ColumnarValue::Scalar(ScalarValue::LargeUtf8(Some(pattern))) => pattern.as_str(),
             _ => {
                 return Err(DataFusionError::Execution("regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings".to_string()));
             }
         };
+        let fields = regex_pattern_to_fields(&raw_pattern.replace('"', ""), haystack_type)?;
+        let re = regex::Regex::new(raw_pattern).map_err(|e| {
+            DataFusionError::Execution(format!("Regular expression did not compile: {e:?}"))
+        })?;
 
-        if result.is_empty() {
-            return Err(DataFusionError::Execution(
-                "regexp_match_to_fields requires at least one input row".to_string(),
-            ));
-        }
-
-        // 2. Unpack result and argument to construct returning struct
-        let fields = regex_pattern_to_fields(&regexp_pattern, &ret_data_type)?;
-
-        // 3. Build returning struct
-        let mut struct_builder = ArrayData::builder(DataType::Struct(fields.into()));
-        match ret_data_type {
-            // Result is a single column of ListArray of StringArray.
-            // Get the first value of ListArray and iterate the StringArray
-            // and build individual StringArrays
-            DataType::Utf8 => {
-                let result_string_arr = as_list_array(&result).value(0);
-                let result_string_arr_internal =
-                    as_generic_string_array::<i32>(&result_string_arr)?;
-
-                for v in result_string_arr_internal {
-                    let arr = StringArray::from(vec![v]);
-                    struct_builder = struct_builder.len(arr.len()).add_child_data(arr.to_data());
-                }
-            }
-            DataType::LargeUtf8 => {
-                let result_string_arr = as_large_list_array(&result).value(0);
-                let result_string_arr_internal =
-                    as_generic_string_array::<i64>(&result_string_arr)?;
-
-                for v in result_string_arr_internal {
-                    let arr = StringArray::from(vec![v]);
-                    struct_builder = struct_builder.len(arr.len()).add_child_data(arr.to_data());
-                }
-            }
+        let struct_array: ArrayRef = match haystack_type {
+            DataType::Utf8 => Arc::new(captures_to_struct::<i32>(&haystack, &re, fields)?),
+            DataType::LargeUtf8 => Arc::new(captures_to_struct::<i64>(&haystack, &re, fields)?),
             _ => unreachable!(), // since checked above
-        }
-
-        let Ok(struct_array_data) = struct_builder.build() else {
-            return Err(DataFusionError::Execution("regexp_match_to_fields failed to pack result to fields. Named Capturing groups are required in regexp pattern".to_string()));
         };
 
-        let struct_array = StructArray::from(struct_array_data);
-        Ok(ColumnarValue::Scalar(ScalarValue::Struct(Arc::new(
-            struct_array,
-        ))))
+        if len.is_none() {
+            return Ok(ColumnarValue::Scalar(ScalarValue::try_from_array(
+                &struct_array,
+                0,
+            )?));
+        }
+        Ok(ColumnarValue::Array(struct_array))
     }
 
     fn aliases(&self) -> &[String] {
@@ -390,15 +347,44 @@ fn regex_pattern_to_fields(pattern: &str, ret_type: &DataType) -> Result<Vec<Fie
     } else {
         Ok(field_names
             .into_iter()
-            .map(|field_name| Field::new(field_name, ret_type.to_owned(), false))
+            .map(|field_name| Field::new(field_name, ret_type.to_owned(), true))
             .collect())
     }
+}
+
+/// Packs per-row regex captures into a struct array; unmatched rows and absent groups are null.
+fn captures_to_struct<O: OffsetSizeTrait>(
+    haystack: &ArrayRef,
+    re: &regex::Regex,
+    fields: Vec<Field>,
+) -> Result<StructArray> {
+    let haystack = as_generic_string_array::<O>(haystack)?;
+    let mut builders: Vec<GenericStringBuilder<O>> = fields
+        .iter()
+        .map(|_| GenericStringBuilder::<O>::new())
+        .collect();
+    for value in haystack.iter() {
+        let caps = value.and_then(|v| re.captures(v));
+        for (builder, field) in builders.iter_mut().zip(&fields) {
+            let capture = caps.as_ref().and_then(|c| c.name(field.name()));
+            builder.append_option(capture.map(|m| m.as_str()));
+        }
+    }
+    let columns = builders
+        .into_iter()
+        .map(|mut b| Arc::new(b.finish()) as ArrayRef)
+        .collect();
+    Ok(StructArray::try_new(Fields::from(fields), columns, None)?)
 }
 
 #[cfg(test)]
 mod tests {
     use datafusion::{
-        arrow::{array::Int64Array, datatypes::Schema, record_batch::RecordBatch},
+        arrow::{
+            array::{Int64Array, StringArray},
+            datatypes::Schema,
+            record_batch::RecordBatch,
+        },
         assert_batches_eq,
         datasource::MemTable,
         prelude::SessionContext,
@@ -568,7 +554,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_regexp_match_to_fields_empty_input_does_not_panic() {
+    async fn test_regexp_match_to_fields_empty_batch_returns_no_rows() {
         let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
         let batch = RecordBatch::new_empty(schema.clone());
 
@@ -578,7 +564,82 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
         let sql = r#"select regexp_match_to_fields(log, '(?P<a>[^\s]+)') as subquery from t"#;
-        let result = ctx.sql(sql).await.unwrap().collect().await;
-        assert!(result.is_err());
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        assert_eq!(result.iter().map(|b| b.num_rows()).sum::<usize>(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_regexp_match_to_fields_builds_one_struct_per_row() {
+        let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![
+                "no match here",
+                "GET /a",
+                "POST /b",
+            ]))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEXP_MATCH_TO_FIELDS_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = r#"select regexp_match_to_fields(log, '^(?P<method>[A-Z]+) (?P<path>/[a-z]+)$') as fields from t"#;
+        let expected = [
+            "+--------------------------+",
+            "| fields                   |",
+            "+--------------------------+",
+            "| {method: , path: }       |",
+            "| {method: GET, path: /a}  |",
+            "| {method: POST, path: /b} |",
+            "+--------------------------+",
+        ];
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        assert_batches_eq!(expected, &result);
+        let fields = result[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<StructArray>()
+            .unwrap();
+        assert!(fields.is_valid(0));
+        assert!(fields.column(0).is_null(0));
+        assert!(fields.column(1).is_null(0));
+        assert!(fields.column(0).is_valid(1));
+    }
+
+    #[tokio::test]
+    async fn test_regexp_match_to_fields_optional_group_is_null() {
+        let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec!["xy", "y"]))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEXP_MATCH_TO_FIELDS_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = r#"select regexp_match_to_fields(log, '(?P<a>x)?(?P<b>y)') as fields from t"#;
+        let expected = [
+            "+--------------+",
+            "| fields       |",
+            "+--------------+",
+            "| {a: x, b: y} |",
+            "| {a: , b: y}  |",
+            "+--------------+",
+        ];
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        assert_batches_eq!(expected, &result);
+        let fields = result[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<StructArray>()
+            .unwrap();
+        assert!(fields.column(0).is_null(1));
+        assert!(fields.column(1).is_valid(1));
     }
 }

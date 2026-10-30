@@ -152,7 +152,7 @@ async fn persist_alert_run_state_deferred(
 ) -> Option<Vec<config::meta::alerts::recovery::RecoveryEvent>> {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
-    // Every delivery path persists here, the grouped and deduplicated ones included.
+    // Every delivery path persists here.
     #[cfg(feature = "enterprise")]
     if clears_recorded_mute(outcome) {
         clear_recorded_mute(&alert.org_id, alert_id).await;
@@ -498,16 +498,12 @@ async fn load_tracked_group_states(
 
 /// What [`dispatch_per_group`] actually did, per group.
 struct GroupDispatchOutcome {
-    delivered: usize,
     failed: usize,
     /// Groups that fired this evaluation, whether or not anything was sent for them.
     fired: usize,
     // how many have transitioned to pending state
     pending: usize,
     errors: Vec<String>,
-    /// Group keys whose send succeeded. A dedup reservation is confirmed by
-    /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
-    delivered_groups: std::collections::HashSet<String>,
     /// Whether any group's send dispatched a destination or workflow.
     attempted: bool,
     /// The state layer failed, so nothing was even attempted. Distinct from
@@ -625,12 +621,10 @@ async fn dispatch_per_group(
              skipping per-group dispatch this evaluation"
         );
         return Some(GroupDispatchOutcome {
-            delivered: 0,
             failed: 0,
             fired: 0,
             pending: 0,
             errors: vec!["group state did not commit".to_string()],
-            delivered_groups: Default::default(),
             attempted: false,
             state_failed: true,
             downtime_id: None,
@@ -645,12 +639,10 @@ async fn dispatch_per_group(
             // The plan's closes already committed, so their recoveries are owed regardless.
             crate::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
             return Some(GroupDispatchOutcome {
-                delivered: 0,
                 failed: 0,
                 fired: 0,
                 pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
-                delivered_groups: Default::default(),
                 attempted: false,
                 state_failed: true,
                 downtime_id: None,
@@ -721,7 +713,6 @@ async fn dispatch_per_group(
 
     let (mut delivered, mut failed) = (0usize, 0usize);
     let mut errors: Vec<String> = Vec::new();
-    let mut delivered_groups: std::collections::HashSet<String> = Default::default();
     let (mut downtime_suppressed, mut downtime_id) = (0usize, None);
     let mut acked_by: Option<String> = None;
     let mut attempted = false;
@@ -828,7 +819,6 @@ async fn dispatch_per_group(
         // how the pure and SQL layers drifted apart before.
         let record = if ok {
             delivered += 1;
-            delivered_groups.insert(item.group_key.clone());
             infra::table::alert_states::DeliveryOutcome::Delivered {
                 silence_minutes: alert.trigger_condition.silence,
                 at: resolved_at,
@@ -851,12 +841,10 @@ async fn dispatch_per_group(
         plan.items.len()
     );
     Some(GroupDispatchOutcome {
-        delivered,
         failed,
         fired: plan.items.len(),
         pending: plan.pending,
         errors,
-        delivered_groups,
         attempted,
         state_failed: false,
         downtime_id,
@@ -921,30 +909,6 @@ async fn group_downtime_map(
     _rows: &[config::utils::json::Map<String, config::utils::json::Value>],
 ) -> HashMap<String, config::meta::downtimes::ActiveDowntime> {
     HashMap::new()
-}
-
-/// Confirm this evaluation's dedup reservations once a notification landed
-/// (§5.5 MN-6).
-///
-/// Unconfirmed reservations do not suppress, so skipping this on failure is
-/// exactly what allows the next evaluation through. Best-effort: failing to
-/// confirm costs at most one duplicate notification, while failing the
-/// evaluation over it would cost the alert.
-async fn confirm_dedup_reservations(org_id: &str, fingerprints: &[String]) {
-    if fingerprints.is_empty() {
-        return;
-    }
-    #[cfg(feature = "enterprise")]
-    {
-        let db = infra::db::get_orm_client_rw().await;
-        if let Err(e) =
-            crate::alerts::deduplication::confirm_notification_sent(db, org_id, fingerprints).await
-        {
-            log::warn!("[SCHEDULER] could not confirm dedup reservations: {e}");
-        }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let _ = (org_id, fingerprints);
 }
 
 pub async fn handle_triggers(
@@ -3645,12 +3609,6 @@ async fn handle_alert_triggers(
     // group plan itself, before sending, so the alert-level state write at the
     // end of this function must not run and clobber the delivery callbacks.
     let mut multi_alert_dispatched = false;
-    // Dedup `(group_key, fingerprint)` pairs, confirmed only after a
-    // successful send (§5.5 MN-6) — per group, so group A's success does not
-    // confirm group B's. Tuples rather than the dedup module's type, which is
-    // enterprise-gated.
-    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
-    let mut dedup_reservations: Vec<(Option<String>, String)> = Vec::new();
     let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: now,
         org: trigger.org.clone(),
@@ -3992,7 +3950,7 @@ async fn handle_alert_triggers(
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
     // send notification
-    // Nowhere to send means no delivery to record: no dedup, silence window or episode.
+    // Nowhere to send means no delivery to record: no silence window or episode.
     let has_target = has_delivery_target(&alert);
     let delivery = match (downtime.as_ref(), acked_by) {
         (Some(downtime), _) => DeliveryDecision::SuppressedByDowntime(downtime.id.clone()),
@@ -4091,84 +4049,6 @@ async fn handle_alert_triggers(
         // notification is skipped.
         && delivery.should_deliver()
     {
-        // Apply deduplication if enabled (enterprise-only feature)
-        #[cfg(feature = "enterprise")]
-        let data = {
-            let db = get_orm_client_rw().await;
-            match crate::alerts::deduplication::apply_deduplication(
-                db,
-                &alert,
-                data.clone(),
-                eval_level,
-            )
-            .await
-            {
-                Ok(outcome) => {
-                    let (deduplicated_data, deduplicated) = (outcome.rows, outcome.applied);
-                    // Reserved, NOT yet suppressing. Confirmed only once the
-                    // notification actually goes out (§5.5 MN-6), so a send
-                    // that fails is retried rather than swallowed as a
-                    // duplicate for the rest of the window.
-                    dedup_reservations = outcome
-                        .reserved
-                        .into_iter()
-                        .map(|r| (r.group_key, r.fingerprint))
-                        .collect();
-                    // A zero-row match has nothing to dedup; empty output is no suppression.
-                    if deduplicated_data.is_empty() && deduplicated && !data.is_empty() {
-                        log::debug!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
-                            new_trigger.org,
-                            new_trigger.module_key
-                        );
-
-                        // Mark as suppressed for history tracking
-                        trigger_data_stream.dedup_enabled = Some(true);
-                        trigger_data_stream.dedup_suppressed = Some(true);
-                        trigger_data_stream.delivery_attempted = Some(false);
-
-                        // All results were deduplicated, skip notification
-                        // Still update the trigger timing
-                        trigger_data.period_end_time = if should_store_last_end_time {
-                            Some(trigger_results.end_time)
-                        } else {
-                            None
-                        };
-                        new_trigger.data = json::to_string(&trigger_data).unwrap();
-                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                        // Condition matched; only the notification was
-                        // deduplicated away. State must reflect the firing.
-                        if let Some(alert_id) = alert.id.as_ref() {
-                            let _ = persist_alert_run_state(
-                                &alert,
-                                &alert_id.to_string(),
-                                &trigger_data_stream.status,
-                                eval_level,
-                                trigger_results.group_classification.as_ref(),
-                                trigger_results.rule_value.as_deref(),
-                                &config::meta::alerts::recovery::EpisodeInput::undelivered(
-                                    alert.keep_firing_for,
-                                ),
-                            )
-                            .await;
-                        }
-                        publish_triggers_usage(trigger_data_stream);
-                        return Ok(());
-                    }
-                    deduplicated_data
-                }
-                Err(e) => {
-                    log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {e}",
-                        new_trigger.org,
-                        new_trigger.module_key,
-                    );
-                    // On error, continue with original data to avoid missing alerts
-                    data
-                }
-            }
-        };
-
         #[cfg(feature = "enterprise")]
         let unmuted_rows = unmuted_group_rows(&alert, &folder_id, &data, now).await;
         #[cfg(feature = "enterprise")]
@@ -4258,12 +4138,6 @@ async fn handle_alert_triggers(
         );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
-
-        // Mark dedup status for history (if dedup was enabled, alert passed through)
-        if alert.deduplication.as_ref().is_some_and(|d| d.enabled) {
-            trigger_data_stream.dedup_enabled = Some(true);
-            trigger_data_stream.dedup_suppressed = Some(false);
-        }
 
         if !should_dispatch_after_incident(
             incident_handled_notification,
@@ -4356,17 +4230,6 @@ async fn handle_alert_triggers(
                 )
                 .await;
             }
-            // MN-6: a reservation is confirmed by its own group's delivery.
-            // An unkeyed one falls back to "any delivery confirms".
-            let confirmable: Vec<String> = dedup_reservations
-                .iter()
-                .filter(|(group_key, _)| match group_key.as_deref() {
-                    Some(k) => dispatch.delivered_groups.contains(k),
-                    None => dispatch.delivered > 0,
-                })
-                .map(|(_, fingerprint)| fingerprint.clone())
-                .collect();
-            confirm_dedup_reservations(&alert.org_id, &confirmable).await;
             record_delivery(&mut trigger_data);
             episode_delivered = true;
             trigger_data.period_end_time = if should_store_last_end_time {
@@ -4413,16 +4276,6 @@ async fn handle_alert_triggers(
                         error_message: err_msg,
                     } = outcome;
                     let partial_failure = !failed.is_empty();
-                    // At least one destination delivered, so the reservations
-                    // this evaluation made are now real suppressions — one
-                    // send covered every reserved row.
-                    if has_target {
-                        let fingerprints: Vec<String> = dedup_reservations
-                            .iter()
-                            .map(|(_, fingerprint)| fingerprint.clone())
-                            .collect();
-                        confirm_dedup_reservations(&alert.org_id, &fingerprints).await;
-                    }
                     let success_msg = success_msg.trim().to_owned();
                     let err_msg = err_msg.trim().to_owned();
                     if !err_msg.is_empty() {
@@ -7523,12 +7376,10 @@ mod tests {
         errors: &[&str],
     ) -> GroupDispatchOutcome {
         GroupDispatchOutcome {
-            delivered,
             failed,
             fired: delivered + failed,
             pending,
             errors: errors.iter().map(|e| (*e).to_string()).collect(),
-            delivered_groups: std::collections::HashSet::new(),
             attempted: false,
             state_failed: false,
             downtime_id: None,

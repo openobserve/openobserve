@@ -1,6 +1,7 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
+import { DISTRIBUTION_ROW_LIMIT, isRawValueChart } from "@/utils/dashboard/chartTypeGroups";
 import {
   heatmapYBucketError,
   heatmapYBucketing,
@@ -446,8 +447,8 @@ export function buildSQLChartQuery(config: {
   // HAVING clause - support multiple fields from y-axis and z-axis
   const havingClauses: string[] = [];
 
-  // Process y-axis having conditions (skip for heatmap)
-  if (chartType !== "heatmap") {
+  // Process y-axis having conditions (skip for heatmap and raw-value charts, which are not grouped)
+  if (chartType !== "heatmap" && !isRawValueChart(chartType)) {
     queryData.fields.y.forEach((field: any) => {
       if (
         field?.havingConditions?.[0]?.operator &&
@@ -494,7 +495,8 @@ export function buildSQLChartQuery(config: {
   }
 
   // LIMIT clause
-  const queryLimit = queryData.config.limit ?? 0;
+  const queryLimit =
+    queryData.config.limit || (isRawValueChart(chartType) ? DISTRIBUTION_ROW_LIMIT : 0);
   if (queryLimit > 0) {
     query += ` LIMIT ${queryLimit}`;
   }

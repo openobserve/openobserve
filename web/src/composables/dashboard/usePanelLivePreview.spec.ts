@@ -25,6 +25,7 @@ import {
   usePanelLivePreview,
   variablesSignature,
 } from "./usePanelLivePreview";
+import { markPanelStarterQuery } from "./usePanelAggregation";
 
 const makeQuery = (overrides: Record<string, any> = {}) => ({
   query: 'SELECT histogram(_timestamp) AS "x_axis_1" FROM "default"',
@@ -157,6 +158,17 @@ describe("usePanelLivePreview", () => {
       const builder = clone(applied);
       builder.queries[0].query = "SELECT count(*) FROM default";
       expect(hasTypedChanges(builder, applied)).toBe(false);
+    });
+
+    it("does not hold a type switch's starter SQL back as typed text", () => {
+      const applied = makePanel();
+      const flame = clone(applied);
+      flame.queries[0].customQuery = true;
+      flame.queries[0].query = 'SELECT stack, sum(samples) AS value FROM "default" GROUP BY stack';
+      markPanelStarterQuery(flame.queries[0]);
+      expect(hasTypedChanges(flame, applied)).toBe(false);
+      flame.queries[0].query += " LIMIT 10";
+      expect(hasTypedChanges(flame, applied)).toBe(true);
     });
 
     it("holds only for an open select list, not tooltips, menus or popovers", () => {

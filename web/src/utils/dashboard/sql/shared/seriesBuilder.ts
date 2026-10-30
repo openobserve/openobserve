@@ -187,6 +187,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
         chartMax,
         store.state.theme,
         panelSchema?.config?.color?.colorBySeries,
+        panelSchema?.config,
       ) ?? null;
 
     const areaStyle = getAreaStyleOverride(
@@ -230,15 +231,15 @@ export function createSeriesBuilders(deps: SeriesDeps) {
     );
 
     if (
-      panelSchema.type == "area-stacked" ||
-      ((panelSchema.type == "line" ||
+      (panelSchema.type == "area-stacked" ||
+        panelSchema.type == "line" ||
         panelSchema.type == "area" ||
         panelSchema.type == "scatter" ||
         panelSchema.type == "bar" ||
         panelSchema.type == "h-bar" ||
         panelSchema.type == "stacked" ||
         panelSchema.type == "h-stacked") &&
-        panelSchema.queries[0].fields.breakdown?.length)
+      panelSchema.queries[0].fields.breakdown?.length
     ) {
       // Display "(empty)" for empty breakdown values instead of falling
       // through to the y-axis label, which produces misleading legends

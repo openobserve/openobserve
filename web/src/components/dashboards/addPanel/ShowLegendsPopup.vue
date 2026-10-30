@@ -207,6 +207,7 @@ export default defineComponent({
             chartMax,
             theme,
             colorConfig.colorBySeries,
+            props.panelData.config,
           );
 
           if (calculatedColor) return calculatedColor;

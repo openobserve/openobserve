@@ -80,7 +80,7 @@ pub const COVERAGE: &[Coverage] = &[
     exempt(
         Kind::Table,
         "alert_dedup_state",
-        "expires within a day through the alert_dedup_cleanup job; no alert of a deleted org refreshes it",
+        "legacy deduplication table, no longer written; dropped in a later release",
     ),
     table("alert_eval_intervals", DB),
     table("alert_incident_alerts", DB),
