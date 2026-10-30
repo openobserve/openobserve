@@ -36,6 +36,10 @@ fn is_idle_expired(last_activity_micros: i64, now_micros: i64, timeout_seconds: 
 pub const USER_SESSION_KEY: &str = "/user_sessions/";
 
 pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
+    let idle_timeout = common::infra::config::get_config().common.session_idle_timeout;
+    // Until last activity is persisted, cached tokens cannot establish idleness.
+    // Validate against the authoritative DB timestamp whenever idle timeout is enabled.
+    if idle_timeout <= 0 {
     // Check cache first for performance
     if let Some(token) = USER_SESSIONS.get(session_id) {
         let token_value = token.to_string();
@@ -79,6 +83,8 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
         }
     }
 
+    }
+
     // Cache miss - fetch from DB
     log::debug!(
         "Cache miss for user session, reading from db: {}",
@@ -91,7 +97,12 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
             // Check if session has expired
             let expires_at = session.expires_at;
             let now = chrono::Utc::now().timestamp_micros();
-            if now > expires_at {
+            if is_idle_expired(session.updated_at, now, idle_timeout) {
+                log::warn!("Session idle timeout exceeded: {}", session_id);
+                delete(session_id).await?;
+                return Err(anyhow::anyhow!("Session idle timeout exceeded"));
+            }
+            if now >= expires_at {
                 log::warn!(
                     "Session expired (db): {} (expired at {})",
                     session_id,
