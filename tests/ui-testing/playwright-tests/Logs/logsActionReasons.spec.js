@@ -24,7 +24,10 @@ const notes = {
 };
 const baseAxeNodes = [
   { id: 'aria-allowed-attr', target: '[role="menu"] div[aria-haspopup="menu"]:has(> [data-cy="syntax-guide-button"])' },
-  { id: 'aria-required-children', target: '[role="menu"]:has([data-test="logs-search-bar-menu-create-saved-view-btn"])' },
+  // The utilities menu (pin buttons), the Saved views submenu and the pinned dropdown (both hold a search input) are known non-menuitem children.
+  { id: 'aria-required-children', target: '[role="menu"]:has([data-test="logs-search-bar-menu-list-saved-views-btn"])' },
+  { id: 'aria-required-children', target: '[role="menu"]:has([data-test="logs-search-bar-menu-saved-views-content"])' },
+  { id: 'aria-required-children', target: '[role="menu"]:has([data-test="logs-search-bar-saved-views-menu-content"])' },
   { id: 'button-name', target: '[data-test="logs-search-bar-sql-mode-toggle-btn"]' },
   { id: 'button-name', target: '[data-test="logs-search-bar-show-histogram-toggle-btn-btn"]' },
   { id: 'button-name', target: '[data-test="logs-search-bar-quick-mode-switch-btn"]' },

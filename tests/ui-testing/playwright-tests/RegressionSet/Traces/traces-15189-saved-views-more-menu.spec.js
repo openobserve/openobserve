@@ -108,6 +108,8 @@ test.describe('Traces saved views in the More menu with a pin (#15189)', () => {
   test('the saved views group is hidden on Services Catalog', {
     tag: ['@bug-15189', '@P2', '@regression', '@tracesRegression'],
   }, async () => {
+    await pm.tracesPage.toggleSavedViewsPinFromMoreMenu();
+    await pm.tracesPage.closeMoreMenu();
     await pm.tracesPage.expectPinnedSavedViewsInToolbar();
 
     await pm.tracesPage.navigateToServicesViaTab();

@@ -3083,10 +3083,7 @@ export class TracesPage {
   }
 
   async applySavedView(viewName) {
-    await this.page.locator('[data-test="traces-search-bar-saved-views-btn"]').click();
-    const view = this.page.locator('[data-test^="traces-saved-view-apply-"]').filter({ hasText: viewName }).first();
-    await view.waitFor({ state: 'visible', timeout: 10000 });
-    await view.click();
+    await this.applySavedViewFromMoreMenu(viewName);
   }
 
   // enterTraceQuery appends to existing text, so clear first and confirm the editor holds only `query`.
@@ -3151,8 +3148,11 @@ export class TracesPage {
   }
 
   async closeMoreMenu() {
-    await this.page.keyboard.press('Escape');
-    await expect(this.openDropdownMenu).toBeHidden({ timeout: 10000 });
+    // A nested submenu consumes the first Escape, so repeat until no menu is left.
+    await expect(async () => {
+      if (await this.openDropdownMenu.count()) await this.page.keyboard.press('Escape');
+      await expect(this.openDropdownMenu).toHaveCount(0, { timeout: 1000 });
+    }).toPass({ timeout: 10000 });
   }
 
   async expectMoreMenuSavedViewsEntriesVisible() {
