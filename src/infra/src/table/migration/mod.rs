@@ -851,7 +851,7 @@ mod tests {
         (
             130,
             "m20261030_000002_create_org_domain_ownership_req_table",
-        )
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
