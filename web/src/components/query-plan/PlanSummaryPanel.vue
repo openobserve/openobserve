@@ -23,7 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="grid grid-cols-2 gap-1.5">
       <ProfileStatTile
         :label="t('search.queryProfile.streamTile', { count: streamCount }, streamCount)"
-        :value="summary.streams.join(', ') || '—'"
+        :value="streamValue"
+        :sub="streamCount > 1 ? raw(summary.streams.join(', ')) : undefined"
         data-test="query-plan-tile-stream"
       />
       <ProfileStatTile
@@ -179,6 +180,9 @@ const emit = defineEmits<{ analyze: [] }>();
 const { t } = useI18nTyped();
 
 const streamCount = computed(() => Math.max(1, props.summary.streams.length));
+const streamValue = computed(() =>
+  streamCount.value > 1 ? streamCount.value : (props.summary.streams[0] ?? "—"),
+);
 
 const leaderText = computed(() =>
   raw(props.summary.leaderCategories.map((c) => t(CATEGORY_STYLE[c].labelKey)).join(", ")),

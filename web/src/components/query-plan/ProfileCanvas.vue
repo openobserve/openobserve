@@ -97,16 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div
-      class="absolute top-3 z-10 w-max -translate-x-1/2"
-      :style="{ left: `${toolbarX}px` }"
-      data-canvas-overlay
-    >
+    <div class="absolute top-3 z-10 w-max" :style="{ left: `${toolbarX}px` }" data-canvas-overlay>
       <slot name="toolbar" />
     </div>
 
     <div
-      class="absolute end-3 bottom-3 z-10 flex items-end gap-2 max-md:hidden"
+      class="absolute end-3 bottom-3 z-10 flex items-end gap-2 max-lg:hidden"
       data-canvas-overlay
     >
       <div
@@ -136,8 +132,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="query-profile-zoom-fit"
           @click="fit"
         />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="layers"
+          :aria-label="t('search.queryProfile.overview')"
+          :aria-pressed="showMini"
+          :class="showMini ? 'text-accent' : ''"
+          data-test="query-profile-minimap-toggle"
+          @click="showMini = !showMini"
+        />
       </div>
       <svg
+        v-if="showMini"
         ref="miniEl"
         class="bg-surface-base border-border-default rounded-default h-30 w-42.5 cursor-pointer border shadow-sm"
         :viewBox="`${-MINI_PAD} ${-MINI_PAD} ${layout.width + 2 * MINI_PAD} ${layout.height + 2 * MINI_PAD}`"
@@ -188,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 import {
   CARD_H,
@@ -210,11 +218,12 @@ const MAX_ZOOM = 2;
 const MINI_PAD = 40;
 const FIT_TOP = 56;
 const FIT_MARGIN = 24;
-// Keeps fitted cards clear of the zoom buttons and minimap, which only show from md (768px) up.
-const FIT_OVERLAY_W = 232;
-const MD_BREAKPOINT = 768;
+// Keeps fitted cards clear of the zoom button column, which only shows on lg viewports.
+const FIT_OVERLAY_W = 56;
 // Below this a fitted card is unreadable; the graph is top-aligned instead and the rest is panned to.
 const MIN_FIT_ZOOM = 0.85;
+// Fitting a very wide plan never shrinks cards past this; the overflow is panned to instead.
+const MIN_READABLE_ZOOM = 0.6;
 
 const props = defineProps<{
   model: ProfileModel;
@@ -227,15 +236,17 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [opId: string] }>();
 
 const { t } = useI18nTyped();
+const { isDesktop } = useBreakpoint();
 
 const canvasEl = ref<HTMLElement | null>(null);
 const miniEl = ref<SVGSVGElement | null>(null);
 const view = reactive({ x: 0, y: 0, k: 1 });
 const size = reactive({ w: 0, h: 0 });
+const showMini = ref(false);
 const drag = ref<{ x: number; y: number; vx: number; vy: number; id: number } | null>(null);
 let observer: ResizeObserver | null = null;
 
-const toolbarX = computed(() => props.leftInset + (size.w - props.leftInset) / 2);
+const toolbarX = computed(() => props.leftInset);
 
 const stageBoxes = computed(() =>
   props.layout.stages.map((box) => {
@@ -312,13 +323,18 @@ function zoomBy(factor: number) {
 }
 
 function fit() {
-  const right = size.w >= MD_BREAKPOINT ? FIT_OVERLAY_W : FIT_MARGIN;
+  const right = isDesktop.value ? FIT_OVERLAY_W : FIT_MARGIN;
   const availW = Math.max(1, size.w - props.leftInset - right);
   const availH = Math.max(1, size.h - FIT_TOP - FIT_MARGIN);
+  // the width fits so the overlays never hide cards; only the height, or a very wide plan, scrolls
   const k = clampZoom(
     Math.max(
-      MIN_FIT_ZOOM,
-      Math.min(availW / props.layout.width, availH / props.layout.height, 1.05),
+      MIN_READABLE_ZOOM,
+      Math.min(
+        availW / props.layout.width,
+        Math.max(MIN_FIT_ZOOM, availH / props.layout.height),
+        1.05,
+      ),
     ),
   );
   view.k = k;
@@ -405,7 +421,7 @@ onMounted(() => {
 onBeforeUnmount(() => observer?.disconnect());
 
 watch(
-  () => [props.layout, props.leftInset],
+  () => [props.layout, props.leftInset, isDesktop.value],
   () => nextTick(fit),
 );
 

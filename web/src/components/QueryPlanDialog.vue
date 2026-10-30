@@ -235,6 +235,7 @@ import {
   formatElapsed,
   parseSearchStream,
   physicalPlanToProfile,
+  summarizePlan,
   type PlanHit,
   type QueryProfile,
   type SearchStreamResult,
@@ -316,6 +317,12 @@ const sqlOneLine = computed(() => raw(sqlQuery.value.replace(/\s+/g, " ").trim()
 const planProfile = computed(() =>
   physicalPlan.value ? physicalPlanToProfile(physicalPlan.value) : null,
 );
+// a join reads streams the logs page did not select, so prefer the ones the plan scans
+const planStreams = computed(() =>
+  planProfile.value
+    ? summarizePlan(buildProfileModel(planProfile.value, [], { planOnly: true })).streams
+    : [],
+);
 const hasResults = computed(() => !!profile.value || !!analyzePlan.value);
 const analyzeBusy = computed(
   () => analyzeState.value === "running" || analyzeState.value === "rerunning",
@@ -346,7 +353,9 @@ const lastSearchTook = computed(() => {
 
 const analyzeFacts = computed<AnalyzeFact[]>(() => {
   const data = props.searchObj?.data;
-  const streams = data?.stream?.selectedStream ?? [];
+  const streams = planStreams.value.length
+    ? planStreams.value
+    : (data?.stream?.selectedStream ?? []);
   const count = Math.max(1, streams.length);
   const facts: AnalyzeFact[] = [
     {

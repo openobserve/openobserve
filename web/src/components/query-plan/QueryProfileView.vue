@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_27.5rem] max-md:flex max-md:flex-col max-md:overflow-y-auto"
+    class="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_22rem] max-lg:flex max-lg:flex-col max-lg:overflow-y-auto xl:grid-cols-[minmax(0,1fr)_27.5rem]"
     data-test="query-profile-view"
   >
-    <div class="relative flex min-h-0 min-w-0 flex-col max-md:shrink-0">
+    <div class="relative flex min-h-0 min-w-0 flex-col max-lg:shrink-0">
       <aside
         ref="panelEl"
-        class="bg-surface-base border-border-default rounded-surface absolute start-3 top-3 z-20 max-h-[calc(100%-1.5rem)] w-75 overflow-y-auto border p-3 shadow-md max-md:static max-md:max-h-none max-md:w-auto max-md:rounded-none max-md:border-0 max-md:border-b max-md:px-4 max-md:shadow-none"
+        class="bg-surface-base border-border-default rounded-surface absolute start-3 top-3 z-20 max-h-[calc(100%-1.5rem)] w-75 overflow-y-auto border p-3 shadow-md max-lg:static max-lg:max-h-none max-lg:w-auto max-lg:rounded-none max-lg:border-0 max-lg:border-b max-lg:px-4 max-lg:shadow-none"
       >
         <ProfileSummaryPanel
           :model="model"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @scope="scope = $event"
         />
       </aside>
-      <div class="min-h-0 flex-1 max-md:h-[78vh] max-md:flex-none">
+      <div class="min-h-0 flex-1 max-lg:h-[78vh] max-lg:flex-none">
         <ProfileCanvas
           :model="model"
           :layout="layout"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-surface-base border-border-default rounded-default flex items-center gap-1.5 border p-1 whitespace-nowrap shadow-sm"
               data-test="query-profile-scope-toolbar"
             >
-              <span class="text-text-secondary ps-1.5 text-xs max-md:hidden">{{
+              <span class="text-text-secondary ps-1.5 text-xs max-xl:hidden">{{
                 t("search.queryProfile.stageMetrics")
               }}</span>
               <OToggleGroup
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <aside
-      class="bg-surface-base border-border-default min-h-0 overflow-y-auto border-s max-md:shrink-0 max-md:overflow-visible max-md:border-s-0 max-md:border-t"
+      class="bg-surface-base border-border-default min-h-0 overflow-y-auto border-s max-lg:shrink-0 max-lg:overflow-visible max-lg:border-s-0 max-lg:border-t"
     >
       <ProfileDetailPanel
         :model="model"
@@ -127,7 +127,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const { isMobile } = useBreakpoint();
+const { isDesktop } = useBreakpoint();
 
 const panelEl = ref<HTMLElement | null>(null);
 const panelWidth = ref(0);
@@ -147,7 +147,7 @@ const nodeOptions = computed(() =>
 
 const selectedNode = computed(() => scopeNodeKey(scope.value));
 const toggleValue = computed(() => (selectedNode.value ? "" : scope.value));
-const leftInset = computed(() => (isMobile.value ? MOBILE_INSET : panelWidth.value + PANEL_GAP));
+const leftInset = computed(() => (!isDesktop.value ? MOBILE_INSET : panelWidth.value + PANEL_GAP));
 
 function onToggle(value: unknown) {
   if (value === "sum" || value === "max") scope.value = value;

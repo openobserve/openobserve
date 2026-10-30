@@ -188,6 +188,15 @@ describe("operatorCategory / operatorLabel", () => {
     ).toBe("Aggregate · Partial");
     expect(operatorLabel({ name: "FilterExec", detail: "FilterExec: a = 1" })).toBe("Filter");
   });
+
+  it("names a TopK sort the same in plan text and in a profile", () => {
+    expect(operatorLabel({ name: "SortExec(TopK)", detail: "SortExec: TopK(fetch=10)" })).toBe(
+      "Sort · TopK",
+    );
+    expect(
+      operatorLabel({ name: "SortExec", detail: "SortExec: TopK(fetch=10), expr=[cnt@1 DESC]" }),
+    ).toBe("Sort · TopK");
+  });
 });
 
 describe("computeTimeNs", () => {
