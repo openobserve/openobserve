@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { Confidence, CoverageVerdict, Severity } from "./digests";
+import type { Confidence, CoverageVerdict, Quality, Severity, Tier } from "./digests";
 import type { EvidenceFormat } from "./rules";
 
 const MINUTES_PER_DAY = 1440;
@@ -95,6 +95,37 @@ export const CONFIDENCE_LABEL: Record<Confidence, I18nKey> = {
   High: "alertCalibration.confidence.high",
   Medium: "alertCalibration.confidence.medium",
   Low: "alertCalibration.confidence.low",
+};
+
+export const TIER_LABEL: Record<Tier, I18nKey> = {
+  A: "alertCalibration.tier.a",
+  B: "alertCalibration.tier.b",
+  C: "alertCalibration.tier.c",
+};
+
+/** Usable evidence needs no badge; the other two say the card is weaker than it looks. */
+export const QUALITY_LABEL: Record<Exclude<Quality, "usable">, I18nKey> = {
+  partial: "alertCalibration.quality.partial",
+  unavailable: "alertCalibration.quality.unavailable",
+};
+
+const SKIP_REASON_LABEL: Record<string, I18nKey> = {
+  insufficient_history: "alertCalibration.skipReason.insufficientHistory",
+  insufficient_samples: "alertCalibration.skipReason.insufficientSamples",
+  unmeasurable_signal: "alertCalibration.skipReason.unmeasurableSignal",
+  alert_disabled: "alertCalibration.skipReason.alertDisabled",
+  window_too_short: "alertCalibration.skipReason.windowTooShort",
+  unsupported_mode: "alertCalibration.skipReason.unsupportedMode",
+  silence_censored_history: "alertCalibration.skipReason.silenceCensoredHistory",
+  no_incident_signal: "alertCalibration.skipReason.noIncidentSignal",
+  sentinel_by_design: "alertCalibration.skipReason.sentinelByDesign",
+  enrichment_timeout: "alertCalibration.skipReason.enrichmentTimeout",
+};
+
+/** A reason this build does not know still shows, by its stored name. */
+export const skipReasonLabel = (t: TranslateFn, reason: string): I18nText => {
+  const key = SKIP_REASON_LABEL[reason];
+  return key ? t(key) : raw(reason);
 };
 
 export const COVERAGE_BADGE: Record<

@@ -105,6 +105,31 @@ describe("AlertCalibrationFindingCard", () => {
     );
   });
 
+  it("shows the tier and limits a version-2 record carries, and nothing for a version-1 record", () => {
+    const v2 = mountCard(
+      finding({
+        schema_version: 2,
+        kind: "finding",
+        tier: "A",
+        quality: "partial",
+        limitations: JSON.stringify(["Counts are a floor"]),
+      }),
+    );
+    expect(v2.find('[data-test="alert-calibration-finding-tier"]').text()).toBe(
+      "Confirmed condition",
+    );
+    expect(v2.find('[data-test="alert-calibration-finding-quality"]').text()).toBe(
+      "Partial evidence",
+    );
+    expect(v2.find('[data-test="alert-calibration-finding-limitations"]').text()).toContain(
+      "Counts are a floor",
+    );
+    const v1 = mountCard(finding());
+    expect(v1.find('[data-test="alert-calibration-finding-tier"]').exists()).toBe(false);
+    expect(v1.find('[data-test="alert-calibration-finding-quality"]').exists()).toBe(false);
+    expect(v1.find('[data-test="alert-calibration-finding-limitations"]').exists()).toBe(false);
+  });
+
   it("lists nothing for a rule that names its alert", () => {
     const wrapper = mountCard(
       finding({ rule_id: "noise", alert_name: "cpu", actions: "RaiseThreshold" }),
