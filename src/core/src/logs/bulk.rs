@@ -24,7 +24,6 @@ use config::{
     meta::{self_reporting::usage::is_internal_rollup_stream, stream::StreamType},
     metrics,
     utils::{
-        flatten::format_label_name_cow,
         json,
         schema::format_stream_name,
         time::{now_micros, parse_timestamp_micro_from_value},
@@ -471,9 +470,12 @@ pub(super) fn prepare_bulk_record(
             record
                 .iter()
                 .find(|(key, value)| {
-                    (value.is_string() || value.is_number())
-                        && key.len() == TIMESTAMP_COL_NAME.len()
-                        && format_label_name_cow(key) == TIMESTAMP_COL_NAME
+                    // what `format_key` turns into `_timestamp`, matched without allocating
+                    let key = key.as_bytes();
+                    key.len() == TIMESTAMP_COL_NAME.len()
+                        && !key[0].is_ascii_alphanumeric()
+                        && key[1..].eq_ignore_ascii_case(&TIMESTAMP_COL_NAME.as_bytes()[1..])
+                        && (value.is_string() || value.is_number())
                 })
                 .map(|(_, value)| value)
         })
@@ -601,6 +603,7 @@ mod tests {
         );
         assert_eq!(stored(json::json!({"@timestamp": iso})), Ok(ts));
         assert_eq!(stored(json::json!({"_Timestamp": ts})), Ok(ts));
+        assert!(stored(json::json!({"Atimestamp": ts, "éimestamp": ts})).unwrap() >= now);
         // the checked value is the stored one, also when a second key is renamed
         assert_eq!(
             stored(json::json!({"@timestamp": ts, "-timestamp": min_ts - 1})),
