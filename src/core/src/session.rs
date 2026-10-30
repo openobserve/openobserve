@@ -92,7 +92,7 @@ pub async fn create_native_session(
     access_token: &str,
     lifetime_seconds: i64,
 ) -> Result<String, anyhow::Error> {
-    let session_id = ider::uuid();
+    let session_id = config::ider::uuid();
     let expires_at = chrono::Utc::now()
         .timestamp_micros()
         .saturating_add(lifetime_seconds.max(1).saturating_mul(1_000_000));
