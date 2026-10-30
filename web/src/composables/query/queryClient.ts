@@ -94,9 +94,6 @@ export const queryClient = new QueryClient({
       const refetches: Promise<void>[] = (meta.invalidates ?? []).map((key) =>
         queryClient.invalidateQueries({ queryKey: key }),
       );
-      for (const key of meta.invalidates ?? []) {
-        void queryClient.invalidateQueries({ queryKey: key });
-      }
       for (const key of meta.stales ?? []) {
         void queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
       }
