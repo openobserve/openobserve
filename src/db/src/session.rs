@@ -170,6 +170,23 @@ pub async fn set_with_expiry(
     Ok(())
 }
 
+/// Refreshes a session only after a separate, authenticated user-activity request.
+/// Never call this from ordinary API polling or the session lookup path.
+pub async fn record_user_activity(session_id: &str) -> Result<bool, anyhow::Error> {
+    let idle_timeout = common::infra::config::get_config().common.session_idle_timeout;
+    if idle_timeout <= 0 {
+        return Ok(false);
+    }
+
+    let refreshed = infra::table::sessions::touch_if_active(session_id, idle_timeout).await?;
+    if !refreshed {
+        // An expired or missing session must not remain usable from either cache.
+        USER_SESSIONS.remove(session_id);
+        USER_SESSIONS_EXPIRY.remove(session_id);
+    }
+    Ok(refreshed)
+}
+
 pub async fn delete(session_id: &str) -> Result<(), anyhow::Error> {
     infra::table::sessions::delete(session_id).await?;
     let key = format!("{USER_SESSION_KEY}{session_id}");
