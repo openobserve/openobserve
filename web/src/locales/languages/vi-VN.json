@@ -9166,6 +9166,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "Đang phân tích...",
+        "thinking": "Đang suy nghĩ...",
+        "processing": "Đang xử lý...",
+        "examiningData": "Đang kiểm tra dữ liệu...",
+        "reviewingContext": "Đang xem xét ngữ cảnh...",
+        "formulatingResponse": "Đang soạn câu trả lời...",
+        "checkingDetails": "Đang kiểm tra chi tiết...",
+        "gatheringInsights": "Đang thu thập thông tin chi tiết...",
+        "evaluatingOptions": "Đang đánh giá các lựa chọn...",
+        "synthesizingInformation": "Đang tổng hợp thông tin...",
+        "workingOnIt": "Đang thực hiện...",
+        "almostThere": "Sắp xong...",
+        "divingDeeper": "Đang đào sâu hơn...",
+        "connectingTheDots": "Đang kết nối các điểm...",
+        "crunchingNumbers": "Đang tính toán...",
+        "exploringPossibilities": "Đang khám phá các khả năng...",
+        "refiningAnswer": "Đang hoàn thiện câu trả lời...",
+        "stillThinking": "Vẫn đang suy nghĩ...",
+        "makingProgress": "Đang tiến triển...",
+        "piecingTogether": "Đang ghép lại..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "Thời gian dùng thử",
@@ -20789,7 +20815,10 @@
     "pagination": {
       "pagination": "Phân trang",
       "previousPage": "Trang trước",
-      "nextPage": "Trang sau"
+      "nextPage": "Trang sau",
+      "firstPage": "Trang đầu",
+      "lastPage": "Trang cuối",
+      "recordsPerPage": "Số bản ghi mỗi trang"
     },
     "select": {
       "more": "thêm",

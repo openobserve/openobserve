@@ -1,0 +1,49 @@
+[
+  {
+    "role": "user",
+    "content": "Summarise the incident",
+    "sentAt": 1772418300000,
+    "turnId": "t-cmp-1"
+  },
+  {
+    "role": "assistant",
+    "content": "Payments reset connections at 02:00.",
+    "contentBlocks": [
+      {
+        "type": "text",
+        "text": "Payments reset connections at 02:00."
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "And the root cause?",
+    "sentAt": 1772418600000,
+    "turnId": "t-cmp-2",
+    "contentBlocks": [
+      {
+        "type": "status",
+        "compactedAt": 1772418600000,
+        "message": "Earlier context was summarised by the assistant at 02:30"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "A config push lowered the pool size.",
+    "contentBlocks": [
+      {
+        "type": "text",
+        "text": "A config push lowered the pool size."
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]

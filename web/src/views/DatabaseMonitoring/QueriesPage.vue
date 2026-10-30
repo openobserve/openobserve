@@ -451,8 +451,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-actions="{ row }">
+          <span
+            v-if="assistantV2 && !row.isOther && !row.isFold"
+            class="inline-flex items-center gap-1"
+          >
+            <DbmRowActions
+              :actions="rowActions"
+              data-test="dbm-queries-row-actions"
+              @action="(id) => onRowAction(id, row)"
+            />
+            <AiEntryButton v-bind="queryFixDoor(row)" appearance="toolbar-icon" />
+          </span>
           <DbmRowActions
-            v-if="!row.isOther && !row.isFold"
+            v-else-if="!row.isOther && !row.isFold"
             :actions="rowActions"
             data-test="dbm-queries-row-actions"
             @action="(id) => onRowAction(id, row)"
@@ -584,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmQueriesPage" });
 
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -640,6 +651,9 @@ import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmOwnFilterSync } from "@/composables/dbm/useDbmScopeFilters";
 import { createDbmContextProvider } from "@/composables/contextProviders";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { dbmFixDoor } from "@/components/dbm/dbmDoors";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import {
@@ -1972,6 +1986,9 @@ const toggleInsightFilter = (insight: DbmInsight) => {
   activeInsightId.value = activeInsightId.value === insight.id ? null : insight.id;
 };
 
+// With the assistant on, the fix is its own door beside the row actions (`ai-entry-dbm-finding-fix`).
+const assistantV2 = isAssistantV2();
+
 /** The four things a reader does next, on the row they are already looking at. */
 const rowActions = computed<DbmRowAction[]>(() => [
   { id: "open", icon: "chevron-right", label: t("dbm.queries.actions.open") },
@@ -1980,7 +1997,7 @@ const rowActions = computed<DbmRowAction[]>(() => [
   { id: "alert", icon: "shield", label: t("dbm.queries.actions.alert") },
   // Absent, not disabled, when AI is off — a row of buttons must not carry a
   // permanent dead one.
-  ...(aiEnabled.value
+  ...(aiEnabled.value && !assistantV2
     ? [{ id: "ai", icon: "brain-circuit", label: t("dbm.ai.rowSuggestFix") } as DbmRowAction]
     : []),
 ]);
@@ -2370,24 +2387,44 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
  * about them rather than sending an empty list, which a model reads as "nobody
  * calls it".
  */
+const queryFixInput = (row: QueryRow) => ({
+  queryNorm: row.query_norm || row.queryText,
+  dbSystem: row.db_system,
+  dbInstance: row.db_instance,
+  p50Ns: row.p50_ns,
+  p95Ns: row.p95_ns,
+  p99Ns: row.p99_ns,
+  maxNs: row.max_ns,
+  totalTimeNs: row.total_time_ns,
+  calls: row.calls,
+  errors: row.errors,
+  callsPerTrace: row.callsPerTrace,
+});
+
 const askAiForFix = (row: QueryRow) => {
   emit("sendToAiChat", {
-    query: buildQueryFixPrompt({
-      queryNorm: row.query_norm || row.queryText,
-      dbSystem: row.db_system,
-      dbInstance: row.db_instance,
-      p50Ns: row.p50_ns,
-      p95Ns: row.p95_ns,
-      p99Ns: row.p99_ns,
-      maxNs: row.max_ns,
-      totalTimeNs: row.total_time_ns,
-      calls: row.calls,
-      errors: row.errors,
-      callsPerTrace: row.callsPerTrace,
-    }),
+    query: buildQueryFixPrompt(queryFixInput(row)),
     autoSend: true,
   });
 };
+
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+// The org the rows were loaded under, so a door left on screen after an org switch is refused.
+const loadedOrg = assistantV2
+  ? useLoadedOrg(
+      () => rows.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+const queryFixDoor = (row: QueryRow) =>
+  dbmFixDoor(
+    { label: t("dbm.ai.rowSuggestFix"), tooltip: t("dbm.ai.suggestFixHint") },
+    () => ({ kind: "query", input: queryFixInput(row) }),
+    store.state,
+    loadedOrg?.value,
+  );
 
 // Registered/unregistered by useDbmListPage around this page's lifecycle.
 const dbmContext = createDbmContextProvider(

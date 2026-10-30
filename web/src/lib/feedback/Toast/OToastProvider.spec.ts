@@ -9,6 +9,16 @@ beforeEach(() => {
 });
 
 describe("OToastProvider", () => {
+  it("marks each viewport as a layer root, so a drawer hiding the page leaves toasts usable", async () => {
+    toast({ variant: "info", message: "Added to chat", timeout: 0 });
+    const wrapper = mount(OToastProvider, { attachTo: document.body });
+    await nextTick();
+    const roots = document.querySelectorAll("[data-o2-layer]");
+    expect(roots.length).toBeGreaterThan(0);
+    expect([...roots].some((root) => root.querySelector('[role="status"]'))).toBe(true);
+    wrapper.unmount();
+  });
+
   it("renders nothing (no OToast elements) when toastRecords is empty", () => {
     const wrapper = mount(OToastProvider, { attachTo: document.body });
     // No ToastRoot elements should be rendered

@@ -221,6 +221,16 @@
       "web/src/services/status_pages.ts",
       "tests/ui-testing/pages/generalPages/statusPagesPage.js",
       "tests/ui-testing/pages/syntheticsPages/**"
+    ],
+    "assistant": [
+      "web/src/components/ai-assistant/**",
+      "web/src/views/SharedChatView.vue",
+      "web/src/views/AssistantView.vue",
+      "web/src/lib/overlay/Sheet/**",
+    "web/src/composables/assistant/**",
+    "web/src/composables/contextProviders/**",
+      "web/src/services/assistant*",
+      "tests/ui-testing/pages/assistantPage.js"
     ]
   }
 }

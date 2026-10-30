@@ -327,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dbm-deadlocks-cycle"
                 @participant-action="(id, p) => onParticipantAction(id, p, row)"
                 @copy-summary="copySummary(row)"
+                :ai-door="deadlockDoor(row)"
                 @ask-ai="askAiForFix(row)"
               />
 
@@ -468,6 +469,9 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
 import { buildDeadlockFixPrompt } from "@/utils/dbm/aiPrompts";
+import { dbmFixDoor } from "@/components/dbm/dbmDoors";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import {
   deadlockCadenceSeconds,
   groupDeadlocks,
@@ -1245,23 +1249,42 @@ const load = () =>
  * fragment would have the model reason about a WHERE clause with no statement
  * around it.
  */
-const askAiForFix = (row: DeadlockRow) => {
+const deadlockInput = (row: DeadlockRow) => {
   const participants = row.selectedEvent?.participants ?? [];
   const queries = participants.map((p) => p.query ?? "").filter(Boolean);
+  return {
+    queries: queries.length ? queries : row.queries,
+    dbSystem: row.db_system,
+    dbInstance: row.db_instance,
+    objects: row.objects,
+    oppositeRowOrder: row.oppositeRowOrder,
+    count: row.count,
+    cadenceSeconds: cadenceFor(row),
+    applications: row.applications,
+  };
+};
+
+const askAiForFix = (row: DeadlockRow) => {
   emit("sendToAiChat", {
-    query: buildDeadlockFixPrompt({
-      queries: queries.length ? queries : row.queries,
-      dbSystem: row.db_system,
-      dbInstance: row.db_instance,
-      objects: row.objects,
-      oppositeRowOrder: row.oppositeRowOrder,
-      count: row.count,
-      cadenceSeconds: cadenceFor(row),
-      applications: row.applications,
-    }),
+    query: buildDeadlockFixPrompt(deadlockInput(row)),
     autoSend: true,
   });
 };
+
+// The org the rows were loaded under, so a door left on screen after an org switch is refused.
+const loadedOrg = isAssistantV2()
+  ? useLoadedOrg(
+      () => tableRows.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+const deadlockDoor = (row: DeadlockRow) =>
+  dbmFixDoor(
+    { label: t("dbm.ai.deadlockFix"), tooltip: t("dbm.ai.deadlockFixHint") },
+    () => ({ kind: "deadlock", input: deadlockInput(row) }),
+    store.state,
+    loadedOrg?.value,
+  );
 
 /** The pair's recurrence gap, when the pair grouping produced one. */
 const cadenceFor = (row: DeadlockRow): number | null => {

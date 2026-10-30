@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import i18n from "@/locales";
+import { APP_LOCALE_TO_BCP47 } from "@/locales/numberFormat";
 import { gt } from "@/types/i18n";
 
 export const b64EncodeUnicode = (str: string) => {
@@ -317,6 +319,14 @@ export function formatUtcWindows(
 // render. `null` caches a timezone the runtime rejects, so it is not retried.
 const hhmmFormatters = new Map<string, Intl.DateTimeFormat | null>();
 const abbrFormatters = new Map<string, Intl.DateTimeFormat | null>();
+// The assistant formatters read the UI locale from i18n and the org zone from the caller, never `navigator.language`.
+const orgTimeFormatters = new Map<string, Intl.DateTimeFormat | null>();
+const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
+const DAY_MS = 86_400_000;
+// The store imports this module (directly and via zincutils), so it registers its zone here; importing it would cycle.
+let orgTimeZoneSource: () => string | undefined = () => undefined;
+
+type ElapsedSymbol = "ms" | "s" | "min" | "h";
 
 function cachedFormatter(
   cache: Map<string, Intl.DateTimeFormat | null>,
@@ -434,3 +444,197 @@ export const formatMicrosDuration = (micros: number): string => {
   const remHours = hours % 24;
   return remHours ? `${days}d ${remHours}h` : `${days}d`;
 };
+
+/** Supplies the org zone that `formatOrgTime` and `formatOrgRange` use when no `timeZone` is passed. */
+export function setOrgTimeZoneSource(source: () => string | undefined): void {
+  orgTimeZoneSource = source;
+}
+
+/** The Intl locale of the UI language; an unknown code is tried as-is before falling back to en-US. */
+export function uiIntlLocale(): string {
+  const current = i18n.global.locale as unknown as string | { value: string };
+  const code = typeof current === "string" ? current : current.value;
+  const mapped = APP_LOCALE_TO_BCP47[code];
+  if (mapped) return mapped;
+  try {
+    return Intl.DateTimeFormat.supportedLocalesOf([code]).length ? code : "en-US";
+  } catch {
+    return "en-US";
+  }
+}
+
+/** Minute-precision time in the org zone: "13:57" today, weekday this week, date older; `absolute` is the tooltip form. */
+export function formatOrgTime(
+  ts: number,
+  opts: {
+    /** `second` is for row timestamps, where two rows in one minute must still differ. */
+    precision?: "minute" | "second";
+    showZone?: boolean;
+    timeZone?: string;
+    absolute?: boolean;
+    now?: number;
+  } = {},
+): string {
+  const locale = uiIntlLocale();
+  const tz = opts.timeZone ?? orgTimeZone();
+  if (opts.absolute) return absoluteOrgTime(ts, tz, locale);
+  const now = opts.now ?? Date.now();
+  const time = orgParts(ts, tz, locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(opts.precision === "second" && { second: "2-digit" }),
+  });
+  const day = dayDistance(ts, now, tz);
+  const zone = opts.showZone ? ` ${zoneName(ts, tz, locale)}` : "";
+  if (day === 0) return `${time}${zone}`;
+  if (day > 0 && day < 7) {
+    return `${orgParts(ts, tz, locale, { weekday: "short" })} ${time}${zone}`;
+  }
+  const sameYear = orgYear(ts, tz) === orgYear(now, tz);
+  const date = orgParts(ts, tz, locale, {
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+  return `${date} ${time}${zone}`;
+}
+
+/** A calendar day in the org zone and UI locale ("1 Nov"), for renewal dates. */
+export function formatOrgDay(ts: number): string {
+  return orgParts(ts, orgTimeZone(), uiIntlLocale(), { day: "numeric", month: "short" });
+}
+
+/** "2026-11-01" in the org zone, for text pasted outside the app. */
+export function formatOrgIsoDay(ts: number): string {
+  return orgParts(ts, orgTimeZone(), "en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+/** Calendar days between `ts` and `now` in the org zone (0 = same day), never a 24 h span. */
+export function orgDayDistance(ts: number, now: number, timeZone: string = orgTimeZone()): number {
+  return dayDistance(ts, now, timeZone);
+}
+
+/** "13:42–13:58 GMT+5:30": one zone, always named, en dash between the ends. */
+export function formatOrgRange(from: number, to: number, opts: { timeZone?: string } = {}): string {
+  const locale = uiIntlLocale();
+  const tz = opts.timeZone ?? orgTimeZone();
+  const zone = zoneName(to, tz, locale);
+  const clock = (ts: number) => orgParts(ts, tz, locale, { hour: "2-digit", minute: "2-digit" });
+  if (dayDistance(from, to, tz) === 0) return `${clock(from)}–${clock(to)} ${zone}`;
+  const dated = (ts: number) =>
+    `${orgParts(ts, tz, locale, { day: "numeric", month: "short" })} ${clock(ts)}`;
+  return `${dated(from)} – ${dated(to)} ${zone}`;
+}
+
+/** "just now", then the short `Intl.RelativeTimeFormat` style of the UI locale ("3 min. ago" in en-US, "3 min ago" in en-GB). */
+export function formatRelative(ts: number, now: number = Date.now()): string {
+  const seconds = Math.round((ts - now) / 1000);
+  const abs = Math.abs(seconds);
+  if (abs < 45) return gt("common.justNow");
+  const rtf = new Intl.RelativeTimeFormat(uiIntlLocale(), { numeric: "auto", style: "short" });
+  if (abs < 3600) return rtf.format(Math.round(seconds / 60), "minute");
+  if (abs < DAY_MS / 1000) return rtf.format(Math.round(seconds / 3600), "hour");
+  if (abs < (30 * DAY_MS) / 1000) return rtf.format(Math.round(seconds / 86_400), "day");
+  if (abs < (365 * DAY_MS) / 1000) return rtf.format(Math.round(seconds / 2_592_000), "month");
+  return rtf.format(Math.round(seconds / 31_536_000), "year");
+}
+
+/** "380 ms", "12 s", "1 min 4 s"; named apart from the older `formatDuration`, whose callers keep their output. */
+export function formatElapsed(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const number = new Intl.NumberFormat(uiIntlLocale(), { maximumFractionDigits: 0 });
+  // SI symbols are language-neutral, unlike Intl's short units ("12 sec", "12 Sek.").
+  const unit = (value: number, symbol: ElapsedSymbol) => `${number.format(value)} ${symbol}`;
+  // Round before choosing the unit, so 999.6 ms reads "1 s", never "1,000 ms".
+  const wholeMs = Math.round(ms);
+  if (wholeMs < 1000) return unit(wholeMs, "ms");
+  const totalSeconds = Math.floor(wholeMs / 1000);
+  if (totalSeconds < 60) return unit(totalSeconds, "s");
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return minutes ? `${unit(hours, "h")} ${unit(minutes, "min")}` : unit(hours, "h");
+  return seconds ? `${unit(minutes, "min")} ${unit(seconds, "s")}` : unit(minutes, "min");
+}
+
+/** Locale digit grouping for a whole count; the caller pluralises the noun with the same count. */
+export function formatCount(n: number): string {
+  return new Intl.NumberFormat(uiIntlLocale(), { maximumFractionDigits: 0 }).format(n);
+}
+
+/** "2.3 MB" in binary steps with at most one decimal. */
+export function formatBytes(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return "—";
+  let value = n;
+  let index = 0;
+  while (value >= 1024 && index < BYTE_UNITS.length - 1) {
+    value /= 1024;
+    index++;
+  }
+  const digits = index === 0 ? 0 : 1;
+  const number = new Intl.NumberFormat(uiIntlLocale(), { maximumFractionDigits: digits }).format(
+    value,
+  );
+  return `${number} ${BYTE_UNITS[index]}`;
+}
+
+function orgFormatter(locale: string, tz: string, options: Intl.DateTimeFormatOptions) {
+  return cachedFormatter(
+    orgTimeFormatters,
+    `${locale}|${tz}|${JSON.stringify(options)}`,
+    () => new Intl.DateTimeFormat(locale, { timeZone: tz, hourCycle: "h23", ...options }),
+  );
+}
+
+function orgParts(
+  ts: number,
+  tz: string,
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  return orgFormatter(locale, tz, options)?.format(new Date(ts)) ?? "";
+}
+
+/** The org's IANA zone, else the browser's. */
+export function orgTimeZone(): string {
+  return orgTimeZoneSource() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+function orgYear(ts: number, tz: string): number {
+  return Number(orgParts(ts, tz, "en-US", { year: "numeric" }));
+}
+
+function orgDayNumber(ts: number, tz: string): number {
+  const parts = orgFormatter("en-US", tz, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  })?.formatToParts(new Date(ts));
+  const get = (type: string) => Number(parts?.find((p) => p.type === type)?.value ?? 0);
+  return Date.UTC(get("year"), get("month") - 1, get("day")) / DAY_MS;
+}
+
+function dayDistance(ts: number, now: number, tz: string): number {
+  return orgDayNumber(now, tz) - orgDayNumber(ts, tz);
+}
+
+function zoneName(ts: number, tz: string, locale: string): string {
+  const parts = orgFormatter(locale, tz, { timeZoneName: "short" })?.formatToParts(new Date(ts));
+  return parts?.find((p) => p.type === "timeZoneName")?.value ?? tz;
+}
+
+function absoluteOrgTime(ts: number, tz: string, locale: string): string {
+  const parts = orgFormatter("en-US", tz, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })?.formatToParts(new Date(ts));
+  const get = (type: string) => parts?.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")} ${zoneName(ts, tz, locale)}`;
+}

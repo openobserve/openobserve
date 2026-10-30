@@ -268,6 +268,7 @@
           <OTabPanel v-if="isMultiAlert" name="groups" stretch>
             <AlertGroupsTable
               :groups="groupData?.list || []"
+              :alert="alert ?? undefined"
               :loading="loadingGroups"
               :alert-id="alertId"
               :alert-name="alert?.name || alertId"

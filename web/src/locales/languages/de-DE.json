@@ -9166,6 +9166,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "Analysiere...",
+        "thinking": "Denke...",
+        "processing": "Verarbeite...",
+        "examiningData": "Prüfe Daten...",
+        "reviewingContext": "Überprüfe Kontext...",
+        "formulatingResponse": "Formuliere Antwort...",
+        "checkingDetails": "Prüfe Details...",
+        "gatheringInsights": "Sammle Erkenntnisse...",
+        "evaluatingOptions": "Bewerte Optionen...",
+        "synthesizingInformation": "Synthetisiere Informationen...",
+        "workingOnIt": "Arbeite daran...",
+        "almostThere": "Fast geschafft...",
+        "divingDeeper": "Tiefer eintauchen...",
+        "connectingTheDots": "Verbinde die Punkte...",
+        "crunchingNumbers": "Rechne Zahlen...",
+        "exploringPossibilities": "Erkunde Möglichkeiten...",
+        "refiningAnswer": "Verfeinere Antwort...",
+        "stillThinking": "Denke noch...",
+        "makingProgress": "Mache Fortschritte...",
+        "piecingTogether": "Setze zusammen..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "Testphase",
@@ -20789,7 +20815,10 @@
     "pagination": {
       "pagination": "Seitennummerierung",
       "previousPage": "Vorherige Seite",
-      "nextPage": "Nächste Seite"
+      "nextPage": "Nächste Seite",
+      "firstPage": "Erste Seite",
+      "lastPage": "Letzte Seite",
+      "recordsPerPage": "Datensätze pro Seite"
     },
     "select": {
       "more": "mehr",

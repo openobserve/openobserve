@@ -1,0 +1,8 @@
+{
+  "_source": "o2-ai src/opencode/events.py title frame",
+  "_item": "today",
+  "frame": {
+    "type": "title",
+    "title": "Checkout 5xx spike in prod"
+  }
+}

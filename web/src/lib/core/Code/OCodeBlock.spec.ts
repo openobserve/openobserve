@@ -101,9 +101,105 @@ describe("OCodeBlock", () => {
     expect(copyMock.mock.calls[0][0]).toBe(real);
   });
 
+  it("names the icon-only copy button", () => {
+    const wrapper = mountBlock({ code: "x", lang: "bash" });
+    expect(wrapper.get('[data-test="code-block-copy-btn"]').attributes("aria-label")).toBe("Copy");
+  });
+
   it("hides the copy button when copyable is false", () => {
     const wrapper = mountBlock({ code: "x", lang: "bash", copyable: false });
     expect(wrapper.find('[data-test="code-block-copy-btn"]').exists()).toBe(false);
+  });
+
+  describe("highlight", () => {
+    it("renders escaped plain text and never calls highlight.js when off", async () => {
+      const hljs = (await import("highlight.js")).default;
+      const highlight = vi.spyOn(hljs, "highlight");
+      const auto = vi.spyOn(hljs, "highlightAuto");
+      const wrapper = mountBlock({ code: "<b>SELECT</b>", lang: "sql", highlight: false });
+      expect(wrapper.find("code").html()).toContain("&lt;b&gt;SELECT&lt;/b&gt;");
+      expect(highlight).not.toHaveBeenCalled();
+      expect(auto).not.toHaveBeenCalled();
+      await wrapper.setProps({ highlight: true });
+      expect(highlight).toHaveBeenCalledTimes(1);
+      highlight.mockRestore();
+      auto.mockRestore();
+    });
+
+    it("highlights plaintext without auto-detection", async () => {
+      const hljs = (await import("highlight.js")).default;
+      const auto = vi.spyOn(hljs, "highlightAuto");
+      mountBlock({ code: "a = 1", lang: "plaintext" });
+      expect(auto).not.toHaveBeenCalled();
+      auto.mockRestore();
+    });
+
+    it("shows highlightedHtml made elsewhere and never runs highlight.js itself", async () => {
+      const hljs = (await import("highlight.js")).default;
+      const highlight = vi.spyOn(hljs, "highlight");
+      const auto = vi.spyOn(hljs, "highlightAuto");
+      const wrapper = mountBlock({
+        code: "SELECT 1",
+        lang: "sql",
+        highlightedHtml: '<span class="hljs-keyword">SELECT</span> 1',
+      });
+      expect(wrapper.find("code .hljs-keyword").text()).toBe("SELECT");
+      expect(highlight).not.toHaveBeenCalled();
+      expect(auto).not.toHaveBeenCalled();
+      highlight.mockRestore();
+      auto.mockRestore();
+    });
+
+    it("skips highlighting past highlightMaxChars", async () => {
+      const hljs = (await import("highlight.js")).default;
+      const highlight = vi.spyOn(hljs, "highlight");
+      mountBlock({ code: "SELECT 1", lang: "sql", highlightMaxChars: 4 });
+      expect(highlight).not.toHaveBeenCalled();
+      highlight.mockRestore();
+    });
+
+    it("keeps at most 50 highlighted versions of a block whose code keeps changing", async () => {
+      const hljs = (await import("highlight.js")).default;
+      const highlight = vi.spyOn(hljs, "highlight");
+      const wrapper = mountBlock({ code: "v0", lang: "sql" });
+      for (let i = 1; i <= 60; i++) await wrapper.setProps({ code: `v${i}` });
+      highlight.mockClear();
+      await wrapper.setProps({ code: "v60" });
+      await wrapper.setProps({ code: "v0" });
+      expect(highlight).toHaveBeenCalledTimes(1);
+      highlight.mockRestore();
+    });
+  });
+
+  describe("assistant options", () => {
+    it("makes the scroller a named focusable region only when scrollLabel is set", () => {
+      const plain = mountBlock({ code: "x", lang: "sql" }).get("pre");
+      expect(plain.attributes("tabindex")).toBeUndefined();
+      expect(plain.attributes("role")).toBeUndefined();
+      const named = mountBlock({ code: "x", lang: "sql", scrollLabel: "Code, SQL" }).get("pre");
+      expect(named.attributes()).toMatchObject({
+        tabindex: "0",
+        role: "region",
+        "aria-label": "Code, SQL",
+      });
+      // highlight.js makes code.hljs its own scroller; the named pre must be the one that scrolls.
+      const code = mountBlock({ code: "x", lang: "sql", scrollLabel: "Code, SQL" }).get("code");
+      expect(code.classes()).toContain("overflow-visible!");
+    });
+
+    it("adds copyButtonClass and the aa contrast label only when asked", () => {
+      const plain = mountBlock({ code: "x", lang: "sql" });
+      expect(plain.get(".o2-code-lang").classes()).toContain("opacity-55");
+      const aa = mountBlock({
+        code: "x",
+        lang: "sql",
+        contrast: "aa",
+        copyButtonClass: "min-h-11",
+      });
+      expect(aa.classes()).toContain("o2-code-block--aa");
+      expect(aa.get(".o2-code-lang").classes()).toContain("text-syntax-text");
+      expect(aa.get('[data-test="code-block-copy-btn"]').classes()).toContain("min-h-11");
+    });
   });
 
   describe("wrap and maxLines", () => {
@@ -339,5 +435,11 @@ describe("OCodeBlock", () => {
       expect(wrapper.find('[data-test="code-block-token-link"]').exists()).toBe(false);
       wrapper.unmount();
     });
+  });
+
+  it("drops the language and actions row when the host labels the code itself", () => {
+    const wrapper = mount(OCodeBlock, { props: { code: "SELECT 1", lang: "sql", toolbar: false } });
+    expect(wrapper.find(".o2-code-toolbar").exists()).toBe(false);
+    expect(wrapper.text()).toContain("SELECT 1");
   });
 });

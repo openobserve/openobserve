@@ -1087,6 +1087,31 @@ async fn delete_org_fleet_resources(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn delete_org_ai_assistant_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    infra::table::ai_access_requests::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_access_requests: {e}"))?;
+    infra::table::ai_actions::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_actions: {e}"))?;
+    infra::table::ai_grants::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_grants: {e}"))?;
+    infra::table::ai_turn_marks::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_turn_marks: {e}"))?;
+    infra::table::ai_chat_feedback::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_feedback: {e}"))?;
+    infra::table::ai_chat_imports::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_imports: {e}"))?;
+    infra::table::ai_approvals::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_approvals: {e}"))?;
+    Ok(())
+}
+
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "enterprise"))]
     use infra::table::service_streams;
@@ -1224,6 +1249,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     crate::ai_chat::purge_org_replicas(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_replicas: {e}"))?;
+    delete_org_ai_assistant_resources(org_id).await?;
     // Turns and shares before their chat rows, so none is left without the chat it belongs to.
     ai_chat_turns::delete_by_org(org_id)
         .await
@@ -1360,6 +1386,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
+    #[cfg(feature = "cloud")]
+    infra::table::paid_overage_attribution::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/paid_overage_attribution: {e}"))?;
     // Through the db layer, not the table layer: it also evicts the token caches cluster-wide.
     crate::db::org_ingestion_tokens::delete_by_org(org_id)
         .await

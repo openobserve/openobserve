@@ -80,6 +80,13 @@ async fn sweep() -> Result<(), infra::errors::Error> {
             Err(e) => log::error!("[AI_CHAT_RETENTION] {org_id}: turn purge failed: {e}"),
         }
     }
+    // Chat content outlives no chat: this runs in every org, with or without retention.
+    if let Err(e) = infra::table::ai_chat_feedback::purge_orphans().await {
+        log::error!("[AI_CHAT_RETENTION] feedback purge failed: {e}");
+    }
+    if let Err(e) = infra::table::ai_chat_imports::purge_orphans().await {
+        log::error!("[AI_CHAT_RETENTION] import purge failed: {e}");
+    }
     Ok(())
 }
 

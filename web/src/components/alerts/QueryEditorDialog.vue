@@ -72,9 +72,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <!-- Right: AI -->
       <div class="flex items-center gap-3">
+        <AiEntryButton
+          v-if="assistantV2 && docked"
+          appearance="toggle"
+          verb="ask"
+          entry-kind="editor_toggle"
+          object-kind="alert"
+          thread="current"
+          dock-host="alert_query"
+          :label="t('assistant.entry.assistant')"
+          :tooltip="t('assistant.entry.tooltip.dockedAsk')"
+          :pressed="docked.dock.isOpen.value"
+          :build="docked.dock.build"
+          data-test="ai-entry-alert-query-ask"
+          @closed="docked.dock.close"
+        />
         <!-- AI button -->
         <OButton
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
@@ -95,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <div
+      :ref="docked ? docked.dockSlot : undefined"
       data-test="query-editor-dialog-card"
       class="bg-card-glass-bg flex h-[calc(100vh-3.5rem)] overflow-hidden"
     >
@@ -102,11 +118,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex h-full w-full flex-col">
           <!-- Main Content Grid: field browser | editors | output -->
           <div
-            class="grid min-h-0 w-full flex-1 grid-cols-[20fr_45fr_35fr] gap-x-2 overflow-hidden px-2 py-2 pe-2"
+            :class="[
+              'grid min-h-0 w-full flex-1 gap-x-2 overflow-hidden px-2 py-2 pe-2',
+              dockOpen
+                ? 'grid-cols-[minmax(12rem,1fr)_minmax(0,3fr)] grid-rows-[minmax(0,3fr)_minmax(0,2fr)] gap-y-2'
+                : 'grid-cols-[20fr_45fr_35fr]',
+            ]"
           >
             <!-- Left Section (25%) — Field Browser -->
             <div
               class="rounded-default border-border-default bg-surface-base h-full overflow-hidden border p-2.5"
+              :class="dockOpen ? 'row-span-2' : ''"
             >
               <SearchFieldList
                 :fields="fieldListItems"
@@ -131,12 +153,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Pane Header -->
                     <div
                       class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
+                      :class="docked ? 'flex-wrap gap-2' : ''"
                     >
-                      <div class="flex items-center gap-2">
+                      <div
+                        :class="
+                          docked
+                            ? 'flex min-w-0 flex-wrap items-center gap-2'
+                            : 'flex items-center gap-2'
+                        "
+                      >
                         <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
                         <span class="text-xs font-semibold">{{
                           localTab === "sql" ? t("alerts.sqlEditor") : t("alerts.promqlEditor")
                         }}</span>
+                        <AiLabel
+                          v-if="docked?.proposal.label.value"
+                          :state="docked.proposal.label.value"
+                          @revert="docked.proposal.revert"
+                          @ask-again="docked.dock.askAgain"
+                        />
                       </div>
                       <div class="flex items-center gap-2">
                         <OSwitch
@@ -172,7 +207,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Unified Query Editor -->
-                    <div class="relative min-h-0 flex-1">
+                    <div ref="editorArea" class="relative min-h-0 flex-1">
+                      <AssistantDiffBlock
+                        v-if="docked?.proposal.pending.value"
+                        :key="docked.proposal.pending.value.id"
+                        :proposal="docked.proposal.pending.value"
+                        class="absolute inset-0 z-1000"
+                      />
                       <UnifiedQueryEditor
                         ref="queryEditorRef"
                         :languages="availableLanguages"
@@ -182,7 +223,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disable-ai-reason="t('search.selectStreamForAI')"
                         @update:query="handleQueryUpdate"
                         @language-change="handleLanguageChange"
-                        @ask-ai="handleAskAI"
                         @run-query="handleRunQuery(localTab)"
                         @focus="onQueryEditorFocus"
                         @blur="onBlurQueryEditor"
@@ -191,9 +231,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :keywords="effectiveKeywords"
                         :suggestions="effectiveSuggestions"
                         :field-value-resolver="resolveFieldValues"
+                        :assistant="dialogAssistant"
+                        :placeholder="dialogAssistant ? fullEditorPlaceholder : undefined"
                       />
                       <div
                         v-if="
+                          !dialogAssistant &&
                           (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
                           queryEditorPlaceholderFlag
                         "
@@ -322,10 +365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:query="updateVrlFunction"
                       @focus="functionEditorPlaceholderFlag = false"
                       @blur="onBlurFunctionEditor"
-                      @toggle-nlp-mode="handleAlertFunctionEditorToggleNlpMode"
-                      @generation-start="handleAlertFunctionEditorGenerationStart"
-                      @generation-end="handleAlertFunctionEditorGenerationEnd"
-                      @generation-success="handleAlertFunctionEditorGenerationSuccess"
                     />
                     <div
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
@@ -490,10 +529,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <AssistantDock v-if="docked" :host="docked.adapter" />
       <!-- AI Chat Panel -->
       <div
         class="bg-surface-base ms-2 w-[24.5vw] max-w-full min-w-18.75"
-        v-if="store.state.isAiChatEnabled"
+        v-else-if="store.state.isAiChatEnabled"
       >
         <O2AIChat
           :header-height="48"
@@ -528,6 +568,17 @@ import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+// The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const AiLabel = defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue"));
+const AssistantDiffBlock = defineAsyncComponent(
+  () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
+);
+const AssistantDock = defineAsyncComponent(
+  () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
+);
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
@@ -546,6 +597,14 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  assistantObjectNameKey,
+  isAssistantV2,
+  useAssistantPanelWidth,
+  useDockedEditor,
+  type DockedEditor,
+  type QueryEditorAssistant,
+} from "@/composables/assistant/pure";
 
 const props = defineProps({
   modelValue: {
@@ -821,34 +880,6 @@ const onBlurQueryEditor = debounce(async () => {
 
 const onBlurFunctionEditor = () => {
   functionEditorPlaceholderFlag.value = vrlFunctionContent.value === "";
-};
-
-/**
- * Handle NLP mode toggle from AI icon in alert function editor
- */
-const handleAlertFunctionEditorToggleNlpMode = () => {
-  // UnifiedQueryEditor manages its own NLP mode state internally
-};
-
-/**
- * Handle generation start event from alert function editor
- */
-const handleAlertFunctionEditorGenerationStart = () => {
-  // Can add loading indicators here if needed
-};
-
-/**
- * Handle generation end event from alert function editor
- */
-const handleAlertFunctionEditorGenerationEnd = () => {
-  // Can remove loading indicators here if needed
-};
-
-/**
- * Handle successful generation from alert function editor
- */
-const handleAlertFunctionEditorGenerationSuccess = () => {
-  // Function code is already updated via @update:query handler
 };
 
 // Column and function selection.
@@ -1207,6 +1238,78 @@ const availableLanguages = computed<("sql" | "promql")[]>(() => {
   return ["sql", "promql"];
 });
 
+const assistantV2 = isAssistantV2();
+const editorArea = ref<HTMLElement | null>(null);
+const alertName = inject(assistantObjectNameKey, ref(""));
+let openedWith = { sql: props.sqlQuery, promql: props.promqlQuery };
+const docked: DockedEditor | null = assistantV2 ? alertQueryHost() : null;
+const panelWidth = assistantV2 ? useAssistantPanelWidth() : null;
+const dockOpen = computed(
+  () => !!docked?.dock.isOpen.value && (panelWidth?.panelWidthRem.value ?? 0) > 0,
+);
+
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) openedWith = { sql: localSqlQuery.value, promql: localPromqlQuery.value };
+    else docked?.proposal.clear();
+  },
+);
+
+const dialogAssistant: QueryEditorAssistant | null = docked
+  ? {
+      id: "alert_query",
+      proposal: docked.proposal,
+      get stream() {
+        return String(props.streamName ?? "");
+      },
+      get streamType() {
+        return props.streamType;
+      },
+      get timeRange() {
+        const minutes = Number(props.period);
+        if (!Number.isFinite(minutes) || minutes <= 0) return undefined;
+        const to = Date.now();
+        return { from: to - minutes * 60_000, to, period: `${minutes}m` };
+      },
+      run: () => handleRunQuery(localTab.value),
+    }
+  : null;
+
+function alertQueryHost(): DockedEditor {
+  const buffer = () => (localTab.value === "sql" ? localSqlQuery.value : localPromqlQuery.value);
+  return useDockedEditor(
+    {
+      id: "alert_query",
+      objectKind: "alert",
+      objectTitle: () =>
+        alertName.value
+          ? t("assistant.editor.title.alert", { name: raw(alertName.value) })
+          : t("assistant.editor.title.alertNew"),
+      language: () => (localTab.value === "promql" ? "promql" : "sql"),
+      getBuffer: buffer,
+      getContext: () => ({
+        selectedStreams: props.streamName ? [props.streamName] : [],
+        streamType: props.streamType,
+        ...(localTab.value === "sql"
+          ? { currentSQLQuery: localSqlQuery.value }
+          : { currentQuery: localPromqlQuery.value }),
+      }),
+      isDirty: () =>
+        localSqlQuery.value !== openedWith.sql || localPromqlQuery.value !== openedWith.promql,
+      run: () => handleRunQuery(localTab.value),
+      focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+      write(text) {
+        if (localTab.value === "sql") updateSqlQuery(text);
+        else updatePromqlQuery(text);
+        queryEditorRef.value?.replaceValue?.(text);
+      },
+      area: () => editorArea.value,
+    },
+    { active: () => props.modelValue },
+  );
+}
+
 // Unified Query Editor handlers
 const handleQueryUpdate = (newQuery: string) => {
   _sqlOnQueryChange();
@@ -1246,11 +1349,6 @@ const handleRunQuery = (language: "sql" | "promql") => {
   } else {
     runPromqlQuery();
   }
-};
-
-const handleAskAI = async () => {
-  // The unified component handles AI generation internally
-  // This event is just for parent components that may need to react
 };
 
 // AI Chat

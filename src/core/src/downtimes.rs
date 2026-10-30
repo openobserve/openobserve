@@ -910,6 +910,7 @@ async fn checked_request(
 ) -> Result<DowntimeRequest, DowntimeError> {
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
+    req.check_target_ids().map_err(DowntimeError::BadRequest)?;
     req.check_alert_targets()
         .map_err(DowntimeError::BadRequest)?;
     span_as_duration(&mut req.schedule);

@@ -275,6 +275,7 @@ jobs:
       matrix: ${{ steps.gen.outputs.matrix }}
       smoke_active: ${{ steps.gen.outputs.smoke_active }}
       shards_selected: ${{ steps.gen.outputs.shards_selected }}
+      assistant_selected: ${{ steps.gen.outputs.assistant_selected }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -314,6 +315,8 @@ jobs:
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           COUNT=$(echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', ')); require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'shards_selected='+m.include.length+'\n')")
           echo "smoke_active=$([ -n "$SELECT_ARGS" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          ASSISTANT_SELECTED=$(echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(m.include.some(s=>s.testfolder==='Assistant'))")
+          echo "assistant_selected=$ASSISTANT_SELECTED" >> "$GITHUB_OUTPUT"
           # Durable record of what ran and why, visible from the PR checks page.
           {
             echo "### Playwright shard selection"
@@ -623,6 +626,94 @@ jobs:
         if: always()
         run: cat o2.log
 
+  # Edition-rewriting assistant flows need the Vite dev server, the only one that serves aws-exports.ts as a module.
+  assistant_editions:
+    timeout-minutes: 30
+    name: e2e / Assistant editions
+    needs: [resolve_binary, build_binary, generate_matrix]
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.resolve_binary.result == 'success' &&
+      needs.generate_matrix.result == 'success' &&
+      needs.generate_matrix.outputs.assistant_selected == 'true' &&
+      (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
+    runs-on:
+      labels: eks-openobserve-standard-8
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.resolve_binary.outputs.binary_artifact_name }}
+          path: release-ci-binary
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.run_id }}
+
+      - name: Start OpenObserve
+        run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
+
+      - name: Wait for start
+        run: |
+          for i in $(seq 1 120); do
+            if curl -sf http://localhost:5080/web/login > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start in 120s"
+          exit 1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Start the Vite dev server against the binary
+        env:
+          VITE_OPENOBSERVE_ENDPOINT: http://localhost:5080
+        run: |
+          cd web && npm ci
+          nohup npx vite --base /web/ --port 8093 --strictPort > ../vite.log 2>&1 &
+          for i in $(seq 1 180); do
+            if curl -sf http://localhost:8093/web/ > /dev/null 2>&1; then
+              echo "Vite ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Vite failed to start in 180s"
+          exit 1
+
+      - name: Run the @edition assistant flows
+        env:
+          O2_VITE_DEV: "1"
+          O2_APP_URL: http://localhost:8093/web
+          O2_BACKEND: http://localhost:5080
+        run: |
+          {
+            echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}"
+            echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}"
+            echo "ZO_BASE_URL=${ZO_BASE_URL}"
+            echo "INGESTION_URL=${INGESTION_URL}"
+            echo "ORGNAME=${ORGNAME}"
+          } > tests/ui-testing/.env
+          cd tests/ui-testing && npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test playwright-tests/assistant --grep @edition --pass-with-no-tests
+
+      - name: Check OpenObserve and Vite logs
+        if: always()
+        run: |
+          cat o2.log
+          cat vite.log || true
+
   merge_reports:
     timeout-minutes: 20
     name: Merge Reports
@@ -869,7 +960,9 @@ jobs:
         check_changes,
         resolve_binary,
         build_binary,
+        generate_matrix,
         ui_integration_tests,
+        assistant_editions,
       ]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
@@ -900,7 +993,14 @@ jobs:
             exit 1
           fi
 
-          # 4. Runtime readiness alone is not enough; all selected shards must pass.
+          # 4. The editions job runs whenever the Assistant shard is selected, and then it must pass.
+          if [ "${{ needs.generate_matrix.outputs.assistant_selected }}" == "true" ] && \
+             [ "${{ needs.assistant_editions.result }}" != "success" ]; then
+            echo "Assistant editions job did not succeed: ${{ needs.assistant_editions.result }}"
+            exit 1
+          fi
+
+          # 5. Runtime readiness alone is not enough; all selected shards must pass.
           if [ "${{ needs.ui_integration_tests.result }}" == "success" ]; then
             echo "All Playwright tests completed successfully"
             exit 0

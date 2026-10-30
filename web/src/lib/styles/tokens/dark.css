@@ -137,6 +137,13 @@
   );
   --color-chat-bubble-user: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
   --color-chat-bubble-ai: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
+  /* Trace thread view copies of the bubble and avatar fills, so LLM observability keeps them after the assistant drops its own */
+  --color-trace-thread-user-bg: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+  --color-trace-thread-user-avatar-bg: linear-gradient(
+    135deg,
+    var(--color-indigo-600) 0%,
+    var(--color-indigo-500) 100%
+  );
 
   /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
   --color-surface-base: var(--d-base); /* content card + table canvas (lifted) */
@@ -799,8 +806,8 @@
 
   --color-toast-loading-bg: var(--color-surface-overlay);
   --color-toast-loading-border: var(--color-border-default);
-  --color-toast-action-text: var(--color-primary-400);
-  --color-toast-action-hover: var(--color-primary-300);
+  --color-toast-action-bg: var(--color-primary-800);
+  --color-toast-action-bg-hover: var(--color-primary-900);
 
   /* OTable (dark) */
   --color-table-header-bg: var(--d-overlay); /* header band lifts off rows */
@@ -1007,4 +1014,14 @@
     0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 45%, transparent),
     0 0.5rem 1.375rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
     0 1.25rem 3rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 45%, transparent);
+}
+
+/* ── O2 Assistant link and primary roles, dark: the normal dark pairing already clears AA (PO B91) ── */
+:root.dark,
+.dark :root,
+.dark {
+  --color-assistant-link: var(--color-primary-400);
+  --color-assistant-link-hover: var(--color-primary-300);
+  --color-assistant-primary: var(--color-primary-600);
+  --color-assistant-primary-hover: var(--color-primary-600);
 }

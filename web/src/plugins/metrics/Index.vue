@@ -176,6 +176,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 export default defineComponent({
   name: "Metrics",
@@ -207,6 +208,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
+    const assistantV2 = isAssistantV2();
     const router = useRouter();
     const { showErrorNotification } = useNotifications();
     const { dashboardPanelData, resetDashboardPanelData, resetAggregationFunction, validatePanel } =
@@ -336,10 +338,25 @@ export default defineComponent({
     const isPanelConfigChanged = ref(false);
 
     // Reset before children mount so FieldList sees stream_type=metrics (avoids a spurious logs stream fetch).
+    // An assistant link applies its query and window but never runs it.
+    const fromAssistant = () =>
+      assistantV2 && route.query.type === "ai_chat_query" && !!route.query.query;
+
     onBeforeMount(() => {
       applyMetricsDefaults();
-      pendingAutoRun = hydrateFromUrl();
+      pendingAutoRun = hydrateFromUrl() && !fromAssistant();
     });
+
+    // A second assistant link to the open page changes only its query, so the reused page re-applies on the nonce.
+    watch(
+      () => route.query.t,
+      (nonce, previous) => {
+        if (!nonce || nonce === previous || !fromAssistant()) return;
+        applyMetricsDefaults();
+        hydrateFromUrl();
+        updateDateTime();
+      },
+    );
 
     onMounted(async () => {
       // DateTimePicker is now mounted; safe to read its value

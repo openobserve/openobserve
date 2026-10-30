@@ -19,6 +19,7 @@ import { dismissAll } from "@/lib/feedback/Toast/useToast";
 import { PANEL_DRAFT_PREFIX } from "@/composables/dashboard/usePanelDraft";
 import { EDITOR_DRAFT_INDEX_KEY, EDITOR_DRAFT_PREFIX } from "@/utils/drafts/editorDraftStore";
 import { DRAFT_SIGNED_OUT_KEY } from "@/utils/drafts/draftSession";
+import { clearSessionStorageKeepingDrafts } from "@/utils/clearSessionStorage";
 import { getPath, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 
 const DRAFT_KEY_PREFIXES = [
@@ -84,7 +85,7 @@ export const expireSession = (
   useLocalCurrentUser("", true);
   useLocalUserInfo("", true);
   if (clearLocalStorage) clearLocalStorageKeepingDrafts();
-  sessionStorage.clear();
+  clearSessionStorageKeepingDrafts();
   // The session is gone, so an editor's "leave site?" prompt could only keep the user on a dead page.
   silenceUnloadPrompts();
   if (toLogin) window.location.assign(`${getPath()}login`);

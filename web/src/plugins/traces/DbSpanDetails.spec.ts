@@ -9,7 +9,7 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: {
     name: "CodeQueryEditor",
     template: '<div data-test="mock-code-editor" />',
-    props: ["query", "language", "readOnly", "showAutoComplete", "showAiIcon", "editorId"],
+    props: ["query", "language", "readOnly", "showAutoComplete", "editorId"],
   },
 }));
 

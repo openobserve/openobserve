@@ -145,8 +145,15 @@
               {{ crossLink.name }}
             </ODropdownItem>
           </template>
+          <template v-if="assistantV2">
+            <AiEntryButton v-bind="fieldDoor(key, value[key], 'explain')" appearance="menu-item" />
+            <AiEntryButton
+              v-bind="fieldDoor(key, value[key], 'add_to_chat')"
+              appearance="menu-item"
+            />
+          </template>
           <ODropdownItem
-            v-if="store.state.zoConfig.ai_enabled"
+            v-else-if="store.state.zoConfig.ai_enabled"
             data-test="send-to-ai-chat-btn"
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
@@ -158,7 +165,13 @@
               <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
             </template>
           </ODropdownItem>
+          <AiEntryButton
+            v-if="assistantV2"
+            v-bind="regexDoor(String(key), value[key])"
+            appearance="menu-item"
+          />
           <ODropdownItem
+            v-else
             data-test="redirect-to-regex-pattern-btn"
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
@@ -208,8 +221,10 @@
           {{ t("logs.jsonPreview.copy") }}
         </div>
         <div
+          v-if="!assistantV2 || regexDoorShown"
           class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
-          @click="handleCreateRegex"
+          :data-test="assistantV2 ? 'ai-entry-regex-field-ask-menu' : undefined"
+          @click="assistantV2 ? handoffSelection() : handleCreateRegex()"
         >
           <img
             :src="regexIconForContextMenu"
@@ -264,7 +279,18 @@ import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, type PropType } from "vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useAssistantGate } from "@/composables/assistant/pure";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import {
+  logFieldBuild,
+  logsDoorBase,
+  regexFieldHandoff,
+  regexPatternsOpener,
+  rowKeyOf,
+  type LogsDoorBase,
+} from "@/plugins/logs/logsDoors";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
@@ -292,6 +318,11 @@ import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamName
 export default {
   name: "JsonPreview",
   props: {
+    /** The org the host loaded this row under; its doors carry it so a stale row is refused. */
+    boundOrg: {
+      type: String,
+      default: undefined,
+    },
     value: {
       type: Object,
       required: true,
@@ -339,8 +370,16 @@ export default {
       type: Boolean,
       default: false,
     },
+    /** The page a field door describes; defaults to the Logs search and this row. */
+    doorContext: {
+      type: Function as PropType<() => LogsDoorBase>,
+      default: undefined,
+    },
   },
   components: {
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     NotEqualIcon,
     EqualIcon,
     AppTabs,
@@ -778,6 +817,67 @@ export default {
       return t("common.addFieldToTable");
     };
 
+    const assistantV2 = isAssistantV2();
+    const loadedOrg = assistantV2
+      ? useLoadedOrg(
+          () => props.value,
+          () => store.state.selectedOrganization?.identifier ?? "",
+        )
+      : null;
+    const fieldDoorBase = (): LogsDoorBase => {
+      if (props.doorContext) return props.doorContext();
+      const base = logsDoorBase(searchObj, store.state, props.value);
+      return props.streamName ? { ...base, stream: props.streamName } : base;
+    };
+    // The drawer stays open on Add: nothing here emits closeTable.
+    const fieldDoor = (key: string, fieldValue: unknown, verb: "explain" | "add_to_chat") => ({
+      verb,
+      entryKind: "object_verb" as const,
+      boundOrg: props.boundOrg ?? loadedOrg?.value,
+      objectKind: "log_field" as const,
+      label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
+      tooltip: t(
+        verb === "explain" ? "assistant.entry.tooltip.explainField" : "assistant.entry.tooltip.add",
+      ),
+      dataTest:
+        verb === "explain"
+          ? ("ai-entry-log-field-explain" as const)
+          : ("ai-entry-log-field-add" as const),
+      build: logFieldBuild(fieldDoorBase, key, fieldValue, props.value),
+      objectKey: `${rowKeyOf(props.value)}:${key}`,
+    });
+
+    // The selection menu's AI item follows the live gate; plain Copy always stays.
+    const gate = assistantV2 ? useAssistantGate() : null;
+    const regexDoorShown = computed(() => ["available", "unhealthy"].includes(gate?.value ?? ""));
+    // The regex drawer receives the prompt in its own dock; the sidebar never also gets it.
+    const openRegexPatterns = regexPatternsOpener(store, router, () => emit("closeTable"));
+    const regexHandoff = (field: string, sample: unknown) => {
+      if (!regexPatternsAccess.value.allowed) return openUpgradeDialog();
+      return regexFieldHandoff(fieldDoorBase(), field, sample, openRegexPatterns);
+    };
+    const regexDoor = (key: string, fieldValue: unknown) => ({
+      verb: "ask" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: props.boundOrg ?? loadedOrg?.value,
+      objectKind: "log_field" as const,
+      label: t("assistant.entry.createRegex"),
+      tooltip: t("assistant.entry.tooltip.createRegex"),
+      dataTest: "ai-entry-regex-field-ask" as const,
+      build: () => undefined,
+      handoff: () => regexHandoff(key, fieldValue),
+    });
+    const handoffSelection = () => {
+      showMenu.value = false;
+      const bound = props.boundOrg ?? loadedOrg?.value;
+      // A row left on screen after an org switch never hands its text to the next org's regex editor.
+      if (bound && bound !== store.state.selectedOrganization?.identifier) {
+        toast({ variant: "default", message: t("assistant.entry.orgChanged") });
+        return;
+      }
+      void regexHandoff("", selectedText.value);
+    };
+
     const sendToAiChat = (value: string, append: boolean = true) => {
       if (!aiAssistantAccess.value.allowed) {
         openUpgradeDialog();
@@ -940,6 +1040,11 @@ export default {
       getOriginalData,
       getTracesStreams,
       addOrRemoveLabel,
+      assistantV2,
+      regexDoor,
+      regexDoorShown,
+      handoffSelection,
+      fieldDoor,
       sendToAiChat,
       getBtnLogo,
       config,

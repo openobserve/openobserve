@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="scheduled-pipeline-container h-full w-full">
     <!-- <OSeparator /> -->
 
-    <div class="stepper-header mb-2 flex h-full w-full">
+    <div :ref="docked ? docked.dockSlot : undefined" class="stepper-header mb-2 flex h-full w-full">
       <div
         :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-full'"
         class="flex"
@@ -725,7 +725,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="tab === 'sql' ? t('pipeline.sqlQuery') : t('pipeline.promqlQuery')"
                     />
                   </span>
-                  <div class="relative">
+                  <AiLabel
+                    v-if="docked?.proposal.label.value"
+                    :state="docked.proposal.label.value"
+                    class="px-2 py-1"
+                    @revert="docked.proposal.revert"
+                    @ask-again="docked.dock.askAgain"
+                  />
+                  <div ref="editorArea" class="relative">
+                    <AssistantDiffBlock
+                      v-if="docked?.proposal.pending.value"
+                      :key="docked.proposal.pending.value.id"
+                      :proposal="docked.proposal.pending.value"
+                      class="absolute inset-0 z-1000"
+                    />
                     <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <UnifiedQueryEditor
                       v-show="expandState.query"
@@ -749,10 +762,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       @blur="onBlurQueryEditor"
                       editor-height="calc(100vh - 190px)"
+                      :assistant="scheduledAssistant"
+                      :placeholder="scheduledAssistant ? editorPlaceholder : undefined"
                     />
                     <!-- eslint-enable local/no-hardcoded-px -->
                     <div
-                      v-if="!query && queryEditorPlaceholderFlag && expandState.query"
+                      v-if="
+                        !scheduledAssistant &&
+                        !query &&
+                        queryEditorPlaceholderFlag &&
+                        expandState.query
+                      "
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
                     >
                       <span
@@ -798,14 +818,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expand-on-row-click="true"
                       :cell-overflow-tooltip="false"
                       data-test="scheduled-pipeline-sql-preview-table"
+                      v-bind="assistantV2 ? { focusToolbar: true } : {}"
                     >
                       <!-- eslint-enable local/no-hardcoded-px -->
                       <template #cell-source="{ row }">
                         <span class="font-mono text-xs">{{ JSON.stringify(row) }}</span>
                       </template>
-                      <template #cell-hover-actions="{ row, column, active }">
+                      <template #cell-hover-actions="{ row, column, active, menu }">
+                        <ODropdown v-if="assistantV2 && menu">
+                          <template #trigger>
+                            <OButton
+                              variant="ghost"
+                              size="icon-sm"
+                              class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                              :aria-label="t('assistant.entry.rowActions')"
+                              data-test="scheduled-pipeline-preview-row-menu"
+                            >
+                              <OIcon name="more-vert" size="sm" />
+                            </OButton>
+                          </template>
+                          <AiEntryButton v-bind="previewRowDoor(row)" appearance="menu-item" />
+                        </ODropdown>
+                        <AiEntryButton
+                          v-else-if="assistantV2 && active && column.id === previewTimestampColumn"
+                          v-bind="previewRowDoor(row)"
+                          appearance="toolbar-icon"
+                        />
                         <O2AIContextAddBtn
-                          v-if="active && column.id === '_timestamp'"
+                          v-else-if="!assistantV2 && active && column.id === '_timestamp'"
                           data-test="scheduled-pipeline-send-to-ai-btn"
                           @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                         />
@@ -916,10 +956,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- query-eidtor-part -->
       </div>
 
+      <AssistantDock v-if="docked" :host="docked.adapter" />
       <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="ms-2 w-1/4 max-w-full"
-        v-if="store.state.isAiChatEnabled"
+        v-else-if="store.state.isAiChatEnabled"
         style="min-width: 4.6875rem; height: calc(100vh - 70px) !important"
       >
         <O2AIChat
@@ -965,8 +1006,14 @@ import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
+import {
+  useDockedEditor,
+  type DockedEditor,
+  type QueryEditorAssistant,
+} from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -992,6 +1039,9 @@ import {
 import OTable from "@/lib/core/Table/OTable.vue";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { rowKeyOf } from "@/plugins/logs/logsDoors";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
 
 import config from "../../../aws-exports";
@@ -1456,7 +1506,7 @@ watch(selectedStreamName, (newStreamName) => {
     selectedStreamType.value,
     tab.value,
   );
-  contextRegistry.register("pipelines", contextProvider);
+  if (!assistantV2) contextRegistry.register("pipelines", contextProvider);
 });
 
 // Watch for stream type changes and update context provider
@@ -1468,7 +1518,7 @@ watch(selectedStreamType, (newStreamType) => {
     newStreamType,
     tab.value,
   );
-  contextRegistry.register("pipelines", contextProvider);
+  if (!assistantV2) contextRegistry.register("pipelines", contextProvider);
 });
 
 // Watch for query type changes and update context provider
@@ -1480,7 +1530,7 @@ watch(tab, (newTab) => {
     selectedStreamType.value,
     newTab,
   );
-  contextRegistry.register("pipelines", contextProvider);
+  if (!assistantV2) contextRegistry.register("pipelines", contextProvider);
 });
 
 onBeforeMount(async () => {
@@ -1498,8 +1548,11 @@ onMounted(async () => {
     selectedStreamType.value,
     tab.value,
   );
-  contextRegistry.register("pipelines", contextProvider);
-  contextRegistry.setActive("pipelines");
+  // The revamped assistant pushes this node's context over the editor's instead of replacing it.
+  if (!assistantV2) {
+    contextRegistry.register("pipelines", contextProvider);
+    contextRegistry.setActive("pipelines");
+  }
 
   setTimeout(() => {
     if (tab.value === "sql" && query.value != "") {
@@ -1523,6 +1576,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   removeAiContextHandler();
+  if (assistantV2) return;
   contextRegistry.unregister("pipelines");
   contextRegistry.setActive("");
 });
@@ -2530,6 +2584,61 @@ const removeAiContextHandler = () => {
 
 // [END] O2 AI Context Handler
 
+const assistantV2 = isAssistantV2();
+const loadedOrg = assistantV2
+  ? useLoadedOrg(
+      () => rows.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+// The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+const AiLabel = defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue"));
+const AssistantDiffBlock = defineAsyncComponent(
+  () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
+);
+const AssistantDock = defineAsyncComponent(
+  () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
+);
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+// The org's timestamp column, not the literal `_timestamp`.
+const previewTimestampColumn = computed(
+  () => store.state.zoConfig?.timestamp_column || "_timestamp",
+);
+
+const previewRowDoor = (row: Record<string, unknown>) => ({
+  verb: "add_to_chat" as const,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg?.value,
+  objectKind: "log_row" as const,
+  thread: "current" as const,
+  dockHost: "scheduled_query" as const,
+  label: t("assistant.entry.addPreviewRow"),
+  tooltip: t("assistant.entry.tooltip.add"),
+  dataTest: "ai-entry-pipeline-preview-add" as const,
+  objectKey: rowKeyOf(row, previewTimestampColumn.value),
+  build: async () => {
+    const now = Date.now();
+    const from = Number(dateTime.value.startTime) / 1000;
+    const to = Number(dateTime.value.endTime) / 1000;
+    return (await import("@/utils/assistant/prompts")).buildLogRowPrompt({
+      org: store.state.selectedOrganization?.identifier ?? "",
+      stream: selectedStreamName.value || "",
+      row,
+      timestampField: previewTimestampColumn.value,
+      range: from > 0 && to > 0 ? { from, to } : { from: now - 15 * 60_000, to: now },
+      timeZone: store.state.timezone || "UTC",
+      query: String(query.value ?? ""),
+      mode: "sql",
+      source: {
+        kind: "pipeline",
+        name: String(pipelineObj.currentSelectedPipeline?.name ?? ""),
+      },
+    });
+  },
+});
+
 const sendToAiChat = (value: any, append: boolean = true) => {
   aiChatAppendMode.value = append;
   aiChatInputContext.value = value;
@@ -2540,6 +2649,65 @@ const sendToAiChat = (value: any, append: boolean = true) => {
     aiChatInputContext.value = "";
   });
 };
+
+const editorArea = ref<HTMLElement | null>(null);
+const openedWithQuery = query.value ?? "";
+const docked: DockedEditor | null = assistantV2 ? scheduledQueryHost() : null;
+const scheduledAssistant: QueryEditorAssistant | null = docked
+  ? {
+      id: "scheduled_query",
+      proposal: docked.proposal,
+      get stream() {
+        return String(selectedStreamName.value ?? "");
+      },
+      get streamType() {
+        return String(selectedStreamType.value ?? "");
+      },
+      get timeRange() {
+        const minutes = Number(triggerData.value.period);
+        if (!Number.isFinite(minutes) || minutes <= 0) return undefined;
+        const to = Date.now();
+        return { from: to - minutes * 60_000, to, period: `${minutes}m` };
+      },
+      run: () => void runQuery(),
+    }
+  : null;
+
+function scheduledQueryHost(): DockedEditor {
+  const nodeEdited = form.useStore((s: { isDirty: boolean }) => s.isDirty);
+  return useDockedEditor({
+    id: "scheduled_query",
+    objectKind: "pipeline_node",
+    objectTitle: () => {
+      const pipeline = String(pipelineObj.currentSelectedPipeline?.name ?? "");
+      return pipeline
+        ? t("assistant.editor.title.queryNode", { pipeline: raw(pipeline) })
+        : t("assistant.editor.title.queryNodeNew");
+    },
+    language: () => (tab.value === "promql" ? "promql" : "sql"),
+    getBuffer: () => String(query.value ?? ""),
+    getContext: () => ({
+      ...createPipelinesContextProvider(
+        pipelineObj,
+        store,
+        selectedStreamName.value,
+        selectedStreamType.value,
+        tab.value,
+      ).getContext(),
+      ...(tab.value === "sql"
+        ? { currentSQLQuery: String(query.value ?? "") }
+        : { currentQuery: String(query.value ?? "") }),
+    }),
+    isDirty: () => !!nodeEdited.value || String(query.value ?? "") !== openedWithQuery,
+    run: () => void runQuery(),
+    focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+    write(text) {
+      updateQueryValue(text);
+      pipelineEditorRef.value?.replaceValue?.(text);
+    },
+    area: () => editorArea.value,
+  });
+}
 
 defineExpose({
   tab,

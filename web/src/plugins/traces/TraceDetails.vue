@@ -696,6 +696,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="treeSidebarRef"
                   data-test="trace-details-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
+                  v-bind="
+                    assistantV2 ? { parentOperation: parentOperationOf(effectiveSpanId) } : {}
+                  "
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
@@ -760,6 +763,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <TraceDetailsSidebar
                   data-test="trace-details-dag-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
+                  v-bind="
+                    assistantV2 ? { parentOperation: parentOperationOf(effectiveSpanId) } : {}
+                  "
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
@@ -1094,6 +1100,7 @@ import {
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useServiceCorrelation, type KeyFieldsConfig } from "@/composables/useServiceCorrelation";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(() => import("@/components/traces/FlameGraphView.vue"));
@@ -2338,6 +2345,12 @@ export default defineComponent({
 
     const hoveredSpanId = ref("");
     const effectiveSpanId = computed(() => hoveredSpanId.value || selectedSpanId.value);
+    const assistantV2 = isAssistantV2();
+    const parentOperationOf = (spanId: string | null | undefined): string | undefined => {
+      const parentId = spanId ? spanMap.value[spanId]?.reference_parent_span_id : undefined;
+      const parent = parentId ? spanMap.value[parentId] : undefined;
+      return parent?.operation_name ? String(parent.operation_name) : undefined;
+    };
 
     /**
      * A sidebar tab requested explicitly by an interaction, as opposed to the
@@ -3410,6 +3423,8 @@ export default defineComponent({
       { active: toRef(props, "shortcutsActive") },
     );
     return {
+      assistantV2,
+      parentOperationOf,
       router,
       t,
       raw,

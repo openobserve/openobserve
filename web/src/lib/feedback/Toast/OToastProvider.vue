@@ -20,6 +20,7 @@ import { useToast, toastRecords } from "./useToast";
 import { viewportPositionClasses } from "./OToastProvider.types";
 import type { ToastPosition } from "./OToast.types";
 import OToast from "./OToast.vue";
+import { LAYER_ROOT_ATTR } from "@/lib/overlay/Drawer/drawerInset";
 
 const { toasts } = useToast();
 
@@ -53,6 +54,7 @@ function handleOpenChange(id: string, open: boolean): void {
       v-bind="t"
       @open-change="(open) => handleOpenChange(t.id, open)"
     />
-    <ToastViewport :class="viewportPositionClasses[pos]" />
+    <!-- A layer root: a drawer that hides the page leaves toasts and their actions usable. -->
+    <ToastViewport :class="viewportPositionClasses[pos]" :[LAYER_ROOT_ATTR]="''" />
   </ToastProvider>
 </template>

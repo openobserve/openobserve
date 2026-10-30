@@ -191,7 +191,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="hero"
                         @ask-ai="onAskAiTracing"
                         @configure-resource="onConfigureTracesStream"
-                      />
+                      >
+                        <template v-if="assistantV2" #ai-door>
+                          <AiEntryButton v-bind="tracesErrorDoor" appearance="chip" />
+                        </template>
+                      </QueryErrorState>
                     </div>
                     <div v-else-if="!isStreamSelected" class="max-lg:h-full">
                       <TracesNoStreamState
@@ -302,6 +306,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { tracesDoorBase, tracingQueryBuild } from "@/plugins/traces/tracesDoors";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
@@ -1376,6 +1382,19 @@ function generateHistogramData() {
 
 const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
 
+// An assistant link applies its stream, window and filter but never runs them.
+const fromAssistant = () => assistantV2 && router.currentRoute.value.query.type === "ai_chat_query";
+
+// A second assistant link to the open page changes only its query, so the reused page re-applies on the nonce.
+watch(
+  () => router.currentRoute.value.query.t,
+  async (nonce, previous) => {
+    if (!nonce || nonce === previous || !fromAssistant()) return;
+    restoreUrlQueryParams();
+    await loadPageData();
+  },
+);
+
 async function loadPageData() {
   const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
   searchObj.loadingStream = true;
@@ -1388,7 +1407,11 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-  if (searchObj.data.stream.selectedStream.value && (streamFromUrl || !isAutoRunOff())) {
+  if (
+    searchObj.data.stream.selectedStream.value &&
+    (streamFromUrl || !isAutoRunOff()) &&
+    !fromAssistant()
+  ) {
     searchData();
   }
 }
@@ -1769,6 +1792,24 @@ const onAskAiTracing = () => {
     false,
   );
 };
+
+// The traces error state's door: the error goes in a chip, the range is absolute.
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const tracesErrorDoor = computed(() => ({
+  verb: "troubleshoot" as const,
+  entryKind: "empty_state" as const,
+  objectKind: "query_error" as const,
+  label: t("assistant.entry.troubleshootQuery"),
+  tooltip: t("assistant.entry.tooltip.troubleshootQuery"),
+  dataTest: "ai-entry-query-error-troubleshoot" as const,
+  build: tracingQueryBuild(
+    () => tracesDoorBase(searchObj, store.state),
+    () => String(searchObj.data.errorMsg ?? ""),
+  ),
+}));
 
 const onConfigureTracesStream = () => {
   const stream = searchObj.data.stream.selectedStream?.value;

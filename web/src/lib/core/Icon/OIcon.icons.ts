@@ -280,6 +280,10 @@ import SearchOffIcon from "~icons/material-symbols/search-off";
 import SensorsOff from "~icons/material-symbols/sensors-off-outline";
 import NotificationsPaused from "~icons/material-symbols/notifications-paused-outline";
 import RepeatIcon from "~icons/material-symbols/repeat";
+import AddCommentIcon from "~icons/material-symbols/add-comment-outline";
+import AutoFixHighIcon from "~icons/material-symbols/auto-fix-high";
+import RemoveCircleOutlineIcon from "~icons/material-symbols/do-not-disturb-on-outline";
+import PushPinIcon from "~icons/material-symbols/push-pin-outline";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
 import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
@@ -731,6 +735,12 @@ export const iconRegistry = {
   // Batch 5: Downtimes (2026-09-24)
   "notifications-paused": NotificationsPaused,
   repeat: RepeatIcon,
+
+  // Batch 6: O2 Assistant glyphs (2026-10-16); Material Symbols has no remove-circle-outline, do-not-disturb-on-outline is its glyph.
+  "add-comment": AddCommentIcon,
+  "auto-fix-high": AutoFixHighIcon,
+  "remove-circle-outline": RemoveCircleOutlineIcon,
+  "push-pin": PushPinIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

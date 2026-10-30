@@ -1071,7 +1071,7 @@ pub async fn get_group_details(Path(_path): Path<(String, String)>) -> Response 
     tag = "Resources",
     operation_id = "GetResources",
     summary = "Get available resources",
-    description = "Retrieves a list of all available resource types that can be used in role and permission assignments. Shows the resource hierarchy and available permission levels for fine-grained access control. Requires enterprise features to be enabled.",
+    description = "Retrieves a list of all available resource types that can be used in role and permission assignments. Shows the resource hierarchy and available permission levels for fine-grained access control. Items carry `group` (e.g. `assistant`, `llm_observability`) and a one-sentence `description` when the resource has them. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -1849,6 +1849,39 @@ mod tests {
         assert_eq!(request.remove_users, Some(remove_users));
         assert!(request.add_roles.is_none());
         assert!(request.remove_roles.is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn resources_carry_their_iam_group_and_description() {
+        let resp = get_resources(Path("default".to_string())).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let resources: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        let by_key = |key: &str| {
+            resources
+                .iter()
+                .find(|r| r["key"] == key)
+                .unwrap_or_else(|| panic!("{key} missing"))
+                .clone()
+        };
+        let ai = by_key("ai");
+        assert_eq!(ai["display_name"], "O2 Assistant");
+        assert_eq!(ai["group"], "assistant");
+        assert!(ai["description"].as_str().is_some_and(|d| !d.is_empty()));
+        for (key, label) in [
+            ("ai_toolsets", "Toolsets"),
+            ("ai_chat_share", "Chat sharing"),
+            ("mcp", "MCP access"),
+        ] {
+            assert_eq!(by_key(key)["display_name"], label);
+            assert_eq!(by_key(key)["group"], "assistant");
+        }
+        assert_eq!(by_key("dataset")["group"], "llm_observability");
+        // A resource without a group keeps today's shape.
+        assert!(by_key("stream").get("group").is_none());
     }
 
     #[cfg(feature = "enterprise")]

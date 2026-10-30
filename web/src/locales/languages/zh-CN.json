@@ -9166,6 +9166,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "正在分析...",
+        "thinking": "正在思考...",
+        "processing": "正在处理...",
+        "examiningData": "正在检查数据...",
+        "reviewingContext": "正在审查上下文...",
+        "formulatingResponse": "正在生成响应...",
+        "checkingDetails": "正在检查详细信息...",
+        "gatheringInsights": "正在收集洞察...",
+        "evaluatingOptions": "正在评估选项...",
+        "synthesizingInformation": "正在综合信息...",
+        "workingOnIt": "正在处理...",
+        "almostThere": "快完成了...",
+        "divingDeeper": "正在深入分析...",
+        "connectingTheDots": "正在串联线索...",
+        "crunchingNumbers": "正在处理数据...",
+        "exploringPossibilities": "正在探索可能性...",
+        "refiningAnswer": "正在完善答案...",
+        "stillThinking": "仍在思考...",
+        "makingProgress": "正在取得进展...",
+        "piecingTogether": "正在整合信息..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "试用期",
@@ -20789,7 +20815,10 @@
     "pagination": {
       "pagination": "分页",
       "previousPage": "上一页",
-      "nextPage": "下一页"
+      "nextPage": "下一页",
+      "firstPage": "第一页",
+      "lastPage": "最后一页",
+      "recordsPerPage": "每页记录数"
     },
     "select": {
       "more": "更多",

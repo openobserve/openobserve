@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :loading="loading"
           :forbidden="forbidden"
+          :row-rail-tone="assistantV2 ? overAllowanceTone : undefined"
         >
           <template #toolbar>
             <OSearchInput
@@ -400,7 +401,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               data-test="ai-credits-limit-input"
               :label="t('settings.organizationManagementPage.totalAiCredits')"
+              :input-attrs="
+                assistantV2 && aiBelowUsage
+                  ? { 'aria-describedby': ALLOWANCE_FLOOR_WARNING_ID }
+                  : undefined
+              "
               required
+            />
+            <AssistantAllowanceFloor
+              v-if="assistantV2"
+              :org="usageLimitsRow?.identifier ?? ''"
+              :used="Number(usageLimitsRow?.credits_used ?? 0)"
+              field="creditsLimit"
+              @update:below="aiBelowUsage = $event"
             />
             <div class="text-text-secondary text-xs">
               {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
@@ -540,6 +553,12 @@ import {
   type ContractForm,
   type ExtendTrialForm,
 } from "./OrganizationManagement.schema";
+import AssistantAllowanceFloor, {
+  ALLOWANCE_FLOOR_WARNING_ID,
+} from "./assistant/AssistantAllowanceFloor.vue";
+import { isAssistantV2 } from "@/composables/assistant";
+import { formatCount } from "@/utils/formatters";
+import { belowUsageOf } from "@/services/assistant_billing.queries";
 
 /** Backend TrialQuotaPool keys — also the usage-allowance dialog's tab names. */
 type QuotaPool =
@@ -566,6 +585,7 @@ export default defineComponent({
     OTable,
     OTab,
     OTabs,
+    AssistantAllowanceFloor,
   },
   setup() {
     const store = useStore();
@@ -658,11 +678,19 @@ export default defineComponent({
         ? t("settings.organizationManagementPage.setSyntheticsStatusStepsSubtitle")
         : t("settings.organizationManagementPage.setSyntheticsStepsSubtitle");
     });
-    const usageLimitsPrimaryLabel = computed(() =>
-      isAiCreditsTab.value
-        ? t("settings.organizationManagementPage.saveCredits")
-        : t("settings.organizationManagementPage.saveSteps"),
-    );
+    const assistantV2 = isAssistantV2();
+    const aiBelowUsage = ref(false);
+    const usageLimitsPrimaryLabel = computed(() => {
+      if (!isAiCreditsTab.value) return t("settings.organizationManagementPage.saveSteps");
+      return assistantV2 && aiBelowUsage.value
+        ? t("assistant.billing.allowance.setAnyway")
+        : t("settings.organizationManagementPage.saveCredits");
+    });
+    // Calm signal: an org at or past its allowance gets the rail, never a red cell.
+    const overAllowanceTone = (row: any) =>
+      Number(row?.credits_limit) > 0 && Number(row?.credits_used) >= Number(row?.credits_limit)
+        ? ("warning" as const)
+        : null;
     const usageLimitsFormId = computed(() =>
       isAiCreditsTab.value ? "org-ai-credits-form" : "org-synthetics-steps-form",
     );
@@ -747,7 +775,9 @@ export default defineComponent({
       },
       {
         id: "ai_credits_used",
-        header: t("settings.organizationManagementPage.aiCreditsUsed"),
+        header: assistantV2
+          ? t("assistant.billing.allowance.used")
+          : t("settings.organizationManagementPage.aiCreditsUsed"),
         accessorKey: "credits_used",
         sortable: true,
         resizable: true,
@@ -757,7 +787,9 @@ export default defineComponent({
       },
       {
         id: "ai_credits_total",
-        header: t("settings.organizationManagementPage.aiCreditsTotal"),
+        header: assistantV2
+          ? t("assistant.billing.allowance.limit")
+          : t("settings.organizationManagementPage.aiCreditsTotal"),
         accessorKey: "credits_limit",
         sortable: true,
         resizable: true,
@@ -1001,34 +1033,64 @@ export default defineComponent({
     // fields the response updates, and the copy. Everything else — the loading
     // toast, the request, the close, the error path — is the same, so it lives
     // here once.
+    // Below current usage blocks the org at once, so it is confirmed and then sent with `force`.
+    const confirmBelowUsage = (limit: number, used: number) =>
+      confirm({
+        title: t("assistant.billing.allowance.confirmTitle"),
+        message: t("assistant.billing.allowance.confirmMessage", {
+          org: usageLimitsRow.value?.name ?? usageLimitsRow.value?.identifier ?? "",
+          limit: formatCount(limit),
+          used: formatCount(used),
+        }),
+        confirmLabel: t("assistant.billing.allowance.confirm"),
+        confirmVariant: "destructive",
+        focusCancel: true,
+      });
+
     const submitUsageLimit = async (
       pool: QuotaPool,
       limit: number,
       apply: (used: number, granted: number) => void,
       copy: { pending: I18nText; success: I18nText; failure: I18nText },
-    ) => {
+      force = false,
+    ): Promise<void> => {
+      const used = Number(usageLimitsRow.value?.credits_used ?? 0);
+      if (assistantV2 && pool === "ai_credits" && !force && limit < used) {
+        if (!(await confirmBelowUsage(limit, used))) return;
+        force = true;
+      }
       loading.value = true;
       const dismiss = toast({ variant: "loading", message: copy.pending, timeout: 0 });
+      let floor: ReturnType<typeof belowUsageOf> = null;
 
       try {
         const response = await OrganizationServices.set_quota_usage_limit(
           store.state.selectedOrganization.identifier,
           pool,
-          { org_id: usageLimitsRow.value.identifier, limit },
+          {
+            org_id: usageLimitsRow.value.identifier,
+            limit,
+            ...(assistantV2 && force ? { force: true } : {}),
+          },
         );
         apply(response.data.used, response.data.limit);
         usageLimitsPrompt.value = false;
         toast({ variant: "success", message: copy.success });
       } catch (error: any) {
-        toast({
-          variant: "error",
-          message: error.response?.data?.message || copy.failure,
-          timeout: 5000,
-        });
+        floor = assistantV2 && pool === "ai_credits" && !force ? belowUsageOf(error) : null;
+        if (!floor)
+          toast({
+            variant: "error",
+            message: error.response?.data?.message || copy.failure,
+            timeout: 5000,
+          });
       } finally {
         loading.value = false;
         dismiss();
       }
+      // The forced retry runs after this attempt's cleanup, so `loading` covers its whole request.
+      if (floor && (await confirmBelowUsage(limit, floor.used)))
+        await submitUsageLimit(pool, limit, apply, copy, true);
     };
 
     const submitAiCredits = (value: AiCreditsForm) =>
@@ -1309,6 +1371,10 @@ export default defineComponent({
     ]);
 
     return {
+      assistantV2,
+      aiBelowUsage,
+      overAllowanceTone,
+      ALLOWANCE_FLOOR_WARNING_ID,
       t,
       columns,
       getImageURL,

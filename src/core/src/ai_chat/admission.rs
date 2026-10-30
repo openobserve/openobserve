@@ -134,6 +134,25 @@ pub async fn admit_turn(
     trace_id: &str,
     caps: TurnCaps,
 ) -> Result<AdmittedTurn, AdmitError> {
+    admit_signed_in_turn(
+        org_id, session_id, turn_id, user_email, None, agent_type, prompt, trace_id, caps,
+    )
+    .await
+}
+
+/// [`admit_turn`] for a turn a browser sign-in started; `auth_session_id` scopes its registration.
+#[allow(clippy::too_many_arguments)]
+pub async fn admit_signed_in_turn(
+    org_id: &str,
+    session_id: Option<&str>,
+    turn_id: Option<&str>,
+    user_email: &str,
+    auth_session_id: Option<&str>,
+    agent_type: &str,
+    prompt: &str,
+    trace_id: &str,
+    caps: TurnCaps,
+) -> Result<AdmittedTurn, AdmitError> {
     let Some(session_id) = session_id.and_then(normalize_uuid) else {
         return Err(AdmitError::InvalidSession(
             "A valid session id is required while chat persistence is enabled",
@@ -158,7 +177,14 @@ pub async fn admit_turn(
         check_turn_owner(&row, &owner, user_email, trace_id)?;
     }
     let lease = acquire_lease(org_id, session_id, trace_id).await?;
-    let registration = match registry::register_capped(org_id, session_id, &turn_id, &owner, caps) {
+    let registration = match registry::register_capped(
+        org_id,
+        session_id,
+        &turn_id,
+        &owner,
+        auth_session_id,
+        caps,
+    ) {
         Ok(registration) => registration,
         Err(scope) => {
             lease.release().await;
@@ -287,6 +313,13 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
     };
     if let Err(e) = ai_chat_sessions::begin_turn(org_id, session_id, turn_id, now).await {
         log::warn!("[AI-CHAT] cannot record the last turn of {session_id}: {e}");
+    }
+    let (typed, _) = crate::ai_chat::projection::split_attachment_blocks(turn.prompt);
+    if !typed.is_empty()
+        && let Err(e) = ai_chat_sessions::append_search_text(org_id, session_id, &typed).await
+    {
+        // Search misses this prompt; the title still matches.
+        log::warn!("[AI-CHAT] cannot index the prompt of {session_id}: {e}");
     }
     if row.title_source.is_empty()
         && let Some(title) = initial_title(turn.agent_type, turn.user_email, turn.prompt)

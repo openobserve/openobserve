@@ -173,8 +173,28 @@
       </div>
     </template>
     <template #actions>
+      <AiEntryButton
+        v-if="assistant && !hideChat"
+        :appearance="dockHost ? 'toggle' : 'button'"
+        verb="ask"
+        entry-kind="editor_toggle"
+        object-kind="function"
+        thread="current"
+        :dock-host="dockHost ? 'function' : undefined"
+        :label="t('assistant.entry.assistant')"
+        :tooltip="
+          dockHost
+            ? t('assistant.entry.tooltip.dockedAsk')
+            : t('assistant.entry.tooltip.sidebarAsk')
+        "
+        :pressed="assistant.dock.isOpen.value"
+        :build="assistant.dock.build"
+        data-test="ai-entry-function-ask"
+        @closed="assistant.dock.close"
+      />
       <OButton
-        v-if="
+        v-else-if="
+          !assistant &&
           config.isEnterprise == 'true' &&
           !isAddFunctionComponent &&
           store.state.zoConfig.ai_enabled &&
@@ -243,7 +263,7 @@
   </OPageHeader>
 </template>
 <script setup lang="ts">
-import { ref, computed, type PropType, inject } from "vue";
+import { ref, computed, type PropType, inject, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -262,6 +282,11 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { toggleFullscreen } from "@/utils/dom";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import type { DockedEditor } from "@/composables/assistant/pure";
+// The assistant's door loads only where the revamp renders it, never in the flag-off chunk.
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
 const { t } = useI18nTyped();
 
 const router = useRouter();
@@ -311,6 +336,16 @@ defineProps({
   },
   /** Drives the Save spinner + disables sibling actions while the form submits. */
   isSubmitting: {
+    type: Boolean,
+    default: false,
+  },
+  /** The revamped assistant's host; `null` keeps the legacy chat toggle. */
+  assistant: {
+    type: Object as PropType<DockedEditor | null>,
+    default: null,
+  },
+  /** Docks beside the editor (a pipeline node) instead of opening the sidebar. */
+  dockHost: {
     type: Boolean,
     default: false,
   },

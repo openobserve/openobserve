@@ -279,8 +279,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @focus="_sqlOnFocus"
                   @blur="_sqlOnBlur"
                   @language-change="handleLanguageChange"
-                  @ask-ai="handleAskAI"
                   @run-query="handleRunQuery"
+                  :assistant="dashboardAssistant"
                   data-test="dashboard-panel-query-editor"
                   data-test-prefix="dashboard-query"
                   editor-height="100%"
@@ -394,6 +394,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
+import type { QueryEditorAssistant } from "@/composables/assistant/pure";
 import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import {
   isShown,
@@ -1075,16 +1076,44 @@ export default defineComponent({
       }, 50);
     };
 
-    // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async () => {
-      // The unified component handles AI generation internally
-      // This event is just for parent components that may need to react
-    };
-
     // Try to inject runQuery from parent (if provided), otherwise use emit
     const injectedRunQuery = inject<((withoutCache?: boolean) => void) | null>("runQuery", null);
 
     // Unified Query Editor: Handle run query from AI bar execution intent
+    const currentFields = () =>
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields;
+    const dashboardAssistant: QueryEditorAssistant = {
+      id: "dashboard",
+      get stream() {
+        return String(currentFields()?.stream ?? "");
+      },
+      get streamType() {
+        return String(currentFields()?.stream_type ?? "");
+      },
+      schemaFields: () =>
+        ((dashboardPanelData.meta.streamFields.groupedFields as any[]) ?? [])
+          .flatMap((group: any) => group.schema ?? [])
+          .map((field: any) => String(field?.name ?? ""))
+          .filter(Boolean),
+      get timeRange() {
+        const { start_time, end_time } = dashboardPanelData.meta.dateTime ?? {};
+        const from = start_time?.getTime?.();
+        const to = end_time?.getTime?.();
+        return typeof from === "number" && typeof to === "number" ? { from, to } : undefined;
+      },
+      focusPicker: (kind) => {
+        const selector =
+          kind === "time"
+            ? '[data-test="dashboard-global-date-time-picker"]'
+            : '[data-test="index-dropdown-stream"]';
+        document
+          .querySelector<HTMLElement>(selector)
+          ?.querySelector<HTMLElement>("button, input")
+          ?.focus();
+      },
+      run: () => handleRunQuery(),
+    };
+
     const handleRunQuery = () => {
       if (injectedRunQuery) {
         injectedRunQuery(false);
@@ -1158,6 +1187,7 @@ export default defineComponent({
     };
 
     return {
+      dashboardAssistant,
       raw,
       t,
       router,
@@ -1199,7 +1229,6 @@ export default defineComponent({
       isPivotTable,
       handleQueryUpdate,
       handleLanguageChange,
-      handleAskAI,
       handleRunQuery,
       handleVrlFunctionUpdate,
       handleVrlGenerationStart,

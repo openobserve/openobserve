@@ -21,6 +21,10 @@ import {
   buildFeatureGateContext,
 } from "@/utils/enterpriseFeatures";
 import { oncallRouteGuard } from "./oncallRouteGuard";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { autoObserveAllowed, type ConfigSource } from "@/components/autoobserve/autoObserveGate";
+import { queryClient } from "@/composables/query/queryClient";
+import { configFullQuery } from "@/services/config.queries";
 
 // "rbac" needs the backend `rbac_enabled` flag, which only `store.state.zoConfig`
 // carries — every other key here is edition-only and could use the default.
@@ -72,6 +76,13 @@ const workflowsRouteGuard = (to: any, from: any, next: any) => {
   }
   routeGuard(to, from, next);
 };
+
+// Same query entry as MainLayout's full-config load, so the guard's fetch is not repeated.
+const zoConfigSource = (org: string | undefined): ConfigSource => ({
+  read: () => store.state.zoConfig,
+  watch: (callback) => store.watch((state: any) => state.zoConfig, callback),
+  fetchFull: () => (org ? queryClient.fetchQuery(configFullQuery(org)) : Promise.resolve(null)),
+});
 
 const OnCallTeams = () => import("@/views/OnCall/OnCallTeams.vue");
 const OnCallTeamDetail = () => import("@/views/OnCall/OnCallTeamDetail.vue");
@@ -389,7 +400,21 @@ const useEnterpriseRoutes = () => {
       component: () => import("@/views/AutoObserveHome.vue"),
       meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
+        if (!isAssistantV2()) {
+          routeGuard(to, from, next);
+          return;
+        }
+        const org = to.query?.org_identifier ?? store.state.selectedOrganization?.identifier;
+        // routeGuard reads the store through inject, which is gone after the first await.
+        routeGuard(to, from, (target?: unknown) => {
+          if (target !== undefined) {
+            next(target);
+            return;
+          }
+          autoObserveAllowed(config.isEnterprise, zoConfigSource(org)).then((allowed) =>
+            allowed ? next() : next({ path: "/", query: { org_identifier: org } }),
+          );
+        });
       },
     });
     routes.push({

@@ -1,0 +1,15 @@
+{
+  "_source": "B-01 error envelope (WP-17: code, error_code, retryable, recoverable, action, retry_after?, turn_id); action is the closed wire set",
+  "shape": "B-01",
+  "status": 503,
+  "body": {
+    "code": "agent_unavailable",
+    "message": "B-01 envelope for agent_unavailable",
+    "retryable": true,
+    "action": "retry",
+    "error": "B-01 envelope for agent_unavailable",
+    "error_code": "agent_unavailable",
+    "recoverable": true,
+    "turn_id": "0199e7b2-7000-7a3e-a1b2-c3d4e5f60718"
+  }
+}

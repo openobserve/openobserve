@@ -48,8 +48,30 @@ vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
   };
 });
 vi.mock("@/views/OverviewTab.vue", () => ({
-  default: { name: "OverviewTab", template: '<div data-test="overview-tab-stub" />' },
+  default: {
+    name: "OverviewTab",
+    template: '<div data-test="overview-tab-stub"><slot name="top" /></div>',
+  },
 }));
+vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
+  __esModule: true,
+  default: { name: "AssistantLauncher", template: '<div data-test="assistant-launcher-stub" />' },
+}));
+const assistant = vi.hoisted(() => ({ userOrgKey: null as string | null }));
+const homeReads = vi.hoisted(() => ({ count: 0 }));
+vi.mock("@/composables/assistant", async () => {
+  const { reactive } = await import("vue");
+  const prefs = await import("@/composables/assistant/prefs");
+  const state = reactive(assistant);
+  return {
+    assistantStore: { state },
+    migrateHome: (key: string) => {
+      homeReads.count += 1;
+      return prefs.migrateHome(key);
+    },
+    writeHome: prefs.writeHome,
+  };
+});
 vi.mock("@/views/UsageTab.vue", () => ({
   default: { name: "UsageTab", template: '<div data-test="usage-tab-stub" />' },
 }));
@@ -74,6 +96,8 @@ vi.mock("@/components/shared/HomeViewSkeleton.vue", () => ({
 }));
 
 import config from "@/aws-exports";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { readHome, resetPrefsForTests } from "@/composables/assistant/prefs";
 import HomeView from "./HomeView.vue";
 
 const mountHome = () =>
@@ -279,6 +303,125 @@ describe("HomeView", () => {
 
       expect(has("first-data-panel-stub")).toBe(false);
       expect(has("home-first-data-hero")).toBe(false);
+    });
+  });
+  describe("assistant v2", () => {
+    const flagged = (on: boolean) => {
+      window.__O2_ASSISTANT_V2__ = on;
+      resetAssistantV2ForTests();
+    };
+
+    beforeEach(() => {
+      setFlag(false);
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+      assistant.userOrgKey = null;
+      resetPrefsForTests();
+    });
+
+    afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
+      localStorage.clear();
+    });
+
+    it("keeps today's AI tab, chat and unscoped keys with the flag off", async () => {
+      flagged(false);
+      openTab("ai");
+      wrapper = mountHome();
+      await flushPromises();
+      expect(has("home-tab-ai")).toBe(true);
+      expect(has("ai-chat-stub")).toBe(true);
+      expect(has("assistant-launcher-stub")).toBe(false);
+      expect(localStorage.getItem("o2_home_active_tab")).toBe("ai");
+    });
+
+    it("drops the AI tab and puts the launcher on Overview with the flag on", async () => {
+      flagged(true);
+      assistant.userOrgKey = "k1";
+      wrapper = mountHome();
+      await flushPromises();
+      expect(has("home-tab-ai")).toBe(false);
+      expect(has("ai-chat-stub")).toBe(false);
+      expect(has("assistant-launcher-stub")).toBe(true);
+    });
+
+    const resolveKey = async (key: string) => {
+      const { assistantStore } = await import("@/composables/assistant");
+      (assistantStore.state as { userOrgKey: string | null }).userOrgKey = key;
+      await flushPromises();
+    };
+
+    const tabIds = () =>
+      wrapper
+        .findAll('[data-test="home-tab-bar"] [data-test^="home-tab-"]')
+        .map((tab) => tab.attributes("data-test"))
+        .filter((id) => !id?.startsWith("home-tab-close"));
+
+    it("holds the tabs and body behind the skeleton until the saved order applies (IW-07 AC 1)", async () => {
+      flagged(true);
+      localStorage.setItem(
+        "o2.assistant.home:k1",
+        JSON.stringify({ order: ["usage", "overview"] }),
+      );
+      wrapper = mountHome();
+      await flushPromises();
+      expect(has("home-skeleton-stub")).toBe(true);
+      expect(wrapper.get('[data-test="home-tab-bar"]').classes()).toContain("invisible");
+      await resolveKey("k1");
+      expect(has("home-skeleton-stub")).toBe(false);
+      expect(wrapper.get('[data-test="home-tab-bar"]').classes()).not.toContain("invisible");
+      expect(tabIds()).toEqual(["home-tab-usage", "home-tab-overview"]);
+    });
+
+    it("never reorders the tabs once shown, when the key resolves after the wait", async () => {
+      vi.useFakeTimers();
+      flagged(true);
+      localStorage.setItem(
+        "o2.assistant.home:k1",
+        JSON.stringify({ order: ["usage", "overview"] }),
+      );
+      wrapper = mountHome();
+      await flushPromises();
+      vi.advanceTimersByTime(1_500);
+      await flushPromises();
+      expect(has("home-skeleton-stub")).toBe(false);
+      const painted = tabIds();
+      await resolveKey("k1");
+      expect(tabIds()).toEqual(painted);
+      vi.useRealTimers();
+    });
+
+    it("stops reading the prefs once Home unmounts (F6)", async () => {
+      flagged(true);
+      wrapper = mountHome();
+      await flushPromises();
+      wrapper.unmount();
+      const before = homeReads.count;
+      await resolveKey("k2");
+      expect(homeReads.count).toBe(before);
+    });
+
+    it("moves a saved AI tab to Overview once, under the user+org key, and leaves the old keys alone", async () => {
+      flagged(true);
+      openTab("ai");
+      localStorage.setItem("o2_home_tab_order", JSON.stringify(["usage", "ai", "overview"]));
+      wrapper = mountHome();
+      assistant.userOrgKey = "k1";
+      await flushPromises();
+      expect(readHome("k1")).toMatchObject({ active: "overview", migratedFromUnscoped: true });
+      expect(
+        wrapper
+          .findAll(
+            '[data-test="home-tab-usage"], [data-test="home-tab-overview"], [data-test="home-tab-ai"]',
+          )
+          .map((tab) => tab.attributes("data-test")),
+      ).toEqual(["home-tab-usage", "home-tab-overview"]);
+      expect(localStorage.getItem("o2_home_active_tab")).toBe("ai");
+      wrapper.unmount();
+      localStorage.setItem("o2_home_active_tab", "usage");
+      wrapper = mountHome();
+      await flushPromises();
+      expect(readHome("k1").active).toBe("overview");
     });
   });
 });

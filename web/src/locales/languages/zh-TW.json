@@ -9161,6 +9161,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "分析中...",
+        "thinking": "思考中...",
+        "processing": "處理中...",
+        "examiningData": "檢查資料中...",
+        "reviewingContext": "檢視上下文...",
+        "formulatingResponse": "構思回應中...",
+        "checkingDetails": "檢查細節中...",
+        "gatheringInsights": "收集洞察中...",
+        "evaluatingOptions": "評估選項中...",
+        "synthesizingInformation": "綜合資訊中...",
+        "workingOnIt": "進行中...",
+        "almostThere": "快完成了...",
+        "divingDeeper": "深入探討中...",
+        "connectingTheDots": "串聯線索中...",
+        "crunchingNumbers": "計算數據中...",
+        "exploringPossibilities": "探索可能性中...",
+        "refiningAnswer": "完善答案中...",
+        "stillThinking": "仍在思考...",
+        "makingProgress": "有進展了...",
+        "piecingTogether": "彙整中..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "試用期",
@@ -20784,7 +20810,10 @@
     "pagination": {
       "pagination": "分頁",
       "previousPage": "上一頁",
-      "nextPage": "下一頁"
+      "nextPage": "下一頁",
+      "firstPage": "第一頁",
+      "lastPage": "最後一頁",
+      "recordsPerPage": "每頁記錄數"
     },
     "select": {
       "more": "更多",
