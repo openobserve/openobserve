@@ -2364,7 +2364,8 @@ export default defineComponent({
     const stopHitsComplete = onHitsComplete((payload) => {
       if (payload.type !== "search" || navigation().pendingPageSelection) return;
       if (!searchObj.meta.showDetailTab || !detailRow.value) return;
-      if (detailIsShared.value && sharedLineRecord.value) mapSharedLine();
+      if (!sharedLineRecord.value) detailIsShared.value = false;
+      if (detailIsShared.value) mapSharedLine();
       else rematchDetailRow();
     });
 
@@ -2378,6 +2379,9 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    // The open record is component state, so a drawer left open across an unmount has nothing to show.
+    if (searchObj.meta.showDetailTab && !detailRow.value) searchObj.meta.showDetailTab = false;
 
     const endSharedDetail = () => {
       if (detailIsShared.value) clearPermalink();
