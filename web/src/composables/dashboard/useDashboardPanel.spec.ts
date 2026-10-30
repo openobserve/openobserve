@@ -231,6 +231,40 @@ describe("useDashboardPanel", () => {
     expect(data.data.queries[2].query).toBe("stale");
   });
 
+  it("regenerates the other builder tabs of a box plot as raw values", () => {
+    const panel = useDashboardPanelData("dashboard-panel-test-boxplot");
+    const data = panel.dashboardPanelData;
+    data.meta.streamFields.groupedFields = [{ name: "logs", schema: [{ name: "took" }] }];
+    data.data.type = "boxplot";
+    const builderQuery = () => ({
+      query: "stale",
+      customQuery: false,
+      fields: {
+        stream: "logs",
+        stream_type: "logs",
+        x: [],
+        y: [
+          {
+            alias: "y_axis_1",
+            functionName: null,
+            args: [{ type: "field", value: { field: "took" } }],
+          },
+        ],
+        z: [],
+        breakdown: [],
+        filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      },
+      config: {},
+    });
+    data.data.queries = [builderQuery(), builderQuery()];
+    data.layout.currentQueryIndex = 1;
+
+    panel.regenerateOtherBuilderQueries();
+
+    expect(data.data.queries[0].query).toContain("y_axis_1_q1");
+    expect(data.data.queries[1].query).toBe("stale");
+  });
+
   it("uses user defined schema when enabled", () => {
     const panel = useDashboardPanelData("dashboard-panel-test-4");
 

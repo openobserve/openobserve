@@ -1460,6 +1460,7 @@ watch(
 
 watch(
   () => [
+    dashboardPanelData.data.type,
     dashboardPanelData.data.config?.heatmap_y_bucket,
     dashboardPanelData.data.config?.heatmap_y_min,
     dashboardPanelData.data.config?.heatmap_y_max,
