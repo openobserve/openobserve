@@ -954,6 +954,22 @@ describe("PanelEditor.vue", () => {
       wrapper.unmount();
     });
 
+    it("rebuilds the other builder tabs when the chart type changes", async () => {
+      const previous = mockDashboardPanelData.data.type;
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockRegenerateOtherBuilderQueries.mockClear();
+
+      mockDashboardPanelData.data.type = "boxplot";
+      await nextTick();
+      expect(mockRegenerateOtherBuilderQueries).toHaveBeenCalledTimes(1);
+      mockDashboardPanelData.data.type = previous;
+      wrapper.unmount();
+    });
+
     it("rebuilds the query when the bucket size is edited in place", async () => {
       const config = mockDashboardPanelData.data.config as Record<string, any>;
       config.heatmap_y_bucket = { mode: "size", size: 10 };

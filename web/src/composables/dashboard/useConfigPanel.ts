@@ -413,6 +413,10 @@ export function useConfigPanel(
         label: t("dashboard.nodeGraphShowEdgeLabels"),
         visible: dashboardPanelData.data.type === "node-graph",
       },
+      "boxplot-whisker": {
+        label: t("dashboard.boxplotWhisker"),
+        visible: dashboardPanelData.data.type === "boxplot",
+      },
       "heatmap-histogram-mode": {
         label: t("dashboard.heatmapHistogramMode"),
         visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",

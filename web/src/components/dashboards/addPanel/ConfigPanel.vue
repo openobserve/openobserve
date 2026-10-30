@@ -928,6 +928,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
+        <template v-if="dashboardPanelData.data.type === 'boxplot'">
+          <OSelect
+            v-show="isConfigOptionVisible('data', 'boxplot-whisker')"
+            :label="t('dashboard.boxplotWhisker')"
+            v-model="boxplotWhiskerModel"
+            :options="boxplotWhiskerOptions"
+            data-test="dashboard-config-boxplot_whisker"
+          />
+        </template>
+
         <OSwitch
           v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
           v-show="isConfigOptionVisible('data', 'heatmap-histogram-mode')"
@@ -3515,6 +3525,7 @@ import {
   defaultPlaceholder,
   withDefaultChoice,
 } from "@/utils/dashboard/optionDefaults";
+import { BOXPLOT_WHISKERS, DEFAULT_BOXPLOT_WHISKER } from "@/utils/dashboard/convertBoxplotData";
 import {
   BAR_GAUGE_MODES,
   BAR_GAUGE_ORIENTATIONS,
@@ -4032,6 +4043,14 @@ export default defineComponent({
         { label: t("dashboard.nodeGraphLayoutCircular"), value: "circular" },
       ],
       DEFAULT_NODE_GRAPH_LAYOUT,
+    );
+    const boxplotWhiskerModel = choiceModel("boxplot_whisker", BOXPLOT_WHISKERS);
+    const boxplotWhiskerOptions = withDefault(
+      [
+        { label: t("dashboard.boxplotWhiskerMinMax"), value: "minmax" },
+        { label: t("dashboard.boxplotWhiskerIqr"), value: "iqr" },
+      ],
+      DEFAULT_BOXPLOT_WHISKER,
     );
     // Absent, the converters label SQL slices by percent and PromQL slices by all three, so the picker starts there.
     const pieLabelContentDefault = () =>
@@ -4822,6 +4841,7 @@ export default defineComponent({
         "pie",
         "donut",
         "gauge",
+        "boxplot",
         "bar-gauge",
         "distribution",
         "treemap",
@@ -5177,6 +5197,8 @@ export default defineComponent({
       statTextModeOptions,
       gaugeStyleModel,
       gaugeStyleOptions,
+      boxplotWhiskerModel,
+      boxplotWhiskerOptions,
       barGaugeModeModel,
       barGaugeModeOptions,
       barGaugeRangeModeModel,
