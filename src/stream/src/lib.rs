@@ -243,6 +243,14 @@ pub async fn create_stream(
             format!("stream name '{stream_name}' is reserved and cannot be created"),
         ));
     }
+    if let Some(violation) =
+        infra::file_list::stream_key_violation(org_id, stream_type, stream_name)
+    {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            violation,
+        ));
+    }
 
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
@@ -1464,6 +1472,37 @@ mod tests {
         )
         .await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_stream_rejects_a_stream_key_too_long() {
+        infra::db::create_table().await.unwrap();
+        // unique per run: where the key is not bounded the stream is created and a rerun would
+        // clash
+        let name = format!(
+            "{}{}",
+            config::utils::time::now_micros(),
+            "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN)
+        );
+        let bounded =
+            infra::file_list::stream_key_violation("org1", StreamType::Logs, &name).is_some();
+        let stream = StreamCreate {
+            fields: vec![],
+            settings: StreamSettings::default(),
+        };
+        let resp = create_stream("org1", &name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        let expected = if bounded {
+            http::StatusCode::BAD_REQUEST
+        } else {
+            http::StatusCode::OK
+        };
+        assert_eq!(resp.status(), expected);
+        assert_eq!(
+            infra::schema::exists("org1", StreamType::Logs, &name).await,
+            !bounded
+        );
     }
 
     async fn create_update_fields_test_stream(name: &str) {

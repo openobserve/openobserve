@@ -1775,6 +1775,12 @@ async fn save_enrichment_batch(
     ) {
         return Err(anyhow!("enrichment table [{stream_name}] is being deleted"));
     }
+    // jobs queued before the API checked the name must fail before the first batch deletes data
+    if let Some(violation) =
+        infra::file_list::stream_key_violation(org_id, StreamType::EnrichmentTables, &stream_name)
+    {
+        return Err(anyhow!(violation));
+    }
 
     // For first batch only, handle schema validation and deletion if not appending
     let mut stream_schema_map: HashMap<String, infra::schema::SchemaCache> = HashMap::new();

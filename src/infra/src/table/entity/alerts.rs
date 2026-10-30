@@ -77,6 +77,7 @@ pub struct Model {
     pub last_edited_by: Option<String>,
     pub updated_at: Option<i64>,
     pub align_time: bool,
+    // Legacy deduplication columns: no longer read or written, dropped in a later release.
     pub dedup_enabled: bool,
     pub dedup_time_window_minutes: Option<i32>,
     pub dedup_config: Option<Json>,
