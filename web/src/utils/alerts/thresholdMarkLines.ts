@@ -25,11 +25,11 @@
 import { chartColor } from "@/utils/chartTheme";
 
 export interface ThresholdMarkLine {
-  name: "Critical" | "Warning";
+  name: string;
   type: "yAxis";
   value: string;
   color: string;
-  show_label: false;
+  show_label: boolean;
 }
 
 /** Axis bounds a chart should honour so its threshold lines stay on screen. */
@@ -49,24 +49,29 @@ const MIN_PAD = 1;
 
 const has = (v: unknown): v is string | number => v !== undefined && v !== null && v !== "";
 
-export function buildThresholdMarkLines(critical: unknown, warning: unknown): ThresholdMarkLine[] {
+/** `labels` names each line on the chart; without it the lines stay unlabelled. */
+export function buildThresholdMarkLines(
+  critical: unknown,
+  warning: unknown,
+  labels?: { critical: string; warning: string },
+): ThresholdMarkLine[] {
   const lines: ThresholdMarkLine[] = [];
   if (has(critical)) {
     lines.push({
-      name: "Critical",
+      name: labels?.critical ?? "Critical",
       type: "yAxis",
       value: String(critical),
       color: chartColor("--color-status-error-text"),
-      show_label: false,
+      show_label: !!labels,
     });
   }
   if (has(warning)) {
     lines.push({
-      name: "Warning",
+      name: labels?.warning ?? "Warning",
       type: "yAxis",
       value: String(warning),
       color: chartColor("--color-status-warning-text"),
-      show_label: false,
+      show_label: !!labels,
     });
   }
   return lines;
