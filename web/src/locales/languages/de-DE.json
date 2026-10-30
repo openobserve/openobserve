@@ -8708,6 +8708,13 @@
     "rowFields": "Zeilenfelder",
     "valueFields": "Wertfelder",
     "noData": "Keine Daten",
+    "previewView": "Vorschauansicht",
+    "previewChart": "Diagramm",
+    "previewData": "Daten",
+    "showRawData": "Rohdaten anzeigen",
+    "showChart": "Diagramm anzeigen",
+    "dataViewEmpty": "Keine Zeilen zurückgegeben",
+    "dataViewCapped": "Die ersten {shown} von {total} Zeilen werden angezeigt",
     "logExplorer": {
       "title": "Logs-Explorer",
       "openInLogs": "In Logs öffnen",

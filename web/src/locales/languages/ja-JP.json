@@ -8708,6 +8708,13 @@
     "rowFields": "行フィールド",
     "valueFields": "値フィールド",
     "noData": "データなし",
+    "previewView": "プレビュー表示",
+    "previewChart": "チャート",
+    "previewData": "データ",
+    "showRawData": "生データを表示",
+    "showChart": "チャートを表示",
+    "dataViewEmpty": "返された行はありません",
+    "dataViewCapped": "{total} 行のうち最初の {shown} 行を表示しています",
     "logExplorer": {
       "title": "ログエクスプローラー",
       "openInLogs": "ログで開く",

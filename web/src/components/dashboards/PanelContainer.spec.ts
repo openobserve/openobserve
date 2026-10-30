@@ -379,6 +379,62 @@ describe("PanelContainer", () => {
   });
 
   describe("Panel Controls", () => {
+    // OTable is covered by PanelDataView.spec; this file's ResizeObserver mock cannot construct.
+    const dataViewStub = {
+      PanelDataView: { template: '<div data-test="dashboard-panel-data-view"></div>' },
+      ODropdown: { template: "<div><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: '<div v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+      },
+    };
+    const TOGGLE = '[data-test="dashboard-panel-data-view-toggle"]';
+    const DATA_VIEW = '[data-test="dashboard-panel-data-view"]';
+
+    it("switches a chart panel to its raw rows and back from the panel menu", async () => {
+      wrapper = createWrapper({}, dataViewStub);
+
+      expect(wrapper.find(TOGGLE).text()).toBe("Show raw data");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+      expect(wrapper.find(TOGGLE).text()).toBe("Show chart");
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+    });
+
+    it("hides the legends button while the rows are shown", async () => {
+      wrapper = createWrapper({ showLegendsButton: true }, dataViewStub);
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
+      expect(wrapper.find('[data-test="dashboard-show-legends-btn"]').exists()).toBe(true);
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find('[data-test="dashboard-show-legends-btn"]').exists()).toBe(false);
+    });
+
+    it("returns to the chart when layout editing starts", async () => {
+      wrapper = createWrapper({ layoutMode: "view" }, dataViewStub);
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(true);
+
+      await wrapper.setProps({ layoutMode: "edit" });
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+    });
+
+    it.each([
+      ["table panels", { data: { ...defaultProps.data, type: "table" } }],
+      ["kiosk mode", { kiosk: true }],
+      ["view-only panels", { viewOnly: true }],
+      ["simplified panels", { simplifiedPanelView: true }],
+    ])("offers no Data view on %s", (_name, props) => {
+      wrapper = createWrapper(props, dataViewStub);
+      expect(wrapper.find(TOGGLE).exists()).toBe(false);
+    });
+
     it("should show fullscreen button on hover when not view-only", async () => {
       wrapper = createWrapper({ viewOnly: false });
 

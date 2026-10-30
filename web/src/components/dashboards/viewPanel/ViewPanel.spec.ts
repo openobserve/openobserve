@@ -1579,4 +1579,37 @@ describe("ViewPanel", () => {
       expect(wrapper.vm.store.state.zoConfig.min_auto_refresh_interval).toBe(5);
     });
   });
+
+  describe("Chart | Data view", () => {
+    const dataViewStub = {
+      PanelDataView: { template: '<div data-test="dashboard-viewpanel-data-view"></div>' },
+    };
+
+    afterEach(() => {
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    it("overlays the raw rows on the chart when Data is picked", async () => {
+      wrapper = createWrapper({}, dataViewStub);
+      wrapper.vm.chartData = mockDashboardPanelData.data;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="dashboard-viewpanel-data-view"]').exists()).toBe(false);
+      await wrapper.find('[data-test="dashboard-viewpanel-preview-view-data"]').trigger("click");
+      expect(wrapper.find('[data-test="dashboard-viewpanel-data-view"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-panel-schema-renderer"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("offers no Data view for a table panel", async () => {
+      mockDashboardPanelData.data.type = "table";
+      wrapper = createWrapper({}, dataViewStub);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="dashboard-viewpanel-preview-view-toggle"]').exists()).toBe(
+        false,
+      );
+    });
+  });
 });

@@ -8708,6 +8708,13 @@
     "rowFields": "Campos de linha",
     "valueFields": "Campos de valor",
     "noData": "Sem dados",
+    "previewView": "Vista de pré-visualização",
+    "previewChart": "Gráfico",
+    "previewData": "Dados",
+    "showRawData": "Mostrar dados brutos",
+    "showChart": "Mostrar gráfico",
+    "dataViewEmpty": "Nenhuma linha devolvida",
+    "dataViewCapped": "A mostrar as primeiras {shown} de {total} linhas",
     "logExplorer": {
       "title": "Explorador de Logs",
       "openInLogs": "Abrir em Logs",

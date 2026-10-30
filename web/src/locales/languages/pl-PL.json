@@ -8708,6 +8708,13 @@
     "rowFields": "Pola wierszy",
     "valueFields": "Pola wartości",
     "noData": "Brak danych",
+    "previewView": "Widok podglądu",
+    "previewChart": "Wykres",
+    "previewData": "Dane",
+    "showRawData": "Pokaż surowe dane",
+    "showChart": "Pokaż wykres",
+    "dataViewEmpty": "Nie zwrócono żadnych wierszy",
+    "dataViewCapped": "Wyświetlanie pierwszych {shown} z {total} wierszy",
     "logExplorer": {
       "title": "Eksplorator logów",
       "openInLogs": "Otwórz w logach",

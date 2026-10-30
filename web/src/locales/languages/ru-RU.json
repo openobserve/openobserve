@@ -8708,6 +8708,13 @@
     "rowFields": "Поля строк",
     "valueFields": "Поля значений",
     "noData": "Нет данных",
+    "previewView": "Режим предпросмотра",
+    "previewChart": "График",
+    "previewData": "Данные",
+    "showRawData": "Показать исходные данные",
+    "showChart": "Показать график",
+    "dataViewEmpty": "Строки не возвращены",
+    "dataViewCapped": "Показаны первые {shown} из {total} строк",
     "logExplorer": {
       "title": "Просмотр логов",
       "openInLogs": "Открыть в логах",

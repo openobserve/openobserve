@@ -196,9 +196,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Warning icons and last refreshed time -->
                   <div class="me-2 flex items-center justify-end gap-2">
+                    <PanelViewToggle
+                      v-if="showDataViewToggle"
+                      v-model="previewView"
+                      class="my-2 ms-2 me-auto"
+                      data-test-prefix="panel-editor"
+                    />
+
                     <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
+                        !isDataView &&
                         !panelSchemaRendererRef?.noData &&
                         ![
                           'table',
@@ -231,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Add Annotations button -->
                     <OButton
                       v-if="
+                        !isDataView &&
                         editMode &&
                         pageType === 'dashboard' &&
                         [
@@ -340,6 +349,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @format-column="openColumnFormatting"
                       />
                     </div>
+                    <!-- Overlays the chart instead of replacing it so the query result and chart state survive the switch. -->
+                    <PanelDataView
+                      v-if="showDataOverlay && chartData"
+                      class="absolute inset-0 z-10"
+                      :data="previewRawData"
+                      :query-type="dashboardPanelData.data.queryType"
+                      :loading="isPanelLoading"
+                      data-test-prefix="panel-editor"
+                    />
                   </div>
 
                   <!-- Errors Component -->
@@ -806,6 +824,9 @@ import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQue
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
+import PanelDataView from "@/components/dashboards/addPanel/PanelDataView.vue";
+import PanelViewToggle from "@/components/dashboards/PanelViewToggle.vue";
+import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1013,6 +1034,18 @@ const seriesOverridePreviewSource = computed(() => {
     resultMetaData: lastResultMetaData.value,
     hiddenQueries: dashboardPanelData.layout.hiddenQueries ?? [],
   };
+});
+
+const {
+  previewView,
+  showDataViewToggle,
+  isDataView,
+  showDataOverlay,
+  rawData: previewRawData,
+} = usePanelDataView({
+  panelType: () => dashboardPanelData.data.type,
+  renderer: panelSchemaRendererRef,
+  enabled: () => props.pageType === "dashboard",
 });
 
 // The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.
