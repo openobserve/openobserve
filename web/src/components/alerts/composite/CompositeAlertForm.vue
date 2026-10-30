@@ -126,6 +126,8 @@ const validateDraft = async (): Promise<void> => {
     selectedChildren.value,
   );
   if (!local.valid) {
+    // Invalidate in-flight server replies so a slower one for an older valid expression can't re-enable Save.
+    validationSequence++;
     preview.value = null;
     emit("validation", { valid: false });
     return;
