@@ -508,6 +508,7 @@ import {
   reactive,
   onMounted,
   onActivated,
+  onBeforeUnmount,
   watch,
   toRef,
   computed,
@@ -519,6 +520,8 @@ import { useStore } from "vuex";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
+import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -700,6 +703,73 @@ export default defineComponent({
     // Form-driven Save spinner for the footer (outside <OForm>, linked by
     // form-id). isSubmitting resets even if the save throws.
     const isSavingVariable = form.useStore((s: any) => s.isSubmitting);
+
+    // The panel editor's variable form has no settings drawer around it, so it keeps no draft.
+    const draftContext = props.isFromAddPanel ? null : useDashboardSettingsDraft();
+    // The form as loaded, once its own watchers settled; null until then.
+    let loadedKey: string | null = null;
+    // Set once the form saved or was cancelled, so its last values never come back as unsaved.
+    let released = false;
+    let lastSaveSucceeded = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const syncDraftSection = () => {
+      if (!draftContext || loadedKey === null || released) return;
+      const values = JSON.parse(JSON.stringify(formValues.value ?? {})) as AddSettingVariableForm;
+      draftContext.pending.variable =
+        stableStringify(values) === loadedKey
+          ? null
+          : { variableName: props.variableName ?? null, values };
+    };
+
+    const pendingForThisVariable = () => {
+      const pending = draftContext?.pending.variable;
+      return pending && pending.variableName === (props.variableName ?? null) ? pending : null;
+    };
+
+    const applyPendingDraft = async () => {
+      const pending = pendingForThisVariable();
+      if (!pending) return;
+      form.reset(pending.values);
+      customSelectAllModel.value =
+        pending.values.type === "custom" &&
+        (pending.values.options ?? []).length > 0 &&
+        (pending.values.options ?? []).every((option: { selected?: boolean }) => option.selected);
+      await nextTick();
+    };
+
+    const releaseDraftSection = () => {
+      released = true;
+      if (draftContext) draftContext.pending.variable = null;
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      lastSaveSucceeded = false;
+      await form.handleSubmit();
+      return lastSaveSucceeded;
+    };
+
+    const startDraftSection = async () => {
+      if (!draftContext) return;
+      // Two ticks: the scope and panel watchers prune the loaded selection after a reset.
+      await nextTick();
+      await nextTick();
+      loadedKey = stableStringify(formValues.value ?? {});
+      await applyPendingDraft();
+      syncDraftSection();
+      unregisterDraftSection = draftContext.register("variable", saveForDraft);
+    };
+
+    watch(formValues, syncDraftSection, { deep: true });
+    watch(
+      () => draftContext?.restoreRevision,
+      async () => {
+        if (loadedKey === null) return;
+        await applyPendingDraft();
+        syncDraftSection();
+      },
+    );
+    onBeforeUnmount(() => unregisterDraftSection?.());
 
     // Format tabs for selection from dashboard data
     const tabsOptions = computed(() =>
@@ -945,6 +1015,7 @@ export default defineComponent({
       } catch (error) {
         showErrorNotification(t("dashboard.addSettingVariable.failedToLoadDashboard"));
       }
+      await startDraftSection();
     });
 
     // Watch on scope — reset tab/panel selections via the form.
@@ -1160,6 +1231,8 @@ export default defineComponent({
             route.query.folder ?? "default",
           );
           analytics.track("dashboard_variable_saved", { type: payload.type, is_new: false });
+          lastSaveSucceeded = true;
+          releaseDraftSection();
           emit("save");
         } catch (error: any) {
           if (saveConflict.isConflict(error)) {
@@ -1170,6 +1243,7 @@ export default defineComponent({
               onResolved: () => emit("save"),
             });
             // The variable is already in the working copy; leaving the form open would let Save add it again.
+            releaseDraftSection();
             emit("save");
           } else {
             showErrorNotification(
@@ -1184,6 +1258,8 @@ export default defineComponent({
         try {
           await addVariable(t, store, dashId, payload, route.query.folder ?? "default");
           analytics.track("dashboard_variable_saved", { type: payload.type, is_new: true });
+          lastSaveSucceeded = true;
+          releaseDraftSection();
           emit("save");
         } catch (error: any) {
           if (saveConflict.isConflict(error)) {
@@ -1194,6 +1270,7 @@ export default defineComponent({
               onResolved: () => emit("save"),
             });
             // The variable is already in the working copy; leaving the form open would let Save add it again.
+            releaseDraftSection();
             emit("save");
           } else {
             showErrorNotification(
@@ -1402,6 +1479,7 @@ export default defineComponent({
     };
 
     const close = () => {
+      releaseDraftSection();
       emit("close");
     };
 

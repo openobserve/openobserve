@@ -84,6 +84,9 @@ interface PanelAutoNameInput {
 /** Chart types that carry no field config at all — nothing to derive a name from. */
 const FIELDLESS_CHART_TYPES = ["markdown", "html", "custom_chart"];
 
+/** Chart types whose stream does not describe what they show, so no generated name beats a stream one. */
+export const NO_AUTO_NAME_TYPES: readonly string[] = ["node-graph", "alert-list", "flame-graph"];
+
 /** Time bucketing is HOW a chart is drawn, not WHAT it measures. */
 const TIME_AGGREGATIONS = ["histogram", "date_bin"];
 
@@ -183,6 +186,8 @@ export function buildPanelAutoName(
   const streamFallback = () =>
     stream ? tidy(capitalize(t("dashboard.autoName.streamOverview", { stream }))) : "";
 
+  // An empty suggestion lets useAutoName clear a stale name it generated for the previous type.
+  if (data.type && NO_AUTO_NAME_TYPES.includes(data.type)) return "";
   if (data.type && FIELDLESS_CHART_TYPES.includes(data.type)) return streamFallback();
 
   // A hand-written query exposes only generated aliases (x_axis_1, y_axis_1);

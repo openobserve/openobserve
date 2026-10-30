@@ -585,7 +585,7 @@ impl<'c, 'de> RecordState<'c, 'de> {
         {
             return false;
         }
-        // `_bulk` reads the literal key, so a key that only flattens into `_timestamp` differs
+        // `_bulk` reads a key that only flattens into `_timestamp` on its JSON path
         if self.fallback || self.raw_timestamp != self.timestamp.is_some() {
             return false;
         }
@@ -1222,8 +1222,9 @@ mod tests {
             // the record's own `_id` would name its response item
             format!(r#"{{"_timestamp":{TS},"_id":"own"}}"#),
             format!(r#"{{"_timestamp":{TS},"_id":null,"level":"a"}}"#),
-            // `_bulk` reads only the literal `_timestamp` key, and rejects what it cannot parse
+            // `_bulk` reads a key that only flattens into `_timestamp` on its JSON path
             format!(r#"{{"_Timestamp":{TS},"level":"a"}}"#),
+            // `_bulk` rejects what it cannot parse
             r#"{"_timestamp":null,"level":"a"}"#.to_string(),
             r#"{"_timestamp":{},"level":"a"}"#.to_string(),
             r#"{"_timestamp":true,"level":"a"}"#.to_string(),

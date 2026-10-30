@@ -257,6 +257,47 @@ describe("OTable", () => {
     });
   });
 
+  describe("pagination: client with filters", () => {
+    const INFO = '[data-test="o2-table-pagination-info"]';
+    const filterableColumns = (): OTableColumnDef<TestRow>[] =>
+      makeColumns().map((c) => (c.id === "status" ? { ...c, filterable: true } : c));
+    const rowsWithFourPending = (): TestRow[] =>
+      makeRows(16).map((r, i) => (i < 4 ? { ...r, status: "Pending" } : r));
+    const footerText = () => wrapper.find(INFO).text().replace(/\s+/g, " ");
+
+    it("counts only rows matching the global filter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: rowsWithFourPending(),
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 10,
+          globalFilter: "Pending",
+        },
+      });
+      await nextTick();
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+    });
+
+    it("counts only rows matching a column filter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: rowsWithFourPending(),
+          columns: filterableColumns(),
+          pagination: "client",
+          pageSize: 10,
+        },
+      });
+      expect(footerText()).toMatch(/1 - 10 \S+ 16$/);
+
+      (wrapper.vm as any).table.getColumn("status").setFilterValue(["Pending"]);
+      await nextTick();
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+    });
+  });
+
   // ── Server-Side Pagination ──────────────────────────────────
 
   describe("pagination: server", () => {
@@ -900,6 +941,29 @@ describe("OTable", () => {
 
       expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(0);
       expect(localStorage.getItem("o2-tables-column-state-v1")).toBe(stored);
+    });
+  });
+
+  describe("persisted columns", () => {
+    beforeEach(() => localStorage.clear());
+
+    /// A column removed from a table must not break a layout saved while it existed.
+    it("ignores saved state for a column the table no longer has", () => {
+      localStorage.setItem(
+        "o2-tables-column-state-v1",
+        JSON.stringify({ "gone-column": { visibility: { state: true }, sizes: { state: 160 } } }),
+      );
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          tableId: "gone-column",
+          persistColumns: true,
+        },
+      });
+
+      expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(2);
+      expect(wrapper.find('[data-test="o2-table-cell-state"]').exists()).toBe(false);
     });
   });
 
@@ -1945,6 +2009,25 @@ describe("OTable", () => {
       expect(rowModelSize(wrapper)).toBe(300);
     });
 
+    it("counts every row in the footer while the row model is windowed", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2000),
+          columns: makeColumns(),
+          virtualScroll: true,
+          windowRowModel: true,
+          pagination: "none",
+          sorting: "server",
+        },
+        slots: {
+          "pagination-bar": `<template #pagination-bar="s"><span data-test="total-rows">{{ s.totalRows }}</span></template>`,
+        },
+      });
+      await nextTick();
+      expect(rowModelSize(wrapper)).toBeLessThan(2000);
+      expect(wrapper.find('[data-test="total-rows"]').text()).toBe("2000");
+    });
+
     it("never windows a tree", () => {
       wrapper = mountWindowed({ measureExpandedRows: true, expansion: "tree" });
       expect(rowModelSize(wrapper)).toBe(300);
@@ -2729,6 +2812,64 @@ describe("OTable", () => {
         .findAll('[data-test="o2-table-cell-email"]')
         .map((c) => c.text().trim());
       expect(emailCells).toEqual(["a1@example.com", "a2@example.com", "b1@example.com"]);
+    });
+
+    it("renders one sticky total row for an object and one per entry for an array", () => {
+      const totals = (stickyTotalRow: any) => {
+        wrapper = mount(OTable, {
+          props: { data: makeRows(2), columns: makeColumns(), stickyTotalRow },
+        });
+        const rows = wrapper.findAll('[data-test="o2-table-pivot-total-foot"] tr');
+        const names = wrapper
+          .findAll('[data-test="o2-table-pivot-total-cell-name"]')
+          .map((cell) => cell.text());
+        wrapper.unmount();
+        return { rows: rows.length, names };
+      };
+      expect(totals({ name: "Total" })).toEqual({ rows: 1, names: ["Total"] });
+      expect(totals([{ name: "Sum" }, { name: "Max" }])).toEqual({
+        rows: 2,
+        names: ["Sum", "Max"],
+      });
+      expect(totals(null).rows).toBe(0);
+      expect(totals([]).rows).toBe(0);
+    });
+
+    it("mutes a calculated-totals row's label and makes its values bold", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          stickyTotalRow: [
+            { name: "Sum", id: "3", __labelKey: "name" },
+            { name: "Total", id: "9" },
+          ],
+        },
+      });
+      const cell = (id: string, row: number) =>
+        wrapper.findAll(`[data-test="o2-table-pivot-total-cell-${id}"]`)[row].classes();
+      expect(cell("name", 0)).toContain("text-text-secondary");
+      expect(cell("name", 0)).not.toContain("font-semibold");
+      expect(cell("id", 0)).toContain("font-semibold");
+      expect(cell("name", 1)).not.toContain("text-text-secondary");
+      expect(cell("id", 1)).not.toContain("font-semibold");
+    });
+
+    it("separates borders on a bordered table only while sticky total rows are pinned", () => {
+      const tableClasses = (extra: Record<string, any>) => {
+        wrapper = mount(OTable, {
+          props: { data: makeRows(2), columns: makeColumns(), bordered: true, ...extra },
+        });
+        const classes = wrapper.find("table").classes();
+        wrapper.unmount();
+        return classes;
+      };
+      const totals = [{ name: "Sum", id: "3", __labelKey: "name" }];
+      expect(tableClasses({})).not.toContain("border-separate");
+      expect(tableClasses({ stickyTotalRow: totals })).not.toContain("border-separate");
+      expect(tableClasses({ stickyTotalRow: totals, stickyRowTotals: true })).toContain(
+        "border-separate",
+      );
     });
 
     it("renders standard header when pivotHeaderLevels is empty", () => {

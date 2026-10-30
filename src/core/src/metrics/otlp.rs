@@ -263,6 +263,7 @@ pub async fn handle_otlp_request(
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
+    let mut stream_key_checks = ingest::StreamKeyChecks::default();
 
     for resource_metric in &request.resource_metrics {
         if resource_metric.scope_metrics.is_empty() {
@@ -289,6 +290,12 @@ pub async fn handle_otlp_request(
 
                 if is_deleting {
                     skipped_records += 1;
+                    continue;
+                }
+
+                if let Some(violation) = stream_key_checks.violation(org_id, &metric_name) {
+                    partial_success.rejected_data_points += data_point_count(metric) as i64;
+                    partial_success.error_message = violation.to_string();
                     continue;
                 }
 
@@ -492,6 +499,17 @@ pub async fn handle_otlp_request(
                     };
 
                     if local_metric_name != metric_name {
+                        // a histogram or exemplar stream is longer than the metric it comes from
+                        if let Some(violation) =
+                            stream_key_checks.violation(org_id, &local_metric_name)
+                        {
+                            if exemplars_stream.is_none() {
+                                partial_success.rejected_data_points += 1;
+                            }
+                            partial_success.error_message = violation.to_string();
+                            continue;
+                        }
+
                         // check for schema
                         stream_schema_exists(
                             org_id,
@@ -581,7 +599,7 @@ pub async fn handle_otlp_request(
         );
     }
 
-    let (pipeline_outputs, failures) = ingest::run_pipelines(
+    let (mut pipeline_outputs, failures) = ingest::run_pipelines(
         org_id,
         &stream_executable_pipelines,
         stream_pipeline_inputs,
@@ -601,6 +619,11 @@ pub async fn handle_otlp_request(
                 partial_success.error_message = message;
             }
         }
+    }
+    for (_, violation, records) in stream_key_checks.drop_unstorable(org_id, &mut pipeline_outputs)
+    {
+        partial_success.rejected_data_points += records as i64;
+        partial_success.error_message = violation;
     }
     for (stream_name, records) in pipeline_outputs {
         json_data_by_stream
@@ -710,6 +733,18 @@ pub fn write_failure_response(req_type: OtlpRequestType, e: &anyhow::Error) -> H
 }
 
 /// Flattens a data-point record exactly as a full rebuild would, without always paying for one.
+fn data_point_count(metric: &opentelemetry_proto::tonic::metrics::v1::Metric) -> usize {
+    match &metric.data {
+        Some(Data::Gauge(gauge)) => gauge.data_points.len(),
+        Some(Data::Sum(sum)) => sum.data_points.len(),
+        Some(Data::Histogram(hist)) => hist.data_points.len(),
+        Some(Data::ExponentialHistogram(exp_hist)) => exp_hist.data_points.len(),
+        Some(Data::Summary(summary)) => summary.data_points.len(),
+        // a metric without data counts as one rejected point, as the no-data path does
+        None => 1,
+    }
+}
+
 fn flatten_record(mut rec: json::Value) -> Result<json::Value, anyhow::Error> {
     // a record with no array or object skips flatten's rebuild, and the rebuild is what drops nulls
     if let json::Value::Object(map) = &mut rec
@@ -4182,6 +4217,69 @@ mod tests {
                 .contains(&format!("only {limit} columns accept"))
         );
         assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_otlp_rejects_only_the_metric_whose_stream_key_is_too_long() {
+        let gauge = |name: &str| {
+            let point = NumberDataPoint {
+                time_unix_nano: Utc::now().timestamp_nanos_opt().unwrap() as u64,
+                value: Some(number_data_point::Value::AsDouble(1.0)),
+                ..Default::default()
+            };
+            Metric {
+                name: name.to_string(),
+                data: Some(Data::Gauge(Gauge {
+                    data_points: vec![point.clone(), point],
+                })),
+                ..Default::default()
+            }
+        };
+        let long_name = "m".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let request = ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                scope_metrics: vec![ScopeMetrics {
+                    metrics: vec![gauge("test_key_len_ok"), gauge(&long_name)],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = otlp_proto(
+            "test_org_id",
+            request.encode_to_vec().into(),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let partial = ExportMetricsServiceResponse::decode(body)
+            .unwrap()
+            .partial_success
+            .unwrap_or_default();
+
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Metrics, &long_name)
+                .is_some();
+        if bounded {
+            assert_eq!(partial.rejected_data_points, 2);
+            assert!(
+                partial.error_message.starts_with("Stream name too long"),
+                "{}",
+                partial.error_message
+            );
+        } else {
+            assert_eq!(partial.rejected_data_points, 0);
+        }
+        assert!(infra::schema::exists("test_org_id", StreamType::Metrics, "test_key_len_ok").await);
+        assert_eq!(
+            infra::schema::exists("test_org_id", StreamType::Metrics, &long_name).await,
+            !bounded
+        );
     }
 
     #[test]
