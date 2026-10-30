@@ -139,13 +139,6 @@ fn build_otlp_log_record(
     Some(rec)
 }
 
-fn partial_success(status: &RecordStatus) -> Option<ExportLogsPartialSuccess> {
-    (status.failed > 0).then(|| ExportLogsPartialSuccess {
-        rejected_log_records: status.failed as i64,
-        error_message: status.error.clone(),
-    })
-}
-
 pub async fn handle_request(
     thread_id: usize,
     org_id: &str,
@@ -869,6 +862,13 @@ pub async fn handle_request(
         res.partial_success = partial_success(status);
     }
     Ok(otlp_export_response(&res, req_type))
+}
+
+fn partial_success(status: &RecordStatus) -> Option<ExportLogsPartialSuccess> {
+    (status.failed > 0).then(|| ExportLogsPartialSuccess {
+        rejected_log_records: status.failed as i64,
+        error_message: status.error.clone(),
+    })
 }
 
 #[cfg(test)]
