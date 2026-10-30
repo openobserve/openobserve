@@ -48,7 +48,7 @@ You have about 15 minutes. Spend it on the riskiest changes first (data written,
 
 ## Reporting
 
-- Report a bug when you can state a concrete trigger: the input or sequence, the path it takes (file:line of each hop you read), and the wrong result. If one hop is unverified because you could not find or read the code, still report it, say which hop, and use `suggestion` severity.
-- Severity: `critical` for wrong data written, data loss, outage, an authorization bypass or a core flow broken for most users; `warning` for wrong behaviour on a realistic input or a regression of existing behaviour; `suggestion` otherwise.
+- Report a bug when you can state a concrete trigger: the input or sequence, the path it takes (file:line of each hop you read), and the wrong result. If one hop is unverified because you could not find or read the code, still report it, say which hop, and use `p3` severity.
+- Severity: `p0` for wrong data written, data loss, outage, an authorization bypass or a default path broken for all users; `p1` for wrong results, a crash or a failed request on normal use or normal config, or a regression of existing behaviour; `p2` for a real bug that needs unusual input, rare timing or non-default config; `p3` for a likely bug with one unverified hop.
 - Put the file:line where the fix belongs, which may be an unchanged file the change broke. In the description, name the changed line that creates the dependency.
 - At most 8 findings, most severe first. No style, naming, docs, performance or security findings; other reviewers own those.

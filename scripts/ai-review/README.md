@@ -19,7 +19,7 @@ On each PR the workflow fetches the diff, filters noise, picks a risk tier (`tri
 documentation) in parallel — plus any *conditional* agent whose domain the diff touches (frontend,
 qa, and release for migrations, `Cargo.toml`/`package.json`, `src/config/src/config.rs`, `.github/`,
 `deploy/` and Docker files) — and a coordinator consolidates their findings into one comment with
-an approve/needs-work decision. Correctness owns the PR's behaviour end to end (callers, sibling
+a decision. Correctness owns the PR's behaviour end to end (callers, sibling
 paths, state, the tests that prove the change); every tier runs it. Before the agents start, the
 runner greps the PR tree for where each symbol the diff changes is used outside the diff, and for
 other definitions of the same name (`src/impact.mjs`), and gives that map to every reviewer.
@@ -29,20 +29,134 @@ fails or times out, the runner (not the model) adds a line to the comment saying
 unreviewed.
 
 The coordinator also lists the findings it kept in a hidden JSON block, which the runner strips
-from the comment. Kept blockers and warnings whose `file:line` is an added or context line of the
+from the comment. Kept P0, P1 and P2 findings whose `file:line` is an added or context line of the
 diff are posted as one `COMMENT` review with inline threads (at most 10, never approve or request
 changes). Each thread carries a hidden fingerprint of file and title, so a re-run skips findings
 already posted by `REVIEW_BOT_LOGIN`. A failed inline post only logs a warning. The threads are
 off by default; set the variable `AI_REVIEW_INLINE` to `true` to turn them on.
 
-Each PR gets at most `AI_REVIEW_MAX_PASSES` automatic reviews (default 2). The count is a hidden
-`o2-review-pass` tag in the review comment, written before the reviewers start, so a run cancelled
-by a newer push still counts; later pushes skip before any model call. A run in which every
-reviewer failed gives its pass back. The paired pointer and the "key not set" notice keep the tag.
-If the bot's comments cannot be read (no reviewer app token, or the list call fails) the run fails
-instead of reviewing, since the count cannot be checked. To review again, dispatch the workflow with
-`ignore_pass_limit` (forwarded to a paired o2-enterprise review), or delete the review comment to
-reset the count.
+Findings are graded `p0` to `p3`. P0 and P1 are blockers and give the decision `blocked`; P2 and P3
+do not block, and only those give `approved_with_comments`; no findings gives `approved`. A review
+keeps at most 3 P2 and 2 P3 findings. Legacy severity words from a reviewer are mapped in
+`src/severity.mjs`. The review stays advisory: the check does not go red on a blocker.
+
+Every new commit gets one review and the same commit is never reviewed twice. A finished review
+records what it covered in a hidden `o2-review-sha` tag (the head SHA, plus the paired head in a
+paired review, so a new commit on either side is new) and shows it in a visible `Reviewed commit`
+line with the review number. A run whose head matches the tag skips before any model call, which
+covers a queued run, a re-label and a plain dispatch, including the paired dispatch from
+openobserve. A run in which every reviewer failed writes no tag, so that commit can be reviewed
+again.
+
+There is no cap on reviews per PR unless the variable `AI_REVIEW_MAX_PASSES` is a positive integer;
+unset, empty, `0` or an invalid value means no cap. Reviews are counted either way, in a hidden
+`o2-review-pass` tag written before the reviewers start, so a run stopped by removing the label or
+by a draft conversion still counts. A run in which every reviewer failed gives its pass back. The
+paired pointer and the "key not set" notice keep the tag. When a cap is set and reached, later
+pushes skip before any model call and the limit note on the comment names the commit that was
+reviewed and the one that was not. If the bot's comments cannot be read (no reviewer app token, or
+the list call fails) the run fails instead of reviewing, since neither the reviewed commit nor the
+count can be checked.
+
+A push does not cancel a review in progress: the paid run finishes and only the newest push waits
+in the concurrency queue. To review a commit again, dispatch the workflow with `ignore_pass_limit`
+(it bypasses both the dedupe and the cap, and is forwarded to a paired o2-enterprise review) or with
+`force_full` (it bypasses the dedupe only), or delete the review comment to reset the count.
+
+The comment marker is matched as a pattern, so a retired provider leg's comment is adopted and
+rewritten in place, including older comments whose marker was redacted to
+`<!-- ai-code-review-[redacted] -->`. The marker is added after redaction, so it survives verbatim
+even when it names the provider.
+
+## Merge confidence
+
+The comment carries one line right after the decision callout, for example
+`**Merge confidence: 🟢 High** — no blockers; all reviewers finished; tests changed`. The runner
+computes it from facts in `src/confidence.mjs`; the model cannot write it, and any such line in its
+output is stripped. It is advisory evidence, not a guarantee: reviewers sample the code.
+
+| Level | When (the lowest that applies wins, every cause is listed) |
+|-------|---------------------------------------------------------------|
+| 🔴 Low | Any P0 or P1; the kept findings could not be counted; the Security or Correctness reviewer did not finish; no reviewer finished or ran |
+| 🟡 Medium | Any other reviewer did not finish; the coordinator failed, so findings are un-judged; any P2; production code changed with no test changed |
+| 🟢 High | Otherwise. P3 findings alone do not lower it |
+
+Production means `src/`, `web/src/` and the enterprise `o2_*/src/` trees, outside test paths. Tests
+mean `tests/`, `test/`, `__tests__/`, `*.spec.*`, `*.test.*`, and Rust files that add `#[test]`,
+`#[tokio::test]` or `#[cfg(test)]`. A paired review counts both repos. When a cap is set and a push
+is skipped at it, the line turns to 🔴 Low and names the unreviewed commit, until a full review
+replaces it.
+While a run reviews a new commit, the line reads `**Merge confidence: 🟡 Reviewing**` and names that
+commit, so an earlier level never stands for it; the final review replaces the line, and a cancelled
+run leaves it in place. The level is the trace attribute `review.merge_confidence` and `merge_confidence` in the findings
+artifact.
+
+## Auto-approve for small PRs
+
+Small, low-risk PRs can skip the human reviewer. The PR title, body, diff and file names are
+untrusted input to a model that can be prompt-injected, so the model's verdict alone can never
+approve: `src/auto-approve.mjs` checks every condition in code, and any failure, or any fact it could
+not read, means a human reviews. The bot never merges; it has no Contents write.
+
+All of these are required:
+
+1. The reviewers ran under the read-only `default` config. Under `ci-full` they have a shell while
+   the parent process holds the app token, so `approve` is ineligible with "reviewers can run
+   commands". `shadow` records that reason too, plus `eligible_ignoring_config`, so the data stays
+   useful while the workflow sets `ci-full`.
+2. The raw diff has at most 100 changed lines and 5 files, with no binary file, mode change, symlink,
+   submodule or file path that cannot be read. For a PR within those limits the diff is rebuilt
+   locally from `MERGE_BASE_SHA` and `HEAD_SHA` in `./pr` before any reviewer starts, and the
+   reviewers and every size condition use that pinned diff. If it cannot be built the review carries
+   on with the API diff and the run is ineligible.
+3. Every raw file was reviewed: no filtered file, no truncation, and the diff agrees with the PR's
+   `changed_files`, `additions` and `deletions`.
+4. No path, old or new, matches `SENSITIVE_PATHS`.
+5. Merge confidence is High, no reviewer reported a finding and none was kept, the findings were
+   counted, the coordinator did not fall back, and the review's decision callout is an approval.
+6. The Security and Correctness reviewers ran and finished, as did every other selected reviewer,
+   and each one that ran saw the whole filtered diff. Finished means the output parsed into findings
+   or stated `<no-issues>`; empty or free-form text does not count and also keeps confidence below
+   High. A PR within the size limit is forced to the `full` tier with `fileFocus` bypassed whenever
+   the mode is not `off`; agents that require focus may still opt out when no file is in their domain.
+7. It is not a paired review, and the workflow proved that: only its "no open PR on this branch"
+   path sets `REVIEW_PAIR_CLEAR`. A failed lookup, a missing token, a failed dispatch or
+   `ignore_paired` leaves it unset, which is ineligible.
+8. The author is not a bot and is an `OWNER`, `MEMBER` or `COLLABORATOR`.
+9. The title, body, file paths and added lines hit no injection tripwire (phrases aimed at the
+   reviewers, review markers, invisible Unicode), matched after NFKC, lowercasing and whitespace
+   folding, with a letters-only pass for spaced-out phrases. Added lines and file paths must be
+   printable ASCII or tab; the title and body may carry emoji but no Cyrillic or Greek letters. A hit
+   disqualifies without proving intent, and the reason never echoes the text.
+10. There is no `no-auto-approve` label and no outstanding `CHANGES_REQUESTED` review.
+11. Re-read right before deciding, the PR head still equals the reviewed commit, the PR is open and
+    not a draft, and its base branch is `main`.
+
+The mode comes from `AI_REVIEW_AUTO_APPROVE`, passed as `REVIEW_AUTO_APPROVE`:
+
+| Mode | Effect |
+|------|--------|
+| `off` | The engine default, and what any unknown value means. No reads, no writes. |
+| `shadow` | The workflow default. Decides and records `auto_approve` in the findings artifact and `review.auto_approve.*` on the trace. Nothing shows on the PR and nothing is written. |
+| `approve` | Submits an `APPROVE` review pinned to the head commit, and adds `**Auto-approved**` or `**Needs human review** — <reasons>` under the confidence line. Never requests changes. |
+
+In `approve` mode every run for a new commit first dismisses the bot's earlier approvals, before any
+reviewer starts, so an approval never survives a later push. A failed dismissal is a warning and
+makes the run ineligible. A failed approval is a warning and never fails the job.
+
+### Before turning on approve
+
+0. Restrict the `ai-review` environment to `main` in both repos. It has no branch policy today, so a
+   workflow added on any branch can read its secrets.
+1. Run the reviewers on the read-only config: set `REVIEW_OPENCODE_CONFIG` to `default` in the
+   workflow. Until then every run is ineligible, whatever the variable says.
+2. Turn on "dismiss stale approvals on push" in `main`'s ruleset. The engine dismisses its own
+   approvals only when it runs, and no engine run happens on a paired deferral, a disabled workflow
+   or a setup failure.
+3. Confirm an approval from the app satisfies the required review on `main`; that depends on the
+   ruleset. CI must still pass either way.
+4. Leave `shadow` on and grade the artifact's decisions against what humans did. Use
+   `eligible_ignoring_config` while the workflow is still on `ci-full`.
 
 Usage of failed and retried attempts is added to the call's span, so a timed-out agent still shows
 what it was billed. Every reviewer's parsed findings and the
@@ -64,7 +178,7 @@ A PR must never be able to run code next to the review secrets or weaken its own
 | Two checkouts | `./engine` = `main` (sparse: this directory, the opencode configs, the ui-architect and eslint skill references). `./pr` = the PR head SHA, data only: no `npm`, no build, no hooks; `persist-credentials: false`. |
 | `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` and `web/AGENTS.md`, or `CLAUDE.md` where a directory has no `AGENTS.md` (listed by the workflow in `REVIEW_RULES_FILES`, one path per line; without it, the engine's `AGENTS.md`) go into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
 | `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` or `opencode.ci.jsonc` from `./engine`), the `OPENCODE_*` disable flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
-| Config selection | `REVIEW_OPENCODE_CONFIG` = `default` (`opencode.jsonc`) or `ci-full` (`opencode.ci.jsonc`); any other value stops the run. The workflow sets `ci-full`. |
+| Config selection | `REVIEW_OPENCODE_CONFIG` = `default` (`opencode.jsonc`) or `ci-full` (`opencode.ci.jsonc`); any other value stops the run. The workflow sets `ci-full`, which keeps `approve` ineligible (see Auto-approve). |
 | `opencode.jsonc` permissions | Each `ai-review-*` agent: deny `*`, then allow `read`, `glob`, `grep`; `external_directory` denied. A `provider.use` policy allows only `deepseek-review`. LSP, formatters, snapshots and sharing are off. |
 | `opencode.ci.jsonc` permissions | Same provider, model and agents, but each agent allows `*`: shell, edit, write and webfetch run with no prompt. The PR checkout is untrusted input to an agent that can run commands, and the provider key is in the opencode process environment, so a shell command can read it. |
 | Startup self-check | Refuses to review if any agent is missing, any non-built-in plugin or MCP server loaded, or a granted tool's plugin is not active. Under `default` it also refuses any agent that resolves to allow a tool other than `read`/`glob`/`grep` or any outside directory; under `ci-full` it refuses an agent that does not allow every tool without asking. Permission prompts are rejected under `default` and approved once under `ci-full`. |
