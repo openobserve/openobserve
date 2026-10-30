@@ -941,11 +941,11 @@ pub fn basic_routes() -> Router {
     // Auth routes (no authentication required)
     let auth_routes = Router::new()
         .route("/login", post(users::authentication).get(users::get_auth))
-        #[cfg(not(feature = "enterprise"))]
-        .route("/activity", post(users::native_session_activity))
         .route("/presigned-url", get(users::get_presigned_url))
         .route("/invites", get(users::list_invitations))
         .route("/invites/{token}", delete(users::decline_invitation));
+    #[cfg(not(feature = "enterprise"))]
+    let auth_routes = auth_routes.route("/activity", post(users::native_session_activity));
     router = router.nest("/auth", auth_routes);
 
     let node_routes = node_routes()
