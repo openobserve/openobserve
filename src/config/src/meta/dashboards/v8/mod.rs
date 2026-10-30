@@ -814,6 +814,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     flame_graph_value_field: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    boxplot_whisker: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_group_by: Option<Vec<String>>,
@@ -3059,7 +3061,8 @@ mod tests {
         });
         let rest4 = serde_json::json!({
             "flame_graph_stack_field": "stack",
-            "flame_graph_value_field": "samples"
+            "flame_graph_value_field": "samples",
+            "boxplot_whisker": "iqr"
         });
         for part in [rest, rest2, rest3, rest4] {
             fields

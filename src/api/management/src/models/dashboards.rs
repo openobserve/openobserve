@@ -558,6 +558,7 @@ mod tests {
             "alert_list_folder": "",
             "flame_graph_stack_field": "folded",
             "flame_graph_value_field": "value",
+            "boxplot_whisker": "minmax",
             "override_config": [{
                 "field": {"matchBy": "series", "value": "errors"},
                 "config": [

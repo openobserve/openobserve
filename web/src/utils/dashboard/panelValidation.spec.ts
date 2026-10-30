@@ -694,12 +694,18 @@ describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline an
   it("rejects out-of-range numbers", () => {
     expect(run("gauge", { gauge_segments: 1 })).toEqual([
       gt("dashboard.utils.configValueOutOfRange", {
-        setting: "gauge_segments",
+        setting: gt("dashboard.gaugeSegments"),
         min: "2",
         max: "100",
       }),
     ]);
-    expect(run("donut", { donut_inner_radius: 99 })).toHaveLength(1);
+    expect(run("donut", { donut_inner_radius: 99 })).toEqual([
+      gt("dashboard.utils.configValueOutOfRange", {
+        setting: gt("dashboard.donutInnerRadius"),
+        min: "0",
+        max: "95",
+      }),
+    ]);
     expect(run("pie", { pie_other_threshold: -1 })).toHaveLength(1);
     expect(run("metric", { value_font_size: 0 })).toHaveLength(1);
     expect(run("geomap", { map_cluster_radius: 0 })).toHaveLength(1);
@@ -1492,6 +1498,78 @@ describe("validatePanel on node graph", () => {
           tabId: "default",
           name: "Default",
           panels: [{ type: "node-graph", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+
+describe("validatePanel on box plot", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "boxplot",
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one y field with at most one x category", () => {
+    expect(run({ y: [field("latency")] })).toEqual([]);
+    expect(run({ x: [field("service")], y: [field("latency")] })).toEqual([]);
+  });
+
+  it("rejects a second x field or a missing y field", () => {
+    expect(run({ x: [field("a"), field("b")], y: [field("v")] })[0]).toMatch(/at most one field/);
+    expect(run({ y: [] })).toHaveLength(1);
+  });
+
+  it("does not allow box plot on PromQL", () => {
+    expect(run({}, {}, "promql")).toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("checks the allowed whisker values", () => {
+    expect(run({ y: [field("v")] }, { boxplot_whisker: "iqr" })).toEqual([]);
+    expect(run({ y: [field("v")] }, { boxplot_whisker: "p99" })).toHaveLength(1);
+  });
+
+  it("lists box plot as an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "boxplot", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
         },
       ],
     });
