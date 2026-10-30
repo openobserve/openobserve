@@ -167,6 +167,7 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         alert_level: alert_level_str,
         alert_status: "firing".to_string(),
         episode_id: None,
+        recovery_reason: String::new(),
         alert_priority: "P1".into(),
         alert_tags: "infra, prod".into(),
         alert_threshold_crit: "90".into(),

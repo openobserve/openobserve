@@ -44,6 +44,8 @@ async function writeClipboard(text: string): Promise<void> {
   const focused = document.activeElement === textarea;
   const copied = focused && document.execCommand("copy");
   container.removeChild(textarea);
+  // Removing the focused textarea drops focus to <body>, which an open popover reads as focus-outside and closes.
+  activeEl?.focus({ preventScroll: true });
 
   if (!copied) {
     throw new Error("execCommand copy failed");

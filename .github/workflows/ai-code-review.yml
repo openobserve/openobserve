@@ -158,6 +158,7 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           BRANCH: ${{ steps.pr.outputs.head_ref }}
           MARKER: ${{ matrix.provider.marker }}
+          IGNORE_PASS_LIMIT: ${{ inputs.ignore_pass_limit || 'false' }}
         run: |
           set -uo pipefail
           if [ -z "$ENT_TOKEN" ]; then
@@ -179,7 +180,9 @@ jobs:
           fi
           ent_ready="$(jq -r '(.isDraft | not) and ([.labels[].name] | index("ready-for-ci") != null)' <<<"$ent_json")"
           if [ "$ent_ready" = "true" ]; then
-            if ! GH_TOKEN="$ENT_TOKEN" gh workflow run ai-code-review.yml --repo "$ent_repo" --ref main -f pr_number="$ent_pr"; then
+            bypass=()
+            if [ "$IGNORE_PASS_LIMIT" = "true" ]; then bypass=(-f ignore_pass_limit=true); fi
+            if ! GH_TOKEN="$ENT_TOKEN" gh workflow run ai-code-review.yml --repo "$ent_repo" --ref main -f pr_number="$ent_pr" "${bypass[@]}"; then
               echo "::warning::Could not dispatch the $ent_repo review; reviewing here."
               exit 0
             fi

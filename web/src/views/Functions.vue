@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        and uses the same breadcrumb section-switcher for fast lateral nav:
          Stream Pipelines ▾            (› Edit Pipeline on a detail page)
        Page actions (and the detail-view teleport target) live in the bar. -->
-  <OPageLayout v-else bleed>
+  <!-- OPageLayout reads which slots it got once, and an empty header slot falls back to a blank header, so it remounts when the header comes or goes. -->
+  <OPageLayout v-else :key="showPipelineActions || isDetailView ? 'header' : 'bare'" bleed>
     <template #header v-if="showPipelineActions || isDetailView">
       <!-- This row hosts page actions: the pipelines-list buttons or the detail
          teleport target. Section pages (functions/enrichment/eval) render
@@ -100,9 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-list-add-pipeline-btn"
               variant="primary"
               size="sm"
+              :aria-label="
+                pipelineDrafts.hasNew
+                  ? t('common.editorDraft.newDot', { label: t('pipeline.addPipeline') })
+                  : undefined
+              "
               @click="goToAddPipeline"
             >
               {{ t("pipeline.addPipeline") }}
+              <EditorDraftDot
+                v-if="pipelineDrafts.hasNew"
+                :saved-at="pipelineDrafts.savedAt(null)"
+                corner
+                data-test="pipeline-list-add-pipeline-draft-dot"
+              />
             </OButton>
             <ODropdown v-if="shouldCollapseActions" align="end">
               <template #trigger>
@@ -164,6 +176,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 export default defineComponent({
   name: "AppFunctions",
@@ -174,12 +188,14 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    EditorDraftDot,
   },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
+    const pipelineDrafts = useEditorDraftIds("pipeline");
 
     // Maps each route to the Level-2 section it belongs under. Pipeline
     // drill-down sub-pages all resolve to the Pipelines section.
@@ -295,6 +311,7 @@ export default defineComponent({
       raw,
       store,
       config,
+      pipelineDrafts,
       orgIdentifier,
       activeTab,
       isDetailView,

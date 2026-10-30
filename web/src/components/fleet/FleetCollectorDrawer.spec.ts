@@ -121,11 +121,6 @@ const CodeStub = {
   props: ["code"],
   template: "<pre>{{ code }}</pre>",
 };
-const MoveStub = {
-  name: "FleetMoveDialog",
-  props: ["open", "collectorIds", "sourceFleetId"],
-  template: "<div />",
-};
 
 function mountDrawer(initialTab = "overview") {
   return mount(FleetCollectorDrawer, {
@@ -135,7 +130,6 @@ function mountDrawer(initialTab = "overview") {
       stubs: {
         ODrawer: DrawerStub,
         FleetCodeEditor: CodeStub,
-        FleetMoveDialog: MoveStub,
         FleetCollectorMetrics: MetricsStub,
       },
     },
@@ -349,14 +343,13 @@ describe("FleetCollectorDrawer", () => {
     expect(wrapper.emitted("update:open")).toBeUndefined();
   });
 
-  it("moves this collector, naming its fleet as the source", async () => {
+  it("says the enrollment token sets the fleet, and offers no move", async () => {
     wrapper = mountDrawer();
     await flushPromises();
-    await wrapper.find(sel("move")).trigger("click");
-    const move = wrapper.findComponent(MoveStub);
-    expect(move.props("open")).toBe(true);
-    expect(move.props("collectorIds")).toEqual(["c1"]);
-    expect(move.props("sourceFleetId")).toBe("default");
+    expect(wrapper.find(sel("fleet-hint")).text()).toBe(
+      "Set by the enrollment token. To move this collector, reinstall it with a token of the target fleet.",
+    );
+    expect(wrapper.find(sel("move")).exists()).toBe(false);
   });
 
   it("closes itself when the org changes", async () => {

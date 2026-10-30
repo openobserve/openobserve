@@ -76,7 +76,8 @@ const p = (
   name: string,
   icon: IconName,
   defaults: Record<string, string>,
-): CatalogItem => ({ key, kind: "processor", type: key, name, icon, defaults });
+  extra: Partial<CatalogItem> = {},
+): CatalogItem => ({ key, kind: "processor", type: key, name, icon, defaults, ...extra });
 const e = (
   key: string,
   name: string,
@@ -139,7 +140,7 @@ export const CATALOG: CatalogItem[] = [
   }),
   r("kubeletstats", "Kubelet stats", "hub", {
     collection_interval: "20s",
-    endpoint: "https://${env:K8S_NODE_NAME}:10250",
+    endpoint: "https://${env:K8S_NODE_IP}:10250",
     auth_type: "serviceAccount",
     insecure_skip_verify: "true",
   }),
@@ -175,12 +176,30 @@ export const CATALOG: CatalogItem[] = [
     limit_mib: "400",
     spike_limit_mib: "100",
   }),
+  // Uid then IP, never the connection: on a gateway that is the sending agent, whose pod would tag node metrics.
   p("k8sattributes", "K8s attributes", "label", {
     auth_type: "serviceAccount",
+    "pod_association[0].sources[0].from": "resource_attribute",
+    "pod_association[0].sources[0].name": "k8s.pod.uid",
+    "pod_association[1].sources[0].from": "resource_attribute",
+    "pod_association[1].sources[0].name": "k8s.pod.ip",
     "extract.metadata[0]": "k8s.pod.name",
     "extract.metadata[1]": "k8s.namespace.name",
     "extract.metadata[2]": "k8s.deployment.name",
+    "extract.metadata[3]": "k8s.node.name",
+    "extract.metadata[4]": "k8s.pod.ip",
   }),
+  p(
+    "k8s_cluster_name",
+    "K8s cluster name",
+    "hub",
+    {
+      "attributes[0].key": "k8s.cluster.name",
+      "attributes[0].value": "${env:K8S_CLUSTER_NAME}",
+      "attributes[0].action": "upsert",
+    },
+    { type: "resource", idHint: "resource/k8s_cluster" },
+  ),
   p("resource", "Resource", "tune", {
     "attributes[0].key": "deployment.environment",
     "attributes[0].value": "production",
@@ -251,11 +270,31 @@ export const CATALOG: CatalogItem[] = [
 
 export const compKey = (kind: EditorKind, id: string) => `${kind}:${id}`;
 
+// The otlp exporter became otlp_grpc, the one upstream rename that dropping underscores does not undo.
+const RENAMED: Partial<Record<EditorKind, Record<string, string>>> = {
+  exporter: { otlpgrpc: "otlp" },
+};
+
+/** Compares component types across upstream's snake_case renames (k8s_attributes is k8sattributes). */
+export function typeKey(kind: EditorKind, type: string): string {
+  const key = type.toLowerCase().replace(/_/g, "");
+  return RENAMED[kind]?.[key] ?? key;
+}
+
+const idKey = (kind: EditorKind, id: string) => {
+  const [type, ...name] = id.split("/");
+  return [typeKey(kind, type), ...name].join("/");
+};
+
 export function catalogFor(c: EditorComponent): CatalogItem | undefined {
+  const type = typeKey(c.kind, c.type);
+  const sameType = (i: CatalogItem) => i.kind === c.kind && typeKey(i.kind, i.type) === type;
   return (
-    CATALOG.find((i) => i.kind === c.kind && i.idHint === c.id) ??
-    CATALOG.find((i) => i.kind === c.kind && i.type === c.type && !i.idHint) ??
-    CATALOG.find((i) => i.kind === c.kind && i.type === c.type)
+    CATALOG.find(
+      (i) => i.kind === c.kind && !!i.idHint && idKey(i.kind, i.idHint) === idKey(c.kind, c.id),
+    ) ??
+    CATALOG.find((i) => sameType(i) && !i.idHint) ??
+    CATALOG.find(sameType)
   );
 }
 

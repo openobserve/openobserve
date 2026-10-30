@@ -34,9 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="template-list-add-btn"
           variant="primary"
           size="sm"
+          :aria-label="
+            templateDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('alert_templates.add') })
+              : undefined
+          "
           @click="editTemplate(null)"
-          >{{ t(`alert_templates.add`) }}</OButton
-        >
+          >{{ t(`alert_templates.add`) }}
+          <EditorDraftDot
+            v-if="templateDrafts.hasNew"
+            :saved-at="templateDrafts.savedAt(null)"
+            corner
+            data-test="template-list-add-draft-dot"
+        /></OButton>
       </template>
       <template #actions-overflow>
         <OButton
@@ -154,6 +164,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-name="{ row }">
             <div class="flex min-w-0 items-center gap-2">
               <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="templateDrafts.ids.has(row.name)"
+                :saved-at="templateDrafts.savedAt(row.name)"
+                :data-test="`alert-template-list-${row.name}-draft-dot`"
+              />
               <OTag
                 v-if="row.isPrebuilt"
                 type="templateOrigin"
@@ -200,11 +215,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
-              :title="t('alert_templates.clone')"
+              :aria-label="cloneActionLabel(row, t('alert_templates.clone'))"
               @click="cloneTemplate(row)"
               data-row-action="duplicate"
             >
               <OIcon name="content-copy" size="sm" />
+              <OTooltip
+                side="bottom"
+                :content="cloneActionLabel(row, t('alert_templates.clone'))"
+              />
+              <EditorDraftDot
+                v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
+                corner
+                :tooltip="false"
+                :data-test="`alert-template-list-${row.name}-clone-draft-dot`"
+              />
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-delete-template`"
@@ -227,13 +252,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #trigger>
                 <OButton
                   icon-left="more-vert"
-                  :title="t('dashboard.moreActions')"
+                  :aria-label="cloneActionLabel(row, t('dashboard.moreActions'))"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="md:hidden"
                   data-test="alert-template-list-row-more-actions"
                   @click.stop
-                />
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="cloneActionLabel(row, t('dashboard.moreActions'))"
+                  />
+                  <EditorDraftDot
+                    v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
+                    corner
+                    :tooltip="false"
+                    :data-test="`alert-template-list-${row.name}-more-actions-draft-dot`"
+                  />
+                </OButton>
               </template>
               <ODropdownItem
                 icon-left="download"
@@ -263,6 +299,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="cloneTemplate(row)"
               >
                 <span>{{ t("alert_templates.clone") }}</span>
+                <EditorDraftDot
+                  v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
+                  :saved-at="templateDrafts.savedAtVariant(`clone:${row.name}`)"
+                  :data-test="`alert-template-list-${row.name}-clone-template-menu-draft-dot`"
+                />
               </ODropdownItem>
               <ODropdownItem
                 icon-left="delete"
@@ -306,6 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddTemplate
         :template="editingTemplate"
         :is-clone="cloningTemplate"
+        :clone-source="cloningSource"
         @cancel:hideform="toggleTemplateEditor"
         @get:templates="refreshTemplates"
       />
@@ -346,7 +388,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { ref, onActivated, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
@@ -379,6 +421,11 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const AddTemplate = defineAsyncComponent(() => import("@/components/alerts/AddTemplate.vue"));
 
@@ -387,6 +434,15 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
 const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
+const templateDrafts = useEditorDraftIds("alert_template");
+const draftLabel = useDraftLabel();
+// The corner dot is presentational, so an action that reopens a kept clone says so, dated, in its own name.
+const cloneActionLabel = (row: { name: string }, label: I18nText): I18nText => {
+  const variant = `clone:${row.name}`;
+  return templateDrafts.hasNewVariant(variant)
+    ? draftLabel(label, templateDrafts.savedAtVariant(variant))
+    : label;
+};
 const orgIdForList = useOrgId();
 const templatesList = useQuery(() =>
   Object.assign(templatesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
@@ -426,6 +482,7 @@ const editingTemplate: Ref<TemplateData | null> = ref(null);
 // True when the editor was opened via the clone action — the AddTemplate
 // form should treat the prefilled data as a fresh template (not an update).
 const cloningTemplate = ref(false);
+const cloningSource = ref<string | null>(null);
 
 const confirmDelete: Ref<{
   visible: boolean;
@@ -565,6 +622,14 @@ const dropTemplates = (names: string[]) => {
   // Anything that failed to delete stays selected, so a bulk retry is one click.
   selectedTemplates.value = selectedTemplates.value.filter((tpl: any) => !gone.has(tpl.name));
   const org = store.state.selectedOrganization.identifier;
+  for (const name of gone) {
+    deleteEditorDraftsFor({
+      kind: "alert_template",
+      org,
+      entityId: name,
+      variant: `clone:${name}`,
+    });
+  }
   // The rows render straight from the cache, so pruning it is what removes them.
   queryClient.setQueriesData({ queryKey: templateKeys.all(org) }, (list: any) =>
     Array.isArray(list) ? list.filter((tpl: any) => !gone.has(tpl.name)) : list,
@@ -577,11 +642,22 @@ const dropTemplates = (names: string[]) => {
 const onDependencyDeleted = (_kind: DepNodeKind) => {
   loadDepGraph(store.state.selectedOrganization.identifier);
 };
+// Re-runs on every refetch; editTemplate toggles, so re-opening the target already shown would close it.
 const updateRoute = () => {
-  if (router.currentRoute.value.query.action === "add") editTemplate();
-  if (router.currentRoute.value.query.action === "update")
-    editTemplate(getTemplateByName(router.currentRoute.value.query.name as string));
-  if (router.currentRoute.value.query.action === "import") {
+  const { action, name, clone } = router.currentRoute.value.query;
+  const cloneSourceRow = typeof clone === "string" && clone ? getTemplateByName(clone) : undefined;
+  if (action === "add" && cloneSourceRow) {
+    if (!showTemplateEditor.value || cloningSource.value !== cloneSourceRow.name)
+      openClone(cloneSourceRow);
+  } else if (action === "add") {
+    if (!showTemplateEditor.value || (editingTemplate.value && !cloningTemplate.value))
+      editTemplate();
+  }
+  if (action === "update") {
+    if (!showTemplateEditor.value || editingTemplate.value?.name !== name)
+      editTemplate(getTemplateByName(name as string));
+  }
+  if (action === "import") {
     showImportTemplate.value = true;
   }
 };
@@ -597,12 +673,13 @@ const editTemplate = (template: any = null) => {
   }
   resetEditingTemplate();
   cloningTemplate.value = false;
+  cloningSource.value = null;
   toggleTemplateEditor();
 
   if (!template) {
     // Strip a stale `name` left over from a previous "update" visit — everything
     // else (including `page`) survives the round trip to the editor and back.
-    const { name: _name, ...restQuery } = router.currentRoute.value.query;
+    const { name: _name, clone: _clone, ...restQuery } = router.currentRoute.value.query;
     router.push({
       name: "alertTemplates",
       query: {
@@ -613,10 +690,11 @@ const editTemplate = (template: any = null) => {
     });
   } else {
     editingTemplate.value = { ...template };
+    const { clone: _clone, ...restQuery } = router.currentRoute.value.query;
     router.push({
       name: "alertTemplates",
       query: {
-        ...router.currentRoute.value.query,
+        ...restQuery,
         action: "update",
         name: template.name,
         org_identifier: store.state.selectedOrganization.identifier,
@@ -627,11 +705,15 @@ const editTemplate = (template: any = null) => {
 const resetEditingTemplate = () => {
   editingTemplate.value = null;
 };
-const cloneTemplate = (template: any) => {
+const cloneTemplate = (template: Template) => {
   track("Button Click", {
     button: "Clone Template",
     page: "Alert Templates",
   });
+  openClone(template);
+};
+// The source rides in the URL so a reload reopens the clone on its own draft slot.
+const openClone = (template: Template) => {
   // Pre-fill the editor with a copy of the source template. AddTemplate
   // treats this as a create (since isClone=true), so the user can rename
   // and save without overwriting the original.
@@ -642,6 +724,7 @@ const cloneTemplate = (template: any) => {
     name: `Copy_of_${template.name}`,
   };
   cloningTemplate.value = true;
+  cloningSource.value = template.name;
   showTemplateEditor.value = true;
   const { name: _name, ...restQuery } = router.currentRoute.value.query;
   router.push({
@@ -649,6 +732,7 @@ const cloneTemplate = (template: any) => {
     query: {
       ...restQuery,
       action: "add",
+      clone: template.name,
       org_identifier: store.state.selectedOrganization.identifier,
     },
   });
@@ -711,7 +795,12 @@ const cancelDeleteTemplate = () => {
 const toggleTemplateEditor = () => {
   showTemplateEditor.value = !showTemplateEditor.value;
   if (!showTemplateEditor.value) {
-    const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
+    const {
+      action: _action,
+      name: _name,
+      clone: _clone,
+      ...restQuery
+    } = router.currentRoute.value.query;
     router.push({
       name: "alertTemplates",
       query: {

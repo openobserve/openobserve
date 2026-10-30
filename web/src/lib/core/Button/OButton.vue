@@ -400,7 +400,9 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
   "sm-action": "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
-  md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
+  // h-8.5 sorts before h-9 and up, so a caller's own plain height class still overrides md.
+  md: "h-8.5 ps-4 pe-4 text-sm gap-2 rounded-default",
+  cta: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
   lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",
   // shrink-0: without it min-width:auto lets a tight flex row squash these fixed squares to icon width.
   icon: "size-6 shrink-0 p-0 rounded-default gap-x-0",
@@ -412,7 +414,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 24px square — matches chip size for paired close/remove buttons
   "icon-chip": "h-6 w-6 shrink-0 p-0 rounded-default gap-x-0",
   "icon-sm": "h-8 w-8 shrink-0 p-0 rounded-default gap-x-0",
-  "icon-md": "h-10 w-10 shrink-0 p-0 rounded-default gap-x-0",
+  "icon-md": "h-8.5 w-8.5 shrink-0 p-0 rounded-default gap-x-0",
   "icon-lg": "h-12 w-12 shrink-0 p-0 rounded-default gap-x-0",
   "icon-circle": "size-8 shrink-0 p-0 rounded-full gap-x-0",
   "icon-circle-sm": "size-7 shrink-0 p-0 rounded-full gap-x-0",
@@ -445,13 +447,8 @@ const classes = computed<string[]>(() => [
   // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
   "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
   "outline-none",
-  /* Unified focus ring — identical to OInput/OSelect: a 2px OPAQUE primary ring
-     hugging the control (no ring-offset gap). The trailing `!` overrides
-     each variant's own ring width/color below, so every button focuses identically.
-     Reads --color-focus-ring-accent, NOT accent/25: at 25% alpha the ring measured
-     1.38:1 in light and 1.50:1 in dark, against the 3:1 SC 1.4.11 floor. Solid, it is
-     4.80:1 / 6.82:1. This override is why the per-variant ring classes never paint. */
-  "focus-visible:ring-[0.125rem]! focus-visible:ring-focus-ring-accent!",
+  // A hugging ring vanishes on accent fills, so the outline sits off a gap; ring-0! mutes the per-variant rings.
+  "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
   unavailable.value ? "cursor-not-allowed!" : "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   unavailable.value

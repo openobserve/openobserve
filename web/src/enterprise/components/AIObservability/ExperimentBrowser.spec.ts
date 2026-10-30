@@ -21,6 +21,8 @@ import { nextTick, reactive } from "vue";
 import ExperimentBrowser from "./ExperimentBrowser.vue";
 import { makeExperiment } from "@/enterprise/views/AIObservability/experimentTestFixtures";
 import type { ExperimentScoreSummary } from "@/services/llm-experiments.service";
+import { createStore } from "vuex";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 const replace = vi.fn();
 const push = vi.fn();
@@ -50,8 +52,13 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string, params?: Record<string, unknown>) =>
       params ? `${key} ${Object.values(params).join(" ")}` : key,
+    locale: { value: "en-US" },
   }),
 }));
+
+const store = createStore({
+  state: { selectedOrganization: { identifier: "acme" }, userInfo: { email: "me@x.io" } },
+});
 
 const experiment = (id: string, datasetId: string, createdAt: number) =>
   makeExperiment({ id, name: id, datasetId, createdAt });
@@ -169,7 +176,7 @@ describe("ExperimentBrowser", () => {
         experiments: [running, experiment("done", "dataset-a", 2)],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     const cell = wrapper.get('[data-test="ai-experiment-status-run"]');
@@ -205,7 +212,7 @@ describe("ExperimentBrowser", () => {
         experiments: [scoring],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     const cell = wrapper.get('[data-test="cell-status-scoring"]');
@@ -225,7 +232,7 @@ describe("ExperimentBrowser", () => {
         experiments: [experiment("one", "dataset-a", 1)],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     for (const control of ["ai-experiment-dataset-filter", "ai-experiment-name-search"]) {
@@ -244,7 +251,7 @@ describe("ExperimentBrowser", () => {
         experiments: [experiment("one", "dataset-a", 1)],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     await wrapper.get('[data-test="ai-experiment-clone-one"]').trigger("click");
@@ -270,7 +277,7 @@ describe("ExperimentBrowser", () => {
         datasets: [] as any,
         loading: true,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     expect(wrapper.find('[data-test="ai-experiment-group-loading"]').exists()).toBe(true);
@@ -295,7 +302,7 @@ describe("ExperimentBrowser", () => {
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
         loading: true,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     expect(wrapper.find('[data-test="ai-experiment-group-loading"]').exists()).toBe(false);
@@ -313,7 +320,7 @@ describe("ExperimentBrowser", () => {
         experiments: [experiment("one", "dataset-a", 1)],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     await wrapper.get('[data-test="ai-experiment-refresh"]').trigger("click");
@@ -331,7 +338,7 @@ describe("ExperimentBrowser", () => {
         ] as any,
         syncUrl: true,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     await wrapper.get('[data-test="ai-experiment-dataset-filter"]').setValue("dataset-a");
@@ -364,7 +371,7 @@ describe("ExperimentBrowser", () => {
         ],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     await wrapper.get('[data-test="ai-experiment-baseline-old"]').trigger("click");
@@ -386,7 +393,7 @@ describe("ExperimentBrowser", () => {
         experiments: [experiment("old", "dataset-a", 1)],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     await wrapper.get('[data-test="ai-experiment-baseline-old"]').trigger("click");
@@ -412,7 +419,7 @@ describe("ExperimentBrowser", () => {
         ],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     const rows = wrapper.findAll('[data-test^="ai-experiment-row-"]');
@@ -439,7 +446,7 @@ describe("ExperimentBrowser", () => {
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
         syncUrl: true,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     const candidateCheckbox = wrapper.get('[data-test="ai-experiment-select-new"]');
@@ -468,7 +475,7 @@ describe("ExperimentBrowser", () => {
         ] as any,
         syncUrl: true,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
     replace.mockReset();
 
@@ -498,7 +505,7 @@ describe("ExperimentBrowser", () => {
         experiments: [row],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     expect(wrapper.get('[data-test="cell-score:approved-scored"]').text()).toBe("100% true");
@@ -523,7 +530,7 @@ describe("ExperimentBrowser", () => {
           { id: "dataset-b", name: "Dataset B" },
         ] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     expect(wrapper.find('[data-test="cell-score:safety-first"]').exists()).toBe(false);
@@ -543,7 +550,7 @@ describe("ExperimentBrowser", () => {
         ],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     await wrapper.get('[data-test="ai-experiment-select-one"]').setValue(true);
@@ -571,7 +578,7 @@ describe("ExperimentBrowser", () => {
         experiments: [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     const count = () => wrapper.get('[data-test="ai-experiment-selection-count"]').text();
@@ -596,7 +603,7 @@ describe("ExperimentBrowser", () => {
           { id: "dataset-b", name: "Dataset B" },
         ] as any,
       },
-      global: { stubs },
+      global: { stubs, plugins: [store] },
     });
 
     const checkboxes = wrapper.findAll('input[type="checkbox"]');
@@ -612,5 +619,59 @@ describe("ExperimentBrowser", () => {
     expect(compare.attributes("aria-description")).toBe(
       "aiObservability.experiments.comparisonReasons.select_two",
     );
+  });
+
+  it("marks the Clone action of a run that has an unsaved clone draft", async () => {
+    writeEditorDraft(
+      { kind: "experiment", org: "acme", entityId: "two", userEmail: "me@x.io" },
+      { data: { name: "two (Copy)" } },
+    );
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as never,
+      },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const clone = wrapper.get('[data-test="ai-experiment-clone-two"]');
+    expect(clone.find('[data-test="ai-experiment-two-clone-draft-dot"]').exists()).toBe(true);
+    expect(clone.attributes("aria-label")).toContain(
+      "common.editorDraft.newDotDated aiObservability.experiments.clone",
+    );
+    expect(
+      wrapper.get('[data-test="ai-experiment-row-two"]').find('[data-test$="-draft-dot"]').exists(),
+    ).toBe(false);
+    expect(wrapper.find('[data-test="ai-experiment-one-clone-draft-dot"]').exists()).toBe(false);
+  });
+
+  it("marks the phone row menu of a run that has an unsaved clone draft", async () => {
+    writeEditorDraft(
+      { kind: "experiment", org: "acme", entityId: "two", userEmail: "me@x.io" },
+      { data: { name: "two (Copy)" } },
+    );
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as never,
+      },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const menus = wrapper.findAll('[data-test="ai-experiment-actions-menu-btn"]');
+    const drafted = menus.filter((m) =>
+      m.find('[data-test="ai-experiment-two-actions-menu-draft-dot"]').exists(),
+    );
+    expect(drafted).toHaveLength(1);
+    expect(drafted[0].attributes("aria-label")).toContain(
+      "common.editorDraft.newDotDated common.moreActions",
+    );
+    expect(wrapper.findAll('[data-test$="-actions-menu-draft-dot"]')).toHaveLength(1);
+    const plain = menus.find((m) => m !== drafted[0]);
+    expect(plain?.attributes("aria-label")).toBe("common.moreActions");
   });
 });

@@ -177,6 +177,7 @@ import {
   onMounted,
   onActivated,
   onBeforeUnmount,
+  watch,
 } from "vue";
 import Sortable from "sortablejs";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -195,6 +196,7 @@ import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import useNotifications from "@/composables/useNotifications";
 import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
+import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -270,8 +272,48 @@ export default defineComponent({
       });
     };
 
+    const draftContext = useDashboardSettingsDraft();
+    // Off until the tabs loaded, so the empty list never clears a rename restored from a draft.
+    let draftReady = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const syncDraftSection = () => {
+      if (!draftContext || !draftReady) return;
+      const tabId = editTabId.value;
+      const name = editTabObj.data?.name;
+      draftContext.pending.tabRename =
+        tabId !== null && typeof name === "string" && name !== tabNameOf(tabId)
+          ? { tabId: String(tabId), name }
+          : null;
+    };
+
+    const applyPendingRename = () => {
+      const pending = draftContext?.pending.tabRename;
+      if (!draftContext || !pending) return;
+      const tab = currentDashboardData.data?.tabs?.find(
+        (candidate: { tabId: string }) => candidate.tabId === pending.tabId,
+      );
+      if (!tab) {
+        draftContext.pending.tabRename = null;
+        return;
+      }
+      editTabId.value = pending.tabId;
+      editTabObj.data = { ...JSON.parse(JSON.stringify(tab)), name: pending.name };
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      if (!editTabObj.data?.name?.trim()) return false;
+      return saveEdit();
+    };
+
     onMounted(async () => {
       await getDashboardData();
+      if (draftContext) {
+        applyPendingRename();
+        draftReady = true;
+        syncDraftSection();
+        unregisterDraftSection = draftContext.register("tabRename", saveForDraft);
+      }
       await initSortable();
     });
 
@@ -280,6 +322,7 @@ export default defineComponent({
     });
 
     onBeforeUnmount(() => {
+      unregisterDraftSection?.();
       sortableInstance?.destroy();
       sortableInstance = null;
     });
@@ -317,7 +360,7 @@ export default defineComponent({
       },
     ];
 
-    const editTabId = ref(null);
+    const editTabId = ref<string | null>(null);
     const editTabObj: any = reactive({
       data: {},
     });
@@ -363,7 +406,7 @@ export default defineComponent({
       );
     };
 
-    const saveEdit = async () => {
+    const saveEdit = async (): Promise<boolean> => {
       // editTab renames the cached tab in place, so read the old name before it runs.
       const previousName = tabNameOf(editTabObj.data.tabId);
       try {
@@ -384,7 +427,9 @@ export default defineComponent({
           // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
+          return true;
         }
+        return false;
       } catch (error: any) {
         if (saveConflict.isConflict(error)) {
           void saveConflict.openConflict({
@@ -403,12 +448,13 @@ export default defineComponent({
           cancelEdit();
           await getDashboardData();
           emit("refresh");
-          return;
+          return false;
         }
         showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
 
         emit("refresh");
         await getDashboardData();
+        return false;
       }
     };
 
@@ -416,6 +462,16 @@ export default defineComponent({
       editTabId.value = null;
       editTabObj.data = {};
     };
+
+    watch([editTabId, () => editTabObj.data?.name], syncDraftSection);
+    watch(
+      () => draftContext?.restoreRevision,
+      () => {
+        if (!draftReady) return;
+        applyPendingRename();
+        syncDraftSection();
+      },
+    );
 
     const addNewItem = () => {
       isTabEditMode.value = false;
