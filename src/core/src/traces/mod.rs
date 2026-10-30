@@ -26,7 +26,6 @@ use axum::{
     http,
     response::{IntoResponse, Response as HttpResponse},
 };
-use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
     O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -72,7 +71,7 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::{
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
-        otlp::{otlp_error_response, otlp_rejection_response},
+        otlp::{otlp_error_response, otlp_export_response, otlp_rejection_response},
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext},
     },
@@ -1737,23 +1736,7 @@ fn format_response(
         ExportTraceServiceResponse::default()
     };
 
-    match req_type {
-        OtlpRequestType::HttpJson => Ok(if partial {
-            (http::StatusCode::PARTIAL_CONTENT, Json(res)).into_response()
-        } else {
-            MetaHttpResponse::json(res)
-        }),
-        _ => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            Ok((
-                http::StatusCode::OK,
-                [(http::header::CONTENT_TYPE, "application/x-protobuf")],
-                out.to_vec(),
-            )
-                .into_response())
-        }
-    }
+    Ok(otlp_export_response(&res, req_type))
 }
 
 /// Schema rejections are tagged `InvalidData`; a failed WAL write carries the ingestion error.
@@ -2023,7 +2006,7 @@ fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use config::utils::json::json;
+    use config::utils::json::{self, json};
     use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
     fn attr_key(
@@ -2325,22 +2308,64 @@ mod tests {
         assert_eq!(response.status(), http::StatusCode::OK);
     }
 
-    #[test]
-    fn test_format_response_partial_success() {
+    #[tokio::test]
+    async fn test_format_response_partial_success() {
         let partial_success =
             opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
                 rejected_spans: 5,
                 error_message: "Some spans rejected".to_string(),
             };
 
-        let result = super::format_response(
+        let response = super::format_response(
             partial_success,
             config::meta::otlp::OtlpRequestType::HttpJson,
+        )
+        .unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert_eq!(
+            response.headers()[http::header::CONTENT_TYPE],
+            crate::common::meta::http::CONTENT_TYPE_JSON
         );
-        assert!(result.is_ok());
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: json::Value = json::from_slice(&body).unwrap();
+        assert_eq!(
+            body,
+            json::json!({
+                "partialSuccess": {
+                    "rejectedSpans": "5",
+                    "errorMessage": "Some spans rejected"
+                }
+            })
+        );
+    }
 
-        let response = result.unwrap();
-        assert_eq!(response.status(), http::StatusCode::PARTIAL_CONTENT);
+    #[tokio::test]
+    async fn test_format_response_json_partial_success_default_message() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 2,
+                error_message: String::new(),
+            };
+
+        let response = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        )
+        .unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: json::Value = json::from_slice(&body).unwrap();
+        assert_eq!(body["partialSuccess"]["rejectedSpans"], "2");
+        assert!(
+            body["partialSuccess"]["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains("retention period")
+        );
     }
 
     #[tokio::test]
