@@ -30,11 +30,12 @@ use crate::{
     },
 };
 
+pub mod ack;
 pub mod aggregation_level;
 pub mod alert;
+pub mod auto_investigate;
 pub mod composite;
 pub mod content_spec;
-pub mod deduplication;
 pub mod dispatch;
 pub mod grouping;
 pub mod incidents;

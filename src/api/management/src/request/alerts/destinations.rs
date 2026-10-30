@@ -55,6 +55,12 @@ pub struct TestDestinationRequest {
     pub destination_type: DestinationType,
     /// Email recipients for email destination testing
     pub recipients: Option<Vec<String>>,
+    /// Template a `slack_app` test renders on a sample alert; the org default when absent.
+    #[serde(default)]
+    pub template: Option<String>,
+    /// The `slack_app` target under test, with the destination body's snake_case fields.
+    #[serde(default)]
+    pub slack_app: Option<crate::models::destinations::SlackAppFields>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
@@ -101,6 +107,7 @@ pub async fn test_destination(
     match test_req.destination_type {
         DestinationType::Email => test_email_destination(&org_id, &test_req).await,
         DestinationType::Http => test_http_destination(&test_req).await,
+        DestinationType::SlackApp => test_slack_app_destination(&org_id, &test_req).await,
         other => MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
@@ -137,6 +144,39 @@ async fn test_email_destination(org_id: &str, test_req: &TestDestinationRequest)
             error: Some(e.to_string()),
         }),
     }
+}
+
+/// Posts now through the bot, so the form shows Slack's own answer, never a queued "ok".
+async fn test_slack_app_destination(org_id: &str, test_req: &TestDestinationRequest) -> Response {
+    let Some(fields) = test_req.slack_app.clone() else {
+        return MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some("A Slack app test needs the slackApp target".to_string()),
+        });
+    };
+    let target = fields.into_target();
+    let sent = openobserve_core::alerts::slack_publish::send_form_test(
+        org_id,
+        &target,
+        test_req.template.as_deref(),
+    )
+    .await;
+    MetaHttpResponse::json(match sent {
+        Ok(detail) => TestDestinationResponse {
+            success: true,
+            status_code: None,
+            response_body: Some(detail),
+            error: None,
+        },
+        Err(e) => TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(e.to_string()),
+        },
+    })
 }
 
 async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
@@ -296,6 +336,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
 pub async fn save_destination(
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
     Json(dest): Json<Destination>,
 ) -> Response {
     // Check the module query parameter to determine if this is an alert or pipeline destination
@@ -306,7 +347,7 @@ pub async fn save_destination(
         Ok(dest) => dest,
         Err(e) => return destination_error_response(e),
     };
-    match destinations::save("", dest, true).await {
+    match destinations::save_by("", dest, true, &user_email.user_id).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Destination saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
@@ -349,6 +390,7 @@ pub async fn save_destination(
 pub async fn update_destination(
     Path((org_id, name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
     Json(dest): Json<Destination>,
 ) -> Response {
     // Check the module query parameter to determine if this is an alert or pipeline destination
@@ -359,7 +401,7 @@ pub async fn update_destination(
         Ok(dest) => dest,
         Err(e) => return destination_error_response(e),
     };
-    match destinations::save(&name, dest, false).await {
+    match destinations::save_by(&name, dest, false, &user_email.user_id).await {
         Ok(_) => MetaHttpResponse::ok("Destination updated"),
         Err(e) => destination_error_response(e),
     }
@@ -853,6 +895,8 @@ mod tests {
             skip_tls_verify: None,
             destination_type: DestinationType::Http,
             recipients: None,
+            template: None,
+            slack_app: None,
         };
         let resp = test_destination(Path("default".to_string()), Json(req)).await;
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)

@@ -146,6 +146,25 @@ describe("ReportRunNowDialog", () => {
     });
   });
 
+  it("opens the run on a detail page that keeps the report's folder", async () => {
+    vi.mocked(reports.triggerReportById).mockResolvedValue({
+      data: { code: 200, message: "Report triggered", run: RUN },
+    } as never);
+    const w = mountDialog({ folderId: "folder-b" });
+    await flushPromises();
+    await (w.vm as unknown as { runNow: () => Promise<void> }).runNow();
+    await flushPromises();
+    const options = vi.mocked(toast).mock.calls.at(-1)![0];
+    options.action?.handler?.();
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "reportDetail",
+        query: expect.objectContaining({ folder: "folder-b", tab: "history" }),
+      }),
+    );
+  });
+
   it("still returns the run row when the send failed", async () => {
     vi.mocked(reports.triggerReportById).mockRejectedValue({
       response: {

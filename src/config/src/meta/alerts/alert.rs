@@ -21,10 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     meta::{
-        alerts::{
-            Operator, QueryCondition, TriggerCondition, deduplication::DeduplicationConfig,
-            priority::AlertPriority,
-        },
+        alerts::{Operator, QueryCondition, TriggerCondition, priority::AlertPriority},
         stream::StreamType,
         triggers::{ScheduledTriggerData, Trigger},
     },
@@ -93,8 +90,6 @@ pub struct Alert {
     pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     pub last_edited_by: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deduplication: Option<DeduplicationConfig>,
     /// When true, this alert creates/joins incidents instead of sending direct notifications.
     /// Notification is sent only when a new incident is created or a new alert type joins
     /// an existing incident. Repeated firings are suppressed.
@@ -153,8 +148,9 @@ pub struct Alert {
     #[serde(default)]
     pub pending_period_sec: i64,
 
-    /// Send one notification when this alert stops firing. Off by default: an existing template
-    /// that never mentions `{alert_status}` would otherwise render the firing wording twice.
+    /// Send one notification when this alert, or each group of a multi-alert, stops firing. Off by
+    /// default: an existing template that never mentions `{alert_status}` would otherwise render
+    /// the firing wording twice.
     #[serde(default)]
     pub notify_on_recovery: bool,
 
@@ -222,7 +218,6 @@ impl MemorySize for Alert {
             + self.description.mem_size()
             + self.owner.mem_size()
             + self.last_edited_by.mem_size()
-            + self.deduplication.mem_size()
             + self.workflows.mem_size()
             + self.tags.mem_size()
             + std::mem::size_of::<Option<AlertPriority>>()
@@ -263,7 +258,6 @@ impl Default for Alert {
             updated_at: None,
             last_edited_by: None,
             last_satisfied_at: None,
-            deduplication: None,
             creates_incident: false,
             workflows: vec![],
             priority: None,
@@ -966,7 +960,6 @@ mod tests {
             template: None,
             context_attributes: None,
             updated_at: None,
-            deduplication: None,
             ..Default::default()
         };
         let json = serde_json::to_value(&alert).unwrap();
@@ -974,14 +967,12 @@ mod tests {
         assert!(!obj.contains_key("template"));
         assert!(!obj.contains_key("context_attributes"));
         assert!(!obj.contains_key("updated_at"));
-        assert!(!obj.contains_key("deduplication"));
     }
 
     #[test]
     fn test_alert_skip_serializing_if_some_fields_present() {
         use chrono::TimeZone;
 
-        use crate::meta::alerts::deduplication::DeduplicationConfig;
         let mut ctx = HashMap::new();
         ctx.insert("env".to_string(), "prod".to_string());
         let tz = chrono::FixedOffset::east_opt(0).unwrap();
@@ -990,7 +981,6 @@ mod tests {
             template: Some("my_template".to_string()),
             context_attributes: Some(ctx),
             updated_at: Some(dt),
-            deduplication: Some(DeduplicationConfig::default()),
             ..Default::default()
         };
         let json = serde_json::to_value(&alert).unwrap();
@@ -999,7 +989,29 @@ mod tests {
         assert_eq!(obj["template"], serde_json::json!("my_template"));
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
-        assert!(obj.contains_key("deduplication"));
+    }
+
+    #[test]
+    fn test_stored_deduplication_still_loads_and_is_dropped_on_save() {
+        let stored = r#"{
+            "name": "test_alert",
+            "org_id": "test_org",
+            "stream_type": "logs",
+            "stream_name": "test_stream",
+            "is_real_time": false,
+            "destinations": [],
+            "deduplication": {
+                "enabled": true,
+                "fingerprint_fields": ["host"],
+                "time_window_minutes": 30,
+                "grouping": {"enabled": true, "max_group_size": 10, "group_wait_seconds": 30}
+            }
+        }"#;
+
+        let alert: Alert = serde_json::from_str(stored).unwrap();
+        assert_eq!(alert.name, "test_alert");
+        let saved = serde_json::to_value(&alert).unwrap();
+        assert!(!saved.as_object().unwrap().contains_key("deduplication"));
     }
 
     // ── Feature 2: list params (PT-3, PT-8) ─────────────────────────────────

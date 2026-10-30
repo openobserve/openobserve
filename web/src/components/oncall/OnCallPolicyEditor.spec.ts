@@ -39,7 +39,11 @@ vi.mock("@/services/oncall", () => ({
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 
 const push = vi.fn();
-vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
+}));
 
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
@@ -118,6 +122,8 @@ function render() {
 
 describe("OnCallPolicyEditor", () => {
   beforeEach(() => {
+    // A draft one test leaves behind would open the restore dialog on the next open.
+    localStorage.clear();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: ["slack-eng"], source: "policy" },
     } as any);
@@ -330,6 +336,19 @@ describe("OnCallPolicyEditor", () => {
       ],
       destinations: ["slack-oncall"],
     };
+
+    it("leaves Slack app destinations out of the picker (7.1)", async () => {
+      destinations.list.mockResolvedValue({
+        data: [{ name: "slack-oncall" }, { name: "sre-prod-slack", type: "slack_app" }],
+      } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: webhookPolicy, open: true },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+      const options = (wrapper.vm as any).destinationOptions.map((o: any) => o.value);
+      expect(options).toEqual(["slack-oncall"]);
+    });
 
     it("hides the picker when nothing pages by webhook", async () => {
       const wrapper = mount(OnCallPolicyEditor, {

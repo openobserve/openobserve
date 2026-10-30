@@ -41,26 +41,25 @@ use usage_reporting::http_report_metrics;
 
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
+pub mod ack;
 pub mod alert;
 #[cfg(feature = "enterprise")]
 pub mod alert_calibration;
+pub mod auto_investigate_decisions;
 pub mod backfill;
 pub mod composite;
 pub mod composite_graph_lock;
-#[cfg(feature = "enterprise")]
-pub mod deduplication;
 pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
 pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
-pub mod grouping;
-#[cfg(feature = "enterprise")]
 pub mod incidents;
-pub mod notifications;
+pub mod lifecycle;
 #[cfg(feature = "enterprise")]
-pub mod org_config;
+pub mod mute;
+pub mod notifications;
 mod prom_rule;
 #[cfg(feature = "enterprise")]
 pub mod rca_live;
@@ -74,6 +73,10 @@ pub mod rca_steering;
 pub mod rca_turn;
 pub mod recovery;
 pub mod scheduler;
+pub mod slack_destination;
+pub mod slack_investigate;
+pub mod slack_publish;
+pub mod slack_view;
 pub mod templates;
 
 #[async_trait]

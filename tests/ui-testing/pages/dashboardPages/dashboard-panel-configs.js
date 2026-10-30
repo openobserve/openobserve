@@ -240,6 +240,8 @@ export default class DashboardPanelConfigs {
     this.legendWidthUnitInactive = page.locator('[data-test="dashboard-config-legend-width-unit-inactive"]');
     this.legendHeightUnitActive = page.locator('[data-test="dashboard-config-legend-height-unit-active"]');
     this.legendHeightUnitInactive = page.locator('[data-test="dashboard-config-legend-height-unit-inactive"]');
+    // Pie/donut only: multi-select toggle group with "value" and "percent" items
+    this.legendValues = page.locator('[data-test="dashboard-config-legend-values"]');
 
     // Gauge & Maps
     this.geomapRenderer = page.locator('[data-test="dashboard-geomap-renderer"]');
@@ -287,6 +289,19 @@ export default class DashboardPanelConfigs {
     this.mapsNameLabel = page.locator('[data-test="dashboard-config-maps-name-label"]');
     this.promqlLegend = page.locator('[data-test="dashboard-config-promql-legend"]');
     this.addQueryBtn = page.locator('[data-test="dashboard-panel-query-tab-add"]');
+    this.promqlSeriesLimit = page.locator('[data-test="dashboard-config-promql-series-limit"]');
+    this.promqlSeriesLimitField = this.promqlSeriesLimit.locator('[data-test$="-field"]');
+    this.promqlQueryTypeTrigger = page.locator('[data-test="dashboard-promql-builder-query-type-trigger"]');
+    this.mapRoam = page.locator('[data-test="dashboard-config-map-roam"]');
+    this.mapRoamBtn = this.mapRoam.locator('[data-test$="-btn"]');
+    this.thresholdsShowAs = page.locator('[data-test="dashboard-config-thresholds-show-as"]');
+    this.thresholdsShowAsTrigger = page.locator('[data-test="dashboard-config-thresholds-show-as-trigger"]');
+    this.thresholdsAddStep = page.locator('[data-test="dashboard-config-thresholds-add-step"]');
+    this.thresholdStepValueFields = page.locator(
+      '[data-test^="dashboard-config-thresholds-step-"][data-test$="-value-field"]'
+    );
+    this.thresholdStepValueField = (index) =>
+      page.locator(`[data-test="dashboard-config-thresholds-step-${index}-value-field"]`);
 
     // Heatmap colour settings
     this.heatmapColorMin = page.locator('[data-test="dashboard-config-heatmap_color_min"]');
@@ -318,6 +333,42 @@ export default class DashboardPanelConfigs {
     this.heatmapYMax = page.locator('[data-test="dashboard-config-heatmap_y_max"]');
     this.heatmapYMaxField = page.locator('[data-test="dashboard-config-heatmap_y_max-field"]');
     this.heatmapYMaxError = page.locator('[data-test="dashboard-config-heatmap_y_max-error"]');
+  }
+
+  /** Types a PromQL series limit into the config sidebar input. */
+  async setPromqlSeriesLimit(limit) {
+    await this.scrollSidebarToElement(this.promqlSeriesLimit);
+    await this.promqlSeriesLimitField.fill(String(limit));
+  }
+
+  /** Picks Range or Instant in the PromQL custom-mode query type select. */
+  async selectPromqlQueryType(label) {
+    await this.selectConfigOption("dashboard-promql-builder-query-type", label);
+  }
+
+  /** Picks the reducer, e.g. "Max (maximum value)", in the aggregation select. */
+  async selectAggregation(label) {
+    await this.selectConfigOption("dashboard-config-aggregation", label);
+  }
+
+  /** Picks how thresholds draw, e.g. "Shaded band" or "Limit line only". */
+  async selectThresholdsShowAs(label) {
+    await this.scrollSidebarToElement(this.thresholdsShowAs);
+    await this.selectConfigOption("dashboard-config-thresholds-show-as", label);
+  }
+
+  /** Adds a threshold step and sets its value. */
+  async addThresholdStep(value) {
+    const index = await this.thresholdStepValueFields.count();
+    await this.thresholdsAddStep.click();
+    const field = this.thresholdStepValueField(index);
+    await field.fill(String(value));
+    await field.press("Tab");
+  }
+
+  async toggleMapRoam() {
+    await this.scrollSidebarToElement(this.mapRoam);
+    await this.mapRoam.click();
   }
   async _clickVirtualOption(dataTestParent, label) {
     const option = this.page.locator(
@@ -370,6 +421,83 @@ export default class DashboardPanelConfigs {
   // dropdown trigger to open.
   async legendPosition(position) {
     await this._clickVirtualOption("dashboard-config-legend-position", position);
+  }
+
+  // Select legend type ("Auto" | "Plain" | "Scroll"). OToggleGroup, items always rendered.
+  async selectLegendsType(type) {
+    await this._clickVirtualOption("dashboard-config-legends-scrollable", type);
+  }
+
+  /**
+   * Legend values toggle item for a pie/donut panel.
+   * @param {"value"|"percent"} key - the item's value, carried in data-test-label
+   */
+  getLegendValuesOption(key) {
+    return this.page.locator(
+      `[data-test="dashboard-config-legend-values-option"][data-test-label="${key}"]`
+    );
+  }
+
+  /**
+   * Bring the Legend values toggle group to exactly the given selection.
+   * Clicks only the items whose state differs, then waits for each to reflect it.
+   * @param {Array<"value"|"percent">} keys - items that should end up pressed
+   */
+  async setLegendValues(keys) {
+    await this.scrollSidebarToElement(this.legendValues);
+    for (const key of ["value", "percent"]) {
+      const option = this.getLegendValuesOption(key);
+      const wanted = keys.includes(key) ? "on" : "off";
+      if ((await option.getAttribute("data-state")) !== wanted) {
+        await option.click();
+      }
+      await expect(option).toHaveAttribute("data-state", wanted, { timeout: 5000 });
+    }
+  }
+
+  /** Flip the Show Legends switch. */
+  async toggleShowLegends() {
+    await this.showLegend.click();
+  }
+
+  /**
+   * Assert the Legend values control is shown (both items) or absent.
+   * @param {boolean} visible
+   */
+  async expectLegendValuesVisible(visible = true) {
+    if (!visible) {
+      await expect(this.legendValues).toBeHidden();
+      return;
+    }
+    await this.scrollSidebarToElement(this.legendValues);
+    await expect(this.getLegendValuesOption("value")).toBeVisible();
+    await expect(this.getLegendValuesOption("percent")).toBeVisible();
+  }
+
+  /**
+   * Assert the PromQL Aggregation Function selector is shown or hidden.
+   * @param {boolean} visible
+   */
+  async expectAggregationVisible(visible = true) {
+    if (visible) {
+      await expect(this.aggregation).toBeVisible();
+    } else {
+      await expect(this.aggregation).toBeHidden();
+    }
+  }
+
+  /**
+   * Assert the Legend values toggle group shows exactly the given selection.
+   * @param {Array<"value"|"percent">} keys - items expected to be pressed
+   */
+  async expectLegendValuesSelected(keys) {
+    await this.scrollSidebarToElement(this.legendValues);
+    for (const key of ["value", "percent"]) {
+      await expect(this.getLegendValuesOption(key)).toHaveAttribute(
+        "data-state",
+        keys.includes(key) ? "on" : "off"
+      );
+    }
   }
 
   // Select chart alignment ("Auto" | "Left" | "Center"). Same OToggleGroup shape as

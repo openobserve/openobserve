@@ -105,7 +105,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { CATALOG, PALETTE_MIME, type CatalogItem, type EditorKind } from "./editorGraph";
+import { CATALOG, PALETTE_MIME, typeKey, type CatalogItem, type EditorKind } from "./editorGraph";
 
 const emit = defineEmits<{ add: [item: CatalogItem] }>();
 const collapsed = defineModel<boolean>("collapsed", { default: false });
@@ -123,7 +123,8 @@ const CHIP: Record<EditorKind, string> = {
 
 const sections = computed(() => {
   const q = search.value.trim().toLowerCase();
-  const match = (i: CatalogItem) => !q || i.name.toLowerCase().includes(q) || i.type.includes(q);
+  const match = (i: CatalogItem) =>
+    !q || i.name.toLowerCase().includes(q) || typeKey(i.kind, i.type).includes(typeKey(i.kind, q));
   const of = (kind: EditorKind) => CATALOG.filter((i) => i.kind === kind && match(i));
   return [
     { kind: "receiver", label: t("fleet.editor.receivers"), items: of("receiver") },

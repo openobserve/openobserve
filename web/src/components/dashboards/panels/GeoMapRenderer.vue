@@ -55,6 +55,7 @@ import {
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
+import { reclusterSeries } from "@/utils/dashboard/geoMapCluster";
 
 echarts.use([
   TitleComponent,
@@ -97,13 +98,25 @@ export default defineComponent({
     let tiledMap: any;
     let appliedView = "";
 
+    const getLeaflet = () => chart?.getModel()?.getComponent("lmap")?.getLeaflet();
+
+    // Clusters are cut at one zoom level, so a zoom regroups the raw points for the new level.
+    const onZoomEnd = () => {
+      const lmap = getLeaflet();
+      const series = props.data.options?.series;
+      if (!lmap || !Array.isArray(series) || !series.some((s: any) => s?._clusterSource)) return;
+      chart?.setOption({ series: reclusterSeries(series, lmap.getZoom()) });
+    };
+    const bindRecluster = (lmap: any) => {
+      lmap.off("zoomend", onZoomEnd);
+      lmap.on("zoomend", onZoomEnd);
+    };
+
     const windowResizeEventCallback = async () => {
       await nextTick();
       await nextTick();
       chart?.resize();
     };
-
-    const getLeaflet = () => chart?.getModel()?.getComponent("lmap")?.getLeaflet();
 
     const applyOptions = () => {
       if (!chart) return;
@@ -131,6 +144,7 @@ export default defineComponent({
         }).addTo(lmap);
         tiledMap = lmap;
         appliedView = "";
+        bindRecluster(lmap);
       }
       if (view !== appliedView && lmapOptions?.center) {
         lmap.setView([lmapOptions.center[1], lmapOptions.center[0]], lmapOptions.zoom);

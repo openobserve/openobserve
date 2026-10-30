@@ -30,6 +30,20 @@ export type DimensionCondition =
   | { type: "group"; op: LogicalOp; items: DimensionCondition[] }
   | { type: "pair"; key: string; operator: PairOperator; value: string };
 
+/** One group of one alert; `group_key` is the hashed label-set identity. */
+export interface AlertGroupRef {
+  alert_id: string;
+  group_key: string;
+  /** Captured at mute time; older nodes send none. */
+  group_labels?: Record<string, string> | null;
+}
+
+/** Set only by "Until it clears"; a null `group_key` ends when no group of the alert is firing. */
+export interface EndOnClear {
+  alert_id: string;
+  group_key?: string | null;
+}
+
 export interface DowntimeTarget {
   module: TargetModule;
   folders: TargetFolders;
@@ -93,6 +107,9 @@ export interface Downtime {
   updated_at: number;
   /** Bumped by every write; an edit that sends the version it loaded is refused once it moved. */
   version?: number;
+  /** When set, the downtime mutes only these groups of its alert targets. */
+  alert_groups?: AlertGroupRef[] | null;
+  end_on_clear?: EndOnClear | null;
 }
 
 export interface DowntimeWindow {
@@ -158,6 +175,8 @@ export interface DowntimeRequest {
   notifications?: DowntimeNotifications;
   /** The loaded row's version; a newer stored row answers 409. */
   version?: number;
+  alert_groups?: AlertGroupRef[];
+  end_on_clear?: EndOnClear;
 }
 
 /** Exactly one of the two, with the loaded row's version when known. */
@@ -232,6 +251,8 @@ export interface ActiveDowntime {
   id: string;
   name: string;
   ends_at: number;
+  end_on_clear?: EndOnClear | null;
+  alert_groups?: AlertGroupRef[] | null;
 }
 
 export interface CorrectionRef {

@@ -83,10 +83,10 @@ function onKeydown(event: KeyboardEvent) {
       type="button"
       :text-value="textValue"
       :aria-describedby="description ? descriptionDomId : undefined"
-      class="group/sub rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-start transition-colors duration-150 outline-none select-none"
+      class="group/sub rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-start transition-colors duration-(--duration-hover-out) outline-none select-none data-[highlighted]:duration-(--duration-hover-in)"
     >
       <slot name="icon-left" />
-      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-1">
+      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span><slot name="trigger" /></span>
         <OText
           :id="descriptionDomId"
@@ -106,7 +106,7 @@ function onKeydown(event: KeyboardEvent) {
         :collision-padding="8"
         :hide-when-detached="true"
         :style="{ zIndex: contentZIndex }"
-        class="bg-dropdown-bg border-dropdown-border rounded-default text-dropdown-item-text max-h-[var(--reka-popper-available-height,75vh)] max-w-[calc(100vw-1rem)] min-w-40 overflow-y-auto border p-1 text-sm shadow-md"
+        class="bg-dropdown-bg rounded-default text-dropdown-item-text shadow-overlay max-h-[var(--reka-popper-available-height,75vh)] max-w-[calc(100vw-1rem)] min-w-40 overflow-y-auto border border-transparent p-1 text-sm"
         @keydown.capture="onKeydown"
         @pointer-down-outside="onPointerDownOutside"
       >

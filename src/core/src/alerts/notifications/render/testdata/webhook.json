@@ -33,6 +33,7 @@
       "web-1"
     ],
     "org_name": "default",
+    "recovery_reason": null,
     "stream_name": "app",
     "stream_type": "logs"
   },

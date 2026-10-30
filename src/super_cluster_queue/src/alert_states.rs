@@ -62,19 +62,30 @@ async fn process_msg(msg: AlertStateMessage) -> Result<()> {
             // region's `alerts` table, so a plan that outran its alert row is
             // dropped rather than stranding group rows under an alert this
             // region has never heard of. It converges on the next evaluation.
-            table::alert_states::persist_group_plan(&plan, &alert_id).await?;
+            table::alert_states::persist_group_plan(
+                &plan,
+                &alert_id,
+                table::alert_states::PlanApply::Replica,
+            )
+            .await?;
         }
         AlertStateMessage::AdvanceDeliveryState {
             alert_id,
             group_key,
             episode,
             outcome,
+            mint_episode_id,
         } => {
-            // The return value says whether the episode guard still matched.
-            // `false` is not an error here: it means this region's row had
-            // already moved on, which is exactly what the guard is for.
-            table::alert_states::advance_delivery_state(&alert_id, &group_key, episode, outcome)
-                .await?;
+            // A refused guard is not an error here: this region's row had already
+            // moved on, which is what the guard is for. The mint still lands.
+            table::alert_states::advance_delivery_state(
+                &alert_id,
+                &group_key,
+                episode,
+                outcome,
+                mint_episode_id.as_deref(),
+            )
+            .await?;
         }
         AlertStateMessage::DeleteGroups {
             alert_id,
@@ -155,6 +166,66 @@ mod tests {
             MessageType::AlertStatesTable,
         );
         assert!(process(msg).await.is_err());
+    }
+
+    /// AC-P2.1.6
+    #[test]
+    fn a_state_message_from_an_older_region_has_no_firing_cycle_and_matches_no_ack() {
+        use config::meta::alerts::{
+            ack::AlertAck,
+            state::{AlertState, StateUpdate},
+        };
+
+        let mut state = AlertState::empty("alert-1", "");
+        state.firing_started_at = Some(1_000);
+        let mut value = config::utils::json::to_value(AlertStateMessage::Persist {
+            update: StateUpdate {
+                state: Some(state),
+                transition: None,
+            },
+            ledger: None,
+        })
+        .unwrap();
+        let text = value.to_string();
+        assert!(
+            text.contains("firing_started_at"),
+            "today's region sends it"
+        );
+        strip_key(&mut value, "firing_started_at");
+
+        let msg = Message::new(
+            "/alert_states/".to_string(),
+            Some(config::utils::json::to_vec(&value).unwrap().into()),
+            None,
+            false,
+            MessageType::AlertStatesTable,
+        );
+        let AlertStateMessage::Persist { update, .. } = msg.try_into().unwrap() else {
+            panic!("decoded as another variant");
+        };
+        let decoded = update.state.unwrap().firing_started_at;
+        assert_eq!(decoded, None);
+        let ack = AlertAck {
+            firing_started_at: 1_000,
+            ..Default::default()
+        };
+        assert!(
+            !ack.in_force_for(decoded),
+            "no ack may match an unknown firing"
+        );
+    }
+
+    fn strip_key(value: &mut config::utils::json::Value, key: &str) {
+        match value {
+            config::utils::json::Value::Object(map) => {
+                map.remove(key);
+                map.values_mut().for_each(|v| strip_key(v, key));
+            }
+            config::utils::json::Value::Array(items) => {
+                items.iter_mut().for_each(|v| strip_key(v, key));
+            }
+            _ => {}
+        }
     }
 
     /// The one hazard this file exists to avoid.
