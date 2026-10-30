@@ -447,8 +447,8 @@ export function buildSQLChartQuery(config: {
   // HAVING clause - support multiple fields from y-axis and z-axis
   const havingClauses: string[] = [];
 
-  // Process y-axis having conditions (skip for heatmap)
-  if (chartType !== "heatmap") {
+  // Process y-axis having conditions (skip for heatmap and raw-value charts, which are not grouped)
+  if (chartType !== "heatmap" && !isRawValueChart(chartType)) {
     queryData.fields.y.forEach((field: any) => {
       if (
         field?.havingConditions?.[0]?.operator &&

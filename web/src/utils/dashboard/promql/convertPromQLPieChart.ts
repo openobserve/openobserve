@@ -99,6 +99,7 @@ export class PieConverter implements PromQLChartConverter {
           chartMax,
           store.state.theme,
           config.color?.colorBySeries,
+          config,
         );
 
       data.push({
