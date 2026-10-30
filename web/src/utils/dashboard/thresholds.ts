@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-import { colorToRgba } from "./colorPalette";
+import { colorToRgba, getAreaFillOpacity } from "./colorPalette";
 import { createSeriesOverrideLookup, resolveSeriesOverride } from "./seriesOverrides";
 import { chartColor, chartNumber } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
@@ -22,7 +22,7 @@ import { gt } from "@/types/i18n";
 import echartsTokens from "echarts/lib/visual/tokens.js";
 
 export type ThresholdMode = "absolute" | "percentage";
-export type ThresholdShowAs = "color_line" | "color" | "line" | "color_band";
+export type ThresholdShowAs = "color_line" | "color" | "line" | "color_band" | "dashed_line";
 
 export interface ThresholdStep {
   value: number;
@@ -46,8 +46,26 @@ export type GaugeColorStop = [number, string];
 /** The axis that carries values: y for vertical charts, x for h-bar. */
 export type ValueAxisKey = "xAxis" | "yAxis";
 
-const SHOW_AS: readonly ThresholdShowAs[] = ["color_line", "color", "line", "color_band"];
-const THRESHOLD_CHART_TYPES = new Set(["line", "area", "area-stacked", "bar", "h-bar", "scatter"]);
+const SHOW_AS: readonly ThresholdShowAs[] = [
+  "color_line",
+  "color",
+  "line",
+  "color_band",
+  "dashed_line",
+];
+/** Show-as values that draw limit lines without colouring the series. */
+const LINE_ONLY_SHOW_AS: readonly ThresholdShowAs[] = ["line", "dashed_line"];
+const THRESHOLD_CHART_TYPES = new Set([
+  "line",
+  "area",
+  "area-stacked",
+  "bar",
+  "h-bar",
+  "stacked",
+  "h-stacked",
+  "scatter",
+]);
+const STACKED_CHART_TYPES = new Set(["area-stacked", "stacked", "h-stacked"]);
 const GAUGE_BAND_ALPHA = 0.28;
 const AREA_BAND_ALPHA = 0.12;
 const LIMIT_LINE_WIDTH = 1.5;
@@ -58,6 +76,7 @@ const LIMIT_DASHES: number[][] = [
   [5, 3],
   [2, 2],
 ];
+const UNIFORM_DASH = [6, 4];
 // Override lines label on the left (alternating) so they never sit on the panel's right-hand labels.
 const OVERRIDE_LABEL_POSITIONS = ["insideStartTop", "insideMiddleTop"];
 
@@ -188,7 +207,10 @@ export const buildLimitLineData = (
       [axis]: step.value,
       lineStyle: {
         color: step.color,
-        type: limitDash(index, thresholds.steps.length),
+        type:
+          thresholds.showAs === "dashed_line"
+            ? UNIFORM_DASH
+            : limitDash(index, thresholds.steps.length),
         width: LIMIT_LINE_WIDTH,
       },
       label: {
@@ -249,7 +271,13 @@ export const gaugeDialRange = (min: any, max: any, unit: unknown): { min: any; m
   const unset = (value: any, fallback: number) =>
     value === null || value === undefined || value === "" || Number(value) === fallback;
   if (unit === "percent-1" && unset(min, 0) && unset(max, 100)) return { min: 0, max: 1 };
-  return { min: min || 0, max: max || 100 };
+  const blank = (value: any) => value === null || value === undefined || value === "";
+  const low = blank(min) ? 0 : min;
+  const high = blank(max) ? 100 : max;
+  // An empty or inverted span cannot be drawn; keep the 100-wide dial such panels always showed.
+  return Number(high) > Number(low)
+    ? { min: low, max: high }
+    : { min: low, max: Number(low) + 100 };
 };
 
 /** Recolours one gauge series: arc bands from the steps, progress and pointer in the value's step colour. */
@@ -264,8 +292,10 @@ export const applyGaugeThresholds = (
   const max = toNumber(gauge.max) ?? 100;
   const resolved = resolveStepValues(thresholds, { min, max });
   if (!resolved) return;
-  const current: string = item.itemStyle?.color ?? fallbackColor;
-  item.itemStyle = { ...item.itemStyle, color: stepColorFor(item.value, resolved, current) };
+  const current: string = (gauge._mappedColor ? null : item.itemStyle?.color) ?? fallbackColor;
+  // A value-mapping colour outranks the step colour, as on the metric chart.
+  const color = gauge._mappedColor ?? stepColorFor(item.value, resolved, current);
+  item.itemStyle = { ...item.itemStyle, color };
   gauge.axisLine = {
     ...gauge.axisLine,
     lineStyle: {
@@ -332,7 +362,7 @@ export const getLineAreaPercentRange = (
   return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null;
 };
 
-/** Percentage range of a stacked chart: the axis shows per-x totals of each stack group, starting at 0. */
+/** Percentage range of a stacked chart: per-x positive and negative stack extents of each stack group, spanning 0. */
 export const getStackedPercentRange = (
   config: any,
   series: any[],
@@ -341,19 +371,22 @@ export const getStackedPercentRange = (
   const yMin = toNumber(config?.y_axis_min);
   const yMax = toNumber(config?.y_axis_max);
   if (yMin !== null && yMax !== null) return { min: yMin, max: yMax };
+  // ECharts stacks positive and negative values apart, so each sign has its own extent.
   const totals = new Map<string, number>();
-  for (const s of series) {
+  series.forEach((s, seriesIndex) => {
+    // A series without a stack key is drawn on its own, beside the others.
+    const group = s.stack ?? `\u0000${seriesIndex}`;
     s.data.forEach((point: unknown, index: number) => {
       const value = pointValue(point, dimension);
       if (value === null) return;
       const x = Array.isArray(point) ? String(point[dimension === 1 ? 0 : 1]) : String(index);
-      const key = `${s.stack ?? ""}\u0000${x}`;
+      const key = `${group}\u0000${x}\u0000${value < 0 ? "-" : "+"}`;
       totals.set(key, (totals.get(key) ?? 0) + value);
     });
-  }
+  });
   if (totals.size === 0) return null;
   const sums = [...totals.values()];
-  return { min: Math.min(0, ...sums), max: Math.max(...sums) };
+  return { min: Math.min(0, ...sums), max: Math.max(0, ...sums) };
 };
 
 /** Empty series that carries the limit lines and bands of one grid, so they show once and survive legend toggles. */
@@ -389,6 +422,15 @@ const extendAxisToLimits = (
   const low = Math.min(...limits);
   const userMax = toNumber(config?.y_axis_max) !== null || typeof axis.max === "number";
   const userMin = toNumber(config?.y_axis_min) !== null || typeof axis.min === "number";
+  // A bar track pinned to the data max still has to reach the limit lines.
+  if (
+    config?.show_bar_track &&
+    toNumber(config?.y_axis_max) === null &&
+    typeof axis.max === "number"
+  ) {
+    const target = high + (high - Math.min(low, 0)) * 0.1;
+    if (axis.max < target) axis.max = niceBound(target, true);
+  }
   // Returning null keeps ECharts' own nice extent whenever the data already clears the limits.
   if (!userMax) {
     axis.max = (extent: { min: number; max: number }) => {
@@ -460,11 +502,11 @@ const categoryNames = (options: any, horizontal: boolean): unknown[] => {
   return Array.isArray(axis?.data) ? axis.data : [];
 };
 
-/** Adds threshold colouring, limit lines and bands to line, area, bar, h-bar and scatter; call it on the final series list, as visualMaps address series by index. */
+/** Adds threshold colouring, limit lines and bands to line, area, bar, h-bar, stacked bars and scatter; call it on the final series list, as visualMaps address series by index. */
 export const applyLineAreaThresholds = (options: any, panelSchema: any): void => {
   if (!THRESHOLD_CHART_TYPES.has(panelSchema?.type) || !Array.isArray(options?.series)) return;
   const config = panelSchema.config;
-  const horizontal = panelSchema.type === "h-bar";
+  const horizontal = panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
   const dimension = horizontal ? 0 : 1;
   const valueAxis: ValueAxisKey = horizontal ? "xAxis" : "yAxis";
   const targets: Array<{ series: any; name: string; index: number; item?: any }> = [];
@@ -485,7 +527,7 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     .filter((target): target is typeof target & { thresholds: Thresholds } => !!target.thresholds);
   if (withSteps.length === 0) return;
 
-  const stacked = panelSchema.type === "area-stacked";
+  const stacked = STACKED_CHART_TYPES.has(panelSchema.type);
   let percentRange: ValueRange | null | undefined;
   const rangeFor = (thresholds: Thresholds) => {
     if (thresholds.mode !== "percentage") return null;
@@ -498,7 +540,9 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     return percentRange;
   };
   const overrides = createSeriesOverrideLookup(config);
-  const areaFillOpacity = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
+  const areaFillOpacity =
+    getAreaFillOpacity(panelSchema.type, config) ??
+    chartNumber("--chart-area-fill-bottom-opacity", 0.4);
 
   const visualMaps: any[] = [];
   const markerSeries = new Map<string, any>();
@@ -514,13 +558,15 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     const resolved = resolveStepValues(thresholds, rangeFor(thresholds));
     if (!resolved) continue;
     stepsBySeries.set(name, resolved);
-    const colours = !stacked && resolved.showAs !== "line";
+    const colours = !stacked && !LINE_ONLY_SHOW_AS.includes(resolved.showAs);
     if (colours && item) {
       // A bar's own itemStyle outranks a visualMap, so item-coloured bars are recoloured directly.
       const color = stepColorFor(pointValue(item, dimension), resolved, null);
       if (color) item.itemStyle = { ...item.itemStyle, color };
     } else if (colours) {
       visualMaps.push(buildThresholdVisualMap(resolved, index, dimension));
+      // Large-mode bars take one colour per series, so a visualMap could not recolour them.
+      if (series.large) series.large = false;
       // An explicit area fill colour outranks the visualMap, so the fill would keep the series colour.
       if (series.areaStyle?.color !== undefined) {
         const { color: _fill, ...areaStyle } = series.areaStyle;
@@ -587,7 +633,10 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
   limitsByAxis.forEach((limits, axisIndex) =>
     extendAxisToLimits(options, valueAxis, axisIndex, limits, config),
   );
-  addTooltipCues(options.tooltip, stepsBySeries, overrides.formatValue, dimension);
+  // A stacked limit is read against the stack height, not one segment's value.
+  if (!stacked) {
+    addTooltipCues(options.tooltip, stepsBySeries, overrides.formatValue, dimension);
+  }
 
   if (visualMaps.length) {
     const existing = options.visualMap;

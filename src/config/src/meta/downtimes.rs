@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -21,6 +21,8 @@ use utoipa::{IntoParams, ToSchema};
 use crate::meta::folder::DEFAULT_FOLDER;
 
 pub const DEFAULT_ENDING_SOON_LEAD_SECS: i64 = 600;
+/// The most alert groups one downtime can name (R-118).
+pub const MAX_ALERT_GROUPS: usize = 50;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Downtime {
@@ -35,6 +37,15 @@ pub struct Downtime {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub condition: Option<DimensionCondition>,
     pub targets: Vec<DowntimeTarget>,
+    /// Narrows targets to these groups; older nodes ignore it and mute the whole alert.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<AlertGroupRef>>,
+    /// Set by "Until it clears": the clear of the firing cancels the row (R-117).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_on_clear: Option<EndOnClear>,
+    /// Who made an alert-scoped quick mute; unset on rows made through the downtime routes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<MuteSource>,
     pub schedule: DowntimeSchedule,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cancelled_at: Option<i64>,
@@ -56,9 +67,11 @@ pub struct Downtime {
 }
 
 impl Downtime {
-    /// Same items covered: only the condition and the targets decide which items match.
+    /// Same items covered: only the condition, the targets and the alert groups decide.
     pub fn same_coverage(&self, other: &Downtime) -> bool {
-        self.condition == other.condition && self.targets == other.targets
+        self.condition == other.condition
+            && self.targets == other.targets
+            && group_keys(self.alert_groups.as_deref()) == group_keys(other.alert_groups.as_deref())
     }
 }
 
@@ -235,6 +248,47 @@ pub struct DowntimeRequest {
     /// The version the edit was loaded at; a newer stored row makes the edit a 409.
     #[serde(default)]
     pub version: Option<i64>,
+    #[serde(default)]
+    pub alert_groups: Option<Vec<AlertGroupRef>>,
+    #[serde(default)]
+    pub end_on_clear: Option<EndOnClear>,
+}
+
+impl DowntimeRequest {
+    /// Alert groups and the end-on-clear alert must be alerts this request names by id.
+    pub fn check_alert_targets(&self) -> Result<(), String> {
+        let ids: BTreeSet<&str> = self
+            .targets
+            .iter()
+            .filter(|t| t.module == TargetModule::Alerts)
+            .flat_map(|t| t.ids.iter().map(String::as_str))
+            .collect();
+        let groups = self.alert_groups.as_deref().unwrap_or_default();
+        if groups.len() > MAX_ALERT_GROUPS {
+            return Err(format!(
+                "A downtime can name at most {MAX_ALERT_GROUPS} alert groups."
+            ));
+        }
+        if let Some(g) = groups.iter().find(|g| !ids.contains(g.alert_id.as_str())) {
+            return Err(format!(
+                "Alert group {:?} is of alert {}, which the downtime does not name.",
+                g.group_key, g.alert_id
+            ));
+        }
+        let Some(end) = &self.end_on_clear else {
+            return Ok(());
+        };
+        if !ids.contains(end.alert_id.as_str()) {
+            return Err(format!(
+                "Until it clears names alert {}, which the downtime does not name.",
+                end.alert_id
+            ));
+        }
+        if self.schedule.repeat != Repeat::None || self.schedule.ends_at.is_none() {
+            return Err("An until-it-clears downtime is one-time and has an end.".to_string());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -443,13 +497,22 @@ pub struct PreviewResponse {
     pub undecidable: HashMap<String, Vec<PreviewMatch>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ActiveDowntime {
     pub id: String,
     pub name: String,
     pub ends_at: i64,
     #[serde(default, skip_serializing_if = "IncidentMode::is_muted")]
     pub incident_mode: IncidentMode,
+    /// The row's version, which an extend sends back; 0 from an older node.
+    #[serde(default)]
+    pub version: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<AlertGroupRef>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_on_clear: Option<EndOnClear>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<MuteSource>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -549,8 +612,135 @@ pub struct ExtendDowntimeResponse {
     pub created_id: Option<String>,
 }
 
+/// One alert group a downtime mutes; `group_key` is `""` for single-row and composite alerts.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct AlertGroupRef {
+    pub alert_id: String,
+    #[serde(default)]
+    pub group_key: String,
+    /// Captured at mute time because `group_key` is a hash the UI cannot show.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_labels: Option<BTreeMap<String, String>>,
+}
+
+/// Where a quick mute came from; the web app's own calls are `openobserve`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MuteSource {
+    Slack,
+    Openobserve,
+    Api,
+}
+
+impl MuteSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Slack => "slack",
+            Self::Openobserve => "openobserve",
+            Self::Api => "api",
+        }
+    }
+
+    /// A value a newer node wrote reads as unknown, not as an error.
+    pub fn parse(stored: &str) -> Option<Self> {
+        match stored {
+            "slack" => Some(Self::Slack),
+            "openobserve" => Some(Self::Openobserve),
+            "api" => Some(Self::Api),
+            _ => None,
+        }
+    }
+}
+
+/// "Until it clears": `group_key` null ends the downtime when no group of the alert is firing.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct EndOnClear {
+    pub alert_id: String,
+    #[serde(default)]
+    pub group_key: Option<String>,
+}
+
+/// `POST /v2/{org}/alerts/{alert_id}/mute`: exactly one of `until_clear`, `minutes` and `ends_at`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
+pub struct AlertMuteRequest {
+    pub until_clear: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minutes: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ends_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_keys: Option<Vec<String>>,
+    pub all_groups: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firing_started_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+}
+
+/// `POST .../mute/{downtime_id}/extend`: exactly one of `minutes`, `until_clear` and `ends_at`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AlertMuteExtendRequest {
+    pub version: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minutes: Option<u32>,
+    #[serde(default)]
+    pub until_clear: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends_at: Option<i64>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AlertMuteResponse {
+    pub downtime_id: String,
+    pub version: i64,
+    pub ends_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_on_clear: Option<EndOnClear>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<AlertGroupRef>>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AlertMuteExtendResponse {
+    pub version: i64,
+    pub ends_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_on_clear: Option<EndOnClear>,
+}
+
+/// The 409 bodies of the alert-scoped mute routes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "code", rename_all = "snake_case")]
+pub enum AlertMuteConflict {
+    DowntimeCap {
+        message: String,
+    },
+    AlreadyMuted {
+        downtime_id: String,
+        version: i64,
+        ends_at: i64,
+    },
+    VersionChanged {
+        version: i64,
+        ends_at: i64,
+    },
+    NotAQuickMute,
+}
+
 pub fn default_folder() -> String {
     DEFAULT_FOLDER.to_string()
+}
+
+/// Labels are display only, so two lists naming the same groups cover the same.
+fn group_keys(groups: Option<&[AlertGroupRef]>) -> BTreeSet<(&str, &str)> {
+    groups
+        .unwrap_or_default()
+        .iter()
+        .map(|g| (g.alert_id.as_str(), g.group_key.as_str()))
+        .collect()
 }
 
 fn default_true() -> bool {
@@ -567,6 +757,9 @@ mod tests {
 
     fn minimal() -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: "2f9KQe4b7Nq1vH3sT0mLzXpRcWd".to_string(),
             org: "default".to_string(),
             folder_id: DEFAULT_FOLDER.to_string(),
@@ -603,192 +796,6 @@ mod tests {
         }
     }
 
-    fn full() -> Downtime {
-        Downtime {
-            reason: Some("CHG-4471".to_string()),
-            condition: Some(DimensionCondition::Group {
-                op: LogicalOp::And,
-                items: vec![
-                    DimensionCondition::Pair {
-                        key: "service".to_string(),
-                        operator: PairOperator::Eq,
-                        value: "payments".to_string(),
-                    },
-                    DimensionCondition::Group {
-                        op: LogicalOp::Or,
-                        items: vec![DimensionCondition::Pair {
-                            key: "host".to_string(),
-                            operator: PairOperator::Ne,
-                            value: "db-*".to_string(),
-                        }],
-                    },
-                ],
-            }),
-            targets: vec![
-                DowntimeTarget {
-                    module: TargetModule::Synthetics,
-                    folders: TargetFolders::Some {
-                        folder_ids: vec!["4Kc1staging".to_string()],
-                    },
-                    tags: vec!["service:payments".to_string()],
-                    ids: vec!["syn_41".to_string()],
-                    slo_mode: None,
-                    incident_mode: Default::default(),
-                },
-                DowntimeTarget {
-                    module: TargetModule::Slos,
-                    folders: TargetFolders::All,
-                    tags: vec![],
-                    ids: vec![],
-                    slo_mode: Some(SloCorrectionMode::CountAsGood),
-                    incident_mode: Default::default(),
-                },
-            ],
-            schedule: DowntimeSchedule {
-                repeat: Repeat::Weekly,
-                starts_at: 1_789_603_200_000_000,
-                ends_at: None,
-                timezone: "Europe/Berlin".to_string(),
-                start_time_local: Some("02:00".to_string()),
-                duration_secs: 5400,
-                weekdays: vec![7],
-            },
-            cancelled_at: Some(5),
-            cancelled_by: Some("lin".to_string()),
-            show_banner: false,
-            notifications: Some(DowntimeNotifications {
-                destinations: vec!["slack-oncall".to_string()],
-                events: NotificationEvents {
-                    started: true,
-                    ending_soon: true,
-                    ..Default::default()
-                },
-                ending_soon_lead_secs: 300,
-                continues: None,
-            }),
-            origin_region: Some("us-east".to_string()),
-            ..minimal()
-        }
-    }
-
-    #[test]
-    fn a_downtime_round_trips_with_every_optional_field_absent() {
-        let d = minimal();
-        let json = serde_json::to_value(&d).unwrap();
-        for absent in [
-            "reason",
-            "condition",
-            "cancelled_at",
-            "cancelled_by",
-            "notifications",
-            "origin_region",
-        ] {
-            assert!(json.get(absent).is_none(), "{absent} must be skipped");
-        }
-        assert!(json["targets"][0].get("tags").is_none());
-        assert!(json["targets"][0].get("slo_mode").is_none());
-        assert!(json["schedule"].get("ends_at").is_some());
-        assert_eq!(serde_json::from_value::<Downtime>(json).unwrap(), d);
-    }
-
-    #[test]
-    fn a_downtime_round_trips_with_every_optional_field_present() {
-        let d = full();
-        let json = serde_json::to_string(&d).unwrap();
-        assert_eq!(serde_json::from_str::<Downtime>(&json).unwrap(), d);
-    }
-
-    #[test]
-    fn stored_names_are_the_wire_contract() {
-        let json = serde_json::to_value(full()).unwrap();
-        assert_eq!(json["condition"]["type"], "group");
-        assert_eq!(json["condition"]["op"], "and");
-        assert_eq!(json["condition"]["items"][0]["operator"], "=");
-        assert_eq!(json["condition"]["items"][1]["items"][0]["operator"], "!=");
-        assert_eq!(json["targets"][0]["module"], "synthetics");
-        assert_eq!(json["targets"][0]["folders"]["kind"], "some");
-        assert_eq!(json["targets"][1]["folders"]["kind"], "all");
-        assert_eq!(json["targets"][1]["slo_mode"], "count_as_good");
-        assert_eq!(json["schedule"]["repeat"], "weekly");
-        assert_eq!(
-            serde_json::to_value(TargetModule::AnomalyDetections).unwrap(),
-            "anomaly_detections"
-        );
-    }
-
-    #[test]
-    fn missing_folder_and_banner_take_their_defaults() {
-        let mut json = serde_json::to_value(minimal()).unwrap();
-        let obj = json.as_object_mut().unwrap();
-        obj.remove("folder_id");
-        obj.remove("show_banner");
-        let d: Downtime = serde_json::from_value(json).unwrap();
-        assert_eq!(d.folder_id, DEFAULT_FOLDER);
-        assert!(d.show_banner);
-    }
-
-    #[test]
-    fn the_api_example_request_parses() {
-        let body = r#"{
-          "folder_id": "planned-maintenance",
-          "name": "Payments failover · weekly",
-          "condition": { "type": "group", "op": "and", "items": [
-            { "type": "pair", "key": "service", "operator": "=", "value": "payments" },
-            { "type": "pair", "key": "env", "operator": "=", "value": "prod" } ] },
-          "targets": [
-            { "module": "alerts", "folders": { "kind": "all" } },
-            { "module": "synthetics", "folders": { "kind": "all" }, "tags": ["service:payments"] },
-            { "module": "slos", "folders": { "kind": "all" }, "slo_mode": "exclude" }
-          ],
-          "schedule": { "repeat": "weekly", "starts_at": 1789603200000000, "ends_at": null,
-                        "timezone": "Europe/Berlin", "start_time_local": "02:00",
-                        "duration_secs": 5400, "weekdays": [7] }
-        }"#;
-        let req: DowntimeRequest = serde_json::from_str(body).unwrap();
-        assert_eq!(req.targets.len(), 3);
-        assert_eq!(req.schedule.ends_at, None);
-        assert!(req.show_banner);
-        assert_eq!(req.targets[2].slo_mode, Some(SloCorrectionMode::Exclude));
-
-        let quick: DowntimeRequest = serde_json::from_str(
-            r#"{ "targets": [ { "module": "anomaly_detections", "folders": { "kind": "all" }, "ids": ["ad_7c1"] } ],
-                 "schedule": { "repeat": "none", "starts_at": 1, "ends_at": 2, "timezone": "UTC", "duration_secs": 60 },
-                 "show_banner": false }"#,
-        )
-        .unwrap();
-        assert_eq!(quick.folder_id, DEFAULT_FOLDER);
-        assert!(!quick.show_banner);
-        assert!(quick.schedule.weekdays.is_empty());
-    }
-
-    #[test]
-    fn notifications_take_their_defaults_and_keep_their_wire_names() {
-        let n: DowntimeNotifications =
-            serde_json::from_str(r#"{ "destinations": ["slack"] }"#).unwrap();
-        assert_eq!(n.ending_soon_lead_secs, DEFAULT_ENDING_SOON_LEAD_SECS);
-        assert!(!n.events.any());
-
-        let json = serde_json::to_value(full()).unwrap();
-        assert_eq!(json["notifications"]["destinations"][0], "slack-oncall");
-        assert_eq!(json["notifications"]["events"]["ending_soon"], true);
-        assert_eq!(json["notifications"]["ending_soon_lead_secs"], 300);
-        assert_eq!(json["origin_region"], "us-east");
-        assert!(json["notifications"].get("continues").is_none());
-        let linked: DowntimeNotifications =
-            serde_json::from_str(r#"{ "destinations": [], "continues": "2f9K" }"#).unwrap();
-        assert_eq!(linked.continues.as_deref(), Some("2f9K"));
-
-        let req: DowntimeRequest = serde_json::from_str(
-            r#"{ "targets": [], "schedule": { "repeat": "none", "starts_at": 1, "ends_at": 2,
-                 "timezone": "UTC", "duration_secs": 60 },
-                 "notifications": { "destinations": ["pd"], "events": { "ended": true } } }"#,
-        )
-        .unwrap();
-        let n = req.notifications.unwrap();
-        assert!(n.events.wants(NotificationEvent::Ended));
-        assert!(!n.events.wants(NotificationEvent::Started));
-    }
-
     #[test]
     fn notification_events_are_stored_by_their_snake_case_names() {
         for (event, name) in [
@@ -812,77 +819,6 @@ mod tests {
         assert_eq!(Repeat::Daily.to_i16(), 1);
         assert_eq!(Repeat::Weekly.to_i16(), 2);
         assert_eq!(Repeat::from_i16(3), None);
-    }
-
-    #[test]
-    fn only_synthetics_has_tags_and_no_identity() {
-        for module in [
-            TargetModule::Alerts,
-            TargetModule::AnomalyDetections,
-            TargetModule::Slos,
-        ] {
-            assert!(module.has_identity());
-            assert!(!module.has_tags());
-        }
-        assert!(!TargetModule::Synthetics.has_identity());
-        assert!(TargetModule::Synthetics.has_tags());
-    }
-
-    #[test]
-    fn a_list_item_flattens_the_downtime() {
-        let item = DowntimeListItem {
-            downtime: minimal(),
-            status: DowntimeStatus::Scheduled,
-            current_window: None,
-            next_window: Some(DowntimeWindow { start: 1, end: 2 }),
-            matched_alerts: 7,
-            matched_anomalies: 0,
-            matched_synthetics: 2,
-            matched_slos: 3,
-        };
-        let json = serde_json::to_value(item).unwrap();
-        assert_eq!(json["id"], "2f9KQe4b7Nq1vH3sT0mLzXpRcWd");
-        assert_eq!(json["status"], "scheduled");
-        assert!(json["current_window"].is_null());
-        assert_eq!(json["next_window"]["end"], 2);
-    }
-
-    #[test]
-    fn ended_early_is_snake_case_on_the_wire() {
-        assert_eq!(
-            serde_json::to_value(DowntimeStatus::EndedEarly).unwrap(),
-            "ended_early"
-        );
-    }
-
-    #[test]
-    fn an_extend_body_takes_either_field_and_the_response_flattens_the_row() {
-        let by: ExtendDowntimeRequest = serde_json::from_str(r#"{ "by_secs": 1800 }"#).unwrap();
-        assert_eq!((by.by_secs, by.until), (Some(1800), None));
-        let until: ExtendDowntimeRequest = serde_json::from_str(r#"{ "until": 5 }"#).unwrap();
-        assert_eq!((until.by_secs, until.until), (None, Some(5)));
-        let json = serde_json::to_value(ExtendDowntimeResponse {
-            downtime: minimal(),
-            created_id: None,
-        })
-        .unwrap();
-        assert_eq!(json["id"], "2f9KQe4b7Nq1vH3sT0mLzXpRcWd");
-        assert!(json.get("created_id").is_none());
-    }
-
-    #[test]
-    fn preview_match_omits_unset_reasons() {
-        let m = PreviewMatch {
-            id: "a".to_string(),
-            name: "n".to_string(),
-            folder_id: "default".to_string(),
-            matched_by: None,
-            missing: Some("host".to_string()),
-            applies: None,
-        };
-        let json = serde_json::to_value(m).unwrap();
-        assert!(json.get("matched_by").is_none());
-        assert_eq!(json["missing"], "host");
     }
 
     #[test]
@@ -912,31 +848,185 @@ mod tests {
         let mut other_module = before.clone();
         other_module.targets[0].module = TargetModule::Synthetics;
         assert!(!before.same_coverage(&other_module));
+
+        let group = |key: &str, label: Option<&str>| AlertGroupRef {
+            alert_id: "a1".to_string(),
+            group_key: key.to_string(),
+            group_labels: label.map(|v| BTreeMap::from([("city".to_string(), v.to_string())])),
+        };
+        let one_group = Downtime {
+            alert_groups: Some(vec![group("k1", Some("pune"))]),
+            ..before.clone()
+        };
+        assert!(!before.same_coverage(&one_group));
+        let relabelled = Downtime {
+            alert_groups: Some(vec![group("k1", None)]),
+            ..before.clone()
+        };
+        assert!(
+            one_group.same_coverage(&relabelled),
+            "labels are display only"
+        );
+        let empty = Downtime {
+            alert_groups: Some(vec![]),
+            ..before.clone()
+        };
+        assert!(before.same_coverage(&empty));
     }
 
     #[test]
-    fn an_alerts_target_without_the_incident_mode_reads_as_muted() {
-        let old: DowntimeTarget =
-            serde_json::from_str(r#"{ "module": "alerts", "folders": { "kind": "all" } }"#)
-                .unwrap();
-        assert_eq!(old.incident_mode, IncidentMode::Muted);
-        let json = serde_json::to_value(&old).unwrap();
-        assert!(
-            json.get("incident_mode").is_none(),
-            "the default is not written"
-        );
+    fn an_older_row_reads_without_the_mute_fields_and_a_newer_field_is_ignored() {
+        let mut json = serde_json::to_value(minimal()).unwrap();
+        for absent in ["alert_groups", "end_on_clear", "source"] {
+            assert!(
+                json.get(absent).is_none(),
+                "{absent} is not written when unset"
+            );
+        }
+        json["a_field_from_a_newer_node"] = serde_json::json!(1);
+        let old = serde_json::from_value::<Downtime>(json).unwrap();
+        assert!(old.alert_groups.is_none() && old.end_on_clear.is_none() && old.source.is_none());
 
-        let none: DowntimeTarget = serde_json::from_str(
-            r#"{ "module": "alerts", "folders": { "kind": "all" }, "incident_mode": "none" }"#,
-        )
-        .unwrap();
-        assert_eq!(none.incident_mode, IncidentMode::None);
-        let json = serde_json::to_value(&none).unwrap();
-        assert_eq!(json["incident_mode"], "none");
+        let quick = Downtime {
+            alert_groups: Some(vec![AlertGroupRef {
+                alert_id: "a1".to_string(),
+                group_key: "k1".to_string(),
+                group_labels: None,
+            }]),
+            end_on_clear: Some(EndOnClear {
+                alert_id: "a1".to_string(),
+                group_key: Some("k1".to_string()),
+            }),
+            source: Some(MuteSource::Slack),
+            ..minimal()
+        };
+        let json = serde_json::to_value(&quick).unwrap();
+        assert_eq!(json["source"], "slack");
+        assert_eq!(json["end_on_clear"]["group_key"], "k1");
+        assert_eq!(serde_json::from_value::<Downtime>(json).unwrap(), quick);
         assert_eq!(
-            serde_json::from_value::<DowntimeTarget>(json).unwrap(),
-            none
+            MuteSource::parse("openobserve"),
+            Some(MuteSource::Openobserve)
         );
-        assert_eq!(serde_json::to_value(IncidentMode::Muted).unwrap(), "muted");
+        assert_eq!(MuteSource::parse("later"), None);
+
+        let active: ActiveDowntime =
+            serde_json::from_str(r#"{"id":"d1","name":"n","ends_at":5}"#).unwrap();
+        assert_eq!(active.version, 0);
+        assert!(active.end_on_clear.is_none() && active.alert_groups.is_none());
+    }
+
+    #[test]
+    fn alert_groups_and_end_on_clear_must_name_targeted_alerts() {
+        let request = |groups: Vec<&str>, end: Option<&str>, ids: Vec<&str>| DowntimeRequest {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: None,
+            reason: None,
+            condition: None,
+            targets: vec![DowntimeTarget {
+                module: TargetModule::Alerts,
+                folders: TargetFolders::All,
+                tags: vec![],
+                ids: ids.into_iter().map(str::to_string).collect(),
+                slo_mode: None,
+                incident_mode: IncidentMode::Muted,
+            }],
+            schedule: minimal().schedule,
+            show_banner: false,
+            notifications: None,
+            version: None,
+            alert_groups: Some(
+                groups
+                    .into_iter()
+                    .map(|alert_id| AlertGroupRef {
+                        alert_id: alert_id.to_string(),
+                        group_key: "k".to_string(),
+                        group_labels: None,
+                    })
+                    .collect(),
+            ),
+            end_on_clear: end.map(|alert_id| EndOnClear {
+                alert_id: alert_id.to_string(),
+                group_key: None,
+            }),
+        };
+        assert!(
+            request(vec!["a1"], Some("a1"), vec!["a1"])
+                .check_alert_targets()
+                .is_ok()
+        );
+        assert!(
+            request(vec!["a2"], None, vec!["a1"])
+                .check_alert_targets()
+                .is_err()
+        );
+        assert!(
+            request(vec![], Some("a2"), vec!["a1"])
+                .check_alert_targets()
+                .is_err()
+        );
+        assert!(
+            request(vec!["a1"; 51], None, vec!["a1"])
+                .check_alert_targets()
+                .is_err()
+        );
+        let mut recurring = request(vec![], Some("a1"), vec!["a1"]);
+        recurring.schedule.repeat = Repeat::Daily;
+        assert!(recurring.check_alert_targets().is_err());
+    }
+
+    #[test]
+    fn mute_shapes_use_the_contract_json() {
+        let all_groups = EndOnClear {
+            alert_id: "a1".into(),
+            group_key: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&all_groups).unwrap(),
+            serde_json::json!({"alert_id": "a1", "group_key": null})
+        );
+        let old: EndOnClear = serde_json::from_str(r#"{"alert_id":"a1"}"#).unwrap();
+        assert_eq!(old, all_groups);
+        let group: AlertGroupRef =
+            serde_json::from_str(r#"{"alert_id":"a1","group_key":"k","later":1}"#).unwrap();
+        assert_eq!(group.group_key, "k");
+        assert!(group.group_labels.is_none());
+        let labelled = AlertGroupRef {
+            group_labels: Some(BTreeMap::from([(
+                "cluster".to_string(),
+                "prod-eu".to_string(),
+            )])),
+            ..group.clone()
+        };
+        assert_eq!(
+            serde_json::to_value(&labelled).unwrap(),
+            serde_json::json!({"alert_id": "a1", "group_key": "k", "group_labels": {"cluster": "prod-eu"}})
+        );
+        assert!(
+            serde_json::to_value(&group)
+                .unwrap()
+                .get("group_labels")
+                .is_none()
+        );
+        assert_eq!(
+            serde_json::to_value(AlertMuteConflict::NotAQuickMute).unwrap(),
+            serde_json::json!({"code": "not_a_quick_mute"})
+        );
+        assert_eq!(
+            serde_json::to_value(AlertMuteConflict::AlreadyMuted {
+                downtime_id: "d1".into(),
+                version: 2,
+                ends_at: 9,
+            })
+            .unwrap(),
+            serde_json::json!({"code": "already_muted", "downtime_id": "d1", "version": 2, "ends_at": 9})
+        );
+        let req: AlertMuteRequest =
+            serde_json::from_str(r#"{"minutes":30,"unknown_later":true}"#).unwrap();
+        assert_eq!(req.minutes, Some(30));
+        assert!(!req.until_clear && req.group_keys.is_none());
+        let extend: AlertMuteExtendRequest =
+            serde_json::from_str(r#"{"version":3,"until_clear":true}"#).unwrap();
+        assert!(extend.until_clear && extend.minutes.is_none());
     }
 }

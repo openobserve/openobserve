@@ -133,6 +133,13 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Without a label the icon is aria-hidden and unreachable by assistive tech; the tooltip's own content never gets a name otherwise.
+const tooltipIconLabel = computed(() =>
+  props.label
+    ? t("components.select.moreInfoAbout", { field: props.label })
+    : t("components.select.moreInfo"),
+);
+
 // Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const split = computed(() => splitControlAttrs($attrs));
@@ -496,7 +503,13 @@ const selectedLabels = computed(() => {
 
 const triggerDisplayLabel = computed(() => {
   if (!hasSelection.value) return "";
-  if (props.multiple) return selectedLabels.value.join(", ");
+  if (props.multiple) {
+    // "Select all" is a sentinel elsewhere (e.g. an absent/empty field reads as
+    // "every panel"); showing its own label here keeps the trigger readable
+    // instead of listing every option.
+    if (props.allSelectedLabel && allSelected.value) return String(props.allSelectedLabel);
+    return selectedLabels.value.join(", ");
+  }
   return selectedLabels.value[0] ?? "";
 });
 
@@ -1252,6 +1265,7 @@ const fieldWidthClass = computed(() => {
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
+        :label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
         ><slot name="tooltip"
@@ -1337,7 +1351,12 @@ const fieldWidthClass = computed(() => {
               </span>
 
               <slot name="trigger" :value="modelValue">
-                <template v-if="multiple && selectedLabels.length > 0">
+                <template v-if="multiple && allSelectedLabel && allSelected">
+                  <span class="text-select-text flex-1 truncate text-start text-sm">{{
+                    allSelectedLabel
+                  }}</span>
+                </template>
+                <template v-else-if="multiple && selectedLabels.length > 0">
                   <div class="flex flex-1 flex-nowrap items-center gap-1 overflow-hidden pe-2">
                     <slot
                       v-for="(labelText, idx) in visibleSelectedLabels"
@@ -1463,7 +1482,7 @@ const fieldWidthClass = computed(() => {
             :class="[
               'z-10001 min-w-(--reka-popover-trigger-width)',
               'flex flex-col overflow-hidden',
-              'rounded-default shadow-lg',
+              'rounded-default shadow-overlay border border-transparent',
               'bg-select-content-bg',
             ]"
             :style="[
@@ -1516,7 +1535,7 @@ const fieldWidthClass = computed(() => {
                     'cursor-pointer outline-none select-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
-                    'transition-colors duration-100',
+                    'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                     'border-select-content-border mb-1 border-b pb-1.5',
                   ]"
                   data-test="o-select-all"
@@ -1635,7 +1654,7 @@ const fieldWidthClass = computed(() => {
                         :class="[
                           'flex h-full w-full items-center justify-between gap-2 ps-3 pe-3 text-sm',
                           'text-select-item-text cursor-pointer select-none',
-                          'transition-colors duration-100',
+                          'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                           vRow.index === highlightedIndex
                             ? 'bg-select-item-hover-bg'
                             : 'hover:bg-select-item-hover-bg',
@@ -1681,7 +1700,7 @@ const fieldWidthClass = computed(() => {
                             'pe-3 text-sm',
                             'text-select-item-text',
                             'cursor-pointer outline-none select-none',
-                            'transition-colors duration-100',
+                            'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                             // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
                             (filteredOptions[vRow.index].subLabel &&
                               !filteredOptions[vRow.index].subLabelInline) ||
@@ -2051,8 +2070,8 @@ const fieldWidthClass = computed(() => {
             'z-10001 min-w-(--reka-select-trigger-width) max-lg:max-w-[calc(100vw-1rem)]',
             'overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-            'rounded-default border shadow-md',
-            'bg-select-content-bg border-select-content-border',
+            'rounded-default shadow-overlay border border-transparent',
+            'bg-select-content-bg',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
             // ease-out-expo in (200ms), quick wipe out (140ms).

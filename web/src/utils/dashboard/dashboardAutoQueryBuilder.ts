@@ -1,6 +1,14 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
+import { DISTRIBUTION_ROW_LIMIT, isRawValueChart } from "@/utils/dashboard/chartTypeGroups";
+import {
+  heatmapYBucketError,
+  heatmapYBucketing,
+  heatmapYBucketSql,
+  heatmapYRangeSql,
+  isNumericYField,
+} from "@/utils/dashboard/heatmapYAxis";
 
 export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
@@ -358,6 +366,9 @@ export function buildSQLChartQuery(config: {
   const stream = queryData.fields.stream;
   const streamAlias = queryData?.joins?.length ? stream : "";
 
+  const yBucket = chartType === "heatmap" ? heatmapYBucketPlan(config, streamAlias) : null;
+  if (yBucket === "reject") return "";
+
   // Merge all field lists
   const allFields = [
     ...queryData.fields.x,
@@ -373,7 +384,10 @@ export function buildSQLChartQuery(config: {
   const validFieldAliases = new Set<string>();
 
   for (const field of allFields) {
-    const expr = buildFieldExpression(field, streamAlias);
+    const expr =
+      yBucket && field === yBucket.field
+        ? `${yBucket.select} as "${field.alias}"`
+        : buildFieldExpression(field, streamAlias);
     if (expr) {
       selectExpressions.push(expr);
       validFieldAliases.add(field.alias);
@@ -391,7 +405,7 @@ export function buildSQLChartQuery(config: {
 
   // WHERE clause
   const whereClause = buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
-  query += whereClause;
+  query += yBucket?.where ? andWhere(whereClause, yBucket.where) : whereClause;
 
   // GROUP BY clause - chart-type-specific logic
   // Only include fields that have valid expressions (are in validFieldAliases)
@@ -433,8 +447,8 @@ export function buildSQLChartQuery(config: {
   // HAVING clause - support multiple fields from y-axis and z-axis
   const havingClauses: string[] = [];
 
-  // Process y-axis having conditions (skip for heatmap)
-  if (chartType !== "heatmap") {
+  // Process y-axis having conditions (skip for heatmap and raw-value charts, which are not grouped)
+  if (chartType !== "heatmap" && !isRawValueChart(chartType)) {
     queryData.fields.y.forEach((field: any) => {
       if (
         field?.havingConditions?.[0]?.operator &&
@@ -481,12 +495,39 @@ export function buildSQLChartQuery(config: {
   }
 
   // LIMIT clause
-  const queryLimit = queryData.config.limit ?? 0;
+  const queryLimit =
+    queryData.config.limit || (isRawValueChart(chartType) ? DISTRIBUTION_ROW_LIMIT : 0);
   if (queryLimit > 0) {
     query += ` LIMIT ${queryLimit}`;
   }
 
   return query;
+}
+
+/** The bucketed y SELECT expression and range condition for a heatmap whose y is a numeric column, "reject" when the settings must not run, or null when bucketing is off. */
+function heatmapYBucketPlan(
+  config: { queryData: any; dashboardPanelData: any },
+  streamAlias: string,
+): { field: any; select: string; where: string } | "reject" | null {
+  const field = config.queryData.fields.y?.[0];
+  const panelConfig = config.dashboardPanelData?.data?.config;
+  if (!isNumericYField(field, config.dashboardPanelData)) return null;
+  if (heatmapYBucketError(panelConfig)) return "reject";
+  const bucketing = heatmapYBucketing(panelConfig);
+  if (!bucketing) return null;
+  const expr = buildSQLQueryFromInput(field, streamAlias);
+  if (!expr) return null;
+  return {
+    field,
+    select: heatmapYBucketSql(expr, bucketing.bucket),
+    where: heatmapYRangeSql(expr, bucketing.range),
+  };
+}
+
+/** `whereClause` (" WHERE ..." or "") with `condition` ANDed on, keeping the user's OR groups intact. */
+function andWhere(whereClause: string, condition: string): string {
+  const existing = whereClause.replace(/^ WHERE /, "").trim();
+  return existing ? ` WHERE (${existing}) AND ${condition}` : ` WHERE ${condition}`;
 }
 
 export function addMissingArgs(fields: any): any {

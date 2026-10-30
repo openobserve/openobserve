@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { getSeriesColor } from "../../colorPalette";
+import { createDistinctSeriesColor, getSeriesColor } from "../../colorPalette";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { chartColor } from "@/utils/chartTheme";
 import {
@@ -21,6 +21,8 @@ import {
   applyPieDonutChartAlignment,
   applyPieDonutCenterAdjustment,
   calculatePieChartContainer,
+  MAX_SEATS_PRECISION,
+  pieLegendPercentDecimals,
 } from "../../legendConfiguration";
 import { type SQLContext } from "../shared/types";
 import { escapeHtml } from "@/utils/html";
@@ -45,6 +47,11 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     getPieChartRadius,
   } = ctx;
   const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+  const distinctColor = createDistinctSeriesColor(
+    (options?.xAxis?.[0]?.data ?? []).map(String),
+    panelSchema?.config?.color,
+    store.state.theme,
+  );
 
   if (panelSchema.type === "pie") {
     // Add more padding for pie chart
@@ -91,6 +98,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             ? null
             : (params: any) => {
                 return (
+                  distinctColor(String(params.name)) ??
                   getSeriesColor(
                     panelSchema?.config?.color,
                     params.name,
@@ -99,7 +107,9 @@ export function applyPieDonutChart(ctx: SQLContext): void {
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
-                  ) ?? null
+                    panelSchema?.config,
+                  ) ??
+                  null
                 );
               },
         },
@@ -108,8 +118,13 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
+          // ECharts haloes inside labels in the slice colour, which glares where a label spills onto a dark panel.
+          textBorderColor: "transparent",
         },
-        percentPrecision: panelSchema.config?.decimals ?? 2,
+        percentPrecision: Math.min(
+          pieLegendPercentDecimals(panelSchema.config?.decimals),
+          MAX_SEATS_PRECISION,
+        ),
       };
       return seriesObj;
     });
@@ -228,6 +243,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             ? null
             : (params: any) => {
                 return (
+                  distinctColor(String(params.name)) ??
                   getSeriesColor(
                     panelSchema?.config?.color,
                     params.name,
@@ -236,7 +252,9 @@ export function applyPieDonutChart(ctx: SQLContext): void {
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
-                  ) ?? null
+                    panelSchema?.config,
+                  ) ??
+                  null
                 );
               },
         },
@@ -245,8 +263,13 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
+          // ECharts haloes inside labels in the slice colour, which glares where a label spills onto a dark panel.
+          textBorderColor: "transparent",
         },
-        percentPrecision: panelSchema.config?.decimals ?? 2,
+        percentPrecision: Math.min(
+          pieLegendPercentDecimals(panelSchema.config?.decimals),
+          MAX_SEATS_PRECISION,
+        ),
       };
       return seriesObj;
     });

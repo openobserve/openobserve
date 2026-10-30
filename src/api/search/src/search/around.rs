@@ -136,7 +136,6 @@ pub(crate) async fn around(
             start_time: around_start_time,
             end_time: around_key,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: query_fn.clone(),
@@ -176,7 +175,6 @@ pub(crate) async fn around(
             start_time: around_key,
             end_time: around_end_time,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: query_fn.clone(),
@@ -210,10 +208,7 @@ pub(crate) async fn around(
         resp.hits
             .push(resp_backward.hits[hits_num - 1 - i].to_owned());
     }
-    let hits_num = resp_forward.hits.len();
-    for i in 0..hits_num {
-        resp.hits.push(resp_forward.hits[i].to_owned());
-    }
+    resp.hits.extend(resp_forward.hits.iter().cloned());
     resp.total = resp.hits.len();
     resp.size = around_size;
     resp.scan_size = resp_forward.scan_size + resp_backward.scan_size;

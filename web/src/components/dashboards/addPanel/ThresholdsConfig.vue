@@ -26,10 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="showAsValue"
       :options="showAsOptions"
       :label="t('dashboard.thresholdShowAs')"
-      :help-text="isStacked ? t('dashboard.thresholdStackedHint') : undefined"
       data-test="dashboard-config-thresholds-show-as"
       @update:model-value="onShowAs"
-    />
+    >
+      <template v-if="isStacked" #tooltip>
+        <OTooltip :content="t('dashboard.thresholdStackedHint')" max-width="15.625rem" />
+      </template>
+    </OSelect>
 
     <OToggleGroup
       type="single"
@@ -140,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="isMetric && hasColouredValueMappings"
+      v-if="(isMetric || chartType === 'gauge') && hasColouredValueMappings"
       class="text-text-secondary flex items-center gap-1.5 text-xs"
       data-test="dashboard-config-thresholds-mapping-note"
     >
@@ -158,6 +161,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ColorSwatchPicker from "../ColorSwatchPicker.vue";
@@ -166,7 +170,7 @@ import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 type ThresholdMode = "absolute" | "percentage";
-type ThresholdShowAs = "color_line" | "color" | "line" | "color_band";
+type ThresholdShowAs = "color_line" | "color" | "line" | "color_band" | "dashed_line";
 
 interface ThresholdStep {
   value: number;
@@ -224,8 +228,19 @@ const uid = useId();
 const rootRef = ref<HTMLElement | null>(null);
 
 const isMetric = computed(() => props.chartType === "metric");
-const isStacked = computed(() => props.chartType === "area-stacked");
-const SHOW_AS_CHART_TYPES = ["line", "area", "area-stacked", "bar", "h-bar", "scatter"];
+const isStacked = computed(() =>
+  ["area-stacked", "stacked", "h-stacked"].includes(props.chartType),
+);
+const SHOW_AS_CHART_TYPES = [
+  "line",
+  "area",
+  "area-stacked",
+  "bar",
+  "h-bar",
+  "stacked",
+  "h-stacked",
+  "scatter",
+];
 const supportsShowAs = computed(() => SHOW_AS_CHART_TYPES.includes(props.chartType));
 
 // Mode, Show as and Base picked before the first step wait here, since the key is only written once a step exists.
@@ -243,7 +258,7 @@ const isPercent = computed(() => !isMetric.value && storedMode.value === "percen
 const modeValue = computed<ThresholdMode>(() => (isPercent.value ? "percentage" : "absolute"));
 const storedShowAs = computed(() => (props.modelValue ? props.modelValue.showAs : pending.showAs));
 const stackedShowAs = (value: ThresholdShowAs | undefined): ThresholdShowAs =>
-  value === "color_band" ? "color_band" : "line";
+  value === "color_band" || value === "dashed_line" ? value : "line";
 const showAsValue = computed<ThresholdShowAs>(() =>
   isStacked.value ? stackedShowAs(storedShowAs.value) : (storedShowAs.value ?? "color_line"),
 );
@@ -269,12 +284,14 @@ const showAsOptions = computed(() =>
   isStacked.value
     ? [
         { label: t("dashboard.thresholdShowAsLine"), value: "line" },
+        { label: t("dashboard.thresholdShowAsDashedLine"), value: "dashed_line" },
         { label: t("dashboard.thresholdShowAsBand"), value: "color_band" },
       ]
     : [
         { label: t("dashboard.thresholdShowAsColorLine"), value: "color_line" },
         { label: t("dashboard.thresholdShowAsColor"), value: "color" },
         { label: t("dashboard.thresholdShowAsLine"), value: "line" },
+        { label: t("dashboard.thresholdShowAsDashedLine"), value: "dashed_line" },
         { label: t("dashboard.thresholdShowAsColorBand"), value: "color_band" },
       ],
 );

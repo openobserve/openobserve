@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import OverrideConfigPopup from "@/components/dashboards/OverrideConfigPopup.vue";
+import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -248,6 +249,27 @@ describe("OverrideConfigPopup", () => {
       const preview = wrapper.vm.selectedPreview;
       const key = preview.columns[0].field;
       expect(typeof preview.rows[0][key]).toBe("string");
+    });
+
+    it("previews a bar gauge column as filled bars in the real table", async () => {
+      wrapper = await createWrapper({
+        previewData: {
+          field1: { column: { field: "field1" }, rows: [{ field1: 5 }, { field1: 10 }] },
+        },
+      });
+      wrapper.vm.columnOverrides[0].fieldType = "bar_gauge";
+      await flushPromises();
+      const preview = wrapper.vm.selectedPreview;
+      expect(preview.columns[0].cellType).toBe("bar_gauge");
+      const table = mount(TableRenderer, {
+        props: { data: preview, valueMapping: [], wrapCells: true, showPagination: false },
+        global: { plugins: [i18n, store] },
+      });
+      await flushPromises();
+      const fills = table.findAll('[data-test="o2-data-bar-cell-fill"]');
+      expect(fills).toHaveLength(2);
+      expect(fills[1].attributes("style")).toContain("width: 100%");
+      table.unmount();
     });
 
     it("uses real preview rows when supplied", async () => {

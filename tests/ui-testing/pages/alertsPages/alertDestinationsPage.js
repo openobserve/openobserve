@@ -110,6 +110,9 @@ export class AlertDestinationsPage {
         this.testResultIdle = '[data-test="test-result-idle"]';
         this.saveButton = '[data-test="add-destination-submit-btn"]';
         this.cancelButton = '[data-test="add-destination-cancel-btn"]';
+        // Editor drafts: Cancel with unsaved changes opens the shared leave dialog
+        this.draftLeaveDialog = '[data-test="editor-draft-leave-dialog"]';
+        this.draftLeaveDiscardBtn = '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]';
         this.backButton = '[data-test="add-destination-back-btn"]';
         this.successNotification = '[data-test-variant="success"]';
         this.toastSuccess = '[data-test-variant="success"]';
@@ -1560,6 +1563,15 @@ export class AlertDestinationsPage {
             } else {
                 await this.page.keyboard.press('Escape');
             }
+        }
+        // Unsaved changes are discarded through the leave dialog so no draft is left behind.
+        const asked = await this.page.locator(this.draftLeaveDialog)
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => true)
+            .catch(() => false);
+        if (asked) {
+            await this.page.locator(this.draftLeaveDiscardBtn).click();
+            await this.page.locator(this.draftLeaveDialog).waitFor({ state: 'hidden', timeout: 10000 });
         }
         // Wait for the cancel button (and form) to detach so subsequent navigation sees a clean state.
         await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});

@@ -13,20 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  routeGuard,
-  useLocalUserInfo,
-  useLocalCurrentUser,
-  invalidateLoginData,
-  getPath,
-} from "@/utils/zincutils";
+import { routeGuard, getPath } from "@/utils/zincutils";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
-import { forgetLinkRequest } from "@/utils/slackLink";
+import { endSignedInSession } from "@/utils/drafts/signOutFlow";
+import { silenceUnloadPrompts } from "@/utils/sessionServices";
+import {
+  PLAYLIST_TV_PATH,
+  buildPlaylistQuery,
+  isPlaylistPage,
+  parsePlaylistQuery,
+} from "@/utils/dashboard/playlist";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
@@ -104,6 +105,13 @@ const dbMonitoringEnabled = (): boolean => {
   return Boolean(zoConfig.database_monitoring_enabled);
 };
 
+// Like dbMonitoringEnabled: a /config that hasn't loaded yet lets a deep link through.
+const publicDashboardsEnabled = (): boolean => {
+  const zoConfig = store?.state?.zoConfig;
+  const configLoaded = !!zoConfig && Object.keys(zoConfig).length > 0;
+  return !configLoaded || zoConfig.public_dashboards_enabled === true;
+};
+
 /**
  * Guard for the three enterprise-only DBM tabs — Deadlocks, Blocked queries and
  * Table health, whose reads an OSS backend answers 403 on. Disabling the tabs
@@ -164,10 +172,12 @@ const profilesRouteGuard = (to: any, from: any, next: any) => {
 };
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
+const TvPlaylist = () => import("@/views/Dashboards/TvPlaylist.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
+const PublicDashboardLinks = () => import("@/views/Dashboards/PublicLinks.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
@@ -244,11 +254,10 @@ const useRoutes = () => {
         // must run even if a clear throws, and must respect the app base —
         // a bare "/login" 404s when the app is served under /web/.
         try {
-          invalidateLoginData();
-          useLocalCurrentUser("", true);
-          useLocalUserInfo("", true);
-          forgetLinkRequest();
+          // Only the menu's sign-out confirms discarding drafts, so a direct link or a retried navigation keeps them, as an expired session does.
+          endSignedInSession(store, { keepDrafts: true });
         } finally {
+          silenceUnloadPrompts();
           window.location.href = `${getPath()}login`;
         }
       },
@@ -303,6 +312,15 @@ const useRoutes = () => {
       component: () => import("@/views/SlackConnectCallback.vue"),
       meta: {
         titleKey: "routeTitles.slackConnectCallback",
+      },
+    },
+    {
+      path: "/public/dashboards/:slug",
+      name: "publicDashboard",
+      component: () => import("@/views/Dashboards/PublicDashboard.vue"),
+      meta: {
+        public: true,
+        titleKey: "dashboard.header",
       },
     },
   ];
@@ -613,15 +631,16 @@ const useRoutes = () => {
     {
       path: "infra/kubernetes",
       name: "infraKubernetes",
-      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
-      props: { workload: "kubernetes" },
+      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
       meta: { titleKey: "menu.kubernetes" },
       beforeEnter: routeGuard,
     },
     {
+      // Not in the nav; the previous curated Kubernetes page stays reachable by URL only.
       path: "infra/kubernetes-2",
       name: "infraKubernetes2",
-      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
+      props: { workload: "kubernetes" },
       meta: { titleKey: "menu.kubernetes2" },
       beforeEnter: routeGuard,
     },
@@ -706,6 +725,24 @@ const useRoutes = () => {
         titleKey: "routeTitles.viewDashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
+        // A playlist link to the dashboard view is played by the TV player, except its own page fallback.
+        const query = to.query ?? {};
+        const playlist = isPlaylistPage(query) ? null : parsePlaylistQuery(query);
+        if (playlist) {
+          next({ path: PLAYLIST_TV_PATH, query: buildPlaylistQuery(playlist), replace: true });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/dashboards/tv",
+      name: "dashboardTvPlaylist",
+      component: TvPlaylist,
+      meta: {
+        titleKey: "routeTitles.dashboardTvPlaylist",
+      },
+      beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
     },
@@ -718,6 +755,21 @@ const useRoutes = () => {
         titleKey: "dashboard.importDashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/dashboards/public-links",
+      name: "publicDashboardLinks",
+      component: PublicDashboardLinks,
+      meta: {
+        titleKey: "dashboard.publicLinks.pageTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        if (!publicDashboardsEnabled()) {
+          next({ name: "dashboards", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },

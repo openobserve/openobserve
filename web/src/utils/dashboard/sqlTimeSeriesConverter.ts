@@ -20,6 +20,8 @@ import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { chartColor } from "../chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
+import { sortTooltipParams } from "./tooltipSort";
+import { stackTotalRows } from "./stackTotals";
 
 /**
  * Handles auto SQL time series conversion.
@@ -181,10 +183,7 @@ export const applyAutoSQLTimeSeries = (
 
         const date = new Date(name[0].data[0]);
 
-        // sort tooltip array based on value
-        name.sort((a: any, b: any) => {
-          return (b.value[1] || 0) - (a.value[1] || 0);
-        });
+        sortTooltipParams(name, panelSchema?.config, (it: any) => it.value[1]);
 
         // if hovered series name is not null then move it to first position
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -226,7 +225,14 @@ export const applyAutoSQLTimeSeries = (
           }
         });
 
-        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+        const totals = stackTotalRows(
+          panelSchema.type,
+          name,
+          options.series,
+          seriesOverrides,
+          (it: any) => it.data?.[1],
+        );
+        return `${formatDate(date)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
       };
 
       options.tooltip.axisPointer = {
@@ -407,10 +413,7 @@ export const applyCustomSQLTimeSeries = (
 
           const date = new Date(name?.[0]?.data?.[0]);
 
-          // sort tooltip array based on value
-          name?.sort((a: any, b: any) => {
-            return (b?.value?.[1] || 0) - (a?.value?.[1] || 0);
-          });
+          sortTooltipParams(name, panelSchema?.config, (it: any) => it?.value?.[1]);
 
           // if hovered series name is not null then move it to first position
           if (hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -451,7 +454,14 @@ export const applyCustomSQLTimeSeries = (
             }
           });
 
-          return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+          const totals = stackTotalRows(
+            panelSchema.type,
+            name,
+            options.series,
+            seriesOverrides,
+            (it: any) => it?.data?.[1],
+          );
+          return `${formatDate(date)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
         } catch (error) {
           return "";
         }

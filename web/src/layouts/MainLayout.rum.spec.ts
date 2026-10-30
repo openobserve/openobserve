@@ -21,6 +21,9 @@ import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
 import { openobserveRum } from "@openobserve/browser-rum";
+import { useLocalOrganization } from "@/utils/zincutils";
+import configService from "@/services/config";
+import { initBrowserRum } from "@/utils/rum/initBrowserRum";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -30,6 +33,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   invalidateLoginData: vi.fn(),
 }));
+
+vi.mock("@/utils/rum/initBrowserRum", () => ({ initBrowserRum: vi.fn() }));
 
 vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: {
@@ -171,11 +176,101 @@ describe("MainLayout — RUM identity and account", () => {
     });
   });
 
+  it("sends the org creation time with the RUM account", async () => {
+    store.state.selectedOrganization = {
+      label: "Acme",
+      identifier: "acme",
+      subscription_type: "",
+      created_at: 1_700_000_000_000_000,
+    };
+    wrapper = mountMainLayout();
+    await flushPromises();
+    store.state.selectedOrganization = { ...store.state.selectedOrganization };
+    await flushPromises();
+
+    expect(openobserveRum.setAccount).toHaveBeenLastCalledWith({
+      id: "acme",
+      name: "Acme",
+      subscription_type: "",
+      created_at: 1_700_000_000_000_000,
+    });
+  });
+
+  it("carries created_at from the org list into the selected org and the RUM account", async () => {
+    const originalOrgs = store.state.organizations;
+    wrapper = mountMainLayout();
+    await flushPromises();
+    store.state.organizations = [
+      {
+        id: 1,
+        name: "Acme",
+        identifier: "acme",
+        type: "default",
+        UserObj: { email: store.state.userInfo.email },
+        ingest_threshold: 0,
+        search_threshold: 0,
+        created_at: 1_700_000_000_000_000,
+      },
+    ];
+    try {
+      store.state.selectedOrganization = {};
+      await flushPromises();
+
+      await (wrapper.vm as any).setSelectedOrganization();
+      await flushPromises();
+
+      expect(store.state.selectedOrganization.created_at).toBe(1_700_000_000_000_000);
+      expect(openobserveRum.setAccount).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: "acme", created_at: 1_700_000_000_000_000 }),
+      );
+    } finally {
+      store.state.organizations = originalOrgs;
+    }
+  });
+
+  it("takes created_at from the org list when the selected org was restored without it", async () => {
+    const originalOrgs = store.state.organizations;
+    const staleOrg = { label: "Acme", identifier: "acme", subscription_type: "" };
+    wrapper = mountMainLayout();
+    await flushPromises();
+    // Mount clears the selection here, so restore the stale org as a page reload would.
+    useLocalOrganization(staleOrg);
+    store.state.selectedOrganization = staleOrg;
+    (wrapper.vm as any).selectedOrg = staleOrg;
+    await flushPromises();
+    try {
+      store.state.organizations = [
+        {
+          id: 1,
+          name: "Acme",
+          identifier: "acme",
+          type: "custom",
+          UserObj: {},
+          created_at: 1_700_000_000_000_000,
+        },
+        { id: 2, name: "Beta", identifier: "beta", type: "custom", UserObj: {} },
+      ];
+      await flushPromises();
+
+      expect(store.state.selectedOrganization.created_at).toBeUndefined();
+      expect(openobserveRum.setAccount).toHaveBeenLastCalledWith({
+        id: "acme",
+        name: "Acme",
+        subscription_type: "",
+        created_at: 1_700_000_000_000_000,
+      });
+    } finally {
+      store.state.organizations = originalOrgs;
+      useLocalOrganization({}, true);
+    }
+  });
+
   it("clears the RUM user and account on sign out", async () => {
     wrapper = mountMainLayout();
     await flushPromises();
 
     (wrapper.vm as any).signout();
+    await flushPromises();
 
     expect(openobserveRum.stopSessionReplayRecording).toHaveBeenCalled();
     expect(openobserveRum.clearUser).toHaveBeenCalled();
@@ -198,6 +293,22 @@ describe("MainLayout — RUM identity and account", () => {
       name: "Acme",
       subscription_type: "",
     });
+  });
+
+  it("starts RUM from the authenticated full config", async () => {
+    const rum = { enabled: true, client_token: "token", application_id: "app", site: "rum" };
+    vi.mocked(configService.get_config_full).mockResolvedValueOnce({
+      data: { version: "v1", rum },
+    } as any);
+    store.state.zoConfig = { ...originalZoConfig, version: "" };
+    wrapper = mountMainLayout();
+    await flushPromises();
+
+    store.state.selectedOrganization = { label: "Rum", identifier: "rum-start" };
+    await flushPromises();
+
+    expect(configService.get_config_full).toHaveBeenCalledWith("rum-start");
+    expect(initBrowserRum).toHaveBeenCalledWith(rum, store.state.API_ENDPOINT);
   });
 
   it("does not set the RUM account when RUM is disabled", async () => {

@@ -15,7 +15,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  allVisibleQueriesInstant,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowGridlines,
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
@@ -28,14 +30,33 @@ import {
   shouldShowAreaLineStyleConfig,
   shouldShowTopResultsConfig,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
+  shouldShowAreaFillConfig,
+  shouldShowScatterPointConfig,
+  shouldShowBarStyleConfig,
+  shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  shouldShowPromQLQueryType,
+  pruneDependentOptions,
 } from "./configUtils";
 
 describe("configUtils", () => {
+  describe("shouldShowLegendValues", () => {
+    const panel = (type: string, show_legends: boolean) => ({
+      data: { type, config: { show_legends } },
+    });
+
+    it("is true only for pie and donut with the legend shown", () => {
+      expect(shouldShowLegendValues(panel("pie", true))).toBe(true);
+      expect(shouldShowLegendValues(panel("donut", true))).toBe(true);
+      expect(shouldShowLegendValues(panel("pie", false))).toBe(false);
+      expect(shouldShowLegendValues(panel("bar", true))).toBe(false);
+    });
+  });
+
   describe("shouldApplyChartAlign", () => {
     it("should return true for pie chart with right legend", () => {
       const dashboardPanelData = {
@@ -1170,9 +1191,10 @@ describe("configUtils", () => {
       expect(shouldShowNoValueReplacement(data, false)).toBe(false);
     });
 
-    it("should return false for table chart in non-promql mode", () => {
-      const data = { data: { type: "table" } };
-      expect(shouldShowNoValueReplacement(data, false)).toBe(false);
+    it.each(["metric", "gauge", "table"])("shows for %s in SQL and PromQL mode", (type) => {
+      const data = { data: { type } };
+      expect(shouldShowNoValueReplacement(data, false)).toBe(true);
+      expect(shouldShowNoValueReplacement(data, true)).toBe(true);
     });
   });
 
@@ -1237,6 +1259,14 @@ describe("configUtils", () => {
 
     it("should return false for table chart", () => {
       expect(shouldShowTopResultsConfig({ data: { type: "table" } }, false)).toBe(false);
+    });
+  });
+
+  describe("shouldShowAxisBorderConfig", () => {
+    it("offers the axis border toggle where axis config shows, except on heatmaps", () => {
+      expect(shouldShowAxisBorderConfig({ data: { type: "line" } })).toBe(true);
+      expect(shouldShowAxisBorderConfig({ data: { type: "heatmap" } })).toBe(false);
+      expect(shouldShowAxisBorderConfig({ data: { type: "table" } })).toBe(false);
     });
   });
 
@@ -1352,41 +1382,40 @@ describe("configUtils", () => {
     });
   });
 
-  describe("shouldShowLineThickness", () => {
-    const makeData = (type: string, customQuery = false) => ({
-      data: {
-        type,
-        queries: [{ customQuery }],
-      },
-      layout: { currentQueryIndex: 0 },
+  describe("shouldShowAreaFillConfig", () => {
+    it("is true only for the area chart", () => {
+      expect(shouldShowAreaFillConfig({ data: { type: "area" } })).toBe(true);
+      ["area-stacked", "line", "bar", "scatter"].forEach((type) =>
+        expect(shouldShowAreaFillConfig({ data: { type } })).toBe(false),
+      );
     });
+  });
 
-    it("should return true for area chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area"), false)).toBe(true);
+  describe("shouldShowScatterPointConfig", () => {
+    it("is true for scatter only", () => {
+      expect(shouldShowScatterPointConfig({ data: { type: "scatter" } })).toBe(true);
+      expect(shouldShowScatterPointConfig({ data: { type: "line" } })).toBe(false);
+      expect(shouldShowScatterPointConfig({ data: { type: "bar" } })).toBe(false);
     });
+  });
 
-    it("should return true for area-stacked chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area-stacked"), false)).toBe(true);
+  describe("shouldShowBarStyleConfig", () => {
+    it("is true only for h-bar", () => {
+      expect(shouldShowBarStyleConfig({ data: { type: "h-bar" } })).toBe(true);
+      ["bar", "h-stacked", "stacked", "line"].forEach((type) =>
+        expect(shouldShowBarStyleConfig({ data: { type } })).toBe(false),
+      );
     });
+  });
 
-    it("should return true for line chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("line"), false)).toBe(true);
-    });
-
-    it("should return false when promqlMode is true", () => {
-      expect(shouldShowLineThickness(makeData("area"), true)).toBe(false);
-    });
-
-    it("should return false when customQuery is true", () => {
-      expect(shouldShowLineThickness(makeData("area", true), false)).toBe(false);
-    });
-
-    it("should return false for bar chart", () => {
-      expect(shouldShowLineThickness(makeData("bar"), false)).toBe(false);
-    });
-
-    it("should return false for scatter chart", () => {
-      expect(shouldShowLineThickness(makeData("scatter"), false)).toBe(false);
+  describe("shouldShowBarWidthConfig", () => {
+    it("is true for h-bar, and for PromQL bar, stacked and h-stacked", () => {
+      expect(shouldShowBarWidthConfig({ data: { type: "h-bar" } }, false)).toBe(true);
+      ["bar", "stacked", "h-stacked"].forEach((type) => {
+        expect(shouldShowBarWidthConfig({ data: { type } }, true)).toBe(true);
+        expect(shouldShowBarWidthConfig({ data: { type } }, false)).toBe(false);
+      });
+      expect(shouldShowBarWidthConfig({ data: { type: "line" } }, true)).toBe(false);
     });
   });
 
@@ -1435,7 +1464,7 @@ describe("configUtils", () => {
       "area-stacked",
       "stacked",
     ];
-    const nonTimeShiftTypes = ["pie", "donut", "table", "metric", "gauge"];
+    const nonTimeShiftTypes = ["pie", "donut", "table", "metric", "gauge", "state-timeline"];
 
     timeShiftTypes.forEach((type) => {
       it(`should return true for ${type} in non-promql mode with non-logs pageKey`, () => {
@@ -1477,5 +1506,222 @@ describe("configUtils", () => {
     it("should return false when pageKey is logs", () => {
       expect(shouldShowTimeShift({ data: { type: "area" } }, false, "logs")).toBe(false);
     });
+  });
+
+  describe("allVisibleQueriesInstant", () => {
+    const panel = (types: string[], hiddenQueries?: number[]) => ({
+      data: { queries: types.map((query_type) => ({ config: { query_type } })) },
+      layout: { hiddenQueries },
+    });
+
+    it("is true only when every visible query is instant", () => {
+      expect(allVisibleQueriesInstant(panel(["instant", "instant"]))).toBe(true);
+      expect(allVisibleQueriesInstant(panel(["instant", "range"]))).toBe(false);
+      expect(allVisibleQueriesInstant(panel(["instant", "range"], [1]))).toBe(true);
+    });
+
+    it("is false with no queries or an unset query type", () => {
+      expect(allVisibleQueriesInstant(panel([]))).toBe(false);
+      expect(allVisibleQueriesInstant({ data: { queries: [{ config: {} }] } })).toBe(false);
+    });
+
+    it("is false when every query is hidden", () => {
+      expect(allVisibleQueriesInstant(panel(["range", "instant"], [0, 1]))).toBe(false);
+    });
+  });
+
+  describe("state-timeline", () => {
+    const panel = {
+      data: {
+        type: "state-timeline",
+        queries: [{ config: { query_type: "instant" } }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    };
+
+    it("hides the range/instant query type selector", () => {
+      expect(shouldShowPromQLQueryType(panel)).toBe(false);
+      expect(shouldShowPromQLQueryType({ data: { type: "line" } })).toBe(true);
+    });
+
+    it("hides legend placement and axis options that do not apply", () => {
+      expect(shouldShowLegendsToggle(panel)).toBe(true);
+      expect(shouldShowLegendPosition(panel)).toBe(false);
+      expect(shouldShowLegendType(panel)).toBe(false);
+      expect(shouldShowLegendWidth(panel)).toBe(false);
+      expect(shouldShowLegendHeight(panel)).toBe(false);
+      expect(shouldShowAxisConfig(panel)).toBe(false);
+      expect(shouldShowCartesianAxisConfig(panel)).toBe(false);
+    });
+  });
+
+  describe("bar gauge", () => {
+    const panel = {
+      data: {
+        type: "bar-gauge",
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    };
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel)).toBe(false);
+      expect(shouldShowLegendsToggle(panel)).toBe(false);
+      expect(shouldShowAxisConfig(panel)).toBe(false);
+    });
+
+    it("keeps the PromQL query type and shows the no-value text", () => {
+      expect(shouldShowPromQLQueryType(panel)).toBe(true);
+      expect(shouldShowNoValueReplacement(panel, true)).toBe(true);
+    });
+  });
+  describe("distribution", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("keeps the legend toggle and gridlines but not legend placement or axis width", () => {
+      const distribution = panel("distribution");
+      expect(shouldShowGridlines(distribution)).toBe(true);
+      expect(shouldShowLegendsToggle(distribution)).toBe(true);
+      expect(shouldShowLegendPosition(distribution)).toBe(false);
+      expect(shouldShowLegendType(distribution)).toBe(false);
+      expect(shouldShowLegendWidth(distribution)).toBe(false);
+      expect(shouldShowAxisConfig(distribution)).toBe(false);
+    });
+  });
+  describe("treemap", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("treemap"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("treemap"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("treemap"))).toBe(false);
+    });
+  });
+  describe("sunburst", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("sunburst"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("sunburst"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("sunburst"))).toBe(false);
+    });
+  });
+  describe("funnel", () => {
+    const panel = {
+      data: {
+        type: "funnel",
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    };
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel)).toBe(false);
+      expect(shouldShowLegendsToggle(panel)).toBe(false);
+      expect(shouldShowLegendPosition(panel)).toBe(false);
+      expect(shouldShowAxisConfig(panel)).toBe(false);
+    });
+  });
+  describe("node graph", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("node-graph"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("node-graph"))).toBe(false);
+      expect(shouldShowLegendPosition(panel("node-graph"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("node-graph"))).toBe(false);
+    });
+  });
+});
+
+describe("pruneDependentOptions", () => {
+  it("drops the saved values of options whose parent no longer applies", () => {
+    const config: Record<string, any> = {
+      scatter_size_min: 2,
+      scatter_size_max: 30,
+      y_axis_scale: "linear",
+      y_axis_log_base: 2,
+      map_cluster: false,
+      map_cluster_radius: 40,
+      connect_nulls: false,
+      connect_nulls_threshold: 300,
+    };
+    pruneDependentOptions(config);
+    expect(config).toEqual({ y_axis_scale: "linear", map_cluster: false, connect_nulls: false });
+  });
+
+  it("keeps them while the parent applies", () => {
+    const config = {
+      scatter_size_field: "count",
+      scatter_size_min: 2,
+      y_axis_scale: "log",
+      y_axis_log_base: 2,
+      map_cluster: true,
+      map_cluster_radius: 40,
+      connect_nulls: true,
+      connect_nulls_threshold: 300,
+    };
+    const before = { ...config };
+    pruneDependentOptions(config);
+    expect(config).toEqual(before);
   });
 });

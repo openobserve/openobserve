@@ -364,7 +364,7 @@ fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ActiveModelTrait as _, IntoActiveModel, Iterable as _};
+    use sea_orm::{IntoActiveModel, Iterable as _};
 
     use super::*;
 

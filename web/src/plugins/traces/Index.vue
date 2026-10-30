@@ -323,6 +323,7 @@ import { logsErrorMessage } from "@/utils/common";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
@@ -1097,7 +1098,9 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           delete tracesRequestState[searchTraceId];
           if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
-            analytics.track("traces_search_completed");
+            analytics.track("traces_search_completed", {
+              hits: searchObj.data.queryResults?.hits?.length ?? 0,
+            });
             fetchTracesCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
@@ -1755,7 +1758,8 @@ const onAskAiTracing = () => {
 
   const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
   const stream = searchObj.data.stream.selectedStream?.value || "unknown";
-  const timeRange = searchObj.data.datetime.relativeTimePeriod || "custom";
+  const period = searchObj.data.datetime.relativeTimePeriod;
+  const timeRange = period ? describePeriod(period) : "custom";
 
   emit(
     "sendToAiChat",
@@ -1932,28 +1936,20 @@ const searchData = () => {
 
   runQueryFn();
 
-  analytics.track("Button Click", {
-    button: "Search Data",
-    user_org: store.state.selectedOrganization.identifier,
-    user_id: store.state.userInfo.email,
+  analytics.track("traces_search_run", {
     stream_name: searchObj.data.stream.selectedStream.value,
     show_query: searchObj.meta.showQuery,
     show_histogram: searchObj.meta.showHistogram,
-    sqlMode: searchObj.meta.sqlMode,
-    showFields: searchObj.meta.showFields,
-    page: "Search Logs",
+    sql_mode: searchObj.meta.sqlMode,
+    show_fields: searchObj.meta.showFields,
   });
 };
 
 const getMoreData = () => {
   getQueryData(true);
 
-  analytics.track("Button Click", {
-    button: "Get More Data",
-    user_org: store.state.selectedOrganization.identifier,
-    user_id: store.state.userInfo.email,
+  analytics.track("traces_more_rows_loaded", {
     stream_name: searchObj.data.stream.selectedStream.value,
-    page: "Search Logs",
   });
 };
 

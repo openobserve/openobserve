@@ -75,6 +75,13 @@ impl RemovalTarget {
     }
 }
 
+/// True when `requested` is not the same set of custom roles as `current`.
+#[cfg(feature = "enterprise")]
+fn custom_roles_differ(requested: &[String], current: &[String]) -> bool {
+    let requested: std::collections::HashSet<&String> = requested.iter().collect();
+    requested != current.iter().collect()
+}
+
 fn redact_token(token: &str) -> String {
     if token.is_empty() {
         return String::new();
@@ -501,9 +508,20 @@ pub async fn update_user(
             is_org_updated |= local_user.role.ne(&new_user.role);
             #[cfg(feature = "enterprise")]
             if let Some(cr) = new_org_role.custom_role {
-                custom_roles_need_change = true;
-                custom_roles.extend(cr);
-                is_org_updated = true;
+                // Only an admin grants custom roles; a self-update may resend its own unchanged.
+                if update_mode.is_self_update()
+                    && !matches!(local_user.role, UserRole::Admin | UserRole::Root)
+                    && custom_roles_differ(
+                        &cr,
+                        &o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email).await,
+                    )
+                {
+                    message = "Self custom roles cannot be changed";
+                } else {
+                    custom_roles_need_change = true;
+                    custom_roles.extend(cr);
+                    is_org_updated = true;
+                }
             }
         }
     }
@@ -1157,6 +1175,8 @@ pub async fn remove_user_from_org(
             ),
         }
     }
+    // After the membership is gone: their links ran with their stream access.
+    crate::public_dashboards::pause_departed_publisher_links(org_id, email_id).await;
     if let Err(e) = infra::table::query_history::delete_by_user(org_id, email_id).await {
         log::error!("error deleting query history of {email_id} in {org_id}: {e}");
     }
@@ -1575,6 +1595,20 @@ mod tests {
     // Mutex to ensure test setup is serialized to prevent race conditions
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_self_update_may_resend_its_custom_roles_but_not_change_them() {
+        let current = ["a".to_string(), "b".to_string()];
+        assert!(!custom_roles_differ(&["b".into(), "a".into()], &current));
+        assert!(custom_roles_differ(
+            &["a".into(), "b".into(), "c".into()],
+            &current
+        ));
+        assert!(custom_roles_differ(&["a".into()], &current));
+        assert!(custom_roles_differ(&["c".into()], &[]));
+        assert!(!custom_roles_differ(&[], &[]));
+    }
+
     #[test]
     fn test_redact_token_exactly_four_chars() {
         // 4 visible chars + 8 stars = 12 total
@@ -1897,6 +1931,62 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
         assert_eq!(history_count("dummy", email).await, 0);
         assert_eq!(history_count("other", email).await, 1);
+    }
+
+    #[tokio::test]
+    async fn gate14_removing_a_publisher_pauses_their_public_links_after_the_membership_delete() {
+        use infra::table::{entity::public_dashboards::Model as Link, public_dashboards as links};
+
+        let _guard = set_up().await;
+        links::create_tables_for_tests(get_orm_client_rw().await)
+            .await
+            .unwrap();
+        // The test database outlives the run, so nothing here may collide with an earlier run.
+        let id = config::ider::uuid();
+        let email = format!("publisher-{id}@example.com");
+        let email = email.as_str();
+        create_user_with_history(email).await;
+        let link = Link {
+            id: id.clone(),
+            org_id: "dummy".to_string(),
+            folder_id: "default".to_string(),
+            dashboard_id: id.clone(),
+            slug: config::utils::rand::generate_random_string(22),
+            name: "Exec view".to_string(),
+            visibility: 1,
+            time_ranges: None,
+            default_range_key: None,
+            frozen_variables: None,
+            refresh_secs: 300,
+            dashboard_version: 8,
+            published_by: email.to_string(),
+            enabled: true,
+            expires_at: None,
+            created_by: email.to_string(),
+            updated_by: None,
+            created_at: 1,
+            updated_at: 1,
+            rev: 1,
+            deleted_at: None,
+            last_accessed_at: None,
+            access_count: 0,
+        };
+        let created = links::insert_capped(get_orm_client_rw().await, &link, u32::MAX, 1, false)
+            .await
+            .unwrap();
+        assert_eq!(created, links::CreateOutcome::Created);
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert!(infra_table::org_users::get("dummy", email).await.is_err());
+        let row = links::get(get_orm_client_rw().await, &id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!row.enabled, "the departed publisher's link is paused");
+        assert!(row.rev > link.rev, "the pause bumped the revision");
     }
 
     #[tokio::test]

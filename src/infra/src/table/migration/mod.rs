@@ -231,10 +231,48 @@ mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
 mod m20261020_000001_create_eval_job_states_tables;
+mod m20261021_000001_create_public_dashboards;
 mod m20261021_000001_status_pages_add_favicon_img;
+mod m20261021_000002_add_search_type_to_search_queue;
 mod m20261024_000001_add_lease_to_org_cleanup_tasks;
+mod m20261025_000001_add_firing_started_at_to_alert_states;
+mod m20261025_000002_create_alert_acks;
+mod m20261025_000003_add_mute_targets_to_downtimes;
+mod m20261025_000004_create_slack_alert_messages;
+mod m20261025_000005_add_held_action_to_slack_link_requests;
+mod m20261026_000001_backfill_v1_rca_pointer;
+mod m20261028_000001_add_group_label_set_to_alert_states;
+mod m20261029_000001_widen_alert_dedup_fingerprint;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_public_dashboards_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261021_000001_create_public_dashboards::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// The search queue as migrations 109 and earlier leave it.
+#[cfg(test)]
+pub(crate) async fn create_search_queue_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20241204_143100_create_table_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20251219_000001_add_org_id_to_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20261021_000002_add_search_type_to_search_queue::Migration
+        .up(&manager)
+        .await
+}
 
 #[cfg(any(test, feature = "test-utils"))]
 pub async fn create_fleet_collectors_for_test(
@@ -398,7 +436,69 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
 /// Apply only the Slack app tables, idempotently, for tests in any crate.
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
-    m20261018_000001_create_slack_tables::create_all(db).await
+    m20261018_000001_create_slack_tables::create_all(db).await?;
+    m20261025_000004_create_slack_alert_messages::create_all(db).await?;
+    m20261025_000005_add_held_action_to_slack_link_requests::add_column(db).await
+}
+
+/// Apply only `alert_acks`, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_alert_acks_table<C: sea_orm::ConnectionTrait>(
+    db: &C,
+) -> Result<(), DbErr> {
+    m20261025_000002_create_alert_acks::create_all(db).await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_alert_states_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260725_000001_create_alert_states_tables::Migration
+        .up(&manager)
+        .await?;
+    m20261025_000001_add_firing_started_at_to_alert_states::Migration
+        .up(&manager)
+        .await?;
+    m20261028_000001_add_group_label_set_to_alert_states::Migration
+        .up(&manager)
+        .await
+}
+
+/// Tables the Phase 2 migrations alter; `downtimes` is bare to skip its folder key.
+#[cfg(test)]
+pub(crate) async fn create_alert_slack_prerequisites_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+    use sea_orm_migration::MigrationTrait;
+    m20260725_000001_create_alert_states_tables::Migration
+        .up(&SchemaManager::new(db))
+        .await?;
+    m20261018_000001_create_slack_tables::create_all(db).await?;
+    db.execute_unprepared("CREATE TABLE IF NOT EXISTS downtimes (id varchar(27) PRIMARY KEY)")
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn alert_slack_migrations_for_test() -> Vec<Box<dyn MigrationTrait>> {
+    vec![
+        Box::new(m20261025_000001_add_firing_started_at_to_alert_states::Migration),
+        Box::new(m20261025_000002_create_alert_acks::Migration),
+        Box::new(m20261025_000003_add_mute_targets_to_downtimes::Migration),
+        Box::new(m20261025_000004_create_slack_alert_messages::Migration),
+        Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
+    ]
+}
+
+/// Run the v1 run-pointer backfill over the current rows, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn backfill_v1_rca_pointer(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    m20261026_000001_backfill_v1_rca_pointer::Migration
+        .up(&SchemaManager::new(db))
+        .await
 }
 
 pub struct Migrator;
@@ -622,6 +722,16 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
             Box::new(m20261005_000001_create_fleet::Migration),
             Box::new(m20261024_000001_add_lease_to_org_cleanup_tasks::Migration),
+            Box::new(m20261021_000001_create_public_dashboards::Migration),
+            Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
+            Box::new(m20261026_000001_backfill_v1_rca_pointer::Migration),
+            Box::new(m20261025_000001_add_firing_started_at_to_alert_states::Migration),
+            Box::new(m20261025_000002_create_alert_acks::Migration),
+            Box::new(m20261025_000003_add_mute_targets_to_downtimes::Migration),
+            Box::new(m20261025_000004_create_slack_alert_messages::Migration),
+            Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
+            Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
+            Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
         ]
     }
 }
@@ -699,6 +809,22 @@ mod tests {
         (116, "m20261021_000001_status_pages_add_favicon_img"),
         (117, "m20261005_000001_create_fleet"),
         (118, "m20261024_000001_add_lease_to_org_cleanup_tasks"),
+        (119, "m20261021_000001_create_public_dashboards"),
+        (120, "m20261021_000002_add_search_type_to_search_queue"),
+        (121, "m20261026_000001_backfill_v1_rca_pointer"),
+        (
+            122,
+            "m20261025_000001_add_firing_started_at_to_alert_states",
+        ),
+        (123, "m20261025_000002_create_alert_acks"),
+        (124, "m20261025_000003_add_mute_targets_to_downtimes"),
+        (125, "m20261025_000004_create_slack_alert_messages"),
+        (
+            126,
+            "m20261025_000005_add_held_action_to_slack_link_requests",
+        ),
+        (127, "m20261028_000001_add_group_label_set_to_alert_states"),
+        (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -798,6 +924,10 @@ mod tests {
                 "m20260924_000001_add_recovery_episode_columns",
             ),
             (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261028_000001_add_group_label_set_to_alert_states",
+            ),
+            (
                 "m20250109_092400_recreate_tables_with_ksuids",
                 "m20261009_000001_create_downtimes",
             ),
@@ -816,6 +946,10 @@ mod tests {
             (
                 "m20261007_000001_scope_alert_dedup_state_by_org",
                 "m20261009_000001_create_downtimes",
+            ),
+            (
+                "m20261007_000001_scope_alert_dedup_state_by_org",
+                "m20261029_000001_widen_alert_dedup_fingerprint",
             ),
             (
                 "m20261009_000001_create_downtimes",
@@ -844,6 +978,22 @@ mod tests {
             (
                 "m20261016_000001_create_rca_runs",
                 "m20261018_000001_create_rca_steering",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261025_000001_add_firing_started_at_to_alert_states",
+            ),
+            (
+                "m20261009_000001_create_downtimes",
+                "m20261025_000003_add_mute_targets_to_downtimes",
+            ),
+            (
+                "m20261018_000001_create_slack_tables",
+                "m20261025_000004_create_slack_alert_messages",
+            ),
+            (
+                "m20261018_000001_create_slack_tables",
+                "m20261025_000005_add_held_action_to_slack_link_requests",
             ),
         ] {
             assert!(

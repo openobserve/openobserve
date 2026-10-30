@@ -29,7 +29,9 @@ import type { RichCardContent } from "./types";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import linuxCard from "./content/linux";
+import postgresCard from "./content/postgres";
 import kubernetesCard from "./content/kubernetes";
 import { gt } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
@@ -828,5 +830,233 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
     await type("ebpfExe", ",");
     expect(warning().exists()).toBe(true);
     expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+});
+
+describe("SetupCardRenderer — setup modes", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const MODES: RichCardContent = {
+    provider: { id: "demo-db", name: "Demo DB", tagline: "A demo.", logo: "", tone: "#000" },
+    setupModes: [
+      { id: "auto", label: "Automatic" },
+      { id: "manual", label: "Manual" },
+    ],
+    steps: [
+      {
+        id: "prepare",
+        title: "Prepare",
+        completeOn: "copy",
+        code: { lang: "sql", raw: "SELECT 1" },
+      },
+      {
+        id: "auto",
+        mode: "auto",
+        title: "Quick install",
+        completeOn: "copy",
+        required: true,
+        inputs: [{ id: "host", label: "Host", default: "localhost" }],
+        code: { lang: "bash", raw: "install --host={host}" },
+        note: "Prefer the long way? Use [Manual](#manual).",
+      },
+      {
+        id: "m-config",
+        mode: "manual",
+        title: "Configure",
+        completeOn: "copy",
+        required: true,
+        inputs: [{ id: "host", label: "Host", default: "localhost" }],
+        code: { lang: "bash", raw: "endpoint: {host}" },
+      },
+      {
+        id: "m-run",
+        mode: "manual",
+        title: "Run",
+        completeOn: "copy",
+        code: { lang: "bash", raw: "run" },
+      },
+      { id: "verify", title: "Verify", completeOn: "detect", detectionAnchor: true },
+    ],
+    detect: { streamType: "metrics", match: "keyword", streamName: "demo", filter: "" },
+    extras: {
+      uninstall: { label: "Uninstall", code: { lang: "bash", raw: "uninstall --host={host}" } },
+    },
+  };
+
+  const stepIds = () =>
+    wrapper
+      .findAllComponents(OStep)
+      .map((s) => String(s.vm.$attrs["data-test"]).replace("ai-step-", ""));
+  const pickMode = async (id: string) => {
+    wrapper
+      .find('[data-test="ai-setup-mode-tabs"]')
+      .findComponent(OToggleGroup)
+      .vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const copyStep = async (id: string) => {
+    wrapper.find(`[data-test="ai-step-${id}"]`).findComponent(OCodeBlock).vm.$emit("copy", {});
+    await flushPromises();
+  };
+  const activeStep = () => wrapper.findComponent(OStepper).props("modelValue");
+
+  it("renders no mode toggle and every step for a card without setupModes", () => {
+    wrapper = mountCard();
+    expect(wrapper.find('[data-test="ai-setup-mode-tabs"]').exists()).toBe(false);
+    expect(stepIds()).toEqual(["install", "verify"]);
+  });
+
+  it("opens on the first mode and shows untagged steps in both modes", async () => {
+    wrapper = mountCard(MODES);
+    expect(wrapper.find('[data-test="ai-setup-mode-auto"]').text()).toBe("Automatic");
+    expect(stepIds()).toEqual(["prepare", "auto", "verify"]);
+    await pickMode("manual");
+    expect(stepIds()).toEqual(["prepare", "m-config", "m-run", "verify"]);
+  });
+
+  it("counts only the visible steps toward completion and the active step", async () => {
+    wrapper = mountCard(MODES);
+    await copyStep("prepare");
+    await copyStep("auto");
+    // Hidden manual steps never block: the verify step (3rd visible) is next.
+    expect(activeStep()).toBe(3);
+    await pickMode("manual");
+    expect(activeStep()).toBe(2);
+    await copyStep("m-config");
+    await copyStep("m-run");
+    expect(activeStep()).toBe(4);
+  });
+
+  it("keeps a typed input value across modes, since both paths share its id", async () => {
+    wrapper = mountCard(MODES);
+    await wrapper.find('[data-test="ai-input-host"] input').setValue("db.internal");
+    expect(wrapper.find('[data-test="ai-step-auto"]').text()).toContain(
+      "install --host=db.internal",
+    );
+    await pickMode("manual");
+    expect(wrapper.find('[data-test="ai-step-m-config"]').text()).toContain(
+      "endpoint: db.internal",
+    );
+  });
+
+  it("switches to the manual mode from a [label](#manual) note link", async () => {
+    wrapper = mountCard(MODES);
+    (Element.prototype as any).scrollIntoView = vi.fn();
+    const link = wrapper.find('a.note-jump[data-jump="manual"]');
+    expect(link.text()).toBe("Manual");
+    await link.trigger("click");
+    await flushPromises();
+    expect(stepIds()).toContain("m-config");
+    expect(stepIds()).not.toContain("auto");
+  });
+
+  it("ignores a #manual link on a card that has no manual mode", async () => {
+    wrapper = mountCard({
+      ...MODES,
+      setupModes: [{ id: "auto", label: "Automatic" }],
+    });
+    await wrapper.find('a.note-jump[data-jump="manual"]').trigger("click");
+    await flushPromises();
+    expect(stepIds()).toEqual(["prepare", "auto", "verify"]);
+  });
+
+  it("auto-advances to the next visible step after switching modes", async () => {
+    wrapper = mountCard(MODES);
+    await pickMode("manual");
+    await pickMode("auto");
+    await pickMode("manual");
+    const targets: Element[] = [];
+    const original = (Element.prototype as any).scrollIntoView;
+    (Element.prototype as any).scrollIntoView = function (this: Element) {
+      targets.push(this);
+    };
+    try {
+      await copyStep("prepare");
+      // A step unmounted by the switch must not clear the ref of the step now in its slot.
+      expect(targets).toHaveLength(1);
+      expect(targets[0].closest('[data-test="ai-step-m-config"]')).not.toBeNull();
+      await copyStep("m-config");
+      expect(targets[1].closest('[data-test="ai-step-m-run"]')).not.toBeNull();
+    } finally {
+      (Element.prototype as any).scrollIntoView = original;
+    }
+  });
+
+  it("shows a mode-scoped uninstall section only in its mode", async () => {
+    wrapper = mountCard({
+      ...MODES,
+      extras: { uninstall: { ...MODES.extras!.uninstall!, mode: "auto" } },
+    });
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(true);
+    await pickMode("manual");
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(false);
+  });
+
+  it("fills step inputs into the uninstall command", async () => {
+    wrapper = mountCard(MODES);
+    await wrapper.find('[data-test="ai-input-host"] input').setValue("db.internal");
+    await wrapper.find('[data-test="ai-uninstall-accordion"] button').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-uninstall-code"]').text()).toContain(
+      "uninstall --host=db.internal",
+    );
+  });
+
+  it("drives the Postgres card: installer by default, DBM variant adds --dbm and the log path", async () => {
+    const PG_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: postgresCard(PG_SUBS, gt), subs: PG_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(stepIds()).not.toContain("install");
+    expect(stepIds()).not.toContain("dbm-configure");
+    expect(stepIds().slice(0, 3)).toEqual(["prepare", "quick-install", "verify"]);
+    const quick = () => wrapper.find('[data-test="ai-step-quick-install"]');
+    const code = () => quick().findComponent(OCodeBlock);
+    expect(code().props("code")).toContain("--db=postgres");
+    expect(code().props("code")).not.toContain("--dbm");
+    // Shown masked; the raw token is only in the copied text.
+    expect(code().props("codeMasked")).not.toContain(PG_SUBS.token);
+    expect(quick().find('[data-test="ai-input-logpath"]').exists()).toBe(false);
+
+    quick().findComponent(OToggleGroup).vm.$emit("update:modelValue", "metrics-dbm");
+    await flushPromises();
+    expect(code().props("code")).toContain("--dbm");
+    expect(code().props("code")).toContain("--log-path='/var/log/postgresql/postgresql*.log'");
+    expect(quick().find('[data-test="ai-input-logpath"]').exists()).toBe(true);
+
+    // Typed values are quoted and sanitised as the script will; a cleared field drops its flag.
+    await quick().find('[data-test="ai-input-serviceName"] input').setValue("Prod DB");
+    await quick().find('[data-test="ai-input-host"] input').setValue("db 1");
+    await quick().find('[data-test="ai-input-user"] input').setValue("");
+    expect(code().props("code")).toContain("--name='prod-db'");
+    expect(code().props("code")).toContain("--host='db 1'");
+    expect(code().props("code")).not.toContain("--db-user");
+    await wrapper.find('[data-test="ai-uninstall-accordion"] button').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-uninstall-code"]').text()).toContain("--name='prod-db'");
+
+    await pickMode("manual");
+    // The script's uninstall does not apply to a manual install.
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(false);
+    expect(stepIds()).toEqual([
+      "prepare",
+      "install",
+      "configure",
+      "run",
+      "verify",
+      "dbm-grant",
+      "dbm-logging",
+      "dbm-logging-verify",
+      "dbm-auto-explain",
+      "dbm-configure",
+      "dbm-run",
+      "verify-dbm",
+    ]);
   });
 });

@@ -17,7 +17,7 @@ pub mod requests;
 pub mod responses;
 
 use config::meta::{
-    alerts::{self as meta_alerts, deduplication::DeduplicationConfig, default_align_time},
+    alerts::{self as meta_alerts, default_align_time},
     search as meta_search, stream as meta_stream,
     triggers::Trigger,
 };
@@ -159,10 +159,6 @@ pub struct Alert {
     #[schema(read_only)]
     pub last_edited_by: Option<String>,
 
-    /// Optional deduplication configuration to prevent alert spam.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deduplication: Option<DeduplicationConfig>,
-
     /// When true, this alert routes notifications through the incident system
     /// instead of sending direct alert notifications.
     #[serde(default)]
@@ -230,7 +226,8 @@ pub struct Alert {
     #[schema(example = 10)]
     pub pending_period_sec: i64,
 
-    /// Send one notification when this alert recovers.
+    /// Send one notification when this alert recovers; a multi-alert sends one per recovered
+    /// group.
     #[serde(default)]
     pub notify_on_recovery: bool,
 
@@ -578,6 +575,8 @@ pub enum SearchEventType {
     SearchJob,
     Download,
     Insights,
+    #[serde(rename = "public_dashboard")]
+    PublicDashboard,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -629,7 +628,6 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             owner: alert.owner,
             updated_at: alert.updated_at.map(|t| t.timestamp()),
             last_edited_by: alert.last_edited_by,
-            deduplication: alert.deduplication,
             creates_incident: alert.creates_incident,
             workflows: alert.workflows,
             priority: alert.priority,
@@ -788,6 +786,7 @@ impl From<meta_search::SearchEventType> for SearchEventType {
             meta_search::SearchEventType::SearchJob => Self::SearchJob,
             meta_search::SearchEventType::Download => Self::Download,
             meta_search::SearchEventType::Insights => Self::Insights,
+            meta_search::SearchEventType::PublicDashboard => Self::PublicDashboard,
         }
     }
 }
@@ -833,7 +832,6 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.enabled = value.enabled;
         alert.tz_offset = value.tz_offset;
         alert.owner = value.owner;
-        alert.deduplication = value.deduplication;
         alert.creates_incident = value.creates_incident;
         alert.workflows = value.workflows;
         alert.priority = value.priority;
@@ -1000,6 +998,7 @@ impl From<SearchEventType> for meta_search::SearchEventType {
             SearchEventType::SearchJob => Self::SearchJob,
             SearchEventType::Download => Self::Download,
             SearchEventType::Insights => Self::Insights,
+            SearchEventType::PublicDashboard => Self::PublicDashboard,
         }
     }
 }
@@ -1291,6 +1290,10 @@ mod tests {
         assert!(matches!(M::from(SearchEventType::SearchJob), M::SearchJob));
         assert!(matches!(M::from(SearchEventType::Download), M::Download));
         assert!(matches!(M::from(SearchEventType::Insights), M::Insights));
+        assert!(matches!(
+            M::from(SearchEventType::PublicDashboard),
+            M::PublicDashboard
+        ));
     }
 
     #[test]
@@ -1354,7 +1357,6 @@ mod tests {
         assert!(!obj.contains_key("template"));
         assert!(!obj.contains_key("context_attributes"));
         assert!(!obj.contains_key("updated_at"));
-        assert!(!obj.contains_key("deduplication"));
     }
 
     #[test]
@@ -1368,6 +1370,24 @@ mod tests {
         assert!(obj.contains_key("template"));
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
+    }
+
+    #[test]
+    fn test_request_with_deduplication_still_saves_without_it() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({
+            "name": "a",
+            "deduplication": {
+                "enabled": true,
+                "fingerprint_fields": ["host"],
+                "time_window_minutes": 30,
+                "grouping": {"enabled": true, "group_wait_seconds": 30}
+            }
+        }))
+        .unwrap();
+        let saved: meta_alerts::alert::Alert = alert.into();
+        let json = serde_json::to_value(&saved).unwrap();
+        assert_eq!(json["name"], "a");
+        assert!(!json.as_object().unwrap().contains_key("deduplication"));
     }
 
     #[test]

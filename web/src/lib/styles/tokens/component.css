@@ -575,8 +575,8 @@
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
   --color-input-border: var(--color-border-control);
-  --color-input-border-hover: var(--color-primary-300);
-  --color-input-border-focus: var(--color-primary-300);
+  --color-input-border-hover: var(--color-accent);
+  --color-input-border-focus: var(--color-accent);
   --color-input-border-error: var(--color-error-500);
   /* Disabled-bg uses grey-200 (#e5e5e5) — `surface-subtle` (grey-100 #f5f5f5)
      was almost identical to the enabled white bg in light mode, making
@@ -586,7 +586,7 @@
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-focus-ring: var(--color-focus-ring-accent);
   --color-input-text: var(--color-text-heading);
-  --color-input-placeholder: var(--color-text-disabled);
+  --color-input-placeholder: var(--color-text-placeholder);
   /* text-heading (not text-secondary) so labels don't read as disabled/hint text */
   --color-input-label: var(--color-text-heading);
   --color-input-hint: var(--color-text-secondary);
@@ -601,14 +601,14 @@
   --color-select-bg: var(--color-surface-base);
   --color-select-border: var(--color-border-control);
   --color-select-disabled-border: var(--color-border-default);
-  --color-select-border-hover: var(--color-primary-300);
-  --color-select-border-focus: var(--color-primary-300);
+  --color-select-border-hover: var(--color-accent);
+  --color-select-border-focus: var(--color-accent);
   --color-select-border-error: var(--color-error-500);
   /* Same rationale as input-disabled-bg. */
   --color-select-disabled-bg: var(--color-grey-200);
   --color-select-disabled-text: var(--color-text-secondary);
   --color-select-text: var(--color-text-soft);
-  --color-select-placeholder: var(--color-text-disabled);
+  --color-select-placeholder: var(--color-text-placeholder);
   /* text-heading, not text-secondary (same as input-label) */
   --color-select-label: var(--color-text-heading);
   --color-select-icon: var(--color-text-secondary);
@@ -623,6 +623,8 @@
 
   /* Flame graph (components/common/FlameGraphView.vue): label text on the light series fills, in both themes. */
   --color-flame-frame-text: var(--color-grey-800);
+  /* Grouped and unchanged frames: light in both themes so the fixed dark label stays readable. */
+  --color-flame-grouped-fill: var(--color-grey-400);
 
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-text-heading);
@@ -690,7 +692,7 @@
   --color-file-disabled-bg: var(--color-surface-subtle);
   --color-file-disabled-border: var(--color-border-default);
   --color-file-text: var(--color-text-heading);
-  --color-file-placeholder: var(--color-text-disabled);
+  --color-file-placeholder: var(--color-text-placeholder);
   --color-file-label: var(--color-text-secondary);
   --color-file-icon: var(--color-text-secondary);
   --color-file-error-text: var(--color-error-600);
@@ -710,7 +712,7 @@
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
   --color-datepicker-text: var(--color-text-heading);
-  --color-datepicker-placeholder: var(--color-text-disabled);
+  --color-datepicker-placeholder: var(--color-text-placeholder);
   --color-datepicker-label: var(--color-text-label);
   --color-datepicker-icon: var(--color-text-secondary);
   --color-datepicker-error-text: var(--color-error-600);
@@ -763,8 +765,19 @@
   --color-table-header-bg: var(--color-surface-panel);
   --color-table-header-text: var(--color-text-secondary);
   --color-table-header-border: var(--color-border-default);
-  --color-table-row-hover-bg: var(--color-primary-50);
-  --color-table-row-selected-bg: var(--color-primary-100);
+  /* Hover clears ~1.19:1 on white and selected sits ~1.08:1 above it, so both read without sinking secondary text. */
+  --color-table-row-hover-bg: color-mix(
+    in srgb,
+    var(--color-primary-100) 85%,
+    var(--color-primary-50)
+  );
+  --color-table-row-selected-bg: color-mix(
+    in srgb,
+    var(--color-primary-200) 30%,
+    var(--color-primary-100)
+  );
+  /* Rows re-point text-secondary to this on the hover/selected fills, where plain grey-500 falls below 4.5:1. */
+  --color-table-row-text-secondary-tinted: var(--color-grey-600);
   --color-table-row-striped-bg: var(--color-surface-subtle);
   /* Row dividers use the SOFT border: lighter than the structural table outline /
      sticky-header underline so rows read as a calm list, not a hard grid. The
@@ -1546,6 +1559,7 @@
 
   /* Flame graph */
   --color-flame-frame-text: var(--color-flame-frame-text);
+  --color-flame-grouped-fill: var(--color-flame-grouped-fill);
 
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-switch-label);
@@ -1985,6 +1999,7 @@
   --color-table-header-border: var(--color-table-header-border);
   --color-table-row-hover-bg: var(--color-table-row-hover-bg);
   --color-table-row-selected-bg: var(--color-table-row-selected-bg);
+  --color-table-row-text-secondary-tinted: var(--color-table-row-text-secondary-tinted);
   --color-table-row-striped-bg: var(--color-table-row-striped-bg);
   --color-table-row-divider: var(--color-table-row-divider);
   --color-table-border: var(--color-table-border);
@@ -2168,6 +2183,10 @@
   --color-log-severity-debug-indicator: var(--color-log-severity-debug-indicator);
   --color-log-severity-trace-indicator: var(--color-log-severity-trace-indicator);
   --color-log-severity-ok-indicator: var(--color-log-severity-ok-indicator);
+  --color-log-severity-error-text: var(--color-log-severity-error-text);
+  --color-log-severity-warning-text: var(--color-log-severity-warning-text);
+  --color-log-severity-debug-text: var(--color-log-severity-debug-text);
+  --color-log-severity-info-text: var(--color-log-severity-info-text);
   --color-log-table-row-bg: var(--color-log-table-row-bg);
   --color-log-table-row-border: var(--color-log-table-row-border);
   --color-purple-700: var(--color-purple-700);

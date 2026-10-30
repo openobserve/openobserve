@@ -84,10 +84,9 @@ impl IncidentStatus {
     }
 }
 
-/// Update payload enum for incident field updates
-/// Ensures only one field can be updated per request
+/// One field per request; `deny_unknown_fields` rejects a payload that sends a second one.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(untagged)]
+#[serde(untagged, deny_unknown_fields)]
 pub enum UpdatePayload {
     /// Update incident title
     Title { title: String },
@@ -960,7 +959,8 @@ pub async fn get_incident_rca_thread(
     };
     let show_tool_io = match &session {
         RunSession::Present(_) => {
-            match db::organization::get_org_setting_ai_rca_thread_tool_output(&org_id).await {
+            match db::organization::read_org_setting(&org_id, |s| s.ai_rca_thread_tool_output).await
+            {
                 Ok(show) => show,
                 Err(e) => return MetaHttpResponse::internal_error(e),
             }
@@ -1566,7 +1566,9 @@ pub async fn get_incident_rca_live_stream(
                 return response;
             }
             let show_tool_io =
-                match db::organization::get_org_setting_ai_rca_thread_tool_output(&org_id).await {
+                match db::organization::read_org_setting(&org_id, |s| s.ai_rca_thread_tool_output)
+                    .await
+                {
                     Ok(show) => show,
                     Err(e) => return MetaHttpResponse::internal_error(e),
                 };
@@ -2208,6 +2210,7 @@ mod tests {
             muted_by_downtime_id: None,
             rca: None,
             rca_off_reason: None,
+            alert_groups: None,
         };
 
         let response = ListIncidentsResponse {
@@ -2298,6 +2301,21 @@ mod tests {
                 assert_eq!(status, IncidentStatus::Resolved);
             }
             _ => panic!("Expected Status variant"),
+        }
+    }
+
+    #[test]
+    fn test_update_payload_rejects_a_second_field() {
+        for json in [
+            r#"{"title":"x","status":"resolved"}"#,
+            r#"{"severity":"P4","status":"resolved"}"#,
+            r#"{"title":"x","severity":"P1"}"#,
+            r#"{"status":"resolved","note":"x"}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<UpdatePayload>(json).is_err(),
+                "{json} must not deserialize to one field"
+            );
         }
     }
 
@@ -2469,6 +2487,7 @@ mod tests {
             muted_by_downtime_id: None,
             rca: None,
             rca_off_reason: Some("l0_off".to_string()),
+            alert_groups: None,
         };
         let json = serde_json::to_value(&incident).unwrap();
         assert!(json.as_object().unwrap().contains_key("rca"));

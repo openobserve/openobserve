@@ -29,9 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         variant="primary"
         data-test="synthetic-monitoring-new-check-btn"
+        :aria-label="
+          hasNewCheckDraft
+            ? t('common.editorDraft.newDot', { label: t('synthetics.newCheck.button') })
+            : undefined
+        "
         @click="showTypePicker = true"
       >
         {{ t("synthetics.newCheck.button") }}
+        <EditorDraftDot
+          v-if="hasNewCheckDraft"
+          :saved-at="newCheckDraftSavedAt"
+          corner
+          data-test="synthetic-monitoring-new-check-draft-dot"
+        />
       </OButton>
       <OButton
         v-else-if="activeSection === 'status-pages'"
@@ -138,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
           :location-names="locationNames"
+          :draft-saved-at="checkDraftSavedAt"
           data-test="synthetic-monitoring-monitors-table"
           :toggle-loading-map="toggleLoadingMap"
           :trigger-loading-map="triggerLoadingMap"
@@ -337,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showBulkDeleteConfirm = false"
     >
       <p class="py-2">
-        {{ t("synthetics.dialog.bulkDeleteBody", { count: selectedMonitorIds.length }) }}
+        {{ t("synthetics.dialog.bulkDeleteBody", { count: bulkDeleteCount }) }}
       </p>
     </ODialog>
 
@@ -399,9 +411,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="deleteLocation"
       @click:secondary="showDeleteLocation = false"
     >
-      <p class="py-2">
-        {{ t("synthetics.privateLocations.deleteBody", { name: locationToDelete?.label ?? "" }) }}
-      </p>
+      <i18n-t keypath="synthetics.privateLocations.deleteBody" tag="p" class="py-2">
+        <template #name>
+          <span
+            data-test="synthetic-monitoring-delete-location-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ locationToDelete?.label }}</span
+          >
+        </template>
+      </i18n-t>
     </ODialog>
 
     <!-- Move checks dialog -->
@@ -431,6 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OText>
         </div>
         <CheckTypePicker
+          :draft-saved-at="newCheckDraftSavedAtByType"
           variant="modal"
           layout="row"
           data-test="synthetic-monitoring-check-type-picker-modal"
@@ -546,6 +565,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -656,6 +678,49 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>;
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
+
+const protocolDrafts = useEditorDraftIds("synthetic_check");
+const browserDrafts = useEditorDraftIds("synthetic_browser");
+const hasNewCheckDraft = computed(
+  () =>
+    browserDrafts.hasNew ||
+    SYNTHETIC_CHECK_TYPES.some((type) => type !== "browser" && protocolDrafts.hasNewVariant(type)),
+);
+/** Each type's new-check draft time: the browser test has its own kind, a protocol check one slot per type. */
+const newCheckDraftSavedAtByType = computed(() =>
+  Object.fromEntries(
+    SYNTHETIC_CHECK_TYPES.map((type) => [
+      type,
+      type === "browser" ? browserDrafts.savedAt(null) : protocolDrafts.savedAtVariant(type),
+    ]),
+  ),
+);
+/** The newest of the new-check drafts, browser or any protocol type. */
+const newCheckDraftSavedAt = computed(() => {
+  const times = Object.values(newCheckDraftSavedAtByType.value).filter(
+    (at): at is number => at !== null,
+  );
+  return times.length ? Math.max(...times) : null;
+});
+/** Check id to its newest draft's time; one scan per kind, not per row. */
+const checkDraftSavedAt = computed(() => {
+  const map: Record<string, number> = {};
+  for (const drafts of [protocolDrafts, browserDrafts]) {
+    for (const id of drafts.ids) {
+      const at = drafts.savedAt(id) ?? 0;
+      map[id] = Math.max(map[id] ?? 0, at);
+    }
+  }
+  return map;
+});
+
+function dropCheckDrafts(ids: string[]) {
+  const org = orgIdentifier.value;
+  for (const entityId of ids) {
+    deleteEditorDraftsFor({ kind: "synthetic_check", org, entityId });
+    deleteEditorDraftsFor({ kind: "synthetic_browser", org, entityId });
+  }
+}
 
 const readFolder = ref<string | undefined>(undefined);
 // Distinct from readFolder being undefined, which is the "All folders" scope.
@@ -899,6 +964,8 @@ watch(searchAcrossFolders, async (newVal) => {
 const selectedMonitorIds = ref<string[]>([]);
 const showMoveDialog = ref(false);
 const showBulkDeleteConfirm = ref(false);
+// Set on open and never cleared: the selection empties before the dialog finishes closing.
+const bulkDeleteCount = ref(0);
 const monitorsToMove = ref<string[]>([]);
 
 // Both delete handlers' 409s render here, with distinct titles for a named parent vs outside ones.
@@ -931,6 +998,7 @@ const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
 
 const openBulkDeleteConfirm = () => {
+  bulkDeleteCount.value = selectedMonitorIds.value.length;
   showBulkDeleteConfirm.value = true;
 };
 
@@ -950,6 +1018,7 @@ const bulkDeleteMonitors = async () => {
     );
     // The bulk endpoint deletes all ids or fails, so a resolved call removed every selected test.
     analytics.track("synthetic_test_deleted", { count: selectedMonitorIds.value.length });
+    dropCheckDrafts(selectedMonitorIds.value.map(String));
     selectedMonitorIds.value = [];
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.bulkDeleteSuccess") });
@@ -1183,7 +1252,9 @@ const openDomains = (page: StatusPageListItem) => {
 const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   const ok = await confirm({
     title: t("statusPages.dialog.deleteTitle"),
-    message: t("statusPages.dialog.deleteBody", { name: page.name }),
+    messageKeypath: "statusPages.dialog.deleteBody",
+    messageName: page.name,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({
@@ -1193,6 +1264,7 @@ const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   });
   try {
     await statusPagesService.delete(orgIdentifier.value, page.id);
+    deleteEditorDraftsFor({ kind: "status_page", org: orgIdentifier.value, entityId: page.id });
     statusPages.value = statusPages.value.filter((p) => p.id !== page.id);
     dismiss();
     toast({ variant: "success", message: t("statusPages.toast.deleted") });
@@ -1711,7 +1783,9 @@ async function runMonitor(m: any) {
 async function deleteMonitor(m: any) {
   const ok = await confirm({
     title: t("synthetics.dialog.deleteSingleTitle"),
-    message: t("synthetics.dialog.deleteSingleBody", { name: m.name }),
+    messageKeypath: "synthetics.dialog.deleteSingleBody",
+    messageName: m.name,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
 
@@ -1724,6 +1798,7 @@ async function deleteMonitor(m: any) {
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
     analytics.track("synthetic_test_deleted", { count: 1 });
+    dropCheckDrafts([String(m.id)]);
     // Every cached folder, not just the one on screen: a cross-folder view deletes rows another folder's entry still holds.
     queryClient.setQueriesData({ queryKey: syntheticsKeys.monitorsAll(org) }, (old: any) => {
       if (!Array.isArray(old)) return undefined;

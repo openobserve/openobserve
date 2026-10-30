@@ -1097,12 +1097,13 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
     use infra::table::{
-        ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_calibration, alert_incidents,
-        anomaly_detection, compactor_manual_jobs, distinct_values, external_alerts, gen_ai_agents,
-        incident_events, incident_integrations, llm_eval, llm_prompts, llm_secrets, oncall_teams,
-        online_eval_jobs, org_ai_toolsets, org_telephony, providers, query_history, ratelimit,
-        rca_runs, rca_steering, re_pattern, re_pattern_stream_map, rum_pa, score_configs, scorers,
-        search_queue, slo, slo_backfill_jobs, slo_budget, slos, status_pages, synthetics_agents,
+        ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_acks, alert_calibration,
+        alert_incidents, anomaly_detection, compactor_manual_jobs, distinct_values,
+        external_alerts, gen_ai_agents, incident_events, incident_integrations, llm_eval,
+        llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets, org_telephony,
+        providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
+        re_pattern_stream_map, rum_pa, score_configs, scorers, search_queue, slack_alert_messages,
+        slo, slo_backfill_jobs, slo_budget, slos, status_pages, synthetics_agents,
         synthetics_checks, synthetics_environments, synthetics_locations, synthetics_probe_tokens,
         synthetics_variables, timed_annotations, workflows,
     };
@@ -1155,6 +1156,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     delete_org_alerts(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alerts: {e}"))?;
+    alert_acks::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_acks: {e}"))?;
     // downtimes.folder_id has a FK (downtimes_folder_fk) → folders.id.
     delete_org_downtimes(org_id)
         .await
@@ -1166,9 +1170,15 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::slack::store::delete_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slack: {e}"))?;
+    slack_alert_messages::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slack_alert_messages: {e}"))?;
     timed_annotations::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/timed_annotations: {e}"))?;
+    crate::public_dashboards::revoke_all_for_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/public_dashboards: {e}"))?;
     // dashboards must be deleted before folders (FK constraint)
     crate::dashboards::delete_by_org(org_id)
         .await
@@ -1746,6 +1756,11 @@ pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
             match sweep_tombstones().await {
                 Ok(n) if n > 0 => log::info!("[org_cleanup] removed {n} expired tombstones"),
                 Err(e) => log::error!("[org_cleanup] tombstone sweep error: {e}"),
+                _ => {}
+            }
+            match crate::public_dashboards::purge_deleted().await {
+                Ok(n) if n > 0 => log::info!("[org_cleanup] purged {n} revoked public links"),
+                Err(e) => log::error!("[org_cleanup] public link purge error: {e}"),
                 _ => {}
             }
             match reconcile().await {
@@ -4480,6 +4495,12 @@ mod tests {
             position_of("delete_org_downtimes(org_id)")
                 < position_of("folders::delete_by_org(org_id)")
         );
+    }
+
+    #[test]
+    fn test_db_resources_deletes_the_orgs_acks_and_slack_alert_messages() {
+        position_of("alert_acks::delete_by_org(org_id)");
+        position_of("slack_alert_messages::delete_by_org(org_id)");
     }
 
     #[test]

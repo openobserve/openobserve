@@ -21,20 +21,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="tabs-delete-popup-dialog"
     v-model:open="open"
     size="md"
-    :title="
-      t('dashboard.tabsDeletePopUp.deleteTitle', {
-        name: dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.name,
-      })
-    "
+    :title="t('dashboard.tabsDeletePopUp.deleteTitle', { name: tabName })"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
+    primary-button-variant="destructive"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
     <div data-test="dialog-box">
-      <p class="para" data-test="dashboard-tab-delete-tab-para">
-        {{ t("dashboard.tabsDeletePopUp.confirmMessage") }}
-      </p>
+      <i18n-t
+        keypath="dashboard.tabsDeletePopUp.confirmMessage"
+        tag="p"
+        class="para"
+        data-test="dashboard-tab-delete-tab-para"
+      >
+        <template #name
+          ><span
+            data-test="dashboard-tab-delete-tab-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ tabName }}</span
+          ></template
+        >
+      </i18n-t>
 
       <!-- only show if there are panels in the tab -->
       <div
@@ -94,6 +102,10 @@ export default defineComponent({
     const selectedTabToMovePanels = ref<string | undefined>(undefined);
     const moveTabOptions = ref([]);
 
+    const tabName = computed(
+      () => props.dashboardData?.tabs?.find((tab: any) => tab.tabId === props.tabId)?.name,
+    );
+
     const open = computed({
       get: () => props.modelValue ?? false,
       set: (v: boolean) => emit("update:modelValue", v),
@@ -140,6 +152,7 @@ export default defineComponent({
     };
     return {
       t,
+      tabName,
       open,
       onCancel,
       onConfirm,

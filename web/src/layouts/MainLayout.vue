@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'flex-col',
     ]"
   >
-    <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
+    <header
+      class="o2-app-header shrink-0"
+      :class="store.state.printMode === true || store.state.kioskMode ? 'hidden' : ''"
+    >
       <!-- Every bar that sits above the toolbar, in one measured wrapper so
            `--navbar-height` accounts for whichever of them is actually showing.
            The wrapper always renders — an unconditional ref keeps the observer
@@ -83,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1">
       <ONavbar
-        v-if="store.state.printMode !== true"
+        v-if="store.state.printMode !== true && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
         :mini-mode="miniMode"
@@ -136,10 +139,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col"
+          :class="store.state.kioskMode ? '' : 'pe-2 pb-2 max-md:pe-0'"
           :style="{
             width:
-              !store.state.isAiChatEnabled || isChatOverlay
+              !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
                 ? '100%'
                 : store.state.isAiChatExpanded
                   ? '50%'
@@ -149,8 +153,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-md"
-            :class="isDark ? 'border-border-default' : 'border-transparent'"
+            class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
+            :class="[
+              store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
+              isDark ? 'border-border-default' : 'border-transparent',
+            ]"
           >
             <div
               v-if="isLoading"
@@ -158,7 +165,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <FirstDataNotice
-                v-if="firstDataNotice.visible.value && router.currentRoute.value.name !== 'home'"
+                v-if="
+                  firstDataNotice.visible.value &&
+                  router.currentRoute.value.name !== 'home' &&
+                  !store.state.kioskMode
+                "
                 class="mx-3 mt-3"
                 :stream="firstDataNotice.stream.value"
                 :arrived-at="firstDataNotice.arrivedAt.value"
@@ -176,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
-          v-show="store.state.isAiChatEnabled && isLoading"
+          v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
           class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
@@ -224,6 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
+    <EditorDraftSignOutDialog
+      v-model:open="signOutDraftsOpen"
+      :count="signOutDraftCount"
+      @confirm="performSignout"
+    />
     <ConnectDataSourcePopup />
     <CommunitySlackInvite />
     <PredefinedThemes />
@@ -245,11 +261,8 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
-  useLocalCurrentUser,
   useLocalOrganization,
-  useLocalUserInfo,
   getImageURL,
-  invalidateLoginData,
   shouldPaywallRoute,
   isEmptyDataExempt,
 } from "../utils/zincutils";
@@ -290,6 +303,8 @@ import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
+import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -305,6 +320,7 @@ import {
   type OrgStreamList,
 } from "@/composables/firstEvent/useFirstDataNotice";
 import { openobserveRum } from "@openobserve/browser-rum";
+import { initBrowserRum } from "@/utils/rum/initBrowserRum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import PaidOverageConsentDialog from "@/components/PaidOverageConsentDialog.vue";
@@ -354,6 +370,7 @@ export default defineComponent({
     ODrawer,
     OButton,
     FirstDataNotice,
+    EditorDraftSignOutDialog,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
@@ -370,34 +387,17 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
-      this.closeSocket();
-
-      // AI chat streams outlive their component by design, so navigating away
-      // doesn't kill an answer. Logout has to stop them explicitly — otherwise
-      // they keep streaming and writing chat history after sign-out.
-      window.dispatchEvent(new Event("o2:abort-ai-streams"));
-
-      // Clear any open notifications so they don't carry over past logout.
-      dismissAll();
-
-      // Stop session replay recording on logout
-      if (this.store.state.zoConfig?.rum?.enabled) {
-        openobserveRum.stopSessionReplayRecording();
-        openobserveRum.clearUser();
-        openobserveRum.clearAccount();
+      // Signing out clears this user's drafts in this browser, so the user is told first, by the open editor's leave dialog when it asks anyway.
+      const count = signOutDraftsToConfirm(this.store);
+      if (count > 0) {
+        this.signOutDraftCount = count;
+        this.signOutDraftsOpen = true;
+        return;
       }
-
-      // Always call backend logout to clear auth cookies (auth_tokens, auth_ext)
-      // before clearing local state — prevents stale credentials from causing
-      // 401 errors on the next login attempt (see #10900)
-      invalidateLoginData();
-
-      this.store.dispatch("logout");
-
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      this.$router.push("/logout");
+      this.performSignout();
+    },
+    performSignout() {
+      void signOutThroughLeaveGuards(this.$router, this.store);
     },
     goToHome() {
       this.$router.push({
@@ -429,6 +429,8 @@ export default defineComponent({
     // Once, here: the mixin calls inject() and onMounted(), which outside setup() warn and do nothing.
     const layoutMixin = mainLayoutMixin.setup();
     const miniMode = ref(false);
+    const signOutDraftsOpen = ref(false);
+    const signOutDraftCount = ref(0);
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
     const isChatOverlay = computed(() => !lgUp.value);
@@ -444,7 +446,7 @@ export default defineComponent({
     );
 
     const { getStreams, resetStreams } = useStreams(t);
-    const { closeSocket } = useSearchWebSocket();
+    useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
     const { prefetchRoute } = useRoutePrefetch();
 
@@ -523,7 +525,6 @@ export default defineComponent({
       return Boolean(store.state.zoConfig?.synthetics_enabled);
     });
 
-    // `ZO_FEATURE_PROFILING_ENABLED` is off by default while Profiles is early-stage.
     const isProfilingEnabled = computed(() => {
       return Boolean(store.state.zoConfig?.profiling_enabled);
     });
@@ -779,20 +780,29 @@ export default defineComponent({
       },
     );
 
-    // main.ts mounts before the bootstrap config resolves, so rum.enabled can arrive after the org.
+    // rum.enabled arrives only with the full config, which is fetched after the org is known.
     watch(
       [
         () => store.state.selectedOrganization?.identifier,
         () => store.state.selectedOrganization?.label,
         () => store.state.selectedOrganization?.subscription_type,
+        // Login and stored selections carry only the org identity, so read created_at from the org list too.
+        () =>
+          store.state.selectedOrganization?.created_at ??
+          (store.state.organizations ?? []).find(
+            (o: { identifier?: string }) =>
+              o?.identifier === store.state.selectedOrganization?.identifier,
+          )?.created_at,
         () => store.state.zoConfig?.rum?.enabled,
       ],
-      ([identifier, name, subscriptionType, rumEnabled]) => {
+      ([identifier, name, subscriptionType, createdAt, rumEnabled]) => {
         if (!identifier || !rumEnabled) return;
         openobserveRum.setAccount({
           id: identifier,
           name,
           subscription_type: subscriptionType,
+          // Unix microseconds, the same unit as _timestamp.
+          created_at: createdAt || undefined,
         });
       },
       { immediate: true },
@@ -1200,6 +1210,7 @@ export default defineComponent({
                 CustomerBillingObj: { subscription_type: string; note: string };
                 status: string;
                 label: string;
+                created_at?: number;
               }) => {
                 // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
                 const optiondata: any = {
@@ -1219,6 +1230,7 @@ export default defineComponent({
                   note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
                     ? data.CustomerBillingObj.note
                     : "",
+                  created_at: data.created_at,
                 };
 
                 if (
@@ -1289,6 +1301,7 @@ export default defineComponent({
             note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
               ? data.CustomerBillingObj.note
               : "",
+            created_at: data.created_at,
           };
           selectedOrg.value = optiondata;
           useLocalOrganization(optiondata);
@@ -1464,6 +1477,8 @@ export default defineComponent({
             linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
           }
 
+          // Before setConfig, so watchers that react to rum.enabled find the SDK running.
+          initBrowserRum(res.data.rum, store.state.API_ENDPOINT);
           store.dispatch("setConfig", res.data);
           fullConfigOrg = orgIdentifier;
           await nextTick();
@@ -1490,11 +1505,6 @@ export default defineComponent({
           }
           // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
-          // Session replay must not be lost to a failed config fetch — the rum
-          // settings already arrived with the unauthenticated bootstrap.
-          if (store.state.zoConfig?.rum?.enabled) {
-            setRumUser();
-          }
           // A transient failure (expired session being refreshed, rolling
           // deploy) would otherwise strand the session on the bootstrap subset.
           if (attempt < FULL_CONFIG_RETRY_DELAYS_MS.length) {
@@ -1693,6 +1703,8 @@ export default defineComponent({
     }
 
     return {
+      signOutDraftsOpen,
+      signOutDraftCount,
       isDark,
       t,
       raw,
@@ -1727,7 +1739,6 @@ export default defineComponent({
       slackIcon: markRaw(SlackIcon),
       openSlack,
       settings: "settings",
-      closeSocket,
       splitterModel,
       toggleAIChat,
       closeChat,

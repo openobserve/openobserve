@@ -684,8 +684,7 @@ pub async fn otlp_json(
     in_stream_name: Option<&str>,
     user: IngestUser,
 ) -> Result<HttpResponse, Error> {
-    let request = match json::from_slice_lenient_floats::<ExportTraceServiceRequest>(body.as_ref())
-    {
+    let request = match json::from_slice_lenient_otlp::<ExportTraceServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid json: org_id: {org_id}, error: {e}");
@@ -842,7 +841,7 @@ pub async fn handle_otlp_request(
     let otel_processor = OtelIngestionProcessor::new();
 
     // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
-    // When ZO_MODEL_PRICING_ENABLED=false, skip DB pricing and fall back to hardcoded values.
+    // When ZO_MODEL_PRICING_ENABLED=false, no pricing applies and spans keep only reported costs.
     static EMPTY_PRICING: std::sync::OnceLock<
         std::sync::Arc<Vec<crate::db::model_pricing::CachedModelPricing>>,
     > = std::sync::OnceLock::new();
@@ -1725,8 +1724,12 @@ fn format_response(
     let partial = partial_success.rejected_spans > 0;
 
     let res = if partial {
-        partial_success.error_message =
-            "Some spans were rejected due to exceeding the allowed retention period".to_string();
+        // the retention checks set no reason of their own
+        if partial_success.error_message.is_empty() {
+            partial_success.error_message =
+                "Some spans were rejected due to exceeding the allowed retention period"
+                    .to_string();
+        }
         ExportTraceServiceResponse {
             partial_success: Some(partial_success),
         }
@@ -2036,6 +2039,45 @@ mod tests {
     use super::span_duration_micros;
 
     #[test]
+    fn test_otlp_json_decodes_empty_any_values() {
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            common::v1::{ArrayValue, KeyValue, KeyValueList, any_value::Value},
+        };
+
+        let body = br#"{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"repro"}},{"key":"geo.locality.region","value":{}}]},"scopeSpans":[{"scope":{"name":"s","attributes":[{"key":"scope.empty","value":{}}]},"spans":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"0123456789abcdef","name":"repro","kind":1,"startTimeUnixNano":"1793184000000000000","endTimeUnixNano":"1793184000000000001","attributes":[{"key":"probe","value":{}},{"key":"list","value":{"arrayValue":{}}},{"key":"map","value":{"kvlistValue":{}}}],"events":[{"timeUnixNano":"1793184000000000000","name":"e","attributes":[{"key":"b","value":{}}]}],"links":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"0123456789abcdee","attributes":[{"key":"c","value":{}}]}]}]}]}]}"#;
+        assert!(config::utils::json::from_slice::<ExportTraceServiceRequest>(body).is_err());
+
+        let request: ExportTraceServiceRequest =
+            config::utils::json::from_slice_lenient_otlp(body).unwrap();
+        let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
+        let resource_spans = &request.resource_spans[0];
+        let resource = resource_spans.resource.as_ref().unwrap();
+        assert_eq!(
+            value(&resource.attributes[0]),
+            Some(Value::StringValue("repro".into()))
+        );
+        assert_eq!(resource.attributes[1].value, None);
+        let scope_spans = &resource_spans.scope_spans[0];
+        assert_eq!(
+            scope_spans.scope.as_ref().unwrap().attributes[0].value,
+            None
+        );
+        let span = &scope_spans.spans[0];
+        assert_eq!(span.attributes[0].value, None);
+        assert_eq!(
+            value(&span.attributes[1]),
+            Some(Value::ArrayValue(ArrayValue { values: vec![] }))
+        );
+        assert_eq!(
+            value(&span.attributes[2]),
+            Some(Value::KvlistValue(KeyValueList { values: vec![] }))
+        );
+        assert_eq!(span.events[0].attributes[0].value, None);
+        assert_eq!(span.links[0].attributes[0].value, None);
+    }
+
+    #[test]
     fn test_otlp_json_decodes_non_canonical_doubles() {
         use opentelemetry_proto::tonic::{
             collector::trace::v1::ExportTraceServiceRequest,
@@ -2046,7 +2088,7 @@ mod tests {
         assert!(config::utils::json::from_slice::<ExportTraceServiceRequest>(body).is_err());
 
         let request: ExportTraceServiceRequest =
-            config::utils::json::from_slice_lenient_floats(body).unwrap();
+            config::utils::json::from_slice_lenient_otlp(body).unwrap();
         let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
         let resource_spans = &request.resource_spans[0];
         let resource = resource_spans.resource.as_ref().unwrap();
@@ -2299,6 +2341,55 @@ mod tests {
 
         let response = result.unwrap();
         assert_eq!(response.status(), http::StatusCode::PARTIAL_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn test_format_response_keeps_specific_error_message() {
+        use prost::Message;
+
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 2,
+                error_message: "Pipeline batch execution error: boom".to_string(),
+            };
+        let response = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+        )
+        .unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let decoded =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse::decode(
+                body,
+            )
+            .unwrap()
+            .partial_success
+            .unwrap();
+        assert_eq!(decoded.rejected_spans, 2);
+        assert_eq!(
+            decoded.error_message,
+            "Pipeline batch execution error: boom"
+        );
+
+        let generic = opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+            rejected_spans: 1,
+            error_message: String::new(),
+        };
+        let response =
+            super::format_response(generic, config::meta::otlp::OtlpRequestType::Grpc).unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let decoded =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse::decode(
+                body,
+            )
+            .unwrap()
+            .partial_success
+            .unwrap();
+        assert!(decoded.error_message.contains("retention period"));
     }
 
     #[test]

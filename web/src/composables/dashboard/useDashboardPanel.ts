@@ -35,6 +35,7 @@ import {
   mapChart,
   sankeyChartQuery,
 } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { usePanelFields } from "@/composables/dashboard/usePanelFields";
 import { usePanelAggregation } from "@/composables/dashboard/usePanelAggregation";
 import {
@@ -134,6 +135,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     dashboardPanelData,
     getDefaultQueries,
     getDefaultCustomChartText,
+    getTimestampColumn: () => store?.state?.zoConfig?.timestamp_column || "_timestamp",
   });
 
   const addQuery = () => {
@@ -1003,9 +1005,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       }
 
       let query = "";
-      if (dashboardPanelData.data.type == "geomap") {
+      if (dashboardPanelData.data.type == "alert-list") {
+        query = "";
+      } else if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart(dashboardPanelData);
-      } else if (dashboardPanelData.data.type == "sankey") {
+      } else if (isFlowChart(dashboardPanelData.data.type)) {
         query = sankeyChartQuery(dashboardPanelData);
       } else if (dashboardPanelData.data.type == "maps") {
         query = mapChart(dashboardPanelData);
@@ -1020,6 +1024,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       return query;
     }
     return;
+  };
+  // Heatmap y bucketing is panel config, so every builder tab's SQL must carry it, not only the active tab's.
+  const regenerateOtherBuilderQueries = () => {
+    if (
+      dashboardPanelData.data.type !== "heatmap" ||
+      dashboardPanelData.data.queryType === "promql"
+    ) {
+      return;
+    }
+    if (!dashboardPanelData?.meta?.streamFields?.groupedFields?.length) return;
+    dashboardPanelData.data.queries.forEach((queryData: any, index: number) => {
+      if (index === dashboardPanelData.layout.currentQueryIndex || queryData?.customQuery) return;
+      queryData.query = buildSQLChartQuery({
+        queryData,
+        chartType: dashboardPanelData.data.type,
+        dashboardPanelData,
+      });
+    });
   };
   const { checkTimestampAlias } = logsUtils();
   // Replace the existing validatePanel function with a wrapper that calls the generic function
@@ -1619,6 +1641,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     getDefaultQueries,
     validatePanel: validatePanelWrapper,
     makeAutoSQLQuery,
+    regenerateOtherBuilderQueries,
     currentXLabel,
     currentYLabel,
     generateLabelFromName,

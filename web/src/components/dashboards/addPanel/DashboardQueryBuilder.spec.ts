@@ -213,6 +213,10 @@ const i18n = createI18n({
         rowFields: "Row Fields",
         valueFields: "Value Fields",
         breakdown: "Breakdown",
+        value: "Value",
+        wellGroup: "Group",
+        wellSubgroup: "Sub-group",
+        wellSize: "Size",
         joins: "Joins",
         addJoin: "Add Join",
       },
@@ -457,6 +461,41 @@ describe("DashboardQueryBuilder", () => {
       mockUseDashboardPanelData.promqlMode = false;
     });
 
+    it("shows the Range/Instant selector for a custom PromQL query", () => {
+      mockUseDashboardPanelData.promqlMode = true;
+      wrapper = createWrapper({
+        "data.queryType": "promql",
+        "data.queries": [{ customQuery: true, query: "up", fields: {}, config: {} }],
+      });
+
+      expect(wrapper.find('[data-test="dashboard-promql-builder-query-type"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-promql-builder-legend"]').exists()).toBe(false);
+      mockUseDashboardPanelData.promqlMode = false;
+    });
+
+    it("renders no empty options row for a custom PromQL state timeline", () => {
+      mockUseDashboardPanelData.promqlMode = true;
+      wrapper = createWrapper({
+        "data.type": "state-timeline",
+        "data.queryType": "promql",
+        "data.queries": [{ customQuery: true, query: "up", fields: {}, config: {} }],
+      });
+
+      expect(wrapper.find('[data-test="dashboard-promql-builder-query-type"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.findComponent({ name: "PromQLBuilderOptions" }).exists()).toBe(false);
+      mockUseDashboardPanelData.promqlMode = false;
+    });
+
+    it("shows no Range/Instant selector for an SQL query", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.find('[data-test="dashboard-promql-builder-query-type"]').exists()).toBe(
+        false,
+      );
+    });
+
     it("should not render main content for geomap type", () => {
       wrapper = createWrapper({ "data.type": "geomap" });
       // Should render child components like DashboardGeoMapsQueryBuilder
@@ -508,6 +547,43 @@ describe("DashboardQueryBuilder", () => {
       wrapper.unmount();
       wrapper = createWrapper({ "data.type": "bar" });
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
+    });
+
+    it("names the x, y and breakdown wells by chart orientation", () => {
+      const wells = (type: string) => {
+        wrapper?.unmount();
+        wrapper = createWrapper({ "data.type": type });
+        return [
+          wrapper.vm.currentXLabel,
+          wrapper.vm.currentYLabel,
+          wrapper.vm.currentBreakdownLabel,
+        ];
+      };
+      expect(wells("sunburst")).toEqual(["Group", "Size", "Sub-group"]);
+      expect(wells("bar")).toEqual(["X-Axis", "Y-Axis", "Breakdown"]);
+      expect(wells("h-bar")).toEqual(["Y-Axis", "X-Axis", "Breakdown"]);
+      wrapper.unmount();
+      wrapper = createWrapper({ "data.type": "sunburst" });
+      const text = wrapper.text();
+      expect(text).toContain("Group");
+      expect(text).toContain("Sub-group");
+      expect(text).toContain("Size");
+      expect(text).not.toContain("X-Axis");
+    });
+
+    it("names the treemap wells by their job", () => {
+      wrapper?.unmount();
+      wrapper = createWrapper({ "data.type": "treemap" });
+      expect([
+        wrapper.vm.currentXLabel,
+        wrapper.vm.currentYLabel,
+        wrapper.vm.currentBreakdownLabel,
+      ]).toEqual(["Group", "Size", "Sub-group"]);
+      const text = wrapper.text();
+      expect(text).toContain("Group");
+      expect(text).toContain("Sub-group");
+      expect(text).toContain("Size");
+      expect(text).not.toContain("X-Axis");
     });
 
     it("should handle x-axis field removal", async () => {
@@ -705,6 +781,15 @@ describe("DashboardQueryBuilder", () => {
         wrapper = createWrapper({ "data.type": type });
         expect(wrapper.vm.dashboardPanelData.data.type).toBe(type);
       });
+    });
+
+    it("renders the breakdown slot for a state timeline, where it holds the row field", () => {
+      wrapper.unmount();
+      wrapper = createWrapper({ "data.type": "state-timeline" });
+      expect(wrapper.find('[data-test="dashboard-b-layout"]').exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ "data.type": "pie" });
+      expect(wrapper.find('[data-test="dashboard-b-layout"]').exists()).toBe(false);
     });
 
     it("should handle unsupported chart types", () => {

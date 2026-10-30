@@ -15,6 +15,14 @@
 
 export type InstallPlatform = "linux" | "macos" | "windows" | "docker" | "kubernetes";
 
+/** What the Helm chart runs: node agents (DaemonSet) or cluster gateways (StatefulSet). */
+export type KubernetesRole = "agent" | "gateway";
+
+export const KUBERNETES_ROLES: KubernetesRole[] = ["agent", "gateway"];
+
+/** The gateway release's name, which is also its OTLP Service. */
+export const GATEWAY_RELEASE = "otel-fleet-collector-gateway";
+
 /** Environment every install command gives the collector. */
 export const INSTALL_ENV = ["O2_ENDPOINT", "O2_TOKEN"];
 /** Environment only the Helm chart adds, from the pod's downward API. */
@@ -44,10 +52,17 @@ export interface InstallTarget {
   version: string | null;
   /** HTTP polling for proxies that cannot carry WebSocket. */
   http: boolean;
+  /** Kubernetes only; agents when unset. */
+  role?: KubernetesRole;
 }
 
 const SCRIPT_BASE = "https://raw.githubusercontent.com/openobserve/agents/main";
 const IMAGE = "o2cr.ai/openobserve/otel-fleet-collector";
+const DOCKER_CONTAINER = "otel-fleet-collector";
+const DOCKER_VOLUME = "otel-fleet-state";
+const DOCKER_DIR = "otel-fleet";
+const HELM_RELEASE = "otel-fleet-collector";
+const HELM_NAMESPACE = "openobserve-collector";
 
 /** The OpAMP endpoint the supervisor connects to; the scheme picks the transport. */
 export function opampEndpoint(target: Pick<InstallTarget, "baseUrl" | "org" | "http">): string {
@@ -67,7 +82,7 @@ function unixCommand(t: InstallTarget): string {
     `--org ${q(t.org)}`,
     `--token ${q(t.token)}`,
     ...(t.version ? [`--version ${q(t.version)}`] : []),
-    ...(t.http ? ["--transport http"] : []),
+    `--transport ${t.http ? "http" : "ws"}`,
   ];
   return [
     `curl -fsSL ${SCRIPT_BASE}/fleet/install.sh | sudo bash -s -- \\`,
@@ -82,7 +97,7 @@ function windowsCommand(t: InstallTarget): string {
     `-Org ${ps(t.org)}`,
     `-Token ${ps(t.token)}`,
     ...(t.version ? [`-Version ${ps(t.version)}`] : []),
-    ...(t.http ? ["-Transport http"] : []),
+    `-Transport ${t.http ? "http" : "ws"}`,
   ];
   return [
     `& ([scriptblock]::Create((irm ${SCRIPT_BASE}/fleet/install.ps1))) \``,
@@ -90,8 +105,11 @@ function windowsCommand(t: InstallTarget): string {
   ].join("\n");
 }
 
+// One release runs one role: its token enrols every pod into one fleet, and a fleet shares one configuration.
 function helmCommand(t: InstallTarget): string {
+  const gateway = t.role === "gateway";
   const sets = [
+    ...(gateway ? ["--set agent.enabled=false", "--set gateway.enabled=true"] : []),
     `--set image.repository=${IMAGE}`,
     ...(t.version ? [`--set image.tag=${q(t.version)}`] : []),
     `--set opamp.endpoint=${q(opampEndpoint(t))}`,
@@ -99,8 +117,8 @@ function helmCommand(t: InstallTarget): string {
   ];
   return [
     "helm repo add openobserve https://charts.openobserve.ai && helm repo update",
-    "helm upgrade --install otel-fleet-collector openobserve/otel-fleet-collector \\",
-    "  --namespace openobserve-collector --create-namespace \\",
+    `helm upgrade --install ${gateway ? GATEWAY_RELEASE : HELM_RELEASE} openobserve/otel-fleet-collector \\`,
+    `  --namespace ${HELM_NAMESPACE} --create-namespace \\`,
     ...sets.map((s, i) => `  ${s}${i < sets.length - 1 ? " \\" : ""}`),
   ].join("\n");
 }
@@ -131,6 +149,7 @@ function dockerCommand(t: InstallTarget): string {
     "  reports_available_components: true",
     "agent:",
     "  executable: /usr/local/bin/otelcol-contrib",
+    "  config_apply_timeout: 30s",
     "  env:",
     `    O2_ENDPOINT: ${reachable.baseUrl.replace(/\/+$/, "")}/api/${t.org}`,
     '    O2_TOKEN: "Basic $AUTH"',
@@ -139,13 +158,15 @@ function dockerCommand(t: InstallTarget): string {
   ];
   return [
     `AUTH=$(printf 'fleet:%s' ${q(t.token)} | base64 | tr -d '\\n')`,
-    "mkdir -p otel-fleet && cat > otel-fleet/supervisor.yaml <<EOF",
+    `mkdir -p ${DOCKER_DIR} && cat > ${DOCKER_DIR}/supervisor.yaml <<EOF`,
     ...yaml,
     "EOF",
-    "docker run -d --name otel-fleet-collector --restart unless-stopped \\",
+    // The state volume survives, so a rerun upgrades or re-tokens the same collector identity.
+    `docker rm -f ${DOCKER_CONTAINER} >/dev/null 2>&1 || true`,
+    `docker run -d --name ${DOCKER_CONTAINER} --restart unless-stopped \\`,
     '  --hostname "$(hostname)" \\',
-    '  -v "$PWD/otel-fleet/supervisor.yaml:/etc/opampsupervisor/supervisor.yaml:ro" \\',
-    "  -v otel-fleet-state:/var/lib/opampsupervisor \\",
+    `  -v "$PWD/${DOCKER_DIR}/supervisor.yaml:/etc/opampsupervisor/supervisor.yaml:ro" \\`,
+    `  -v ${DOCKER_VOLUME}:/var/lib/opampsupervisor \\`,
     `  ${IMAGE}:${t.version ?? "latest"}`,
   ].join("\n");
 }
@@ -156,6 +177,37 @@ export function installCommand(platform: InstallPlatform, target: InstallTarget)
   if (platform === "docker") return dockerCommand(target);
   if (platform === "kubernetes") return helmCommand(target);
   return unixCommand(target);
+}
+
+/** Removes what installCommand installed; it carries no token. */
+export function uninstallCommand(
+  platform: InstallPlatform,
+  role: KubernetesRole = "agent",
+): string {
+  if (platform === "windows") {
+    return `& ([scriptblock]::Create((irm ${SCRIPT_BASE}/fleet/install.ps1))) -Uninstall`;
+  }
+  if (platform === "docker") {
+    return [
+      `docker rm -f ${DOCKER_CONTAINER}`,
+      `docker volume rm ${DOCKER_VOLUME}`,
+      `rm -rf ${DOCKER_DIR}`,
+    ].join("\n");
+  }
+  if (platform === "kubernetes") {
+    const release = role === "gateway" ? GATEWAY_RELEASE : HELM_RELEASE;
+    return `helm uninstall ${release} --namespace ${HELM_NAMESPACE}`;
+  }
+  return `curl -fsSL ${SCRIPT_BASE}/fleet/install.sh | sudo bash -s -- --uninstall`;
+}
+
+/** The install platform a set of collectors' reported OS points at; Docker reports linux. */
+export function platformForOs(oses: (string | null)[]): InstallPlatform {
+  const [first] = oses;
+  const same = oses.every((os) => os === first);
+  return same && INSTALL_PLATFORMS.includes(first as InstallPlatform)
+    ? (first as InstallPlatform)
+    : "linux";
 }
 
 /** Absolute base URL; a relative endpoint means the app's own origin. */

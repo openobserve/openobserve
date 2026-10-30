@@ -51,8 +51,12 @@ pub const COVERAGE: &[Coverage] = &[
     table("fleet_settings", DB),
     table("fleet_tokens", DB),
     table("fleets", DB),
+    table("public_dashboard_org_settings", DB),
+    table("public_dashboard_outbox", DB),
+    table("public_dashboards", DB),
     table("rca_runs", DB),
     table("rca_steering", DB),
+    table("slack_alert_messages", DB),
     table("slack_channel_defaults", DB),
     table("slack_org_connections", DB),
     table("slack_threads", DB),
@@ -69,13 +73,14 @@ pub const COVERAGE: &[Coverage] = &[
     table("ai_chat_sessions", DB),
     table("ai_chat_shares", DB),
     table("ai_chat_turns", DB),
+    table("alert_acks", DB),
     table("alert_calibration_configs", DB),
     table("alert_composite_children", DB),
     table("alert_composites", DB),
     exempt(
         Kind::Table,
         "alert_dedup_state",
-        "expires within a day through the alert_dedup_cleanup job; no alert of a deleted org refreshes it",
+        "legacy deduplication table, no longer written; dropped in a later release",
     ),
     table("alert_eval_intervals", DB),
     table("alert_incident_alerts", DB),
@@ -454,7 +459,7 @@ mod tests {
     /// Steps the worker runs by name, beyond the fixed steps it enqueues.
     const ITEM_STEPS: [&str; 2] = ["delete_stream", "delete_stream_final"];
     /// Tables that name their org through a parent id or key that no `belongs_to` declares.
-    const PARENT_ID_SCOPED: [&str; 13] = [
+    const PARENT_ID_SCOPED: [&str; 14] = [
         "alert_state_transitions",
         "alert_states",
         "compactor_manual_jobs",
@@ -463,6 +468,7 @@ mod tests {
         "llm_prompt_labels",
         "oncall_response_events",
         "oncall_team_members",
+        "public_dashboard_outbox",
         "search_job_partitions",
         "search_job_results",
         "slo_backfill_jobs",

@@ -131,9 +131,34 @@ export default defineComponent({
         id: "donut",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/treemap.svg"),
+        title: t("dashboard.chartSelection.treemap"),
+        id: "treemap",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/sunburst.svg"),
+        title: t("dashboard.chartSelection.sunburst"),
+        id: "sunburst",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.svg"),
         title: t("dashboard.heatmapLabel"),
         id: "heatmap",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/distribution.svg"),
+        title: t("dashboard.chartSelection.distribution"),
+        id: "distribution",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/state-timeline.svg"),
+        title: t("dashboard.stateTimelineLabel"),
+        id: "state-timeline",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/hostmap.svg"),
+        title: t("dashboard.hostmapLabel"),
+        id: "hostmap",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/table.svg"),
@@ -151,6 +176,26 @@ export default defineComponent({
         id: "gauge",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/bar-gauge.svg"),
+        title: t("dashboard.chartSelection.barGauge"),
+        id: "bar-gauge",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/funnel.svg"),
+        title: t("dashboard.chartSelection.funnel"),
+        id: "funnel",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/alert-list.svg"),
+        title: t("dashboard.chartSelection.alertList"),
+        id: "alert-list",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/flame-graph.svg"),
+        title: t("dashboard.chartSelection.flameGraph"),
+        id: "flame-graph",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.svg"),
         title: t("dashboard.chartSelection.html"),
         id: "html",
@@ -164,6 +209,11 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
         title: t("dashboard.chartSelection.sankey"),
         id: "sankey",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/node-graph.svg"),
+        title: t("dashboard.chartSelection.nodeGraph"),
+        id: "node-graph",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/chart.svg"),
@@ -183,10 +233,13 @@ export default defineComponent({
       "area-stacked",
       "metric",
       "gauge",
+      "bar-gauge",
       "pie",
       "donut",
       "table",
       "heatmap",
+      "state-timeline",
+      "hostmap",
       "h-bar",
       "stacked",
       "h-stacked",

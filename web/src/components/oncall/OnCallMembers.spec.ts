@@ -228,6 +228,14 @@ describe("OnCallMembers", () => {
     expect(wrapper.find('[data-test="oncall-members-user-select"]').text()).toContain("cara@o2.ai");
   });
 
+  it("names the member picker for a screen reader", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-members-user-select"]').attributes("aria-label")).toBe(
+      "People to add",
+    );
+  });
+
   // Losing the picker must not lose the ability to add anybody.
   it("degrades to a free-text field when the user list cannot be loaded", async () => {
     users.orgUsers.mockRejectedValue(new Error("boom"));
@@ -235,7 +243,9 @@ describe("OnCallMembers", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-members-user-select"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-members-email-input"]').exists()).toBe(true);
+    const input = wrapper.find('[data-test="oncall-members-email-input"]');
+    expect(input.exists()).toBe(true);
+    expect(input.attributes("aria-label")).toBe("People to add");
   });
 
   // Already on the team means nothing left to add.
@@ -355,6 +365,26 @@ describe("OnCallMembers", () => {
 
   /// C5/C6: the rota already SKIPS an away member; the table says so where
   /// the people are listed, before somebody asks why the order changed.
+  it("names the member in the remove confirm, with a destructive button", async () => {
+    const wrapper = render([member("ana@o2.ai")]);
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+    await flushPromises();
+
+    const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
+    expect(confirm.props("modelValue")).toBe(true);
+    expect(confirm.props("messageKeypath")).toBe("oncall.removeMemberMessage");
+    expect(confirm.props("messageName")).toBe("ana@o2.ai");
+    expect(confirm.props("okVariant")).toBe("destructive");
+
+    confirm.vm.$emit("update:cancel");
+    await flushPromises();
+    expect(confirm.props("modelValue")).toBe(false);
+    expect(confirm.props("messageName")).toBeUndefined();
+    // The real ConfirmDialog keeps what it showed while open, so the fade-out still reads right.
+    expect((confirm.vm as any).shown.messageName).toBe("ana@o2.ai");
+  });
+
   describe("absences", () => {
     const member = { id: "m1", team_id: "team_1", user_email: "ana@o2.ai" };
 

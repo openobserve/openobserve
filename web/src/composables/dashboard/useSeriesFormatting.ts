@@ -15,10 +15,19 @@
 
 import { computed, onBeforeUnmount, ref, shallowRef, watch, type Ref } from "vue";
 import { useStore } from "vuex";
+import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import {
   valueMappingPatternError,
   type ValueMappingPatternError,
 } from "@/utils/dashboard/tableConfigUtils";
+import {
+  seriesStyleConfigItems,
+  seriesStyleKeyOf,
+  type SeriesDrawStyle,
+  type SeriesLineStyle,
+  type SeriesTransform,
+  type SeriesYAxisSide,
+} from "@/utils/dashboard/seriesOverrides";
 
 /** How the dialog matches a series: an exact legend name or a pattern. */
 export type SeriesDraftMatch = "name" | "regex";
@@ -26,7 +35,7 @@ export type SeriesDraftMatch = "name" | "regex";
 /** Thresholds as an override stores them; same shape as `config.thresholds`. */
 export interface SeriesOverrideThresholds {
   mode?: "absolute" | "percentage";
-  showAs?: "color_line" | "color" | "line" | "color_band";
+  showAs?: "color_line" | "color" | "line" | "color_band" | "dashed_line";
   baseColor?: string | null;
   steps?: { value: number; color: string }[];
 }
@@ -35,6 +44,19 @@ export interface SeriesOverrideThresholds {
 export interface SeriesOverrideEntry {
   field: { matchBy: "series" | "series_regex"; value: string };
   config: { type: string; value: unknown }[];
+}
+
+/** Style settings while the dialog edits them; "", null and false mean the panel default. */
+export interface SeriesStyleDraft {
+  lineStyle: SeriesLineStyle | null;
+  lineWidth: string;
+  fillOpacity: string;
+  showPoints: boolean | null;
+  drawStyle: SeriesDrawStyle | null;
+  stackGroup: string;
+  yAxis: SeriesYAxisSide | null;
+  hideFrom: { chart: boolean; legend: boolean; tooltip: boolean };
+  transform: SeriesTransform | null;
 }
 
 /** One override while the Series Formatting dialog edits it; "" and null mean inherit. */
@@ -48,6 +70,9 @@ export interface SeriesOverrideDraft {
   decimals: string;
   color: string | null;
   thresholds: SeriesOverrideThresholds | undefined;
+  /** Per-series value mappings; only the state timeline reads them. */
+  valueMappings?: any[];
+  style: SeriesStyleDraft;
 }
 
 /** The applied panel schema plus the data the editor already fetched for it. */
@@ -64,6 +89,35 @@ const PREVIEW_DEBOUNCE_MS = 120;
 const STORED_MATCH = { name: "series", regex: "series_regex" } as const;
 
 let nextDraftId = 0;
+
+export const emptySeriesStyleDraft = (): SeriesStyleDraft => ({
+  lineStyle: null,
+  lineWidth: "",
+  fillOpacity: "",
+  showPoints: null,
+  drawStyle: null,
+  stackGroup: "",
+  yAxis: null,
+  hideFrom: { chart: false, legend: false, tooltip: false },
+  transform: null,
+});
+
+const numberText = (value: unknown): string =>
+  typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+
+const readStyleItem = (style: SeriesStyleDraft, type: string, value: any) => {
+  const key = seriesStyleKeyOf(type);
+  if (key === "lineWidth" || key === "fillOpacity") style[key] = numberText(value);
+  else if (key === "showPoints") style.showPoints = typeof value === "boolean" ? value : null;
+  else if (key === "stackGroup") style.stackGroup = typeof value === "string" ? value : "";
+  else if (key === "hideFrom") {
+    style.hideFrom = {
+      chart: value?.chart === true,
+      legend: value?.legend === true,
+      tooltip: value?.tooltip === true,
+    };
+  } else if (key) (style as any)[key] = typeof value === "string" ? value : null;
+};
 
 const cloneThresholds = (thresholds: unknown): SeriesOverrideThresholds | undefined => {
   const steps = (thresholds as SeriesOverrideThresholds | undefined)?.steps;
@@ -104,6 +158,7 @@ export const emptySeriesOverrideDraft = (
   decimals: "",
   color: null,
   thresholds: undefined,
+  style: emptySeriesStyleDraft(),
 });
 
 /** A stored series entry as an editable draft (a copy, so Cancel discards edits). */
@@ -125,6 +180,10 @@ export const toSeriesOverrideDraft = (stored: any): SeriesOverrideDraft => {
       draft.color = typeof value === "string" && value !== "" ? value : null;
     } else if (item?.type === "thresholds") {
       draft.thresholds = cloneThresholds(value);
+    } else if (item?.type === "value_mappings" && Array.isArray(value)) {
+      draft.valueMappings = JSON.parse(JSON.stringify(value));
+    } else if (seriesStyleKeyOf(item?.type)) {
+      readStyleItem(draft.style, item.type, value);
     }
   }
   return draft;
@@ -156,6 +215,10 @@ export const serializeSeriesOverride = (draft: SeriesOverrideDraft): SeriesOverr
   if (draft.color) config.push({ type: "series_color", value: draft.color });
   const thresholds = cloneThresholds(draft.thresholds);
   if (thresholds) config.push({ type: "thresholds", value: thresholds });
+  if (draft.valueMappings?.length) {
+    config.push({ type: "value_mappings", value: JSON.parse(JSON.stringify(draft.valueMappings)) });
+  }
+  config.push(...seriesStyleConfigItems(draft.style));
   if (!config.length) return null;
   return { field: { matchBy: STORED_MATCH[draft.matchBy], value: draft.value }, config };
 };
@@ -165,14 +228,20 @@ export const serializeSeriesOverrides = (drafts: SeriesOverrideDraft[]): SeriesO
     .map((draft) => serializeSeriesOverride(draft))
     .filter((entry): entry is SeriesOverrideEntry => entry !== null);
 
-/** Legend series names of converted chart options, read per chart type like Color by series. */
-export const getLegendSeriesNames = (options: any, chartType: string): string[] => {
+/** Legend series names of converted chart options, read per chart type like Color by series; state-timeline rows come from `extras.rowEntities`. */
+export const getLegendSeriesNames = (options: any, chartType: string, extras?: any): string[] => {
   const series: any[] = Array.isArray(options?.series) ? options.series : [];
   let names: unknown[];
   if (chartType === "pie" || chartType === "donut") {
     names = (series[0]?.data ?? []).map((item: any) => item?.name);
   } else if (chartType === "gauge") {
     names = series.map((s: any) => s?.data?.[0]?.name);
+  } else if (chartType === "bar-gauge") {
+    // The bars are the categories; the trailing label series holds bare numbers.
+    const axes = [options?.yAxis, options?.xAxis].flat();
+    names = axes.find((axis: any) => axis?.type === "category")?.data ?? [];
+  } else if (isRowTimeline(chartType)) {
+    names = extras?.rowEntities ?? [];
   } else if (chartType === "metric") {
     // `_metricLabel` is drawn and may hold a display name; overrides match `_metricName`.
     names = series.map((s: any) => s?._metricName ?? s?._metricLabel);
@@ -199,13 +268,17 @@ export const getPromqlMetricSeriesNames = async (
   source: SeriesOverridePreviewSource,
   store: any,
 ): Promise<string[]> => {
-  const [{ alignShiftedPromQLResults }, { buildPromqlSeriesNames }, { legendFallbackOf }, cache] =
-    await Promise.all([
-      import("@/utils/dashboard/convertPromQLData"),
-      import("@/utils/dashboard/promql/shared/legendBuilder"),
-      import("@/utils/dashboard/promql/formula"),
-      import("@/utils/semanticGroupsCache"),
-    ]);
+  const [
+    { alignShiftedPromQLResults, METRIC_MAX_CELLS },
+    { buildPromqlSeriesNames },
+    { legendFallbackOf },
+    cache,
+  ] = await Promise.all([
+    import("@/utils/dashboard/convertPromQLData"),
+    import("@/utils/dashboard/promql/shared/legendBuilder"),
+    import("@/utils/dashboard/promql/formula"),
+    import("@/utils/semanticGroupsCache"),
+  ]);
   const { data, parentQueryIndex, nameSuffixes } = alignShiftedPromQLResults(
     source.data,
     source.metadata,
@@ -227,15 +300,16 @@ export const getPromqlMetricSeriesNames = async (
     })),
     cache.getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
-  const unique = new Set<string>();
-  limited.forEach((q: any, i: number) => {
-    const metric = q?.result?.[0];
-    if (!metric) return;
-    const name = names.get(metric.metric) ?? "";
-    const full = nameSuffixes[i] ? `${name} (${nameSuffixes[i]})` : name;
-    if (full) unique.add(full);
-  });
-  return [...unique];
+  // One value per series, in the converter's order and under its cell cap.
+  const cellNames = limited
+    .flatMap((q: any, i: number) =>
+      (q?.result ?? []).map((metric: any) => {
+        const name = names.get(metric.metric) ?? "";
+        return nameSuffixes[i] ? `${name} (${nameSuffixes[i]})` : name;
+      }),
+    )
+    .slice(0, METRIC_MAX_CELLS);
+  return [...new Set<string>(cellNames.filter(Boolean))];
 };
 
 /** The source as PanelSchemaRenderer converts it: hidden queries dropped from data, schema and metadata alike. */
@@ -279,6 +353,28 @@ export const withoutHiddenQueries = (
   };
 };
 
+const isEmptyList = (list: unknown) => !Array.isArray(list) || list.length === 0;
+
+/** True for the unnamed all-null series a time-series converter adds to hold annotation marks. */
+export const isEmptyAnnotationHolder = (series: any): boolean =>
+  !!series &&
+  !series.name &&
+  (series.markLine !== undefined || series.markArea !== undefined) &&
+  isEmptyList(series.markLine?.data) &&
+  isEmptyList(series.markArea?.data) &&
+  Array.isArray(series.data) &&
+  series.data.every((point: any) => (Array.isArray(point) ? point[1] : point) == null);
+
+// The preview draws no annotations, and an empty holder reads as an extra NaN series to the chart's aria text.
+const withoutEmptyAnnotationHolders = (result: any) => {
+  const series = result?.options?.series;
+  if (!Array.isArray(series) || !series.some(isEmptyAnnotationHolder)) return result;
+  return {
+    ...result,
+    options: { ...result.options, series: series.filter((s: any) => !isEmptyAnnotationHolder(s)) },
+  };
+};
+
 const hasPreviewData = (source: SeriesOverridePreviewSource | null | undefined) =>
   !!source?.panelSchema && Array.isArray(source.data) && source.data.length > 0;
 
@@ -319,7 +415,7 @@ const readOriginalNames = async (
   }
   const detached = { value: document.createElement("div") };
   const result = await convertWithOverrides(source, [], store, detached);
-  return getLegendSeriesNames(result?.options, chartType);
+  return getLegendSeriesNames(result?.options, chartType, result?.extras);
 };
 
 /** Converts the editor's fetched data twice: without overrides for the original legend names, and with the draft for the preview. */
@@ -372,7 +468,9 @@ export const useSeriesOverridePreview = (options: {
       const result = await convertWithOverrides(source!, options.overrides.value, store, {
         value: element,
       });
-      if (generation === previewGeneration) previewData.value = result?.options ? result : null;
+      if (generation === previewGeneration) {
+        previewData.value = result?.options ? withoutEmptyAnnotationHolders(result) : null;
+      }
     } catch {
       if (generation === previewGeneration) previewData.value = null;
     }

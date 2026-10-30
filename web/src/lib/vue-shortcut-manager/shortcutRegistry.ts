@@ -118,6 +118,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.dashboardsList",
       "shortcuts.pages.dashboards",
       "shortcuts.pages.dashboardsPanel",
+      "shortcuts.pages.dashboardTvPlaylist",
       "shortcuts.pages.panelEditor",
     ],
   },
@@ -152,6 +153,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
+  { titleKey: "shortcuts.modules.kubernetes", pages: ["shortcuts.pages.kubernetes"] },
   {
     titleKey: "shortcuts.modules.fleet",
     pages: ["shortcuts.pages.fleetOverview", "shortcuts.pages.fleetConfigEditor"],
@@ -198,6 +200,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.onlineEvals",
     pages: [
       "shortcuts.pages.evalTemplates",
+      "shortcuts.pages.quality",
       "shortcuts.pages.scorers",
       "shortcuts.pages.evalJobs",
       "shortcuts.pages.scoreConfigs",
@@ -347,11 +350,46 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         descriptionKey: "shortcuts.actions.dashboardLayoutExit",
       },
       {
+        id: "dashboardKioskExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardKioskExit",
+      },
+      {
         id: "dashboardFullscreen",
         key: "f",
         descriptionKey: "shortcuts.actions.dashboardFullscreen",
       },
       { id: "dashboardExport", key: "x", descriptionKey: "shortcuts.actions.dashboardExport" },
+    ],
+  },
+
+  // ── Dashboard TV playlist ────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.dashboardTvPlaylist",
+    scope: "dashboard-tv",
+    shortcuts: [
+      {
+        id: "dashboardPlaylistPrev",
+        key: "left",
+        display: "←",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPrev",
+      },
+      {
+        id: "dashboardPlaylistNext",
+        key: "right",
+        display: "→",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistNext",
+      },
+      {
+        id: "dashboardPlaylistPause",
+        key: "space",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPause",
+      },
+      {
+        id: "dashboardPlaylistExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistExit",
+      },
     ],
   },
 
@@ -617,6 +655,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "pipelinesRowDelete",
         display: "del / ⌫",
         descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
+    ],
+  },
+
+  // ── Kubernetes ──────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.kubernetes",
+    scope: "kubernetes",
+    shortcuts: [
+      {
+        id: "k8sPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "shortcuts.actions.k8sPalette",
+        allowInInput: true,
       },
     ],
   },
@@ -1026,6 +1079,16 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         key: "r",
         descriptionKey: "shortcuts.actions.evalTemplatesRefresh",
       },
+    ],
+  },
+
+  // ── Online Evals — Quality ──────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.quality",
+    scope: "quality",
+    visible: onlineEvals,
+    shortcuts: [
+      { id: "qualityBack", key: "escape", descriptionKey: "shortcuts.actions.qualityBack" },
     ],
   },
 

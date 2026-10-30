@@ -15,7 +15,9 @@
 
 import { scaleLinear } from "d3-scale";
 import { isNumber } from "lodash-es";
+import { color as echartsColor } from "echarts/core";
 import { chartColor, chartNumber } from "../chartTheme";
+import { getSeriesThresholds, resolveStepValues, stepColorFor } from "./thresholds";
 
 export enum ColorModeWithoutMinMax {
   PALETTE_CLASSIC_BY_SERIES = "palette-classic-by-series",
@@ -54,6 +56,39 @@ export const classicColorPaletteDarkTheme = [
   "#f5d0fe", // fuchsia
   "#fef08a", // amber
 ];
+
+// d3 schemeCategory10, the categorical palette many tools default to.
+export const CATEGORY10_PALETTE = [
+  "#1f77b4",
+  "#ff7f0e",
+  "#2ca02c",
+  "#d62728",
+  "#9467bd",
+  "#8c564b",
+  "#e377c2",
+  "#7f7f7f",
+  "#bcbd22",
+  "#17becf",
+];
+
+// Tableau 10 (2016 refresh).
+export const TABLEAU10_PALETTE = [
+  "#4e79a7",
+  "#f28e2c",
+  "#e15759",
+  "#76b7b2",
+  "#59a14f",
+  "#edc949",
+  "#af7aa1",
+  "#ff9da7",
+  "#9c755f",
+  "#bab0ab",
+];
+
+const CATEGORICAL_PALETTES: Record<string, string[]> = {
+  "palette-category10": CATEGORY10_PALETTE,
+  "palette-tableau10": TABLEAU10_PALETTE,
+};
 
 // Classic dashboard series palette. The light/dark swap now lives in the
 // --color-chart-series-* tokens (base.css / dark.css); this resolves them for
@@ -199,7 +234,7 @@ export const getSQLMinMaxValue = (
 };
 
 // need one function which will take some series name and will return hash which will be between 1 to 1000
-const getSeriesHash = (seriesName: string, colorPalette: string[]) => {
+export const getSeriesHash = (seriesName: string, colorPalette: string[]) => {
   // Initialize a hash variable
   let hash = 0;
   const classicColorPaletteLength = colorPalette.length;
@@ -245,12 +280,21 @@ const getSeriesValueBasedOnSeriesBy = (values: any, seriesBy: SeriesBy): number 
   }
 };
 
+/** The panel config keys an area fill reads. */
+export interface AreaFillConfig {
+  fill_opacity?: unknown;
+  fill_gradient?: boolean | null;
+}
+
 interface ColorConfig {
   mode:
     | "fixed"
     | "shades"
     | "palette-classic-by-series"
     | "palette-classic"
+    | "palette-category10"
+    | "palette-tableau10"
+    | "palette-from-thresholds"
     | "continuous-green-yellow-red"
     | "continuous-red-yellow-green"
     | "continuous-temperature"
@@ -259,6 +303,7 @@ interface ColorConfig {
     | "continuous-light-to-dark-blue";
   fixedColor?: string[];
   seriesBy?: SeriesBy;
+  colorBySeries?: Array<{ value: string; color?: string }>;
 }
 
 function getDomainPartitions(chartMin: number, chartMax: number, numPartitions: number) {
@@ -286,6 +331,8 @@ export const getSeriesColor = (
   chartMax: number,
   theme: string,
   colorBySeries?: any,
+  // Only read by palette-from-thresholds, which takes the series' step colour.
+  panelConfig?: any,
 ): string | null => {
   const colorPalette = getColorPalette(theme);
 
@@ -314,6 +361,20 @@ export const getSeriesColor = (
     return colorPalette[getSeriesHash(seriesName?.toString() ?? "", colorPalette)];
   } else if (colorCfg.mode === "palette-classic") {
     return null;
+  } else if (CATEGORICAL_PALETTES[colorCfg.mode]) {
+    const palette = CATEGORICAL_PALETTES[colorCfg.mode];
+    return palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
+  } else if (colorCfg.mode === "palette-from-thresholds") {
+    const fallback = colorPalette[getSeriesHash(seriesName?.toString() ?? "", colorPalette)];
+    const thresholds = getSeriesThresholds(panelConfig, String(seriesName ?? ""));
+    const resolved = thresholds && resolveStepValues(thresholds, { min: chartMin, max: chartMax });
+    if (!resolved) return fallback;
+    // PromQL values arrive as numeric strings, which the series reducer would skip.
+    const numbers = (Array.isArray(value) ? value : [value]).map((v) =>
+      v === null || v === "" ? v : Number(v),
+    );
+    const reading = getSeriesValueBasedOnSeriesBy(numbers, colorCfg?.seriesBy ?? "last");
+    return stepColorFor(reading, resolved, fallback);
   } else {
     const d3ColorObj = scaleLinear(
       getDomainPartitions(chartMin, chartMax, colorCfg?.fixedColor?.length ?? colorPalette.length),
@@ -323,6 +384,83 @@ export const getSeriesColor = (
       (getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ?? chartMin) as number,
     );
   }
+};
+
+// Below this redmean distance two palette colours read as one hue: the amber/yellow pair sits at 20-34.
+const NEAR_COLOR_DISTANCE = 60;
+
+const toRgb = (value: string): [number, number, number] | null => {
+  const hex = /^#([0-9a-f]{6})$/i.exec(value.trim());
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const rgb = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(value.trim());
+  return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
+};
+
+const isNearColor = (a: string, b: string): boolean => {
+  const x = toRgb(a);
+  const y = toRgb(b);
+  if (!x || !y) return a === b;
+  const rMean = (x[0] + y[0]) / 2;
+  const [dr, dg, db] = [x[0] - y[0], x[1] - y[1], x[2] - y[2]];
+  const distance = Math.sqrt(
+    (2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db,
+  );
+  return distance < NEAR_COLOR_DISTANCE;
+};
+
+/** Name-hashed palette colours; a name leaves its hash slot only when an earlier name or a reserved colour already holds that colour. */
+export const getDistinctSeriesColors = (
+  names: string[],
+  palette: string[],
+  reserved: string[] = [],
+): Map<string, string> => {
+  const colors = new Map<string, string>();
+  const takenColors = [...reserved];
+  const takenSlots = new Set(
+    palette.flatMap((color, i) => (reserved.some((r) => isNearColor(color, r)) ? [i] : [])),
+  );
+  const isApart = (slot: number) => takenColors.every((c) => !isNearColor(palette[slot], c));
+  const take = (name: string, slot: number) => {
+    takenSlots.add(slot);
+    takenColors.push(palette[slot]);
+    colors.set(name, palette[slot]);
+  };
+  // Sorted, so the same set of names always gets the same colours.
+  const unique = [...new Set(names)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  // Uncontested hash slots are claimed before any probing, so a probe never takes another name's own colour.
+  const displaced = unique.filter((name) => {
+    const home = getSeriesHash(name, palette);
+    if (takenSlots.has(home) || !isApart(home)) return true;
+    take(name, home);
+    return false;
+  });
+  displaced.forEach((name) => {
+    const home = getSeriesHash(name, palette);
+    const slots = palette.map((_, i) => (home + i) % palette.length);
+    const isFree = (slot: number) => !takenSlots.has(slot);
+    take(name, slots.find((i) => isFree(i) && isApart(i)) ?? slots.find(isFree) ?? home);
+  });
+  return colors;
+};
+
+/** Per-chart override of getSeriesColor's name hash: returns the distinct colour, or undefined where getSeriesColor decides. */
+export const createDistinctSeriesColor = (
+  names: string[],
+  colorCfg: ColorConfig | null | undefined,
+  theme: string,
+): ((name: string) => string | undefined) => {
+  if (colorCfg && colorCfg.mode !== "palette-classic-by-series") return () => undefined;
+  const mappings = (colorCfg?.colorBySeries ?? []).filter((m) => m?.color);
+  const mapped = new Set(mappings.map((m) => m.value));
+  const colors = getDistinctSeriesColors(
+    names.filter((name) => !mapped.has(name)),
+    getColorPalette(theme),
+    mappings.map((m) => String(m.color)),
+  );
+  return (name) => colors.get(name);
 };
 
 // Dashboard table row-highlight palette. The light/dark swap lives in the
@@ -356,95 +494,97 @@ export const getColorForTable = (_theme?: string): string[] => [
 ];
 
 /**
- * Converts a color string (hex, rgb, or rgba) into an rgba string with the
- * given alpha. Returns the input unchanged if it can't be parsed.
+ * Converts any CSS color ECharts can parse (hex with or without alpha, rgb, hsl, named) into an
+ * rgba string with the given alpha. Returns the input unchanged if it can't be parsed.
  */
 export const colorToRgba = (color: string, alpha: number): string => {
   if (!color) return color;
-  // hex: #rgb or #rrggbb
-  if (color[0] === "#") {
-    let hex = color.slice(1);
-    if (hex.length === 3) {
-      hex = hex
-        .split("")
-        .map((c) => c + c)
-        .join("");
-    }
-    const num = parseInt(hex, 16);
-    if (Number.isNaN(num)) return color;
-    const r = (num >> 16) & 255;
-    const g = (num >> 8) & 255;
-    const b = num & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  // rgb()/rgba()
-  const match = color.match(/rgba?\(([^)]+)\)/);
-  if (match) {
-    const parts = match[1].split(",").map((p) => p.trim());
-    const [r, g, b] = parts;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  return color;
+  const parsed = echartsColor.parse(color);
+  if (!parsed) return color;
+  const [r, g, b] = parsed;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 /**
- * Dashed split-line style for chart grids — subtle so the lines recede behind
+ * Solid split-line style for chart grids — subtle so the lines recede behind
  * the data. Theme-aware: faint white on dark, faint black on light. Shared by
  * the PromQL and SQL chart builders so the grid look stays consistent.
  */
 export const getGridLineStyle = (_theme?: string) => ({
-  type: "dashed",
+  type: "solid",
   width: 1,
   // light/dark swap lives in the --color-chart-gridline token (base/dark css).
   color: chartColor("--color-chart-gridline"),
 });
 
-/**
- * Builds a top-to-bottom vertical gradient for area chart fills that fades
- * from a translucent series color at the top to fully transparent at the
- * bottom. `color` should be the resolved concrete series color.
- */
-export const getAreaGradientColor = (color: string, _theme?: string) => {
-  // The fade opacities' light/dark swap lives in the --chart-area-fill-*-opacity
-  // tokens (base/dark css); `_theme` kept for call-site compatibility, ignored.
-  const topAlpha = chartNumber("--chart-area-fill-top-opacity", 0.9);
-  const bottomAlpha = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
-  return {
-    type: "linear",
-    x: 0,
-    y: 0,
-    x2: 0,
-    y2: 1,
-    colorStops: [
-      { offset: 0, color: colorToRgba(color, topAlpha) },
-      { offset: 1, color: colorToRgba(color, bottomAlpha) },
-    ],
-    global: false,
-  };
+const verticalGradient = (topColor: string, bottomColor: string) => ({
+  type: "linear",
+  x: 0,
+  y: 0,
+  x2: 0,
+  y2: 1,
+  colorStops: [
+    { offset: 0, color: topColor },
+    { offset: 1, color: bottomColor },
+  ],
+  global: false,
+});
+
+/** The theme's top-to-bottom area fill fade; `stacked` reads the area-stacked tokens, which stay opaque in dark. */
+export const getAreaGradientColor = (color: string, stacked = false) => {
+  // Dark keeps a stack's layers opaque since they tile; unstacked areas overlap, so they stay translucent.
+  const topAlpha = stacked
+    ? chartNumber("--chart-area-stacked-fill-top-opacity", 0.9)
+    : chartNumber("--chart-area-fill-top-opacity", 0.9);
+  const bottomAlpha = stacked
+    ? chartNumber("--chart-area-stacked-fill-bottom-opacity", 0.4)
+    : chartNumber("--chart-area-fill-bottom-opacity", 0.4);
+  return verticalGradient(colorToRgba(color, topAlpha), colorToRgba(color, bottomAlpha));
 };
 
-/**
- * Builds the `{ areaStyle: {...} }` override for area charts — fades the fill
- * into a bottom-to-top transparent gradient. Returns `{}` for non-area charts
- * or when there's no base areaStyle. Resolves a concrete color from the palette
- * when the series color is null (auto-palette mode). Shared by the PromQL and
- * SQL chart builders so the area fill stays consistent.
- */
+/** The `area` panel's `fill_opacity` as a 0-1 alpha, or null when unset so the theme tokens apply. */
+export const getAreaFillOpacity = (
+  panelType: string,
+  config?: AreaFillConfig | null,
+): number | null => {
+  const value = config?.fill_opacity;
+  if (panelType !== "area" || value === null || value === undefined || value === "") return null;
+  const percent = Number(value);
+  if (!Number.isFinite(percent)) return null;
+  return Math.min(Math.max(percent, 0), 100) / 100;
+};
+
+/** The `{ areaStyle }` override for area charts: the theme gradient, or the `area` panel's own fill opacity and gradient; `{}` for other charts. */
 export const getAreaStyleOverride = (
   panelType: string,
   baseAreaStyle: any,
   resolvedColor: any,
   seriesName: any,
   theme: string,
+  config?: AreaFillConfig | null,
 ) => {
   const isAreaChart = panelType === "area" || panelType === "area-stacked";
   if (!isAreaChart || !baseAreaStyle) return {};
   const palette = getColorPalette(theme);
   const color = resolvedColor ?? palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
+  const gradient = panelType !== "area" || config?.fill_gradient !== false;
+  const opacity = getAreaFillOpacity(panelType, config);
+  if (opacity === null) {
+    return {
+      areaStyle: {
+        ...baseAreaStyle,
+        color: gradient
+          ? getAreaGradientColor(color, panelType === "area-stacked")
+          : colorToRgba(color, chartNumber("--chart-area-fill-top-opacity", 0.9)),
+      },
+    };
+  }
+  // The alpha rides on areaStyle.opacity, which also replaces ECharts' 0.7 default, so the percent is exact.
   return {
     areaStyle: {
       ...baseAreaStyle,
-      color: getAreaGradientColor(color, theme),
+      opacity,
+      color: gradient ? verticalGradient(colorToRgba(color, 1), colorToRgba(color, 0)) : color,
     },
   };
 };

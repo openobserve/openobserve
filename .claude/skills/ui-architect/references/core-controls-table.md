@@ -26,8 +26,8 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 **Don't use for:** Navigation between routes — use a router-link/`MenuLink` styled tile. For a segmented on/off choice, use [OToggleGroup](#otogglegroup). For a set of buttons joined into one control, wrap in [OButtonGroup](#obuttongroup).
 **Key props:**
 
-- `variant` (default `"primary"`) — one of: `primary`, `secondary`, `outline`, `ghost`, `ghost-primary`, `ghost-muted`, `ghost-subtle`, `ghost-destructive`, `ghost-success`, `ghost-warning`, `ghost-neutral`, `outline-destructive`, `sidebar-toggle`, `panel-collapse`, `sidebar-button`, `destructive`, `ai-gradient`, `on-dark-primary`, `on-dark-ghost`, `warning`, `pending`, `preview-slack`, `preview-teams`, `preview-email`, `preview-action`, `webinar-dismiss`, `pricing-chip`, `outline-primary`
-- `size` (default `"md"`) — one of: `xs`, `chip`, `sm`, `sm-action`, `md`, `lg`, `icon`, `icon-xs`, `icon-xs-circle`, `icon-xs-sq`, `icon-chip`, `icon-sm`, `icon-md`, `icon-lg`, `icon-circle`, `icon-circle-sm`, `icon-toolbar`, `icon-panel`, `sidebar-button`, `sm-toolbar`, `chip-12`
+- `variant` (default `"primary"`) — one of: `primary`, `secondary`, `outline`, `ghost`, `ghost-primary`, `ghost-muted`, `ghost-subtle`, `ghost-destructive`, `ghost-success`, `ghost-warning`, `ghost-neutral`, `outline-destructive`, `sidebar-toggle`, `panel-collapse`, `sidebar-button`, `destructive`, `ai-gradient`, `on-dark-primary`, `on-dark-ghost`, `warning`, `pending`, `preview-slack`, `preview-teams`, `preview-email`, `preview-action`, `webinar-dismiss`, `pricing-chip`, `outline-primary`, and the four tinted-fill variants `tint-teal`, `tint-purple`, `tint-blue`, `tint-orange` (soft categorical fill for tiles that identify an entity by colour, e.g. a cluster code; not for status)
+- `size` (default `"md"`) — one of: `xs`, `chip`, `sm`, `sm-action`, `md`, `cta`, `lg`, `icon`, `icon-xs`, `icon-xs-circle`, `icon-xs-sq`, `icon-chip`, `icon-sm`, `icon-md`, `icon-lg`, `icon-circle`, `icon-circle-sm`, `icon-toolbar`, `icon-panel`, `sidebar-button`, `sm-toolbar`, `chip-12`
 - `iconLeft` (`IconName`) — renders an OIcon before the label; `#icon-left` slot takes precedence if present
 - `iconRight` (`IconName`) — renders an OIcon after the label; `#icon-right` slot takes precedence if present
 - `loading` (boolean, default `false`) — shows a centered spinner overlay, keeps dimensions, disables interaction
@@ -73,6 +73,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - `orientation` (`"horizontal"` | `"vertical"`, default `"horizontal"`)
 - `align` (`"stretch"` | `"center"` | `"start"` | `"end"`, default `"stretch"`) — cross-axis alignment of children
 - `radius` (`"sm"` | `"md"` | `"lg"`, default `"md"`) — must match the inner buttons' radius; use `"sm"` when children use `size="chip"` or `size="icon-chip"`
+- The group never clips overflow (a clip hides a child's offset focus outline) and lifts the focused child with `z-1`; each child paints its own outer corners, so wrap non-OButton children that need clipping yourself
   **Slots:** `default` (one or more OButton children)
   **Emits:** none
   **Example:**

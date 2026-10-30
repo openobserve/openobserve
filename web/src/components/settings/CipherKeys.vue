@@ -25,8 +25,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
     >
       <template #actions>
-        <OButton variant="primary" size="sm" @click="addCipherKey" data-test="cipher-keys-add-btn">
+        <OButton
+          variant="primary"
+          size="sm"
+          :aria-label="
+            cipherKeyDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('cipherKey.add') })
+              : undefined
+          "
+          @click="addCipherKey"
+          data-test="cipher-keys-add-btn"
+        >
           {{ t(`cipherKey.add`) }}
+          <EditorDraftDot
+            v-if="cipherKeyDrafts.hasNew"
+            :saved-at="cipherKeyDrafts.savedAt(null)"
+            corner
+            data-test="cipher-keys-add-draft-dot"
+          />
         </OButton>
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
@@ -85,6 +101,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :filtered="!!filterQuery"
               @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addCipherKey())"
             />
+          </template>
+          <template #cell-name="{ row }">
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="cipherKeyDrafts.ids.has(row.name)"
+                :saved-at="cipherKeyDrafts.savedAt(row.name)"
+                :data-test="`cipher-keys-${row.name}-draft-dot`"
+              />
+            </div>
           </template>
           <template #cell-actions="{ row }">
             <OButton
@@ -159,7 +185,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <ConfirmDialog
     :title="t('settings.cipherKeysPage.deleteCipherKeyTitle')"
-    :message="t('settings.cipherKeysPage.deleteCipherKeyMessage')"
+    message-keypath="settings.cipherKeysPage.deleteCipherKeyMessage"
+    :message-name="confirmDelete.data?.name"
+    ok-variant="destructive"
     @update:ok="deleteCipherKey"
     @update:cancel="cancelDeleteCipherKey"
     v-model="confirmDelete.visible"
@@ -168,6 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('settings.cipherKeysPage.deleteCipherKeysTitle')"
     :message="t('settings.cipherKeysPage.deleteCipherKeysMessage', { count: selectedKeys.length })"
+    ok-variant="destructive"
     @update:ok="bulkDeleteCipherKeys"
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"
@@ -198,6 +227,10 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -216,6 +249,8 @@ export default defineComponent({
     ORefreshButton,
     OSearchInput,
     OTable,
+    OTruncatedText,
+    EditorDraftDot,
   },
   setup() {
     const store = useStore();
@@ -223,6 +258,11 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
+    const cipherKeyDrafts = useEditorDraftIds("cipher_key");
+    const dropCipherKeyDrafts = (names: string[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      for (const name of names) deleteEditorDraftsFor({ kind: "cipher_key", org, entityId: name });
+    };
     const orgIdForList = useOrgId();
     const cipherKeysList = useQuery(() =>
       Object.assign(cipherKeysQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
@@ -445,15 +485,16 @@ export default defineComponent({
 
     getData();
 
+    // The route goes first: while it still says ?action, onUpdated would remount the editor and reopen its draft.
     const hideAddDialog = async () => {
-      showAddDialog.value = !showAddDialog.value;
-      await getData(true);
-      router.push({
+      await router.push({
         name: "cipherKeys",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+      showAddDialog.value = false;
+      await getData(true);
     };
 
     const deleteCipherKey = () => {
@@ -477,6 +518,7 @@ export default defineComponent({
             // Drop the row from the cache first so it disappears now, not when
             // the refetch lands.
             const deletedName = confirmDelete.value.data.name;
+            dropCipherKeyDrafts([deletedName]);
             queryClient.setQueriesData(
               { queryKey: cipherKeyKeys.all(store.state.selectedOrganization.identifier) },
               (list: any) =>
@@ -537,6 +579,7 @@ export default defineComponent({
       CipherKeysService.bulkDelete(store.state.selectedOrganization.identifier, { ids: keyNames })
         .then((res) => {
           const { successful, unsuccessful } = res.data;
+          dropCipherKeyDrafts(successful);
 
           if (successful.length > 0 && unsuccessful.length === 0) {
             toast({
@@ -590,6 +633,7 @@ export default defineComponent({
     ]);
 
     return {
+      cipherKeyDrafts,
       refreshData,
       t,
       store,

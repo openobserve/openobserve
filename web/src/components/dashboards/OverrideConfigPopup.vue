@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('common.remove')"
                 :data-test="`series-override-remove-${idx}`"
                 class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
-                @click.stop="removeSeries(idx)"
+                @click.stop="removeSeries(draft.id)"
               />
             </div>
           </div>
@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :panel-unit="panelUnit"
               :panel-unit-custom="panelUnitCustom"
               :panel-decimals="panelDecimals"
+              :panel-line-width="panelLineWidth"
               :has-coloured-value-mappings="hasColouredValueMappings"
               @update="updateSelectedSeries"
             />
@@ -401,13 +402,17 @@ import {
 } from "@/composables/dashboard/useColumnFormatting";
 import {
   parseOverrideConfigs,
+  resolveIsNumber,
   applyColumnOverrides,
   buildValueMappingCache,
   formatNumericValue,
 } from "@/utils/dashboard/tableConfigUtils";
 
 import SeriesAddMenu from "./SeriesAddMenu.vue";
+import { applyTableOptions } from "@/utils/dashboard/tableOptions";
+import { lineThicknessOf } from "@/utils/dashboard/promqlChartSeriesProps";
 import SeriesFormatControls from "./SeriesFormatControls.vue";
+import { valueMappingPatternErrors } from "./addPanel/valueMappingErrors";
 import {
   type SeriesOverrideDraft,
   type SeriesOverridePreviewSource,
@@ -601,11 +606,7 @@ export default defineComponent({
     };
 
     const isNumericColumn = (col: ColumnOverrideUI): boolean =>
-      col.fieldType === "num"
-        ? true
-        : col.fieldType === "text"
-          ? false
-          : detectedNumeric(col.field);
+      resolveIsNumber(detectedNumeric(col.field), col.fieldType);
 
     watch(
       () => columnOverrides.value.map((c) => `${c.field}|${c.fieldType}`),
@@ -675,7 +676,10 @@ export default defineComponent({
       const dataKey = String(baseColumn.field ?? baseColumn.alias ?? baseColumn.name ?? col.field);
       const rows = base?.rows?.length ? base.rows : makeDummyRows(dataKey, isNumeric);
       const previewCol = buildPreviewColumn(baseColumn, col, isNumeric);
-      return { rows, columns: [previewCol] };
+      const preview = { rows, columns: [previewCol] };
+      const entry = serializeColumnOverride(col);
+      applyTableOptions(preview, { config: { override_config: entry ? [entry] : [] } });
+      return preview;
     };
 
     const selectedPreview = computed(() => {
@@ -732,6 +736,10 @@ export default defineComponent({
       seriesDrafts.value.filter((d) => d.matchBy === "name").map((d) => d.value),
     );
 
+    const panelLineWidth = computed(() =>
+      lineThicknessOf(props.previewSource?.panelSchema?.config),
+    );
+
     const hasColouredValueMappings = computed(() =>
       (props.valueMapping ?? []).some((m: any) => !!(m?.color || m?.textColor)),
     );
@@ -752,7 +760,10 @@ export default defineComponent({
       if (selectedSeries.value) Object.assign(selectedSeries.value, changes);
     };
 
-    const removeSeries = (idx: number) => {
+    // By id: a second click queued before the list re-renders still carries the old index.
+    const removeSeries = (id: number) => {
+      const idx = seriesDrafts.value.findIndex((d) => d.id === id);
+      if (idx === -1) return;
       seriesDrafts.value.splice(idx, 1);
       if (selectedSeriesIdx.value >= seriesDrafts.value.length) {
         selectedSeriesIdx.value = seriesDrafts.value.length - 1;
@@ -763,7 +774,11 @@ export default defineComponent({
 
     // An invalid pattern can never match, so Save stays on the dialog and shows its error.
     const saveSeriesOverrides = () => {
-      const invalidIdx = seriesDrafts.value.findIndex((d) => seriesPatternError(d) !== null);
+      const invalidIdx = seriesDrafts.value.findIndex(
+        (d) =>
+          seriesPatternError(d) !== null ||
+          Object.keys(valueMappingPatternErrors(d.valueMappings, t)).length > 0,
+      );
       if (invalidIdx !== -1) {
         selectedSeriesIdx.value = invalidIdx;
         return;
@@ -817,6 +832,7 @@ export default defineComponent({
       seriesNameOptions,
       usedSeriesNames,
       hasColouredValueMappings,
+      panelLineWidth,
       seriesRowLabel,
       addSeries,
       updateSelectedSeries,

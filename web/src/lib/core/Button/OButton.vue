@@ -284,12 +284,45 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
+  // cell: table-cell content that is itself the action; overrides the size box so the lines stack.
+  cell: [
+    "bg-transparent border-0 text-inherit text-left font-normal rounded-default",
+    "h-auto! w-full p-0! flex-col! items-stretch! justify-center! gap-1! whitespace-normal!",
+    "enabled:hover:opacity-80",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
     "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
     "transition-colors duration-150",
     "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
+    "disabled:opacity-60",
+  ].join(" "),
+  // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
+  "tint-teal": [
+    "bg-badge-teal-soft-bg text-badge-teal-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-purple": [
+    "bg-badge-purple-soft-bg text-badge-purple-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-blue": [
+    "bg-badge-blue-soft-bg text-badge-blue-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-orange": [
+    "bg-badge-orange-soft-bg text-badge-orange-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
 };
@@ -328,6 +361,11 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "outline-primary": "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",
+  "tint-teal": "opacity-60",
+  "tint-purple": "opacity-60",
+  "tint-blue": "opacity-60",
+  "tint-orange": "opacity-60",
+  cell: "opacity-60",
 };
 
 const unavailableClasses = computed(() => {
@@ -362,7 +400,9 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
   "sm-action": "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
-  md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
+  // h-8.5 sorts before h-9 and up, so a caller's own plain height class still overrides md.
+  md: "h-8.5 ps-4 pe-4 text-sm gap-2 rounded-default",
+  cta: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
   lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",
   // shrink-0: without it min-width:auto lets a tight flex row squash these fixed squares to icon width.
   icon: "size-6 shrink-0 p-0 rounded-default gap-x-0",
@@ -374,7 +414,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 24px square — matches chip size for paired close/remove buttons
   "icon-chip": "h-6 w-6 shrink-0 p-0 rounded-default gap-x-0",
   "icon-sm": "h-8 w-8 shrink-0 p-0 rounded-default gap-x-0",
-  "icon-md": "h-10 w-10 shrink-0 p-0 rounded-default gap-x-0",
+  "icon-md": "h-8.5 w-8.5 shrink-0 p-0 rounded-default gap-x-0",
   "icon-lg": "h-12 w-12 shrink-0 p-0 rounded-default gap-x-0",
   "icon-circle": "size-8 shrink-0 p-0 rounded-full gap-x-0",
   "icon-circle-sm": "size-7 shrink-0 p-0 rounded-full gap-x-0",
@@ -407,13 +447,8 @@ const classes = computed<string[]>(() => [
   // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
   "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
   "outline-none",
-  /* Unified focus ring — identical to OInput/OSelect: a 2px OPAQUE primary ring
-     hugging the control (no ring-offset gap). The trailing `!` overrides
-     each variant's own ring width/color below, so every button focuses identically.
-     Reads --color-focus-ring-accent, NOT accent/25: at 25% alpha the ring measured
-     1.38:1 in light and 1.50:1 in dark, against the 3:1 SC 1.4.11 floor. Solid, it is
-     4.80:1 / 6.82:1. This override is why the per-variant ring classes never paint. */
-  "focus-visible:ring-[0.125rem]! focus-visible:ring-focus-ring-accent!",
+  // A hugging ring vanishes on accent fills, so the outline sits off a gap; ring-0! mutes the per-variant rings.
+  "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
   unavailable.value ? "cursor-not-allowed!" : "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   unavailable.value

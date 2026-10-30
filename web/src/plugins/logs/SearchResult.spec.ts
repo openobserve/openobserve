@@ -684,6 +684,71 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
     });
 
+    it("resolves the FTS default once the fields land after the search finished", async () => {
+      // A search finishing inside the window where extractFields() has emptied the list leaves the table on _source for good.
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello", kubernetes_pod_id: "pod-1" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("does not resolve on late fields when the user chose the columns", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["kubernetes_pod_id"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["kubernetes_pod_id"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+    });
+
+    it("does not resolve on late fields in SQL mode", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message", ftsKey: true }];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+    });
+
     it("loading watcher leaves columns alone in SQL mode (custom queries are authoritative)", async () => {
       // A hand-written SQL query (CTE / aggregate) with no pinned fields renders
       // the generic "source" column. The FTS feature must not override a custom
@@ -1269,45 +1334,99 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("results progress bar (#14303)", () => {
-    const progressBars = () => wrapper.findAllComponents({ name: "LoadingProgress" });
-    const barsLoading = () => progressBars().filter((bar: any) => bar.props("loading") === true);
+  describe("results progress line (#14303)", () => {
+    const line = () => wrapper.find('[data-test="logs-results-progress"] [role="progressbar"]');
 
-    const setProgress = async (loading: boolean, percentage: number | undefined) => {
-      wrapper.vm.searchObj.loading = loading;
-      wrapper.vm.searchObj.loadingProgressPercentage = percentage;
+    const startQuery = async (percentage: number | undefined) => {
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       wrapper.vm.searchObj.loadingHistogram = false;
       wrapper.vm.searchObj.loadingHistogramProgressPercentage = 0;
-      await wrapper.vm.$nextTick();
-      await flushPromises();
+      wrapper.vm.searchObj.loadingProgressPercentage = percentage;
+      wrapper.vm.searchObj.loading = true;
+      await nextTick();
     };
 
-    it("binds the streaming results percentage to its own progress bar", async () => {
-      await setProgress(true, 42);
-      expect(barsLoading()).toHaveLength(1);
-      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(42);
+    const passDelay = async () => {
+      vi.advanceTimersByTime(300);
+      await nextTick();
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
-    it("falls back to 0 when no progress has been reported yet", async () => {
-      await setProgress(true, undefined);
-      expect(barsLoading()).toHaveLength(1);
-      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(0);
+    it("waits 300ms so a fast query never flashes the line", async () => {
+      await startQuery(42);
+      vi.advanceTimersByTime(299);
+      await nextTick();
+      expect(line().exists()).toBe(false);
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(line().exists()).toBe(true);
     });
 
-    it("stays mounted with loading=false so it can run its own fade-out", async () => {
-      await setProgress(false, 37);
-      const settled = progressBars().filter(
-        (bar: any) => bar.props("loadingProgressPercentage") === 37,
+    it("binds the streaming results percentage to the line", async () => {
+      await startQuery(42);
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 42%");
+      expect(line().attributes("aria-valuenow")).toBe("42");
+    });
+
+    it("keeps a 5% floor when no progress has been reported yet", async () => {
+      await startQuery(undefined);
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 5%");
+    });
+
+    it("removes the line at once when the query settles", async () => {
+      await startQuery(42);
+      await passDelay();
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      expect(line().exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-results-progress"]').classes()).toContain("opacity-0");
+    });
+
+    it("does not let the histogram progress drive the results line", async () => {
+      await startQuery(42);
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 90;
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 42%");
+    });
+
+    it("shows the size a fresh run has scanned so far, in place of the scan chip", async () => {
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.data.histogram.chartParams.titleParts = {
+        start: 1,
+        end: 10,
+        total: "10",
+        took: 5,
+        scanLabel: "Scan Size",
+        scanSize: "300.00 MB",
+      };
+      await startQuery(10);
+      wrapper.vm.searchObj.data.queryResults = { hits: [], scan_size: 1536 };
+      await passDelay();
+      expect(wrapper.find('[data-test="logs-result-scan-progress"]').text()).toBe(
+        "Scanned 1.50 GB",
       );
-      expect(settled).toHaveLength(1);
-      expect(settled[0].props("loading")).toBe(false);
+      expect(wrapper.find('[data-test="logs-result-scan-chip"]').exists()).toBe(false);
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      expect(wrapper.find('[data-test="logs-result-scan-progress"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-result-scan-chip"]').exists()).toBe(true);
     });
+  });
 
-    it("does not let the histogram bar stand in for the results bar", async () => {
-      await setProgress(true, 42);
-      expect(barsLoading()).toHaveLength(1);
-      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(42);
-      expect(wrapper.vm.searchObj.loadingHistogram).toBe(false);
+  describe("results bar layout", () => {
+    it("lets the header bar grow when its chips wrap instead of clipping them", () => {
+      const bar = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]').element
+        .parentElement as HTMLElement;
+      expect(bar.classList.contains("min-h-9")).toBe(true);
+      expect(bar.classList.contains("h-9")).toBe(false);
     });
   });
 });

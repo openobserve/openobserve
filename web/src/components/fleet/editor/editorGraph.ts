@@ -97,9 +97,13 @@ export const CATALOG: CatalogItem[] = [
     "protocols.http.endpoint": "0.0.0.0:4318",
   }),
   r("prometheus", "Prometheus", "query-stats", {
-    "config.scrape_configs[0].job_name": "app",
+    "config.scrape_configs[0].job_name": "kubernetes-pods",
     "config.scrape_configs[0].scrape_interval": "30s",
-    "config.scrape_configs[0].static_configs[0].targets[0]": "localhost:9090",
+    "config.scrape_configs[0].kubernetes_sd_configs[0].role": "pod",
+    "config.scrape_configs[0].relabel_configs[0].source_labels[0]":
+      "__meta_kubernetes_pod_annotation_prometheus_io_scrape",
+    "config.scrape_configs[0].relabel_configs[0].action": "keep",
+    "config.scrape_configs[0].relabel_configs[0].regex": "true",
   }),
   r("filelog", "File log", "description", {
     "include[0]": "/var/log/pods/*/*/*.log",
@@ -236,6 +240,11 @@ export const CATALOG: CatalogItem[] = [
     create_directory: "true",
   }),
   x("health_check", "Health check", "monitor-heart", { endpoint: "0.0.0.0:13133" }),
+  x("k8s_leader_elector", "K8s leader elector", "workspace-premium", {
+    auth_type: "serviceAccount",
+    lease_name: "otel-fleet-collector-gateway",
+    lease_namespace: "${env:K8S_NAMESPACE}",
+  }),
   x("pprof", "pprof", "speed", { endpoint: "localhost:1777" }),
   x("zpages", "zpages", "insights", { endpoint: "localhost:55679" }),
 ];
@@ -290,16 +299,30 @@ const isIdList = (v: unknown): v is string[] =>
 
 type Segment = string | number;
 
-/** `a.b[0].c` → ["a", "b", 0, "c"]. */
-function segments(path: string): Segment[] {
+const BARE_KEY = /^[\w-]+$/;
+
+/** A map key as one settings path segment, JSON-quoted when it holds a `.` or other path syntax. */
+const pathKey = (key: string) => (BARE_KEY.test(key) ? key : JSON.stringify(key));
+
+/** `a."b.c"[0].d` → ["a", "b.c", 0, "d"], or null when `path` is not a settings path. */
+function segments(path: string): Segment[] | null {
+  const segment = /([\w-]+|"(?:[^"\\]|\\.)*")((?:\[\d+\])*)(\.|$)/y;
   const out: Segment[] = [];
-  for (const part of path.split(".")) {
-    const name = part.replace(/(\[\d+\])+$/, "");
-    if (name) out.push(name);
-    for (const m of part.slice(name.length).matchAll(/\[(\d+)\]/g)) out.push(Number(m[1]));
+  while (segment.lastIndex < path.length) {
+    const m = segment.exec(path);
+    if (!m || (m[3] === "." && segment.lastIndex === path.length)) return null;
+    try {
+      out.push(m[1].startsWith('"') ? JSON.parse(m[1]) : m[1]);
+    } catch {
+      return null;
+    }
+    for (const index of m[2].matchAll(/\[(\d+)\]/g)) out.push(Number(index[1]));
   }
-  return out;
+  return out.length ? out : null;
 }
+
+/** Whether `path` names a setting the graph can nest back into YAML. */
+export const isSettingPath = (path: string) => segments(path) !== null;
 
 const leaf = (value: string): unknown =>
   value === EMPTY_MAP ? {} : value === EMPTY_LIST ? [] : value;
@@ -314,7 +337,8 @@ function compact(node: unknown): unknown {
 function nest(settings: Record<string, string>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [path, value] of Object.entries(settings)) {
-    const segs = segments(path);
+    // Every path comes from `flatten` or passed `isSettingPath`; the fallback only keeps a value from vanishing.
+    const segs = segments(path) ?? [path];
     let cur: Record<string, unknown> = out;
     segs.forEach((seg, i) => {
       if (i === segs.length - 1) {
@@ -335,7 +359,7 @@ const scalar = (v: string) => (/^[\w./-]+$/.test(v) ? v : JSON.stringify(v));
 
 function emitList(key: string, items: unknown[], indent: number, lines: string[]) {
   const pad = " ".repeat(indent);
-  lines.push(`${pad}${key}:`);
+  lines.push(`${pad}${scalar(key)}:`);
   for (const item of items) {
     if (isMap(item) && Object.keys(item).length) {
       const sub: string[] = [];
@@ -350,15 +374,15 @@ function emit(obj: Record<string, unknown>, indent: number, lines: string[]) {
   const pad = " ".repeat(indent);
   for (const [k, v] of Object.entries(obj)) {
     if (Array.isArray(v)) {
-      if (!v.length) lines.push(`${pad}${k}: []`);
+      if (!v.length) lines.push(`${pad}${scalar(k)}: []`);
       else emitList(k, v, indent, lines);
     } else if (isMap(v)) {
-      if (!Object.keys(v).length) lines.push(`${pad}${k}: {}`);
+      if (!Object.keys(v).length) lines.push(`${pad}${scalar(k)}: {}`);
       else {
-        lines.push(`${pad}${k}:`);
+        lines.push(`${pad}${scalar(k)}:`);
         emit(v, indent + 2, lines);
       }
-    } else lines.push(`${pad}${k}: ${scalar(String(v))}`);
+    } else lines.push(`${pad}${scalar(k)}: ${scalar(String(v))}`);
   }
 }
 
@@ -415,7 +439,10 @@ function flatten(obj: Record<string, unknown>): Record<string, string> | null {
     } else if (isMap(v)) {
       // An empty map is a real setting (`cpu: {}` enables a scraper), kept as the literal `{}`.
       if (!Object.keys(v).length) out[path] = EMPTY_MAP;
-      else return Object.entries(v).every(([k, c]) => visit(path ? `${path}.${k}` : k, c));
+      else
+        return Object.entries(v).every(([k, c]) =>
+          visit(path ? `${path}.${pathKey(k)}` : pathKey(k), c),
+        );
     } else out[path] = String(v);
     return true;
   };

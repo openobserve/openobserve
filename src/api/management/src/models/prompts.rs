@@ -43,13 +43,13 @@ impl TryFrom<CreatePromptRequestBody> for core::CreatePrompt {
         Ok(Self {
             name: value.name,
             folder_id: value.folder_id,
-            prompt_type: core::PromptType::try_from(value.r#type.as_str())?,
+            prompt_type: value.r#type.parse::<core::PromptType>()?,
             description: value.description,
             tags: value.tags,
             payload: value.payload,
             config: core::config_from_request_value(value.config)?,
             commit_message: value.commit_message,
-            source: core::PromptSource::try_from(value.source.as_str())?,
+            source: value.source.parse::<core::PromptSource>()?,
         })
     }
 }
@@ -78,7 +78,7 @@ impl CreatePromptVersionRequestBody {
             payload: self.payload,
             config: core::config_from_request_value(self.config)?,
             commit_message: self.commit_message,
-            source: core::PromptSource::try_from(self.source.as_str())?,
+            source: self.source.parse::<core::PromptSource>()?,
             base_version: self.base_version,
             base_hash: self.base_hash,
             if_head,
@@ -150,7 +150,7 @@ impl MatchPromptsRequestBody {
         self,
     ) -> Result<(core::PromptType, Value, core::PromptConfig), core::PromptError> {
         Ok((
-            core::PromptType::try_from(self.r#type.as_str())?,
+            self.r#type.parse::<core::PromptType>()?,
             self.payload,
             core::config_from_request_value(self.config)?,
         ))

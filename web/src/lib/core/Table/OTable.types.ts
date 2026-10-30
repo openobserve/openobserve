@@ -400,10 +400,18 @@ export interface OTableProps<TData = any> {
    * regardless of virtual scroll (which only bounds DOM nodes), so very large
    * datasets (100k+ rows) freeze or OOM the tab without this. Applies only
    * while no client-side row transform needs the full model: requires
-   * virtualScroll, pagination "none", non-client sorting, expansion "none",
-   * no wrap, no tree, and deactivates while a column/global filter is set.
+   * virtualScroll, pagination "none", non-client sorting, expansion "none"
+   * (or single/multiple with `measureExpandedRows`), no wrap, no tree, and
+   * deactivates while a column/global filter is set.
    */
   windowRowModel?: boolean;
+  /**
+   * Under virtual scroll, measure each rendered row together with its expanded
+   * detail row, so a tall detail never shifts the rows below it. Expansion state
+   * is keyed by `rowKey`, so this also lets `windowRowModel` stay on while rows
+   * expand. Opt-in: it measures every rendered row from the DOM.
+   */
+  measureExpandedRows?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
   /**
@@ -554,9 +562,10 @@ export interface OTableProps<TData = any> {
   pivotHeaderLevels?: any[];
   /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Grand-total row rendered as a sticky `<tfoot>`, keyed by each column's
-   *  `accessorKey`/`id`; values run through the column's `meta.format`. */
-  stickyTotalRow?: Record<string, any> | null;
+  /** Grand-total row (or rows, one `<tr>` each) rendered as a sticky `<tfoot>`, keyed by each column's
+   *  `accessorKey`/`id`; values run through the column's `meta.format`. A row with `__labelKey` is a
+   *  calculated-totals row: that column's cell shows the calculation's name, muted, and the values bold. */
+  stickyTotalRow?: Record<string, any> | Record<string, any>[] | null;
   /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
   /** Show sticky column totals */

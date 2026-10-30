@@ -163,7 +163,10 @@ describe("FleetTokens", () => {
 
   it("lists only this fleet's tokens", async () => {
     wrapper = await mountTokens();
-    expect(fleet.listTokens).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(fleet.listTokens).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+      expect.objectContaining({ offset: 0 }),
+    );
     const body = wrapper.find('[data-test="o2-table-body"]').text();
     expect(body).toContain("k8s-helm");
     expect(body).toContain("old-batch");

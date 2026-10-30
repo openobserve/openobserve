@@ -1082,6 +1082,10 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(replaceDialog().exists()).toBe(true);
       expect(replaceDialog().props("open")).toBe(true);
       expect(wrapper.text()).toContain("Host Metrics");
+      const name = wrapper.find('[data-test="add-dashboard-github-replace-confirm-name"]');
+      expect(name.text()).toBe("Host Metrics");
+      expect(name.classes()).toContain("font-semibold");
+      expect(replaceDialog().props("primaryButtonVariant")).toBe("destructive");
       // Nothing is destroyed before the user answers.
       expect(dashboardsService.delete).not.toHaveBeenCalled();
       expect(dashboardsService.create).not.toHaveBeenCalled();

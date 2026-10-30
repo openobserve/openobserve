@@ -36,6 +36,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-text-heading": "#262626",
   "--color-text-body": "#404040",
   "--color-text-secondary": "#737373",
+  "--color-text-inverse": "#ffffff",
   "--color-border-default": "#d4d4d4",
   "--color-border-strong": "#a3a3a3",
   "--color-border-subtle": "#ededed",
@@ -51,6 +52,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-status-positive": "#208a3c",
   "--color-surface-subtle": "#f5f5f5",
   "--color-white": "#ffffff",
+  "--color-black": "#000000",
   "--color-tooltip-text": "#262626",
   "--color-tooltip-bg": "#ffffff",
   "--color-tooltip-border": "#ededed",
@@ -99,7 +101,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-table-22": "#FFF2CC",
   "--color-chart-table-23": "#FFE6E6",
   "--color-chart-table-24": "#E8F4FD",
-  "--color-chart-gridline": "rgba(0, 0, 0, 0.2)",
+  "--color-chart-gridline": "rgba(0, 10, 23, 0.09)",
   "--color-chart-band": "rgba(115, 115, 115, 0.22)",
   // --color-chart-crosshair-bg is deliberately absent: it is dark-only, and the empty
   // string light returns is what makes ECharts use its own auto default (base.css:262).
@@ -148,6 +150,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-latency-p95": "#0a4ce8",
   "--color-progress-bar-default": "#3f7994",
   "--color-progress-bar-neutral": "#a3a3a3",
+  "--color-progress-bar-track": "#e5e5e5",
 };
 
 /**
@@ -200,6 +203,50 @@ export const chartTextColor = (): string => chartColor("--color-text-secondary")
 export const chartAxisLine = (): string => chartColor("--color-border-default");
 export const chartBg = (): string => chartColor("--color-surface-base");
 export const chartGridLine = (): string => chartColor("--color-border-subtle");
+
+export const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+/** WCAG relative luminance (0–1) of a `#rrggbb` hex colour. */
+function relativeLuminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 0xff) / 255;
+  const g = ((n >> 8) & 0xff) / 255;
+  const b = (n & 0xff) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio (1–21) between two `#rrggbb` hex colours. */
+function contrastRatio(a: string, b: string): number {
+  const [l1, l2] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+/** `hex` mixed `amount` (0–1) of the way toward white. */
+function mixToWhite(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (channel: number) => Math.round(channel + (255 - channel) * amount);
+  const r = mix((n >> 16) & 0xff);
+  const g = mix((n >> 8) & 0xff);
+  const b = mix(n & 0xff);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+/** Lightens `hex` toward white in steps until it clears 3:1 contrast against `backgroundHex`, or white is reached if that ratio isn't achievable. */
+export function lightenForContrast(hex: string, backgroundHex: string): string {
+  if (!HEX_RE.test(hex) || !HEX_RE.test(backgroundHex)) return hex;
+  // A light canvas doesn't need lightening; only a dark one can hide a dark marker colour.
+  if (relativeLuminance(backgroundHex) >= 0.5) return hex;
+  if (contrastRatio(hex, backgroundHex) >= 3) return hex;
+  for (let amount = 0.05; amount < 1; amount += 0.05) {
+    const mixed = mixToWhite(hex, amount);
+    if (contrastRatio(mixed, backgroundHex) >= 3) return mixed;
+  }
+  return "#ffffff";
+}
+
+/** `lightenForContrast` against the chart's own canvas colour, so markers stay legible on a dark dashboard. */
+export const chartMarkerColor = (hex: string): string =>
+  lightenForContrast(hex, chartColor("--color-surface-base"));
 
 // Shared fill for chart selections so the zoom brush and annotation markAreas read identically.
 export const CHART_SELECTION_FILL = "rgba(0, 191, 255, 0.15)";

@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import {
   dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
   Past30SecondsValue
@@ -265,11 +266,16 @@ export class DashboardPage {
     // Use Playwright's built-in expect to wait for button to be enabled
     await expect(this.dashboardSubmitButton).toBeEnabled({ timeout: 15000 });
 
-    // Click submit button
+    // The toast only shows after a list refetch; the POST can queue ~30s behind a server DB-pool stall.
+    const createResponse = this.page.waitForResponse(
+      (res) => res.request().method() === 'POST' && /\/api\/[^/]+\/dashboards$/.test(new URL(res.url()).pathname),
+      { timeout: 45000 }
+    );
     await this.dashboardSubmitButton.click();
-
-    // Wait for the success notification to confirm dashboard was created
-    await this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 });
+    const res = await createResponse;
+    if (!res.ok()) {
+      throw new Error(`Dashboard creation failed: HTTP ${res.status()} ${await res.text().catch(() => '')}`);
+    }
 
     // Wait for navigation to the new dashboard view page.
     // Some environments (e.g. pentest) may not navigate to /dashboards/view/
@@ -497,6 +503,7 @@ export class DashboardPage {
   async signOut() {
     await this.profileButton.click();
     await this.signOutButton.click();
+    await confirmDraftSignOut(this.page);
   }
 
 
@@ -512,6 +519,7 @@ export class DashboardPage {
 
     // Now click the logout item
     await this.logoutMenuItem.click({ force: true });
+    await confirmDraftSignOut(this.page);
   }
 
   async notAvailableDashboard() {

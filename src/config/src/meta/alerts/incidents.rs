@@ -113,10 +113,10 @@ impl std::fmt::Display for CorrelationReason {
     }
 }
 
-impl TryFrom<&str> for CorrelationReason {
-    type Error = String;
+impl std::str::FromStr for CorrelationReason {
+    type Err = String;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value.to_lowercase().as_str() {
             "service_discovery" => Ok(Self::ServiceDiscovery),
             "primary_match" => Ok(Self::PrimaryMatch),
@@ -348,6 +348,19 @@ pub struct Incident {
     /// Why automatic analysis runs never start for this incident (`l0_off`).
     #[serde(default)]
     pub rca_off_reason: Option<String>,
+
+    /// Every alert that fired into the incident and how often, most-fired first; list only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<IncidentAlertGroup>>,
+}
+
+/// One alert's firings within an incident, for the list row.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct IncidentAlertGroup {
+    pub alert_id: String,
+    pub alert_name: String,
+    /// Times this alert fired into the incident
+    pub count: i32,
 }
 
 /// Alert info within an incident (junction table representation)
@@ -444,6 +457,16 @@ impl IncidentCorrelationOutcome {
             | Self::NewAlertTypeJoined { service_name, .. }
             | Self::ExistingAlertRepeated { service_name, .. }
             | Self::SeverityEscalated { service_name, .. } => service_name,
+        }
+    }
+
+    /// The incident a NEW alert just joined; `None` for a new incident or a member firing again.
+    pub fn joined_by_new_alert(&self) -> Option<&str> {
+        match self {
+            Self::NewAlertTypeJoined { incident_id, .. } => Some(incident_id),
+            Self::NewIncidentCreated { .. }
+            | Self::ExistingAlertRepeated { .. }
+            | Self::SeverityEscalated { .. } => None,
         }
     }
 }
@@ -933,6 +956,45 @@ impl IncidentEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only a new alert joining counts; the same alert firing again never re-pages.
+    #[test]
+    fn test_only_a_new_alert_joining_names_the_incident() {
+        let (id, svc) = (|| "inc_1".to_string(), || "checkout".to_string());
+        let cases = [
+            (
+                IncidentCorrelationOutcome::NewAlertTypeJoined {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                Some("inc_1"),
+            ),
+            (
+                IncidentCorrelationOutcome::ExistingAlertRepeated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::SeverityEscalated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::NewIncidentCreated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+        ];
+        for (outcome, want) in cases {
+            assert_eq!(outcome.joined_by_new_alert(), want, "{outcome:?}");
+        }
+    }
 
     /// A node that predates an event type must still recover the whole timeline.
     ///
@@ -1710,14 +1772,14 @@ mod tests {
     #[test]
     fn test_correlation_reason_try_from() {
         assert_eq!(
-            CorrelationReason::try_from("service_discovery").unwrap(),
+            "service_discovery".parse::<CorrelationReason>().unwrap(),
             CorrelationReason::ServiceDiscovery
         );
         assert_eq!(
-            CorrelationReason::try_from("PRIMARY_MATCH").unwrap(),
+            "PRIMARY_MATCH".parse::<CorrelationReason>().unwrap(),
             CorrelationReason::PrimaryMatch
         );
-        assert!(CorrelationReason::try_from("bad_value").is_err());
+        assert!("bad_value".parse::<CorrelationReason>().is_err());
     }
 
     // ── KeyType ───────────────────────────────────────────────────────────────
@@ -1805,6 +1867,7 @@ mod tests {
             muted_by_downtime_id: None,
             rca: None,
             rca_off_reason: None,
+            alert_groups: None,
         }
     }
 

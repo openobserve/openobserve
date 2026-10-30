@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="traces-search-bar-saved-views"
-            class="element-box-shadow border-button-outline-border shrink-0 border p-0"
+            class="border-button-outline-border shrink-0 border p-0"
           >
             <ODropdown
               :open="savedViewsDropdownOpen"
@@ -314,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             class="h-8 max-lg:me-auto max-md:[&_.date-time-label]:hidden"
@@ -327,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 data-test="traces-search-bar-cancel-btn"
                 :title="t('search.cancel')"
-                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow h-[1.875rem]! w-[5.875rem]! ![border-radius:0.375rem_0_0_0.375rem] p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! h-[1.875rem]! w-[5.875rem]! ![border-radius:0.375rem_0_0_0.375rem] p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 @click="cancelQueryData"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -337,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 :title="t('search.runQuery')"
-                class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:ring-2"
+                class="bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:ring-2"
                 :class="
                   store.state.zoConfig.auto_query_enabled
                     ? '![border-radius:0.375rem_0_0_0.375rem]'
@@ -437,6 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
+              calendar-presets
               class="h-8!"
               @on:date-change="updateDateTime"
             />
@@ -490,6 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
+              calendar-presets
               class="me-1.5 h-8!"
               @on:date-change="updateDateTime"
             />
@@ -847,12 +850,10 @@ export default defineComponent({
     // Gives the user 2.5s to finish typing start/end time before firing.
     const triggerAbsoluteQueryDebounced = debounce((value: object) => {
       if (value.userChangedValue) {
-        analytics.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
+        analytics.track("traces_time_range_changed", {
           stream_name: searchObj.data.stream.selectedStream.value,
-          page: "Search Logs",
+          value_type: value.valueType,
+          relative_period: value.relativeTimePeriod,
         });
       }
 
@@ -945,14 +946,10 @@ export default defineComponent({
       }
 
       if (value.userChangedValue) {
-        analytics.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
+        analytics.track("traces_time_range_changed", {
           stream_name: searchObj.data.stream.selectedStream.value,
-          page: "Search Logs",
+          value_type: value.valueType,
+          relative_period: value.relativeTimePeriod,
         });
       }
     };
@@ -1220,7 +1217,9 @@ export default defineComponent({
       savedViewsDialogOpen.value = false;
       const confirmed = await confirm({
         title: t("search.deleteSavedView"),
-        message: t("search.deleteSavedViewConfirm"),
+        messageKeypath: "search.deleteSavedViewConfirm",
+        messageName: view.view_name,
+        confirmVariant: "destructive",
       });
       if (!confirmed) return;
       try {

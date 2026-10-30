@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
+import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import { shallowMount, flushPromises } from "@vue/test-utils";
-import { inject } from "vue";
+import { inject, nextTick, reactive, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", async (importOriginal) => {
@@ -59,6 +62,11 @@ vi.mock("@/services/reports", async (importOriginal) => {
     },
   });
 });
+
+vi.mock("@/services/health", () => ({
+  pingBackend: vi.fn().mockResolvedValue(true),
+  default: { pingBackend: vi.fn().mockResolvedValue(true) },
+}));
 
 vi.mock("@/services/short_url", () => ({
   default: {
@@ -109,12 +117,20 @@ const mockRouterPush = vi.fn().mockResolvedValue(undefined);
 const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 const mockRouterBack = vi.fn();
 // Captures the leave guard ViewDashboard registers so tests can invoke it.
-const routeLeaveGuards: Array<() => unknown> = [];
 type RouteLike = { query: Record<string, string> };
+const routeLeaveGuards: Array<(to?: RouteLike) => unknown> = [];
+// Captures afterEach hooks so a test can say whether the navigation landed or a later guard stopped it.
+const afterEachHooks: Array<(to: unknown, from: unknown, failure?: unknown) => void> = [];
+const land = (to?: RouteLike, failure?: unknown) =>
+  afterEachHooks.forEach((hook) => hook(to, {}, failure));
 const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = [];
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
+// Mutable so a test can open the dashboard from a folder other than the default.
+const mockRouteFolder = { value: "default" };
+// Extra query params a test wants on the route it mounts with (cleared before every test).
+const mockExtraRouteQuery: Record<string, string> = {};
 
 // Comprehensive Vue composable mocks
 vi.mock("vue-router", () => ({
@@ -126,6 +142,13 @@ vi.mock("vue-router", () => ({
     forward: vi.fn(),
     options: { history: { state: mockHistoryState } },
     resolve: vi.fn().mockReturnValue({ href: "/test" }),
+    afterEach: (hook: (to: unknown, from: unknown, failure?: unknown) => void) => {
+      afterEachHooks.push(hook);
+      return () => {
+        const index = afterEachHooks.indexOf(hook);
+        if (index >= 0) afterEachHooks.splice(index, 1);
+      };
+    },
     currentRoute: {
       value: {
         params: { dashboardId: "test-dashboard-1", folderId: "default" },
@@ -137,7 +160,7 @@ vi.mock("vue-router", () => ({
       },
     },
   }),
-  onBeforeRouteLeave: (guard: () => unknown) => {
+  onBeforeRouteLeave: (guard: (to?: RouteLike) => unknown) => {
     routeLeaveGuards.push(guard);
   },
   onBeforeRouteUpdate: (guard: (to: RouteLike, from: RouteLike) => unknown) => {
@@ -145,7 +168,12 @@ vi.mock("vue-router", () => ({
   },
   useRoute: () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
-    query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" },
+    query: {
+      dashboard: "test-dashboard-1",
+      folder: mockRouteFolder.value,
+      tab: "tab-1",
+      ...mockExtraRouteQuery,
+    },
     path: "/dashboard/test-dashboard-1",
   }),
 }));
@@ -159,7 +187,8 @@ global.mockHistoryState = mockHistoryState;
 // Global store mock instances
 const mockStoreCommit = vi.fn();
 const mockStoreDispatch = vi.fn();
-const mockStoreState = {
+// Reactive like the real store, so watchers on store state (e.g. the timezone) run in specs.
+const mockStoreState = reactive({
   selectedOrganization: { identifier: "test-org" },
   theme: "light",
   printMode: false,
@@ -167,8 +196,8 @@ const mockStoreState = {
   organizationData: {
     folders: [{ folderId: "default", name: "Default" }],
   },
-  zoConfig: { min_auto_refresh_interval: 5 },
-};
+  zoConfig: { min_auto_refresh_interval: 5 } as Record<string, unknown>,
+}) as Record<string, any>;
 
 vi.mock("vuex", async () => {
   const actual = await vi.importActual("vuex");
@@ -259,6 +288,7 @@ import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { getDashboard } from "@/utils/commons.ts";
+import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import { getManager } from "@/lib/vue-shortcut-manager";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 
@@ -292,6 +322,7 @@ describe("ViewDashboard", () => {
     global.mockRouterReplace.mockClear();
     global.mockRouterBack.mockClear();
     global.mockHistoryState.back = null;
+    Object.keys(mockExtraRouteQuery).forEach((key) => delete mockExtraRouteQuery[key]);
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
     global.mockShowPositiveNotification.mockClear();
@@ -993,6 +1024,7 @@ describe("ViewDashboard", () => {
       global.mockStoreDispatch.mockClear();
 
       routeLeaveGuards.forEach((guard) => guard());
+      land();
 
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", false);
       Object.assign(global.mockStoreState, { printMode: false });
@@ -1006,6 +1038,7 @@ describe("ViewDashboard", () => {
       global.mockStoreDispatch.mockClear();
 
       routeLeaveGuards.forEach((guard) => guard());
+      land();
 
       expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setPrintMode", expect.anything());
     });
@@ -1794,6 +1827,256 @@ describe("ViewDashboard", () => {
     });
   });
 
+  describe("calendar time ranges", () => {
+    const NOW = new Date("2026-10-08T03:00:00Z");
+    const baseDashboard = {
+      dashboardId: "test-dashboard-1",
+      title: "Test Dashboard",
+      variables: { list: [] },
+      tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+    };
+
+    const mountWithPicker = async () => {
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: { template: '<div><slot name="actions" /></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.currentDashboardData.data = baseDashboard;
+      wrapper.vm.dateTimePicker = { getConsumableDateTime: () => ({}) };
+    };
+
+    beforeEach(() => {
+      store.state.timezone = "UTC";
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("turns the calendar presets on for the header picker", async () => {
+      await mountWithPicker();
+      const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
+      expect(picker.props("calendarPresets")).toBe(true);
+    });
+
+    it("reads a calendar token from the URL period and writes it back", async () => {
+      Object.assign(mockExtraRouteQuery, { period: "calendar:month:-1" });
+      await mountWithPicker();
+
+      expect(wrapper.vm.selectedDate).toMatchObject({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:month:-1",
+      });
+      expect(wrapper.vm.getQueryParamsForDuration(wrapper.vm.selectedDate)).toEqual({
+        period: "calendar:month:-1",
+      });
+    });
+
+    it("opens on the dashboard's default calendar period when the URL has no time", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        ...baseDashboard,
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "calendar:week:0" },
+      });
+      await mountWithPicker();
+
+      expect(wrapper.vm.selectedDate).toEqual({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:week:0",
+      });
+    });
+
+    it("keeps __global while an offset-0 period only grows with now", async () => {
+      await mountWithPicker();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      wrapper.vm.computeAllPanelTimes(true);
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(settled.start_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00Z") * 1000);
+
+      vi.setSystemTime(new Date("2026-10-08T04:00:00Z"));
+      wrapper.vm.computeAllPanelTimes();
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).toBe(settled);
+
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:-1" };
+      wrapper.vm.computeAllPanelTimes();
+      const moved = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(moved).not.toBe(settled);
+      expect(moved.start_time.getTime()).toBe(Date.parse("2026-10-07T00:00:00Z") * 1000);
+      expect(moved.end_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00.000Z") * 1000);
+    });
+
+    describe("timezone change from any picker", () => {
+      const panelWithOwnYesterday = {
+        ...baseDashboard,
+        tabs: [
+          {
+            tabId: "tab-1",
+            name: "Tab 1",
+            panels: [
+              {
+                id: "p1",
+                type: "line",
+                config: {
+                  panel_time_enabled: true,
+                  panel_time_range: { type: "relative", relativeTimePeriod: "calendar:day:-1" },
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const UTC_START = Date.parse("2026-10-07T00:00:00Z") * 1000;
+      const IST_START = Date.parse("2026-10-06T18:30:00Z") * 1000;
+      const yesterdayAt = (startTime: number) => ({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:day:-1",
+        startTime,
+        endTime: startTime + 86_400_000_000,
+      });
+      // What any picker's DateTime.onTimezoneChange does: the store zone changes, then the app reacts.
+      const changeZone = async (zone: string) => {
+        global.mockStoreState.timezone = zone;
+        await flushPromises();
+      };
+      const setAutoRun = (on: boolean) => {
+        global.mockStoreState.zoConfig = {
+          ...global.mockStoreState.zoConfig,
+          auto_query_enabled: on,
+        };
+      };
+
+      const mountWith = async (autoRun: boolean, global0: Record<string, unknown>) => {
+        setAutoRun(autoRun);
+        await mountWithPicker();
+        setPickerTimezoneSource(() => global.mockStoreState.timezone);
+        wrapper.vm.currentDashboardData.data = panelWithOwnYesterday;
+        wrapper.vm.timeGate.onPick(global0);
+        wrapper.vm.selectedDate = global0;
+        await flushPromises();
+        wrapper.vm.computeAllPanelTimes(true);
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+      };
+
+      afterEach(() => {
+        setPickerTimezoneSource(() => localStorage.getItem("timezone"));
+        global.mockStoreState.zoConfig = { min_auto_refresh_interval: 5 };
+        global.mockStoreState.timezone = "UTC";
+      });
+
+      it("moves a panel's own calendar range when the store zone changes, once", async () => {
+        await mountWith(true, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        await changeZone("Asia/Kolkata");
+        const moved = wrapper.vm.currentTimeObjPerPanel.p1;
+        expect(moved.start_time.getTime()).toBe(IST_START);
+
+        await changeZone("Asia/Calcutta");
+        expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(moved);
+      });
+
+      it("re-applies a global calendar range through the time gate", async () => {
+        await mountWith(true, yesterdayAt(UTC_START));
+
+        await changeZone("Asia/Kolkata");
+
+        expect(wrapper.vm.selectedDate.startTime).toBe(IST_START);
+        expect(wrapper.vm.currentTimeObjPerPanel.__global.start_time.getTime()).toBe(IST_START);
+      });
+
+      it("queries a panel once when its own picker raised the zone change", async () => {
+        await mountWith(true, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        global.mockStoreState.timezone = "Asia/Kolkata";
+        await nextTick();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+        // The panel's own gate re-applies it a tick later, as RenderDashboardCharts does.
+        wrapper.vm.refreshPanelRequest("p1");
+        const fromPanelGate = wrapper.vm.currentTimeObjPerPanel.p1;
+        expect(fromPanelGate.start_time.getTime()).toBe(IST_START);
+        await flushPromises();
+
+        expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(fromPanelGate);
+      });
+
+      it("waits for Refresh with Auto Run off and forgets the wait when the zone goes back", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+        expect(wrapper.vm.isRefreshPending).toBe(true);
+
+        await changeZone("UTC");
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+        expect(wrapper.vm.isRefreshPending).toBe(false);
+
+        await changeZone("Asia/Kolkata");
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
+
+      it("applies waiting panel windows when Auto Run is turned on", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.zoneRefreshPending).toBe(true);
+
+        setAutoRun(true);
+        await flushPromises();
+
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
+
+      it("keeps a waiting header pick when the zone changes from another picker", async () => {
+        await mountWith(false, yesterdayAt(UTC_START));
+        const lastWeek = {
+          valueType: "relative",
+          relativeTimePeriod: "7d",
+          startTime: 1,
+          endTime: 2,
+        };
+        wrapper.vm.timeGate.onPick(lastWeek);
+        expect(wrapper.vm.timeGate.isWaiting.value).toBe(true);
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.timeGate.picked.value.relativeTimePeriod).toBe("7d");
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("7d");
+      });
+
+      it("moves a waiting calendar header pick to the new zone", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+        wrapper.vm.timeGate.onPick(yesterdayAt(UTC_START));
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.timeGate.picked.value.startTime).toBe(IST_START);
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.selectedDate).toMatchObject({
+          relativeTimePeriod: "calendar:day:-1",
+          startTime: IST_START,
+        });
+      });
+    });
+
+    it("still refreshes __global on a forced recompute", async () => {
+      await mountWithPicker();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      wrapper.vm.computeAllPanelTimes(true);
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+
+      wrapper.vm.computeAllPanelTimes(true);
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).not.toBe(settled);
+    });
+  });
+
   describe("product analytics", () => {
     const mountWithOverflowActions = () =>
       createWrapper({
@@ -1841,6 +2124,58 @@ describe("ViewDashboard", () => {
 
       expect(analytics.track).not.toHaveBeenCalled();
     });
+  });
+
+  it("names beta in the publish button's label instead of a chip while public links are on", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    const publish = wrapper.find('[data-test="dashboard-publish-public"]');
+    const button = publish.find('[data-test="dashboard-publish-public-btn"]');
+    expect(button.exists()).toBe(true);
+    expect(publish.findComponent({ name: "BetaBadge" }).exists()).toBe(false);
+    // This spec's t() returns the key, so the rendered label is checked against the real message.
+    expect(button.attributes("aria-label")).toBe("dashboard.publicDashboard.shareTooltip");
+    expect(i18n.global.t("dashboard.publicDashboard.shareTooltip")).toBe("Publish publicly (beta)");
+  });
+
+  it("tells the public links drawer the dashboard's folder, so publishing can save it there", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    mockRouteFolder.value = "f9";
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+      mockRouteFolder.value = "default";
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "PublicLinksPanel" }).props("folderId")).toBe("f9");
+  });
+
+  it("hands the live variables manager to the template, so public links seed from it", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    const manager = {
+      committedVariablesData: { global: [], tabs: {}, panels: {} },
+      getUrlParams: () => ({ "var-qns": "ingress-nginx" }),
+    };
+    await wrapper.vm.onVariablesManagerReady(manager);
+
+    expect(wrapper.vm.variablesManager.getUrlParams()).toEqual({ "var-qns": "ingress-nginx" });
   });
 
   describe("layout edit mode", () => {
@@ -1907,6 +2242,7 @@ describe("ViewDashboard", () => {
       mockSyncGrid.mockReset();
       routeLeaveGuards.length = 0;
       routeUpdateGuards.length = 0;
+      afterEachHooks.length = 0;
     });
 
     it("opens in view mode with the layout locked", async () => {
@@ -1919,6 +2255,61 @@ describe("ViewDashboard", () => {
       expect(has("dashboard-panel-add")).toBe(true);
       expect(has("dashboard-edit-save-btn")).toBe(false);
       expect(has("dashboard-edit-badge")).toBe(false);
+    });
+
+    it("marks Add panel with a dot while this dashboard has a new-panel draft", async () => {
+      localStorage.clear();
+      await mountDashboard();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "panel.add",
+      );
+
+      writePanelDraft(
+        { userEmail: "", org: "test-org", dashboardId: "test-dashboard-1" },
+        {
+          tabId: "tab-1",
+          data: {},
+          layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+          sessionVariables: [],
+          variablesWithCurrentPanel: [],
+        },
+      );
+      await flushPromises();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(true);
+      // A button's children are presentational, so the draft state must be in the button's own name.
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "dashboard.panelDraft.addPanelDot",
+      );
+
+      // The dot lives inside the Add panel button, which layout editing removes.
+      wrapper.vm.enterLayoutEdit();
+      await flushPromises();
+      expect(has("dashboard-panel-add")).toBe(false);
+      localStorage.clear();
+    });
+
+    it("marks Settings with a dot while this dashboard has a settings draft", async () => {
+      localStorage.clear();
+      await mountDashboard();
+      const settings = () => wrapper.find('[data-test="dashboard-setting-btn"]');
+      expect(settings().attributes("aria-label")).toBeUndefined();
+
+      const scope = {
+        kind: "dashboard_settings" as const,
+        org: "test-org",
+        userEmail: "",
+      };
+      writeEditorDraft({ ...scope, entityId: "another-dashboard" }, { data: {} });
+      await flushPromises();
+      expect(wrapper.vm.hasSettingsDraft).toBe(false);
+
+      writeEditorDraft({ ...scope, entityId: "test-dashboard-1" }, { data: {} });
+      await flushPromises();
+      expect(wrapper.vm.hasSettingsDraft).toBe(true);
+      // A button's children are presentational, so the draft state must be in the button's own name.
+      expect(settings().attributes("aria-label")).toBe("common.editorDraft.newDotDated");
+      localStorage.clear();
     });
 
     it("swaps the header actions when entering edit mode", async () => {
@@ -2084,6 +2475,64 @@ describe("ViewDashboard", () => {
       const leave = guard() as Promise<boolean>;
       wrapper.vm.settleDiscard(true);
       await expect(leave).resolves.toBe(true);
+      land();
+      expect(panelLayout().x).toBe(0);
+    });
+
+    it("offers no Stay on a forced sign-out, which goes on whatever is answered", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      beginDraftSignOut({ forced: true });
+      onTestFinished(() => cancelDraftSignOut());
+
+      const leave = routeLeaveGuards.at(-1)!() as Promise<boolean>;
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("secondaryButtonLabel")).toBeUndefined();
+      expect(dialog.props("persistent")).toBe(true);
+      expect(dialog.props("showClose")).toBe(false);
+      expect(dialog.props("primaryButtonLabel")).toBe("dashboard.layoutEdit.discardAndSignOut");
+      expect(wrapper.vm.discardForced).toBe(true);
+
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+    });
+
+    it("keeps the layout edits when a later leave guard keeps the user on the page", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const guard = routeLeaveGuards.at(-1)!;
+      const toLogs = { query: {} };
+
+      const leave = guard(toLogs) as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      // The settings drawer's guard answered Stay, so the navigation never landed.
+      land(toLogs, { type: 4 });
+      expect(wrapper.vm.isEditingLayout).toBe(true);
+      expect(panelLayout().x).toBe(30);
+
+      // A later, unrelated navigation must not roll back the edits the user stayed for.
+      land({ query: {} });
+      expect(panelLayout().x).toBe(30);
+    });
+
+    it("rolls the layout back only once a confirmed leave lands", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const toLogs = { query: {} };
+
+      const leave = routeLeaveGuards.at(-1)!(toLogs) as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      expect(panelLayout().x).toBe(30);
+
+      land(toLogs);
+      expect(wrapper.vm.isEditingLayout).toBe(false);
       expect(panelLayout().x).toBe(0);
     });
 
@@ -2106,6 +2555,7 @@ describe("ViewDashboard", () => {
       const leave = guard(toOther, from) as Promise<boolean>;
       wrapper.vm.settleDiscard(true);
       await expect(leave).resolves.toBe(true);
+      land(toOther);
       expect(wrapper.vm.isEditingLayout).toBe(false);
       expect(panelLayout().x).toBe(0);
     });
@@ -2322,6 +2772,384 @@ describe("ViewDashboard", () => {
         expect(mockSaveExecute).toHaveBeenCalledTimes(1);
         expect(wrapper.vm.isEditingLayout).toBe(true);
         expect(panelLayout().x).toBe(20);
+      });
+    });
+  });
+
+  describe("time range carried by a link", () => {
+    // A link with ?refresh= rewrites the URL on mount, before the dashboard (and its picker value) has loaded.
+    it.each(["1w", "15m", "2h", "7d", "1M"])(
+      "keeps period=%s when the link also sets a refresh interval",
+      async (period) => {
+        Object.assign(mockExtraRouteQuery, { period, refresh: "1m" });
+        let resolveDashboard: (value: unknown) => void = () => {};
+        vi.mocked(getDashboard).mockImplementationOnce(
+          () => new Promise((resolve) => (resolveDashboard = resolve)),
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+        expect(rewrites.length).toBeGreaterThan(0);
+        rewrites.forEach((query) => expect(query?.period).toBe(period));
+
+        resolveDashboard({
+          dashboardId: "test-dashboard-1",
+          title: "Test Dashboard",
+          variables: { list: [] },
+          defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "15m" },
+          tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+        });
+        await flushPromises();
+        expect(wrapper.vm.selectedDate).toMatchObject({
+          valueType: "relative",
+          relativeTimePeriod: period,
+        });
+      },
+    );
+
+    it("keeps an absolute from/to when the link also sets a refresh interval", async () => {
+      Object.assign(mockExtraRouteQuery, {
+        from: "1700000000000",
+        to: "1700003600000",
+        refresh: "1m",
+      });
+      vi.mocked(getDashboard).mockImplementationOnce(() => new Promise(() => {}));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+      expect(rewrites.length).toBeGreaterThan(0);
+      rewrites.forEach((query) => {
+        expect(query?.from).toBe("1700000000000");
+        expect(query?.to).toBe("1700003600000");
+      });
+    });
+  });
+
+  describe("Kiosk / TV mode", () => {
+    const mountKiosk = async () => {
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: {
+              name: "OPageLayout",
+              props: ["headerClass"],
+              template:
+                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+            },
+            RenderDashboardCharts: {
+              name: "RenderDashboardCharts",
+              props: ["viewOnly", "kiosk", "fitToScreen", "showTabs", "readOnlySelectors"],
+              setup() {
+                return { applyLive: inject<Ref<boolean> | null>("dashboardAutoRun", null) };
+              },
+              template: '<div :data-apply-live="String(applyLive)" />',
+            },
+          },
+        },
+      });
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      global.mockStoreState.kioskMode = false;
+    });
+
+    it("keeps the normal view unchanged: no strip, header shown, panels editable", async () => {
+      await mountKiosk();
+
+      expect(wrapper.vm.kioskMode).toBe(false);
+      expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(false);
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("viewOnly")).toBe(false);
+      expect(charts.props("kiosk")).toBe(false);
+      expect(charts.props("readOnlySelectors")).toBe(false);
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("shrink-0");
+    });
+
+    it("opens TV mode with a link that keeps the relative range and adds the chosen options", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockRouterPush.mockClear();
+
+      await wrapper.vm.enterKiosk({ refreshSeconds: 300, theme: "dark", fit: true });
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", true);
+      expect(global.mockStoreCommit).toHaveBeenCalledWith("setThemeOverride", "dark");
+      expect(wrapper.vm.refreshInterval).toBe(300);
+      const { query } = global.mockRouterPush.mock.calls.at(-1)[0];
+      expect(query).toMatchObject({
+        dashboard: "test-dashboard-1",
+        tab: "tab-1",
+        kiosk: "true",
+        theme: "dark",
+        fit: "true",
+        refresh: "5m",
+      });
+      expect(query.print).toBeUndefined();
+      expect(query.from).toBeUndefined();
+    });
+
+    it("renders the read-only strip and view-only panels without the toolbar", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+
+      expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("hidden");
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("viewOnly")).toBe(true);
+      expect(charts.props("kiosk")).toBe(true);
+      expect(charts.props("readOnlySelectors")).toBe(false);
+    });
+
+    it("passes the strip its countdown and loading state and exits when it asks to", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+      global.mockRouterReplace.mockClear();
+
+      const strip = wrapper.findComponent({ name: "KioskStrip" });
+      expect(strip.props("loading")).toBe(wrapper.vm.arePanelsLoading);
+      expect(strip.props()).toHaveProperty("countdown");
+      expect(strip.props()).not.toHaveProperty("exitVisible");
+      strip.vm.$emit("exit");
+      await flushPromises();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+      expect(global.mockRouterReplace.mock.calls.at(-1)[0].query.kiosk).toBeUndefined();
+    });
+
+    it("keeps the tab bar on and applies variable changes live, since a wall has no Refresh button", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("showTabs")).toBe(true);
+      expect(charts.attributes("data-apply-live")).toBe("true");
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+    });
+
+    it("lets Esc close an open variable dropdown without leaving TV mode", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const listbox = document.createElement("div");
+      listbox.setAttribute("role", "listbox");
+      document.body.appendChild(listbox);
+      // The dropdown closes itself on the same keypress, before the shortcut runs.
+      const closeFirst = () => listbox.remove();
+      document.addEventListener("keydown", closeFirst, { once: true });
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+
+      expect(listbox.isConnected).toBe(false);
+      expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("exits on the next Esc while a closed dropdown's trigger still has focus", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const trigger = document.createElement("button");
+      trigger.setAttribute("role", "combobox");
+      document.body.appendChild(trigger);
+      trigger.focus();
+      trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+      trigger.remove();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("keeps TV mode on Esc while typing in a text field", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      input.focus();
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+      input.remove();
+
+      expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("restores the normal view's refresh on exit when TV mode was opened from the toolbar", async () => {
+      // The mock store is not reactive, so kiosk state is set up front.
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.refreshInterval = 300;
+      await flushPromises();
+      await wrapper.vm.enterKiosk({ refreshSeconds: 30, theme: "current", fit: false });
+      expect(wrapper.vm.refreshInterval).toBe(30);
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      await wrapper.vm.exitKiosk();
+      await flushPromises();
+
+      expect(wrapper.vm.refreshInterval).toBe(300);
+      const { query } = global.mockRouterReplace.mock.calls[0][0];
+      expect(query.kiosk).toBeUndefined();
+      expect(query.refresh).toBe("5m");
+    });
+
+    it("keeps the TV link's refresh on exit when the link was opened directly", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.refreshInterval = 30;
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      await wrapper.vm.exitKiosk();
+      await flushPromises();
+
+      expect(wrapper.vm.refreshInterval).toBe(30);
+    });
+
+    it("exits on Esc back to the normal view with kiosk params removed", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await flushPromises();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+      const { query } = global.mockRouterReplace.mock.calls.at(-1)[0];
+      expect(query.kiosk).toBeUndefined();
+      expect(query.theme).toBeUndefined();
+    });
+
+    it("never shows an invalid range in the strip before the picker resolves", async () => {
+      await mountKiosk();
+      wrapper.vm.selectedDate = { valueType: "absolute", startTime: null, endTime: null };
+      // The selectedDate watcher fills the range from the mocked picker, so the unresolved state is set after it.
+      await flushPromises();
+      wrapper.vm.currentTimeObj = {};
+      wrapper.vm.timeString = " Invalid date - Invalid date ";
+      expect(wrapper.vm.kioskTimeRange).toBe("");
+    });
+
+    it("leaves kiosk when the page is left", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      routeLeaveGuards.at(-1)?.();
+      land();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    describe("TV playlist slide", () => {
+      const realParent = window.parent;
+      const postMessage = vi.fn();
+
+      beforeEach(() => {
+        postMessage.mockClear();
+        global.mockShowErrorNotification.mockClear();
+        global.mockRouterPush.mockClear();
+        global.mockRouterBack.mockClear();
+        global.mockStoreState.kioskMode = true;
+      });
+
+      afterEach(() => {
+        Object.defineProperty(window, "parent", { value: realParent, configurable: true });
+      });
+
+      const insideFrame = () =>
+        Object.defineProperty(window, "parent", { value: { postMessage }, configurable: true });
+
+      it("inside the player frame hides the strip and reports a deleted dashboard instead of leaving for the list", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 404 }, message: "x" });
+        await mountKiosk();
+
+        expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(false);
+        expect(postMessage).toHaveBeenCalledWith(
+          { source: "o2-tv-playlist", type: "missing", reason: "notFound" },
+          window.location.origin,
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalled();
+        expect(global.mockRouterPush).not.toHaveBeenCalled();
+        expect(global.mockRouterBack).not.toHaveBeenCalled();
+      });
+
+      it("inside the player frame shows the tabs and pickers read-only", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        await mountKiosk();
+
+        const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+        expect(charts.props("readOnlySelectors")).toBe(true);
+        expect(charts.props("kiosk")).toBe(true);
+      });
+
+      it("reports a server error as a load failure so the player retries it", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 502 }, message: "x" });
+        await mountKiosk();
+
+        expect(postMessage).toHaveBeenCalledWith(
+          { source: "o2-tv-playlist", type: "error" },
+          window.location.origin,
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalled();
+      });
+
+      it("a normal kiosk link still shows the error and goes back to the list", async () => {
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({
+          response: { status: 404 },
+          message: "gone",
+        });
+        await mountKiosk();
+
+        expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(true);
+        expect(global.mockShowErrorNotification).toHaveBeenCalled();
+      });
+
+      it("the page fallback keeps the playlist in the URL rewrite and shows the slide position", async () => {
+        Object.assign(mockExtraRouteQuery, {
+          kiosk: "true",
+          refresh: "5m",
+          playlist: "test-dashboard-1:default,d2:ops",
+          interval: "1m",
+          slide: "1",
+          tvpage: "1",
+        });
+        await mountKiosk();
+
+        const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+        expect(rewrites.length).toBeGreaterThan(0);
+        rewrites.forEach((query) =>
+          expect(query).toMatchObject({
+            playlist: "test-dashboard-1:default,d2:ops",
+            interval: "1m",
+            slide: "1",
+            tvpage: "1",
+          }),
+        );
+        expect(wrapper.findComponent({ name: "KioskStrip" }).props("position")).toBe(
+          "dashboard.playlist.position",
+        );
+        expect(
+          wrapper.findComponent({ name: "RenderDashboardCharts" }).props("readOnlySelectors"),
+        ).toBe(true);
       });
     });
   });

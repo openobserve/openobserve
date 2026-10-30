@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, vi, afterAll, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 
@@ -53,6 +53,7 @@ import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccount
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import service_accounts from "@/services/service_accounts";
+import config from "@/aws-exports";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -865,6 +866,18 @@ describe("ServiceAccountsList Component", () => {
       expect(openDialogs.length).toBeGreaterThan(0);
     });
 
+    it("names the account and uses a destructive OK button", async () => {
+      wrapper.vm.confirmDeleteAction({ email: "service1@example.com", is_system: false });
+      await nextTick();
+      const deleteDialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d) => d.props("modelValue") === true);
+      expect(deleteDialog.props("messageKeypath")).toBe("serviceAccounts.confirmDeleteMsg");
+      expect(deleteDialog.props("messageName")).toBe(wrapper.vm.deleteUserEmailIdentifier);
+      expect(deleteDialog.props("messageName")).toBeTruthy();
+      expect(deleteDialog.props("okVariant")).toBe("destructive");
+    });
+
     it("closes confirm delete dialog when ConfirmDialog emits update:cancel", async () => {
       wrapper.vm.confirmDelete = true;
       wrapper.vm.deleteUserEmailIdentifier = "service1@example.com";
@@ -929,6 +942,10 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.openBulkDeleteDialog();
       await nextTick();
       expect(wrapper.vm.confirmBulkDelete).toBe(true);
+      const bulkDialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d) => d.vm.$attrs["data-test"] === "service-accounts-list-bulk-delete-dialog");
+      expect(bulkDialog.props("okVariant")).toBe("destructive");
     });
 
     it("closes bulk delete dialog when ConfirmDialog emits update:cancel", async () => {
@@ -1150,6 +1167,21 @@ describe("ServiceAccountsList Component", () => {
       expect(curl).not.toContain("_search");
     });
 
+    it.each([
+      ["http://localhost:5080", "http://localhost:5080"],
+      ["/", window.location.origin],
+      ["https://o2.example.com/base", "https://o2.example.com/base"],
+    ])("cURL snippet targets the API endpoint the UI calls (%s)", (apiEndpoint, expectedHost) => {
+      const original = store.state.API_ENDPOINT;
+      store.state.API_ENDPOINT = apiEndpoint;
+      try {
+        wrapper.vm.revealToken("the-token", "svc@example.com");
+        expect(wrapper.vm.tokenCurlSnippet).toContain(`"${expectedHost}/api/test-org/streams"`);
+      } finally {
+        store.state.API_ENDPOINT = original;
+      }
+    });
+
     it("Header snippet is Authorization: Basic base64(identifier:token)", () => {
       wrapper.vm.revealToken("the-token", "svc@example.com");
       const header = wrapper.vm.tokenHeaderSnippet;
@@ -1221,6 +1253,24 @@ describe("ServiceAccountsList Component", () => {
         // copyable defaults to true — the box owns its own copy button.
         expect(codeBlock.props("copyable")).not.toBe(false);
       }
+    });
+  });
+
+  // Regional Cloud orgs (e.g. us2) reject service-account Basic auth on the
+  // primary region's API host, so the snippet must use the region's own host.
+  describe("Token dialog — cURL host on Cloud", () => {
+    beforeAll(() => {
+      config.isCloud = "true";
+    });
+    afterAll(() => {
+      config.isCloud = false;
+    });
+
+    it("targets the API endpoint the UI calls, not a fixed global API host", () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const curl = wrapper.vm.tokenCurlSnippet;
+      expect(curl).toContain(`"${store.state.API_ENDPOINT}/api/test-org/streams"`);
+      expect(curl).not.toContain("api.openobserve.ai");
     });
   });
 

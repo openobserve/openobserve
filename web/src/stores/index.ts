@@ -23,7 +23,10 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
+import { clearPanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
+import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
+import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -90,7 +93,7 @@ const organizationObj = {
   }>,
 };
 
-export default createStore({
+const store = createStore({
   state: {
     API_ENDPOINT: API_ENDPOINT,
     userInfo: {},
@@ -103,6 +106,9 @@ export default createStore({
     searchCollapsibleSection: 20,
     theme: localStorage.getItem("theme") === "dark" ? "dark" : "light",
     printMode: false,
+    kioskMode: false,
+    // A per-screen theme forced by a kiosk URL; never persisted as the user's preference.
+    themeOverride: null,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: <{ [key: string]: any }>{},
     timezone: useLocalTimezone()
@@ -297,6 +303,12 @@ export default createStore({
     setPrintMode(state, payload) {
       state.printMode = payload;
     },
+    setKioskMode(state, payload) {
+      state.kioskMode = payload;
+    },
+    setThemeOverride(state, payload) {
+      state.themeOverride = payload;
+    },
     setTimezone(state, payload) {
       state.timezone = payload;
     },
@@ -437,13 +449,20 @@ export default createStore({
   },
   actions: {
     login(context, payload) {
+      const current = context.state.userInfo as { email?: string } | null;
+      const sameSession = context.state.loggedIn && current?.email === payload?.userInfo?.email;
       context.commit("login", payload);
+      // A token refresh re-dispatches login, and a sign-out here always reloads, so a login after one in this tab is a refresh too.
+      const refresh = sameSession || editorDraftSessionEnded.value;
+      if (payload?.loginState && !refresh) resumeEditorDraftSession(payload.userInfo?.email);
     },
-    logout(context) {
+    logout(context, payload?: { draftsOf?: string }) {
       context.commit("logout");
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
+      // Only an explicit sign-out names a user to clear; an expired session keeps every draft for the next login.
+      if (payload?.draftsOf !== undefined) clearPanelDraftsFor(payload.draftsOf);
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);
@@ -544,6 +563,9 @@ export default createStore({
     setPrintMode(context, payload) {
       context.commit("setPrintMode", payload);
     },
+    setKioskMode(context, payload) {
+      context.commit("setKioskMode", payload);
+    },
     setTimezone(context, payload) {
       context.commit("setTimezone", payload);
     },
@@ -602,3 +624,8 @@ export default createStore({
     incidents,
   },
 });
+
+// Zone-less calendar resolves (query builders, guards) must use the zone the picker shows.
+setPickerTimezoneSource(() => store.state.timezone);
+
+export default store;

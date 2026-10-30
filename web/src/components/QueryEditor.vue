@@ -119,7 +119,7 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="onAiToggleClick"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img
@@ -164,6 +164,11 @@ import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDi
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
+
+interface QueryChangeOrigin {
+  /** false when the editor was written to (setValue), rather than typed in. */
+  fromUser: boolean;
+}
 
 interface Props {
   // Language configuration
@@ -220,7 +225,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "update:query": [query: string];
+  "update:query": [query: string, origin?: QueryChangeOrigin];
   "user-edit": [];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
@@ -328,8 +333,8 @@ const rootStyle = computed(() => {
 });
 
 // Handle query update from editor
-const handleQueryUpdate = (newQuery: string) => {
-  emit("update:query", newQuery);
+const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryChangeOrigin) => {
+  emit("update:query", newQuery, origin);
 };
 
 const handleEditorFocus = () => {

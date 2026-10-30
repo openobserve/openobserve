@@ -21,11 +21,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
         :wrap-cells="panelConfig.wrap_table_cells"
+        :density="panelConfig.table_density"
         :value-mapping="panelConfig.mappings ?? []"
         :show-pagination="panelConfig.table_pagination && !store.state.printMode"
         :rows-per-page="panelConfig.table_pagination_rows_per_page"
         :enable-filtering="enableFiltering"
-        @row-click="$emit('row-click', $event)"
+        :expandable-rows="!!panelConfig.table_expandable_rows"
+        :row-key-fields="rowKeyFields"
+        @row-click="
+          (evt: MouseEvent | null, row: Record<string, unknown>, index: number) =>
+            $emit('row-click', evt, row, index)
+        "
       >
         <!-- kube-state omits the metric family entirely when nothing is in that
              state, so an empty triage table means nothing is wrong rather than
@@ -39,6 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check" size="sm" />
             <span>{{ t("infra.curated.tileAllClear") }}</span>
           </div>
+        </template>
+        <template v-else-if="emptyText" #empty>
+          <OEmptyState
+            size="inline"
+            icon="bar-chart"
+            :title="emptyText"
+            :backdrop="false"
+            data-test="no-data"
+          />
         </template>
 
         <!-- Override bottom slot to add legend filter alongside native pagination -->
@@ -60,13 +75,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="panelConfig.table_pagination && !store.state.printMode"
-              :pagination="scope.pagination"
-              :pagination-options="scope.paginationOptions"
+              :pagination="{ page: scope.currentPage, rowsPerPage: scope.pageSize }"
               :total-rows="scope.totalRows"
-              :pages-number="scope.pagesNumber"
+              :pages-number="scope.totalPages"
               :is-first-page="scope.isFirstPage"
               :is-last-page="scope.isLastPage"
-              @update:rows-per-page="scope.setRowsPerPage"
+              @update:rows-per-page="scope.setPageSize"
               @first-page="scope.firstPage"
               @prev-page="scope.prevPage"
               @next-page="scope.nextPage"
@@ -87,13 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, watch, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { I18nText } from "@/types/i18n";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -110,8 +126,13 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Replaces the "No Data" title when the table has no rows. */
+    emptyText: {
+      type: String as unknown as PropType<I18nText | null>,
+      default: null,
+    },
   },
-  components: { TableRenderer, TablePaginationControls, OSelect, OIcon },
+  components: { TableRenderer, TablePaginationControls, OSelect, OIcon, OEmptyState },
   setup(props) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -140,6 +161,14 @@ export default defineComponent({
       }));
       return rows;
     });
+
+    // A row is its series plus, in the time-series modes, its timestamp; the values change on every refresh.
+    const rowKeyFields = computed(() => [
+      ...(tableColumns.value as { field?: string; name?: string }[])
+        .map((col) => col.field ?? col.name ?? "")
+        .filter((field) => field && field !== "value" && !field.startsWith("value_")),
+      "__legend__",
+    ]);
 
     // Legend filtering logic
     const selectedLegend = ref<string>("");
@@ -204,10 +233,6 @@ export default defineComponent({
       return filtered;
     });
 
-    // Note: paginationOptions is now provided by TableRenderer's slot
-    // and accessible via scope.paginationOptions in the template
-    // This avoids code duplication
-
     const pagination = ref({
       rowsPerPage: 0, // 0 = show all rows (like SQL table)
     });
@@ -257,6 +282,7 @@ export default defineComponent({
       loading,
       innerTableRef,
       tableColumns,
+      rowKeyFields,
       tableRows,
       filteredTableRows,
       pagination,

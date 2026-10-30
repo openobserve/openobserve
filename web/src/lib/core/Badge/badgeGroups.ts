@@ -161,12 +161,38 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Public dashboard link state, derived server-side; only live is green so exceptions stand out.
+  publicLinkStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      live: { variant: "success-soft", labelKey: "components.badge.publicLinkStatus.live" },
+      paused: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.paused" },
+      notviewed: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkStatus.notViewed",
+      },
+      needsattention: {
+        variant: "warning-soft",
+        labelKey: "components.badge.publicLinkStatus.needsAttention",
+      },
+      expired: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.expired" },
+      dashboarddeleted: {
+        variant: "error-soft",
+        labelKey: "components.badge.publicLinkStatus.dashboardDeleted",
+      },
+      // The organization has public links turned off.
+      disabled: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.disabled" },
+    },
+  },
+
   // One chip per downtime target, plus the shared condition. The caller always supplies the label.
   downtimeTarget: {
     mode: "icon",
     shape: "pill",
     values: {
       condition: { variant: "primary-soft", icon: "tune" },
+      group: { variant: "primary-soft", icon: "bar-chart" },
       alerts: { variant: "default-soft", icon: "shield-alert-outline" },
       anomalydetections: { variant: "default-soft", icon: "query-stats" },
       synthetics: { variant: "default-soft", icon: "radar" },
@@ -244,6 +270,7 @@ export const BADGE_GROUPS = {
       triaged: { variant: "amber-soft", labelKey: "oncall.state_triaged" },
       acknowledged: { variant: "blue-soft", labelKey: "oncall.state_acknowledged" },
       resolved: { variant: "success-soft", labelKey: "oncall.state_resolved" },
+      exhausted: { variant: "error-soft", labelKey: "oncall.state_exhausted" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -459,7 +486,11 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       // Current RunOutcome vocabulary.
-      firing: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.firing" },
+      // Derived-stream runs record a successful run as `firing`.
+      firing: {
+        variant: "success-soft",
+        labelKey: "components.badge.pipelineRunOutcome.succeeded",
+      },
       normal: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.normal" },
       succeeded: {
         variant: "success-soft",
@@ -1582,6 +1613,19 @@ export const BADGE_GROUPS = {
         icon: "schedule",
         labelKey: "components.badge.alertState.pending",
       },
+
+      // ── acknowledged: someone owns a firing; blue keeps it apart from firing red and muted amber ──
+      acknowledged: {
+        variant: "blue-soft",
+        icon: "person",
+        labelKey: "components.badge.alertState.acknowledged",
+      },
+      // An ack, unack or take-over recorded as its own history row, not a run.
+      ackevent: {
+        variant: "default-soft",
+        icon: "person",
+        labelKey: "components.badge.alertState.ackevent",
+      },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },
   },
@@ -1792,14 +1836,11 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     class: "!bg-transparent !p-0 !ring-0",
+    // Keys are the Quality API `status` values (`no_data` normalises to `nodata`).
     values: {
+      attention: { variant: "error-soft", labelKey: "components.badge.qualityStatus.attention" },
       healthy: { variant: "success-soft", labelKey: "components.badge.qualityStatus.healthy" },
-      warn: { variant: "warning-soft", labelKey: "components.badge.qualityStatus.warn" },
-      unhealthy: { variant: "error-soft", labelKey: "components.badge.qualityStatus.unhealthy" },
-      nothreshold: {
-        variant: "default-soft",
-        labelKey: "components.badge.qualityStatus.nothreshold",
-      },
+      unset: { variant: "default-soft", labelKey: "components.badge.qualityStatus.unset" },
       nodata: { variant: "default-soft", labelKey: "components.badge.qualityStatus.nodata" },
     },
     fallback: { variant: "default-soft" },

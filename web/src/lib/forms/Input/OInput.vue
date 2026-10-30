@@ -18,9 +18,16 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Without a label the icon is aria-hidden and unreachable by assistive tech; the tooltip's own content never gets a name otherwise.
+const tooltipIconLabel = computed(() =>
+  props.label
+    ? t("components.input.moreInfoAbout", { field: props.label })
+    : t("components.input.moreInfo"),
+);
+
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const split = computed(() => splitControlAttrs($attrs));
+const split = computed(() => splitControlAttrs($attrs, { forwardRole: true }));
 const wrapperAttrs = computed(() => split.value.wrapperAttrs);
 const controlAttrs = computed(() => split.value.controlAttrs);
 onMounted(() =>
@@ -294,6 +301,7 @@ const wrapperClasses = computed(() => [
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
+        :label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
         ><slot name="tooltip"
@@ -483,12 +491,12 @@ const wrapperClasses = computed(() => [
         :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
-        class="text-input-error-text text-xs leading-none"
+        class="text-input-error-text text-xs leading-snug"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-input-hint text-xs leading-none">
+      <span v-else-if="helpText" class="text-input-hint text-xs leading-snug">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />

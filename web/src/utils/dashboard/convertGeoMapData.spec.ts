@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { convertGeoMapData } from "./convertGeoMapData";
+import { getUnitValue } from "./convertDataIntoUnitValue";
 
 // Mock the convertDataIntoUnitValue functions
 vi.mock("./convertDataIntoUnitValue", () => ({
@@ -669,6 +670,7 @@ describe("convertGeoMapData", () => {
       expect(result.options).toBeDefined();
       expect(result.options.tooltip).toBeDefined();
       expect(typeof result.options.tooltip.formatter).toBe("function");
+      expect(result.options.tooltip.enterable).toBe(true);
 
       // Test the formatter function
       const mockParams = {
@@ -676,7 +678,9 @@ describe("convertGeoMapData", () => {
         seriesName: "Layer 1",
       };
       const formattedResult = result.options.tooltip.formatter(mockParams);
-      expect(formattedResult).toBe("Layer 1: 100.00 KB");
+      expect(formattedResult).toBe(
+        "<b>Layer 1</b><br/>Latitude: 40.7128<br/>Longitude: -74.006<br/>Weight: 100.00 KB",
+      );
     });
   });
 
@@ -715,10 +719,9 @@ describe("convertGeoMapData", () => {
         ],
       ];
 
-      // This should throw an error because weight.alias is undefined
-      expect(() => convertGeoMapData(panelSchema, mapData)).toThrow(
-        "Cannot read properties of undefined (reading 'alias')",
-      );
+      const result: any = convertGeoMapData(panelSchema, mapData);
+
+      expect(result.options.series[0].data).toEqual([[-74.006, 40.7128, 15]]);
     });
 
     it("should handle missing weight field in auto query", () => {
@@ -1056,6 +1059,131 @@ describe("convertGeoMapData", () => {
 
       const result = convertGeoMapData(panelSchema, mapData);
       expect(result).toBeDefined();
+    });
+  });
+  describe("Saved panels with odd data", () => {
+    const schema = (config: any) => ({
+      queries: [
+        {
+          customQuery: true,
+          fields: {
+            latitude: { alias: "lat" },
+            longitude: { alias: "lng" },
+            weight: { alias: "w" },
+          },
+          config: { layer_type: "scatter", weight_fixed: 1 },
+        },
+      ],
+      config,
+    });
+
+    it("opens on the default view when the panel saved map_view as null", () => {
+      const result: any = convertGeoMapData(schema({ map_view: null }), [
+        [{ lat: 10, lng: 20, w: 1 }],
+      ]);
+      expect(result.options.lmap.center).toEqual([0, 0]);
+      expect(result.options.lmap.zoom).toBe(1);
+      const zero: any = convertGeoMapData(schema({ map_view: { lat: 5, lng: 6, zoom: 0 } }), [
+        [{ lat: 10, lng: 20, w: 1 }],
+      ]);
+      expect(zero.options.lmap).toMatchObject({ center: [6, 5], zoom: 0 });
+    });
+
+    it("drops points off the globe instead of failing the panel", () => {
+      const result: any = convertGeoMapData(schema({ map_view: null }), [
+        [
+          { lat: 51.5, lng: -0.1, w: 3 },
+          { lat: 120, lng: 30, w: 4 },
+          { lat: 10, lng: -500, w: 5 },
+        ],
+      ]);
+      expect(result.options.series[0].data).toEqual([[-0.1, 51.5, 3]]);
+    });
+  });
+  describe("Detail tooltip and equal weights", () => {
+    const customSchema = (fields: any) => ({
+      queries: [
+        {
+          fields,
+          config: { layer_type: "scatter", weight_fixed: 1 },
+          customQuery: true,
+        },
+      ],
+      config: { map_view: { lat: 0, lng: 0, zoom: 2 } },
+    });
+
+    it("gives equal weights a finite mid-range symbol size", () => {
+      const panelSchema = customSchema({
+        latitude: { alias: "lat" },
+        longitude: { alias: "lng" },
+        weight: null,
+      });
+      const mapData = [
+        [
+          { lat: 1, lng: 2 },
+          { lat: 3, lng: 4 },
+        ],
+      ];
+
+      const result: any = convertGeoMapData(panelSchema, mapData);
+      const size = result.options.series[0].symbolSize([2, 1, 1]);
+
+      expect(size).toBe(50.5);
+    });
+
+    it("falls back to weight 1 when neither a weight field nor weight_fixed is set", () => {
+      const panelSchema: any = customSchema({
+        latitude: { alias: "lat" },
+        longitude: { alias: "lng" },
+        weight: null,
+      });
+      panelSchema.queries[0].config = { layer_type: "scatter" };
+
+      const result: any = convertGeoMapData(panelSchema, [[{ lat: 1, lng: 2 }]]);
+
+      expect(result.options.series[0].data).toEqual([[2, 1, 1]]);
+    });
+
+    it("keeps the other custom SQL columns for the tooltip", () => {
+      const panelSchema = customSchema({
+        latitude: { alias: "lat" },
+        longitude: { alias: "lng" },
+        weight: { alias: "hits" },
+      });
+      const mapData = [[{ lat: 1, lng: 2, hits: 5, city: "<b>Paris</b>" }]];
+
+      const result: any = convertGeoMapData(panelSchema, mapData);
+      const point = result.options.series[0].data[0];
+
+      expect(point).toEqual({ value: [2, 1, 5], fields: { city: "<b>Paris</b>" } });
+      expect(result.options.visualMap.min).toBe(5);
+      expect(result.options.visualMap.max).toBe(5);
+
+      const html = result.options.tooltip.formatter({
+        seriesName: "Layer 1",
+        value: point.value,
+        data: point,
+      });
+      expect(html).toContain("Latitude: 1");
+      expect(html).toContain("Longitude: 2");
+      expect(html).toContain("city: &lt;b&gt;Paris&lt;/b&gt;");
+      expect(html).not.toContain("<b>Paris</b>");
+    });
+
+    it("formats the visual map labels with the panel unit", () => {
+      const panelSchema = customSchema({
+        latitude: { alias: "lat" },
+        longitude: { alias: "lng" },
+        weight: { alias: "hits" },
+      });
+
+      const result: any = convertGeoMapData(
+        { ...panelSchema, config: { ...panelSchema.config, unit: "bytes", decimals: 1 } },
+        [[{ lat: 1, lng: 2, hits: 5 }]],
+      );
+
+      expect(result.options.visualMap.formatter(1024)).toBe("100.00 KB");
+      expect(getUnitValue).toHaveBeenLastCalledWith(1024, "bytes", undefined, 1);
     });
   });
 });

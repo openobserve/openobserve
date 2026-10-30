@@ -5279,12 +5279,34 @@ mod tests {
     }
 
     async fn e2e_get_organizations() {
+        use base64::Engine;
+
         let auth = setup();
         let app = init_test_router();
-        let headers = auth_headers(auth);
-        let (status, _body) =
-            make_request(&app, Method::GET, "/api/organizations", Some(headers), None).await;
-        assert!(status.is_success());
+        // The non-root path lists orgs through memberships, whose own created_at must not leak.
+        let member_auth = format!(
+            "Basic {}",
+            base64::engine::general_purpose::STANDARD
+                .encode("nonadmin@example.com:Newpass12!Abcde")
+        );
+        for headers in [
+            auth_headers(auth),
+            auth_headers((auth.0, member_auth.as_str())),
+        ] {
+            let (status, body) =
+                make_request(&app, Method::GET, "/api/organizations", Some(headers), None).await;
+            assert!(status.is_success());
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let orgs = json["data"].as_array().unwrap();
+            assert!(!orgs.is_empty());
+            for org in orgs {
+                let stored = infra::table::organizations::get(org["identifier"].as_str().unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(org["created_at"].as_i64(), Some(stored.created_at), "{org}");
+                assert!(stored.created_at > 0);
+            }
+        }
     }
 
     async fn e2e_get_user_passcode() {
@@ -6630,7 +6652,7 @@ mod tests {
         alert.is_real_time = false;
         alert.enabled = true;
         alert.query_condition = QueryCondition {
-            query_type: "sql".into(),
+            query_type: config::meta::alerts::QueryType::SQL,
             conditions: None,
             sql: Some("SELEC country FROM \"olympics_schema\"".to_string()),
             ..Default::default()
@@ -6776,9 +6798,19 @@ mod tests {
     async fn e2e_config() {
         let auth = setup();
         let app = init_test_router();
-        let headers = auth_headers(auth);
-        let (status, _body) = make_request(&app, Method::GET, "/config", Some(headers), None).await;
+        let (status, body) = make_request(&app, Method::GET, "/config", None, None).await;
         assert!(status.is_success());
+        let bootstrap: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(bootstrap.get("rum").is_none(), "{bootstrap}");
+        assert!(bootstrap.get("commit_hash").is_some(), "{bootstrap}");
+
+        let headers = auth_headers(auth);
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/config", Some(headers), None).await;
+        assert!(status.is_success());
+        let full: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(full["rum"]["version"], config::VERSION, "{full}");
+        assert!(full["rum"].get("client_token").is_some(), "{full}");
     }
 
     // Helper function to create pipeline via API

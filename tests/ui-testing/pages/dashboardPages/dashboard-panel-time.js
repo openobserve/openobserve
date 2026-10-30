@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { applyPickedDateTime } from "./dashboard-time.js";
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 /**
  * Page Object for Panel Time Range operations
@@ -98,11 +99,6 @@ export default class DashboardPanelTime {
   /** Apply the range picked in the open date-time picker (Apply, or close + Refresh on dashboards) */
   async clickDateTimeApplyBtn() {
     await applyPickedDateTime(this.page);
-  }
-
-  /** Click the panel discard button (swallows errors; does not accept the dialog) */
-  async clickPanelDiscard() {
-    await this.panelDiscardBtn.click().catch(() => {});
   }
 
   // =========================================
@@ -371,6 +367,21 @@ export default class DashboardPanelTime {
     // fires the pointer event as soon as the locator resolves without waiting for
     // the wrapper to clear — the button itself IS the intended target.
     await timeOptionLocator.click({ force: true, timeout: 15000 });
+
+    if (!clickApply) {
+      // A deferred pick leaves no URL change to detect a swallowed force click; the preset's selected class is the only proof it landed.
+      await expect(async () => {
+        // A force click on the popper wrapper dismisses the popover, so reopen it before re-picking.
+        if (!(await this.dateTimeMenu.isVisible())) {
+          await this.clickPanelTimePicker(panelId);
+          await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
+        }
+        if (!/bg-button-primary!/.test((await timeOptionLocator.getAttribute("class")) ?? "")) {
+          await timeOptionLocator.click({ force: true, timeout: 5000 });
+        }
+        await expect(timeOptionLocator).toHaveClass(/bg-button-primary!/, { timeout: 2000 });
+      }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
+    }
 
     if (clickApply) {
       // With Auto Run on the pick already started a panel reload; let it settle first.
@@ -649,13 +660,11 @@ export default class DashboardPanelTime {
   }
 
   /**
-   * Discard panel changes (click discard button and accept confirmation dialog)
+   * Discard panel changes, answering the in-app leave dialog with Discard when edits are pending
    */
   async discardPanelChanges() {
-    this.page.once("dialog", async (dialog) => {
-      await dialog.accept();
-    });
     await this.panelDiscardBtn.click().catch(() => {});
+    await settlePanelLeave(this.page, { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
   }
 

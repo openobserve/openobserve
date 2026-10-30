@@ -52,6 +52,7 @@ vi.mock("./calculateGridForSubPlot", () => ({
 }));
 
 vi.mock("./colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   ColorModeWithoutMinMax: { palette: "palette" },
   getMetricMinMaxValue: vi.fn(() => [0, 100]),
   getSeriesColor: vi.fn(() => "#FF0000"),
@@ -1629,6 +1630,84 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.options.yAxis.max).toBe(100); // Max of (100, dataMax) = 100
     });
 
+    describe("stacked value-axis bounds", () => {
+      const series = (job: string, ...values: string[]) => ({
+        metric: { job },
+        values: values.map((value, i) => [1640435200 + i * 3600, value]),
+      });
+      const run = (type: string, config: object, ...queries: object[][]) =>
+        convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config,
+            queries: queries.map(() => ({ config: { promql_legend: "" } })),
+          },
+          queries.map((result) => ({ resultType: "matrix", result })),
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+      it.each([
+        ["stacked", "yAxis"],
+        ["area-stacked", "yAxis"],
+        ["h-stacked", "xAxis"],
+      ])("widens a %s y_axis_max that would clip the stack total", async (type, axis) => {
+        const result = await run(type, { y_axis_max: 10 }, [
+          series("a", "70", "70"),
+          series("b", "70", "70"),
+        ]);
+        expect(result.options[axis].max).toBe(140);
+      });
+
+      it("area-stacked: a y_axis_min above the deepest negative stack drops to its sum", async () => {
+        const result = await run("area-stacked", { y_axis_min: -10 }, [
+          series("a", "-70", "-20"),
+          series("b", "-30", "-20"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-100);
+      });
+
+      it("drops a positive y_axis_min to 0 instead of the smallest segment", async () => {
+        const result = await run("stacked", { y_axis_min: 50 }, [
+          series("a", "100"),
+          series("b", "5"),
+        ]);
+        expect(result.options.yAxis.min).toBe(0);
+      });
+
+      it("keeps a y_axis_min that already sits below the stacks", async () => {
+        const result = await run("stacked", { y_axis_min: -20 }, [
+          series("a", "100"),
+          series("b", "5"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-20);
+      });
+
+      it("fits mixed signs: positives and negatives stack apart", async () => {
+        const result = await run("stacked", { y_axis_min: -1, y_axis_max: 1 }, [
+          series("a", "100"),
+          series("b", "-40"),
+          series("c", "60"),
+          series("d", "-30"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-70);
+        expect(result.options.yAxis.max).toBe(160);
+      });
+
+      it("stacks every query of the panel into one total", async () => {
+        const result = await run(
+          "stacked",
+          { y_axis_max: 10 },
+          [series("a", "70")],
+          [series("b", "200")],
+        );
+        expect(result.options.yAxis.max).toBe(270);
+      });
+    });
+
     it("should use getFinalAxisValue with null config values", async () => {
       const panelSchema = {
         id: "panel1",
@@ -1867,6 +1946,82 @@ describe("Convert PromQL Data Utils", () => {
       expect(scatterSeries.type).toBe("scatter");
       expect(scatterSeries.emphasis.focus).toBe("series");
       expect(scatterSeries.symbolSize).toBe(5);
+    });
+
+    it("applies scatter point size and opacity to an instant (vector) result", async () => {
+      const result = await convertPromQLData(
+        {
+          id: "panel1",
+          type: "scatter",
+          config: { symbol_size: 10, symbol_opacity: 40 },
+          queries: [{ config: { promql_legend: "" } }],
+        },
+        [
+          {
+            resultType: "vector",
+            result: [{ metric: { __name__: "test" }, value: [1640435200, "10"] }],
+          },
+        ],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+      expect(series.symbolSize).toBe(10);
+      expect(series.itemStyle.opacity).toBe(0.4);
+    });
+
+    it.each([
+      ["line", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["area", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["area-stacked", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["line", { resultType: "vector", value: [1640435200, "10"] }],
+    ])(
+      "applies the panel line_thickness to %s series (%o)",
+      async (type, { resultType, ...sample }) => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config: { line_thickness: 4 },
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [{ resultType, result: [{ metric: { __name__: "test" }, ...sample }] }],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+        expect(series.lineStyle.width).toBe(4);
+      },
+    );
+
+    it("draws a saved line_thickness of 0 at the default width instead of hiding the line", async () => {
+      const result = await convertPromQLData(
+        {
+          id: "panel1",
+          type: "line",
+          config: { line_thickness: 0 },
+          queries: [{ config: { promql_legend: "" } }],
+        },
+        [
+          {
+            resultType: "matrix",
+            result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+          },
+        ],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+      expect(series.lineStyle.width).toBe(1.5);
     });
 
     it("should use getLegendPosition function with bottom position", async () => {
@@ -2321,7 +2476,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.series[0].data[0].value).toBe("80");
+      expect(result.options.series[0].data[0].value).toBe(80);
     });
 
     it("should test gauge tooltip valueFormatter function (lines 650-658)", async () => {
@@ -2556,7 +2711,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
     });
 
@@ -2590,7 +2745,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
     });
 
@@ -2730,8 +2885,8 @@ describe("Convert PromQL Data Utils", () => {
 
       // Based on the ternary logic: panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true
       // When show_gridlines is null, it's not undefined, so it uses the null value
-      // The splitLine.show gets set to null, not the default true
-      expect(result.options.xAxis.splitLine.show).toBe(null);
+      // The y splitLine.show gets set to null, not the default true; the x axis never draws gridlines
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(null);
     });
   });
@@ -3403,7 +3558,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.legend.show).toBe(false);
       expect(result.extras.isTimeSeries).toBe(true);
     });
@@ -3692,8 +3847,40 @@ describe("Convert PromQL Data Utils", () => {
       // Should show both axis borders and gridlines
       expect(result.options.xAxis.axisLine.show).toBe(true);
       expect(result.options.yAxis.axisLine.show).toBe(true);
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
+    });
+
+    it("draws the x baseline by default and hides it when axis_border_show is false", async () => {
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "baseline_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+      const build = (config: Record<string, unknown>) =>
+        convertPromQLData(
+          { id: "panel1", type: "line", config, queries: [{ config: { promql_legend: "" } }] },
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+      const byDefault = await build({});
+      expect(byDefault.options.xAxis.axisLine.show).toBe(true);
+      expect(byDefault.options.yAxis.axisLine.show).toBe(false);
+      expect(byDefault.options.xAxis.axisLabel.fontSize).toBe(12);
+      expect(byDefault.options.xAxis.axisLabel.color).toBe(byDefault.options.yAxis.axisLabel.color);
+
+      const hidden = await build({ axis_border_show: false });
+      expect(hidden.options.xAxis.axisLine.show).toBe(false);
     });
 
     it("should handle empty result but valid structure", async () => {
@@ -3869,6 +4056,31 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     describe("Additional comprehensive coverage tests", () => {
+      it("draws annotation bands above the series, so bars and area fills cannot hide them", async () => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type: "line",
+            config: {},
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [
+            {
+              resultType: "matrix",
+              result: [{ metric: { __name__: "m" }, values: [[1640435200, "100"]] }],
+            },
+          ],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const helper = result.options.series.find((s) => s.markArea);
+        expect(helper.markArea.z).toBe(4);
+        expect(helper.markArea.z).toBeGreaterThan(3);
+      });
+
       it("should handle chart with trellis layout enabled", async () => {
         const panelSchema = {
           id: "panel1",
@@ -4821,6 +5033,45 @@ describe("Convert PromQL Data Utils", () => {
       const result = await convert(streamThroughProcessor(40, 6, 100));
 
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
+    });
+  });
+
+  describe("heatmap time axis", () => {
+    it("hands the server step to the heatmap so steps without samples still get a column", async () => {
+      const panelSchema = { id: "panel1", type: "heatmap", config: {}, queries: [{ config: {} }] };
+      const searchQueryData = [
+        {
+          result: [
+            {
+              metric: { job: "api" },
+              values: [
+                [60, "1"],
+                [180, "3"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result: any = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        [],
+        { queries: [{ startTime: 0, endTime: 240_000_000 }] },
+        [[{ step: 60_000_000 }]],
+      );
+
+      expect(result.options.xAxis[0].data).toHaveLength(5);
+      expect(result.options.series[0].data.map((cell: any) => cell[2])).toEqual([
+        "-",
+        1,
+        "-",
+        3,
+        "-",
+      ]);
     });
   });
 });

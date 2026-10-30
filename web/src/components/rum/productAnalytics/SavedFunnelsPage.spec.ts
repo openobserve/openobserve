@@ -493,9 +493,10 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
       const { a } = await openAWithEdits();
       await action(0, "delete").trigger("click");
       await settle();
-      expect(confirmMock.mock.calls.at(-1)![0].message).toBe(
-        'Delete "Alpha" for everyone in this organization? Links to it will fall back to the steps they carried.',
-      );
+      const call = confirmMock.mock.calls.at(-1)![0];
+      expect(call.messageKeypath).toBe("rum.analytics.saved.deleteMessage");
+      expect(call.messageName).toBe("Alpha");
+      expect(call.confirmVariant).toBe("destructive");
       expect(api.funnels.has(a.id)).toBe(false);
       expect(names()).toEqual(["Beta"]);
       expect(useProductAnalytics().openedFunnel.value).toBeNull();

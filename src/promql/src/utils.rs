@@ -19,8 +19,8 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         promql::{
-            BUCKET_LABEL, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS, VALUE_LABEL,
-            exemplars_stream_name, histogram_family, value::Sample,
+            BUCKET_LABEL, BUCKET_STREAM_SUFFIX, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS,
+            VALUE_LABEL, exemplars_stream_name, value::Sample,
         },
         stream::StreamType,
     },
@@ -37,7 +37,7 @@ use datafusion::{
 use hashbrown::HashSet;
 pub use metrics_index::{matcher_predicates, matcher_residual_field};
 use promql_parser::{
-    label::{MatchOp, Matchers},
+    label::{MatchOp, Matcher, Matchers},
     parser::{Offset, VectorSelector},
 };
 
@@ -68,6 +68,13 @@ pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
         df = df.filter(predicate)?;
     }
     Ok(df)
+}
+
+/// True when `matcher`'s label is absent from `schema` and "" (a missing label's value) fails it.
+pub fn absent_label_rejects_all(schema: &Schema, matcher: &Matcher) -> bool {
+    ![TIMESTAMP_COL_NAME, VALUE_LABEL, NAME_LABEL].contains(&matcher.name.as_str())
+        && schema.field_with_name(&matcher.name).is_err()
+        && !matcher.is_match("")
 }
 
 pub fn apply_label_selector(
@@ -104,18 +111,31 @@ pub fn apply_label_selector(
     Some(df)
 }
 
-/// The stream an exemplar query reads for `selector_name`: a histogram's bucket stream (named
-/// `_bucket` and carrying `le`) reads the family's, where every protocol writes a histogram's
-/// exemplars; any other metric reads its own. The schema comes from the in-memory cache only.
+/// The exemplar stream for `selector_name`, from cached schemas only: its own if that exists, else
+/// its histogram family's when the family's `_bucket` stream carries `le`.
 pub async fn exemplars_stream_for(org_id: &str, selector_name: &str) -> String {
-    if let Some(family) = histogram_family(selector_name)
-        && infra::schema::get_stream_schema_from_cache(org_id, selector_name, StreamType::Metrics)
-            .await
-            .is_some_and(|schema| schema.field_with_name(BUCKET_LABEL).is_ok())
-    {
-        return exemplars_stream_name(family);
+    let own = exemplars_stream_name(selector_name);
+    let Some(family) = [BUCKET_STREAM_SUFFIX, "_count", "_sum"]
+        .iter()
+        .find_map(|suffix| selector_name.strip_suffix(suffix))
+    else {
+        return own;
+    };
+    let cached = |stream: String| async move {
+        infra::schema::get_stream_schema_from_cache(org_id, &stream, StreamType::Metrics).await
+    };
+    // remote write keeps exemplars sent on a `_count`/`_sum` series in that series' own stream
+    if cached(own.clone()).await.is_some() {
+        return own;
     }
-    exemplars_stream_name(selector_name)
+    let is_family = cached(format!("{family}{BUCKET_STREAM_SUFFIX}"))
+        .await
+        .is_some_and(|schema| schema.field_with_name(BUCKET_LABEL).is_ok());
+    if is_family {
+        exemplars_stream_name(family)
+    } else {
+        own
+    }
 }
 
 /// Zeroes the step of local exemplar loads only; older peers divide by the forwarded step.
@@ -278,12 +298,30 @@ mod tests {
         seed("rpc_latency_bucket", vec![label("le"), label("job")]).await;
         seed("queue_count", vec![label("job")]).await;
         seed("plain_bucket", vec![label("job")]).await;
+        seed("plain_count", vec![label("job")]).await;
+        seed("rw_latency_bucket", vec![label("le"), label("job")]).await;
+        seed("rw_latency_sum_exemplars", vec![label("job")]).await;
 
+        for name in ["rpc_latency_bucket", "rpc_latency_count", "rpc_latency_sum"] {
+            assert_eq!(
+                exemplars_stream_for("exemplar_org", name).await,
+                "rpc_latency_exemplars",
+                "{name}"
+            );
+        }
         assert_eq!(
-            exemplars_stream_for("exemplar_org", "rpc_latency_bucket").await,
-            "rpc_latency_exemplars"
+            exemplars_stream_for("exemplar_org", "rw_latency_count").await,
+            "rw_latency_exemplars"
         );
-        for name in ["queue_count", "plain_bucket", "unknown_bucket", "up"] {
+        for name in [
+            "queue_count",
+            "plain_bucket",
+            "plain_count",
+            "unknown_bucket",
+            "unknown_sum",
+            "up",
+            "rw_latency_sum",
+        ] {
             assert_eq!(
                 exemplars_stream_for("exemplar_org", name).await,
                 format!("{name}_exemplars"),
@@ -480,7 +518,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_null_label_matches_no_source_rows() {
+    async fn test_null_label_matches_as_empty() {
         use promql_parser::label::Matcher;
 
         let schema = Arc::new(ArrowSchema::new(vec![Field::new(
@@ -494,13 +532,17 @@ mod tests {
         )
         .unwrap();
         let ctx = SessionContext::new();
-        for matcher in [
-            Matcher::new(MatchOp::Equal, "env", "prod"),
-            Matcher::new(MatchOp::Equal, "env", ""),
-            Matcher::new(MatchOp::NotEqual, "env", "prod"),
-            parsed_matchers(r#"m{env=~".*"}"#).matchers.remove(0),
-            parsed_matchers(r#"m{env!~"prod"}"#).matchers.remove(0),
+        for (matcher, expected) in [
+            (Matcher::new(MatchOp::Equal, "env", "prod"), 0),
+            (Matcher::new(MatchOp::Equal, "env", ""), 1),
+            (Matcher::new(MatchOp::NotEqual, "env", "prod"), 1),
+            (Matcher::new(MatchOp::NotEqual, "env", ""), 0),
+            (parsed_matchers(r#"m{env=~".*"}"#).matchers.remove(0), 1),
+            (parsed_matchers(r#"m{env=~"p.*"}"#).matchers.remove(0), 0),
+            (parsed_matchers(r#"m{env!~"prod"}"#).matchers.remove(0), 1),
+            (parsed_matchers(r#"m{env!~".*"}"#).matchers.remove(0), 0),
         ] {
+            let case = format!("{matcher:?}");
             let rows = apply_matchers(
                 ctx.read_batch(batch.clone()).unwrap(),
                 &Matchers::new(vec![matcher]),
@@ -509,7 +551,11 @@ mod tests {
             .collect()
             .await
             .unwrap();
-            assert_eq!(rows.iter().map(RecordBatch::num_rows).sum::<usize>(), 0);
+            assert_eq!(
+                rows.iter().map(RecordBatch::num_rows).sum::<usize>(),
+                expected,
+                "{case}"
+            );
         }
     }
 
@@ -659,5 +705,31 @@ mod tests {
             panic!("expected vector selector");
         };
         selector.matchers
+    }
+
+    #[test]
+    fn test_absent_label_reads_as_empty_string() {
+        let schema = ArrowSchema::new(vec![Field::new("job", DataType::Utf8, true)]);
+        for (query, rejects) in [
+            (r#"m{absent="x"}"#, true),
+            (r#"m{absent=~"foo.+"}"#, true),
+            (r#"m{absent!=""}"#, true),
+            (r#"m{absent=""}"#, false),
+            (r#"m{absent!="x"}"#, false),
+            (r#"m{absent=~".*"}"#, false),
+            (r#"m{absent=~"foo|"}"#, false),
+            (r#"m{absent!~"x"}"#, false),
+            (r#"m{job="x"}"#, false),
+            (r#"{__name__="m"}"#, false),
+        ] {
+            assert_eq!(
+                parsed_matchers(query)
+                    .matchers
+                    .iter()
+                    .any(|mat| absent_label_rejects_all(&schema, mat)),
+                rejects,
+                "{query}"
+            );
+        }
     }
 }

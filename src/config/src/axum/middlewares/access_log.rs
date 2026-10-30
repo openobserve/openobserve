@@ -306,7 +306,7 @@ pub fn mask_log_url(url: &str) -> String {
     mask_slack_callback_query(&mask_share_tokens(url))
 }
 
-/// `path` (or a URL) with every chat share token, a bearer credential, cut to a short prefix.
+/// `path` (or a URL) with every chat share token or dashboard slug, a bearer credential, cut short.
 pub fn mask_share_tokens(path: &str) -> String {
     let segments: Vec<&str> = path.split('/').collect();
     let mut masked = Vec::with_capacity(segments.len());
@@ -314,7 +314,11 @@ pub fn mask_share_tokens(path: &str) -> String {
         let shares_token = i >= 2
             && matches!(
                 (segments[i - 2], segments[i - 1]),
-                ("ai", "shared") | ("ai", "public") | ("public", "ai_chats")
+                ("ai", "shared")
+                    | ("ai", "public")
+                    | ("public", "ai_chats")
+                    | ("api", "public_dashboards")
+                    | ("public", "dashboards")
             );
         if !shares_token {
             masked.push((*segment).to_string());
@@ -392,6 +396,35 @@ mod tests {
         ] {
             assert_eq!(mask_share_tokens(untouched), untouched);
         }
+    }
+
+    #[test]
+    fn public_dashboard_slugs_never_reach_the_access_log() {
+        let slug = "k8Zt2mR7aB3cD4eF5gH6Qx";
+        for (url, masked) in [
+            (
+                format!("/api/public_dashboards/{slug}"),
+                "/api/public_dashboards/k8Zt2m…",
+            ),
+            (
+                format!("/api/public_dashboards/{slug}/data?range=r3600"),
+                "/api/public_dashboards/k8Zt2m…/data?range=r3600",
+            ),
+            (
+                format!("/web/public/dashboards/{slug}"),
+                "/web/public/dashboards/k8Zt2m…",
+            ),
+            (
+                format!("https://o2.test/base/web/public/dashboards/{slug}?range=r3600#p1"),
+                "https://o2.test/base/web/public/dashboards/k8Zt2m…?range=r3600#p1",
+            ),
+        ] {
+            assert_eq!(mask_log_url(&url), masked);
+            assert!(!mask_log_url(&url).contains(slug));
+        }
+        // Admin routes name links by id under the org, which is no credential.
+        let admin = "/api/default/public_dashboards/status?ids=a,b";
+        assert_eq!(mask_log_url(admin), admin);
     }
 
     #[test]

@@ -13,19 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::{LazyLock, OnceLock},
-    time::{Duration, Instant},
-};
+use std::{sync::OnceLock, time::Duration};
 
 use base64::{Engine, prelude::BASE64_STANDARD};
-use config::{
-    RwHashMap,
-    utils::{
-        encryption::{Algorithm, SECRET_PREFIX, decode_encryption_key},
-        rand::random_bytes,
-        time::now_micros,
-    },
+use config::utils::{
+    encryption::{Algorithm, SECRET_PREFIX, decode_encryption_key},
+    rand::random_bytes,
+    time::now_micros,
 };
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -33,7 +27,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::entity::cipher_keys::*;
+use super::{entity::cipher_keys::*, ttl_cache::TtlCache};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
@@ -52,8 +46,8 @@ pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
 /// public API.
 pub const DEFAULT_DEK_NAME: &str = "__default__";
 
-/// In-memory DEK cache: org → (raw key bytes, time of last load).
-static DEK_CACHE: LazyLock<RwHashMap<String, (Vec<u8>, Instant)>> = LazyLock::new(Default::default);
+/// In-memory DEK cache: org → raw key bytes.
+static DEK_CACHE: TtlCache<Vec<u8>> = TtlCache::new(DEK_CACHE_TTL);
 const DEK_CACHE_TTL: Duration = Duration::from_secs(300);
 
 /// Key state, installed once by [`boot`] from `src/main.rs` and `tests/integration_test.rs`.
@@ -406,14 +400,12 @@ pub async fn get_or_create_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
 /// Returns the per-org DEK, using an in-memory cache with a 5-minute TTL to
 /// avoid a database round-trip on every encryption/decryption operation.
 pub async fn get_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
-    if let Some(entry) = DEK_CACHE.get(org)
-        && entry.1.elapsed() < DEK_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = DEK_CACHE.get(org) {
+        return Ok(cached);
     }
 
     let dek = get_or_create_dek(org).await?;
-    DEK_CACHE.insert(org.to_string(), (dek.clone(), Instant::now()));
+    DEK_CACHE.insert(org.to_string(), dek.clone());
     Ok(dek)
 }
 
@@ -488,10 +480,8 @@ pub async fn boot(key_b64: Option<&str>) -> Result<(), errors::Error> {
 }
 
 async fn find_dek(org: &str) -> Result<Option<Vec<u8>>, errors::Error> {
-    if let Some(entry) = DEK_CACHE.get(org)
-        && entry.1.elapsed() < DEK_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
+    if let Some(dek) = DEK_CACHE.get(org) {
+        return Ok(Some(dek));
     }
     let Some(b64) = get_data(org, EntryKind::CipherKey, DEFAULT_DEK_NAME).await? else {
         return Ok(None);
@@ -499,7 +489,7 @@ async fn find_dek(org: &str) -> Result<Option<Vec<u8>>, errors::Error> {
     let dek = BASE64_STANDARD
         .decode(b64)
         .map_err(|e| errors::Error::Message(format!("failed to decode DEK for org {org}: {e}")))?;
-    DEK_CACHE.insert(org.to_string(), (dek.clone(), Instant::now()));
+    DEK_CACHE.insert(org.to_string(), dek.clone());
     Ok(Some(dek))
 }
 
@@ -1014,7 +1004,7 @@ mod tests {
             ],
         )
         .await;
-        DEK_CACHE.insert(org.to_string(), (vec![9u8], Instant::now()));
+        DEK_CACHE.insert(org.to_string(), vec![9u8]);
 
         let (first, installed) = boot_db(&db, aes(1)).await;
         assert_eq!(installed, Some(Ok("AES")));
@@ -1039,7 +1029,7 @@ mod tests {
                 .iter()
                 .all(|r| r.2.starts_with(SECRET_PREFIX))
         );
-        assert_eq!(DEK_CACHE.get(org).unwrap().0, vec![9u8]);
+        assert_eq!(DEK_CACHE.get(org).unwrap(), vec![9u8]);
 
         let before = stored(&db).await;
         let second = boot_db(&db, aes(1)).await.0.unwrap().unwrap();

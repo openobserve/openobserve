@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
-import { PrebuiltConfig, PrebuiltType } from "./types";
+import { DestinationTile, PrebuiltConfig, PrebuiltType } from "./types";
 
 export const isValidSlackWebhookUrl = (url: string): boolean => {
   if (url !== url.trim() || /\s/.test(url) || url.includes("?") || url.includes("#")) {
@@ -103,7 +103,6 @@ export const slackConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: isValidSlackWebhookUrl,
   credentialFields: [
     {
       key: "webhookUrl",
@@ -131,10 +130,28 @@ import slackLogo from "@/assets/images/alerts/destinations/slack.png";
 
 export const slackDestinationType: PrebuiltType = {
   id: "slack",
-  name: raw("Slack"),
+  get name() {
+    return gt("slackApp.destination.webhookTile", { product: raw("Slack") });
+  },
   descriptionKey: "alert_destinations.prebuilt.slackDescription",
   icon: "slack",
   image: slackLogo,
   popular: true,
   category: "messaging",
+};
+
+export const slackAppDestinationTile: DestinationTile = {
+  id: "slack_app",
+  get name() {
+    return gt("slackApp.destination.appTile", { product: raw("Slack") });
+  },
+  descriptionKey: "alert_destinations.prebuilt.slackAppDescription",
+  icon: "slack",
+  image: slackLogo,
+  get tag() {
+    return {
+      label: gt("slackApp.destination.recommendedForAlertResponse"),
+      variant: "success-soft" as const,
+    };
+  },
 };

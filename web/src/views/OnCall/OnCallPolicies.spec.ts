@@ -21,6 +21,7 @@ import { resetListViewState, useListViewState } from "@/composables/useListViewS
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallPolicies from "@/views/OnCall/OnCallPolicies.vue";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 vi.mock("@/services/oncall", () => ({
   default: { listTeams: vi.fn(), getPolicy: vi.fn(), whoIsOnCall: vi.fn() },
@@ -239,5 +240,49 @@ describe("OnCallPolicies", () => {
       expect(saved.currentPage).toBe(4);
       expect(saved.sortOrder).toBe("desc");
     });
+  });
+});
+
+describe("OnCallPolicies - editor drafts", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    resetListViewState();
+    service.listTeams.mockResolvedValue({ data: TEAMS } as never);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as never);
+    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as never);
+  });
+
+  it("dots the team whose escalation policy has an unsaved draft", async () => {
+    writeEditorDraft(
+      {
+        kind: "oncall_policy",
+        org: store.state.selectedOrganization.identifier,
+        entityId: "t2",
+        userEmail: store.state.userInfo.email,
+      },
+      { data: {} },
+    );
+    const wrapper = mount(OnCallPolicies, {
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OTooltip: { name: "OTooltip", template: "<span><slot /></span>" },
+          OTable: {
+            name: "OTable",
+            props: ["data", "columns"],
+            template: `<div><div v-for="(row, i) in (data || [])" :key="i">
+              <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" :value="row[c.id]" />
+            </div></div>`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-policies-t2-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-policies-t1-draft-dot"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Platform");
   });
 });

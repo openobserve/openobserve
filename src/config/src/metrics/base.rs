@@ -1349,7 +1349,6 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Alert deduplication metrics
 // Alert notification chart events. Single low-cardinality `event` label —
 // deliberately NO organization/alert labels: signature failures carry
 // attacker-controlled request data, which must never become label values.
@@ -1368,45 +1367,6 @@ pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static ALERT_DEDUP_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_suppressed_total",
-            "Total number of alerts suppressed by deduplication",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "alert_name", "dedup_type"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_DEDUP_PASSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_passed_total",
-            "Total number of alerts that passed deduplication",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "alert_name"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_DEDUP_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_errors_total",
-            "Total deduplication processing errors",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "error_type"],
-    )
-    .expect("Metric created")
-});
-
 pub static ALERT_RUNS_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1420,73 +1380,6 @@ pub static ALERT_RUNS_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Alert grouping/batching metrics
-pub static ALERT_GROUPING_BATCHES_PENDING: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "alert_grouping_batches_pending",
-            "Current number of pending alert batches",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_grouping_notifications_sent_total",
-            "Total number of grouped notifications sent",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "send_strategy", "reason"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_GROUPING_BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "alert_grouping_batch_size",
-            "Number of alerts per grouped notification",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels())
-        .buckets(vec![1.0, 2.0, 3.0, 5.0, 10.0, 25.0, 50.0, 100.0]),
-        &["organization", "send_strategy"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_GROUPING_WAIT_TIME: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "alert_grouping_wait_time_seconds",
-            "Time batches waited before sending (seconds)",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels())
-        .buckets(vec![5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0, 120.0]),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_GROUPING_SEND_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_grouping_send_errors_total",
-            "Total grouped notification send failures",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "error_type"],
-    )
-    .expect("Metric created")
-});
 pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("meta_num_dashboards", "Metadata dashboard nums")
@@ -3095,6 +2988,114 @@ pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// public dashboards (design 8.5)
+pub static PUBLIC_DASHBOARD_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "public_dashboard_reads_total",
+            "Public dashboard data reads by outcome.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_BUILDS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "public_dashboard_builds_total",
+            "Public dashboard builds by outcome.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_BUILD_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "public_dashboard_build_seconds",
+            "Public dashboard build time.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0])
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_RESULT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "public_dashboard_result_bytes",
+            "Size of public dashboard result files.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(prometheus::exponential_buckets(1024.0, 4.0, 10).expect("buckets"))
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_MEM_CACHE_HITS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "public_dashboard_mem_cache_hits_total",
+            "Public dashboard bodies served from the memory cache.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_MEM_CACHE_MISSES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "public_dashboard_mem_cache_misses_total",
+            "Public dashboard bodies decompressed from disk.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_FILE_CACHE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "public_dashboard_file_cache_bytes",
+            "Bytes of public dashboard result files in the disk result cache.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_INFLIGHT_BUILDS: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "public_dashboard_inflight_builds",
+            "Public dashboard builds running on this querier.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_LINKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "public_dashboard_links",
+            "Public dashboard links by status.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status"],
+    )
+    .expect("Metric created")
+});
+
 pub(crate) fn register(registry: &Registry) {
     // http latency
     registry
@@ -3433,35 +3434,8 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(ALERT_CHART_EVENTS_TOTAL.clone()))
         .expect("Metric registered");
 
-    // alert deduplication metrics
-    registry
-        .register(Box::new(ALERT_DEDUP_SUPPRESSED_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_DEDUP_PASSED_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_DEDUP_ERRORS_TOTAL.clone()))
-        .expect("Metric registered");
     registry
         .register(Box::new(ALERT_RUNS_SUPPRESSED_TOTAL.clone()))
-        .expect("Metric registered");
-
-    // alert grouping metrics
-    registry
-        .register(Box::new(ALERT_GROUPING_BATCHES_PENDING.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_GROUPING_BATCH_SIZE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_GROUPING_WAIT_TIME.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_GROUPING_SEND_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
 
     // db stats
@@ -3758,6 +3732,15 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
         Box::new(RCA_RESUME_TOTAL.clone()),
         Box::new(RCA_LIVE_STREAMS.clone()),
+        Box::new(PUBLIC_DASHBOARD_READS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_BUILDS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_BUILD_SECONDS.clone()),
+        Box::new(PUBLIC_DASHBOARD_RESULT_BYTES.clone()),
+        Box::new(PUBLIC_DASHBOARD_MEM_CACHE_HITS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_MEM_CACHE_MISSES_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_FILE_CACHE_BYTES.clone()),
+        Box::new(PUBLIC_DASHBOARD_INFLIGHT_BUILDS.clone()),
+        Box::new(PUBLIC_DASHBOARD_LINKS.clone()),
     ] {
         registry.register(metric).expect("Metric registered");
     }
@@ -3915,17 +3898,9 @@ mod tests {
     }
 
     #[test]
-    fn test_statics_alert_dedup_and_grouping() {
+    fn test_statics_alert_chart_and_suppression() {
         let _ = ALERT_CHART_EVENTS_TOTAL.clone();
-        let _ = ALERT_DEDUP_SUPPRESSED_TOTAL.clone();
-        let _ = ALERT_DEDUP_PASSED_TOTAL.clone();
-        let _ = ALERT_DEDUP_ERRORS_TOTAL.clone();
         let _ = ALERT_RUNS_SUPPRESSED_TOTAL.clone();
-        let _ = ALERT_GROUPING_BATCHES_PENDING.clone();
-        let _ = ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone();
-        let _ = ALERT_GROUPING_BATCH_SIZE.clone();
-        let _ = ALERT_GROUPING_WAIT_TIME.clone();
-        let _ = ALERT_GROUPING_SEND_ERRORS_TOTAL.clone();
     }
 
     #[test]
@@ -4023,6 +3998,47 @@ mod tests {
             };
             assert_eq!(labels, expected, "{}", family.name());
         }
+    }
+
+    #[test]
+    fn public_dashboard_metrics_are_the_nine_of_the_design() {
+        let registry = Registry::new();
+        register(&registry);
+        PUBLIC_DASHBOARD_READS_TOTAL
+            .with_label_values(&["o", "fresh"])
+            .inc();
+        PUBLIC_DASHBOARD_BUILDS_TOTAL
+            .with_label_values(&["o", "complete"])
+            .inc();
+        PUBLIC_DASHBOARD_BUILD_SECONDS
+            .with_label_values(&["o"])
+            .observe(1.0);
+        PUBLIC_DASHBOARD_RESULT_BYTES
+            .with_label_values(&["o"])
+            .observe(10.0);
+        PUBLIC_DASHBOARD_LINKS
+            .with_label_values(&["o", "live"])
+            .set(1);
+        let names: std::collections::BTreeSet<String> = registry
+            .gather()
+            .into_iter()
+            .map(|m| m.name().to_string())
+            .filter(|n| n.starts_with("zo_public_dashboard_"))
+            .collect();
+        assert_eq!(
+            names.into_iter().collect::<Vec<_>>(),
+            [
+                "zo_public_dashboard_build_seconds",
+                "zo_public_dashboard_builds_total",
+                "zo_public_dashboard_file_cache_bytes",
+                "zo_public_dashboard_inflight_builds",
+                "zo_public_dashboard_links",
+                "zo_public_dashboard_mem_cache_hits_total",
+                "zo_public_dashboard_mem_cache_misses_total",
+                "zo_public_dashboard_reads_total",
+                "zo_public_dashboard_result_bytes",
+            ]
+        );
     }
 
     #[test]

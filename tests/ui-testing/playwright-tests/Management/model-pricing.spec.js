@@ -298,12 +298,12 @@ test.describe("Model Pricing — Edit, Cancel & Delete", () => {
             createdId = models.find(m => m.name === updatedName)?.id ?? createdId;
 
             // Delete → cancel → model still there
-            await pm.modelPricingPage.deleteBtnForModel(updatedName).click();
+            await pm.modelPricingPage.clickDeleteForModel(updatedName);
             await pm.modelPricingPage.confirmCancelBtn.click();
             await pm.modelPricingPage.verifyModelInList(updatedName);
 
             // Delete → confirm → model gone
-            await pm.modelPricingPage.deleteBtnForModel(updatedName).click();
+            await pm.modelPricingPage.clickDeleteForModel(updatedName);
             await pm.modelPricingPage.confirmOkBtn.click();
             await pm.modelPricingPage.verifyModelNotInList(updatedName);
             createdId = null;
