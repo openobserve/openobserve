@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, reactive } from "vue";
+import { computed, reactive, watch } from "vue";
 
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -219,6 +219,15 @@ function copy(value: L0Policy): L0Policy {
 }
 
 const draft = reactive<L0Policy>(copy(props.l0 ?? l0Defaults()));
+
+/// The parent resets or restores a draft through the prop, and a kept-alive tab would otherwise show the old edit.
+watch(
+  () => props.l0,
+  (value) => {
+    Object.assign(draft, copy(value ?? l0Defaults()));
+    emit("update:valid", budgetValid.value);
+  },
+);
 
 const budgetValid = computed(
   () =>

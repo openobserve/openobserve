@@ -58,8 +58,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
+    <OEmptyState
+      v-if="loadError !== null"
+      size="inline"
+      variant="error"
+      :title="t('oncall.myDeliveriesLoadFailed')"
+      :description="raw(loadError)"
+      :action-label="t('oncall.retry')"
+      data-test="oncall-my-deliveries-error"
+      @action="refresh"
+    />
+
     <OTable
-      v-if="rows.length || loading"
+      v-else-if="rows.length || loading"
       ref="oTableRef"
       :data="rows"
       :columns="columns"
@@ -118,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-at="{ row }">
-        <OText variant="meta">{{ raw(formatInZone(row.at, browserZone)) }}</OText>
+        <OTimeCell :value="row.at" unit="us" />
       </template>
 
       <template #cell-actions="{ row }">
@@ -157,6 +168,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -168,7 +180,6 @@ import { useListViewState } from "@/composables/useListViewState";
 import { markDeliveriesReadMutation, myDeliveriesQuery } from "@/services/oncall.queries";
 import type { MyDeliveries, MyDelivery } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -216,10 +227,6 @@ watch(loading, (isLoading) => {
   pageRestored = true;
   setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
 });
-
-/// This is the reader's own inbox, so it is rendered in the reader's own clock
-/// — unlike a schedule, which belongs to its team's zone.
-const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
 const teamName = (id: string) => props.teamNames[id] ?? id;
 
@@ -270,6 +277,8 @@ async function read<T>(
 // The newest read: a slower answer for a filter the reader has already left must not overwrite the inbox.
 let latestDeliveriesRead = 0;
 let loadedOnce = false;
+/// Set only when the first load fails, so "nothing was sent" is never said for a read that did not happen.
+const loadError = ref<string | null>(null);
 
 async function fetchDeliveries(force = false) {
   loading.value = true;
@@ -284,6 +293,7 @@ async function fetchDeliveries(force = false) {
     // The badge ignores the filter on purpose: "3 unread" must not change because somebody ticked "unread only".
     setUnread(data?.unread ?? 0);
     loadedOnce = true;
+    loadError.value = null;
   } catch (err: any) {
     if (readId !== latestDeliveriesRead) return;
     // A failed refresh keeps the inbox on screen rather than emptying it and zeroing the badge.
@@ -296,6 +306,7 @@ async function fetchDeliveries(force = false) {
     }
     rows.value = [];
     setUnread(0);
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
   } finally {
     if (readId === latestDeliveriesRead) loading.value = false;
   }

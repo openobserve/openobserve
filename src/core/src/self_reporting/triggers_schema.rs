@@ -198,9 +198,9 @@ mod tests {
         }
 
         // Verify count matches struct fields
-        // 47: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value + 6
-        // report + 4 ack
-        assert_eq!(field_names.len(), 47);
+        // 44: 21 original + 2 grouping + 6 value + 2 synthetics + downtime + delivery + rule_value
+        // + 6 report + 4 ack
+        assert_eq!(field_names.len(), 44);
 
         // Verify no duplicate fields
         let unique_count = field_names

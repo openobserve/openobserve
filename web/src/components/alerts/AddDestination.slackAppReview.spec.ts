@@ -35,6 +35,8 @@ vi.mock("vue-router", () => ({
     currentRoute: { value: route },
   }),
   useRoute: () => ({ params: {}, query: {} }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 vi.mock("@/services/slack", () => ({
   default: {

@@ -27,7 +27,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-const props = defineProps<{ check: ProtocolCheck }>();
+const props = defineProps<{ check: ProtocolCheck; validationErrors?: Record<string, string> }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
 
 const { t } = useI18nTyped();
@@ -150,6 +150,8 @@ function removeAssertion(index: number) {
             <OInput
               :model-value="h.value"
               :placeholder="t('synthetics.protocolConfig.http.headerValue')"
+              :error="!!validationErrors?.[`http.headers.${i}.value`]"
+              :error-message="raw(validationErrors?.[`http.headers.${i}.value`])"
               :data-test="`synthetics-check-http-header-value-${i}`"
               @update:model-value="
                 (v: string | number) =>

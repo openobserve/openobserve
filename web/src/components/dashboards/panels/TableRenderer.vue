@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :pagination="showPagination ? 'client' : 'none'"
       :page-size="effectivePageSize"
       :horizontal-scroll="true"
-      :row-height="22"
+      :row-height="tableRowHeight(density)"
       :virtual-scroll="virtualizeRows"
       :window-row-model="virtualizeRows"
       :default-columns="false"
@@ -65,6 +65,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         #[`cell-${col.id}`]="{ value }"
       >
         <JsonFieldRenderer :value="value" />
+      </template>
+
+      <template
+        v-for="col in barGaugeColumns"
+        :key="`bar-gauge-cell-${col.id}`"
+        #[`cell-${col.id}`]="{ value, column, row }"
+      >
+        <ODataBarCell
+          :value="value"
+          :min="col.barRange?.min ?? 0"
+          :max="col.barRange?.max ?? 0"
+          :color="col.barColor?.(value) ?? null"
+          :display="formatCellValue(value, column, row)"
+          gauge
+          :data-test="`dashboard-table-bar-gauge-${col.id}`"
+        />
+      </template>
+
+      <template
+        v-for="col in sparklineColumns"
+        :key="`sparkline-cell-${col.id}`"
+        #[`cell-${col.id}`]="{ value, column, row }"
+      >
+        <OSparkline
+          v-if="parseSparklineValue(value)"
+          :points="parseSparklineValue(value) ?? []"
+          size="xs"
+          :data-test="`dashboard-table-sparkline-${col.id}`"
+        />
+        <span v-else>{{ formatCellValue(value, column, row) }}</span>
       </template>
 
       <template
@@ -204,6 +234,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
+import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
+import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
+import { parseSparklineValue, tableRowHeight } from "@/utils/dashboard/tableOptions";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
@@ -266,6 +299,8 @@ export default defineComponent({
     OTooltip,
     TablePaginationControls,
     JsonFieldRenderer,
+    ODataBarCell,
+    OSparkline,
   },
   props: {
     data: {
@@ -315,6 +350,12 @@ export default defineComponent({
       required: false,
       type: Boolean,
       default: false,
+    },
+    /** Row density (`table_density`); absent keeps the compact rows. */
+    density: {
+      required: false,
+      type: String,
+      default: undefined,
     },
     expandableRows: {
       required: false,
@@ -448,6 +489,17 @@ export default defineComponent({
       (otableColumns.value as any[]).filter((c: any) => c.showFieldAsJson),
     );
 
+    const barGaugeColumns = computed(() =>
+      (otableColumns.value as any[]).filter(
+        (c: any) => !c.showFieldAsJson && c.cellType === "bar_gauge",
+      ),
+    );
+    const sparklineColumns = computed(() =>
+      (otableColumns.value as any[]).filter(
+        (c: any) => !c.showFieldAsJson && c.cellType === "sparkline",
+      ),
+    );
+
     // Only absolute http(s) URLs are links. This both avoids turning arbitrary
     // text into a link and prevents unsafe protocols such as javascript:.
     const getHttpUrl = (value: unknown): string | null => {
@@ -467,7 +519,7 @@ export default defineComponent({
     const linkFieldColumns = computed(() => {
       const rows = (props.data?.rows as any[]) || [];
       return (otableColumns.value as any[]).filter((col: any) => {
-        if (col.showFieldAsJson) return false;
+        if (col.showFieldAsJson || col.cellType) return false;
         const field = col.field ?? col.name;
         return rows.some((row: any) => getHttpUrl(row?.[field]) !== null);
       });
@@ -746,6 +798,10 @@ export default defineComponent({
       otableColumns,
       pivotRowColumns,
       jsonFieldColumns,
+      barGaugeColumns,
+      sparklineColumns,
+      parseSparklineValue,
+      tableRowHeight,
       linkFieldColumns,
       getHttpUrl,
       formatCellValue,
