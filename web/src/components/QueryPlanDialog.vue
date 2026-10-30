@@ -23,7 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => !v && onClose()"
   >
     <div class="h-full overflow-hidden p-0">
+      <QueryProfileView
+        v-if="showProfile && profile"
+        :profile="profile"
+        :stream="streamResult"
+        :sql="sqlQuery"
+      />
       <OSplitter
+        v-else
         v-model="splitterPosition"
         :horizontal="false"
         separator-class="relative before:content-[''] before:absolute before:left-1/2 before:inset-y-0 before:w-px before:bg-card-glass-border before:-translate-x-1/2 before:transition-[background-color,width] before:duration-200 hover:before:bg-accent hover:before:w-0.5"
@@ -194,6 +201,13 @@ import {
 } from "@/utils/queryPlanParser";
 import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
+import QueryProfileView from "@/components/query-plan/QueryProfileView.vue";
+import {
+  extractProfile,
+  parseSearchStream,
+  type QueryProfile,
+  type SearchStreamResult,
+} from "@/utils/queryProfile";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -209,6 +223,7 @@ export default defineComponent({
     OTabPanel,
     MetricsSummaryCard,
     QueryPlanTree,
+    QueryProfileView,
     OButton,
     ODialog,
     OSpinner,
@@ -242,6 +257,8 @@ export default defineComponent({
     const isAnalyzing = ref(false);
     const showAnalyzeResults = ref(false);
     const splitterPosition = ref(50);
+    const profile = ref<QueryProfile | null>(null);
+    const streamResult = ref<SearchStreamResult | null>(null);
 
     let { searchObj } = searchState();
 
@@ -274,6 +291,8 @@ export default defineComponent({
       if (!analyzePlan.value) return null;
       return parseQueryPlanTree(analyzePlan.value);
     });
+
+    const showProfile = computed(() => showAnalyzeResults.value && !!profile.value);
 
     // Calculate summary metrics for EXPLAIN ANALYZE
     const summaryMetrics = computed<SummaryMetrics | null>(() => {
@@ -389,46 +408,6 @@ export default defineComponent({
       }
     };
 
-    const parseSSEResponse = (sseText: string): any => {
-      // Parse Server-Sent Events format response
-      // Format: event: <event_type>\ndata: <json>\n\n
-      try {
-        const lines = sseText.split("\n");
-        let currentEvent = "";
-        let result: any = null;
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-
-          if (trimmed.startsWith("event:")) {
-            currentEvent = trimmed.substring(6).trim();
-          } else if (trimmed.startsWith("data:")) {
-            const dataContent = trimmed.substring(5).trim();
-
-            // Skip progress events and done marker
-            if (dataContent === "[[DONE]]" || currentEvent === "progress") {
-              continue;
-            }
-
-            try {
-              const parsed = JSON.parse(dataContent);
-              // Look for actual search results with hits
-              if (parsed && (parsed.hits !== undefined || parsed.total !== undefined)) {
-                result = parsed;
-              }
-            } catch (e) {
-              // Not JSON, skip
-            }
-          }
-        }
-
-        return result;
-      } catch (err) {
-        console.error("Error parsing SSE response:", err);
-        return null;
-      }
-    };
-
     const fetchExplainPlan = async () => {
       loading.value = true;
       error.value = "";
@@ -436,6 +415,8 @@ export default defineComponent({
       physicalPlan.value = "";
       analyzePlan.value = "";
       showAnalyzeResults.value = false;
+      profile.value = null;
+      streamResult.value = null;
 
       try {
         // Build the complete query using getSearchQueryPayload()
@@ -468,7 +449,7 @@ export default defineComponent({
         });
 
         // Parse SSE response - streaming API returns Server-Sent Events format
-        const parsedData = parseSSEResponse(response.data);
+        const parsedData = parseSearchStream(response.data);
 
         // Parse the response to extract logical and physical plans
         if (parsedData) {
@@ -526,14 +507,16 @@ export default defineComponent({
         });
 
         // Parse SSE response - streaming API returns Server-Sent Events format
-        const parsedData = parseSSEResponse(response.data);
+        const parsedData = parseSearchStream(response.data);
 
         // Parse the response to extract execution plan with metrics
         if (parsedData) {
           parsePlans(parsedData, true);
+          streamResult.value = parsedData;
+          profile.value = extractProfile(parsedData.hits);
 
           // Check if we got the analyze plan
-          if (analyzePlan.value) {
+          if (analyzePlan.value || profile.value) {
             showAnalyzeResults.value = true;
           } else {
             error.value = t("search.noAnalyzePlanFound");
@@ -614,6 +597,9 @@ export default defineComponent({
       activeTab,
       isAnalyzing,
       showAnalyzeResults,
+      showProfile,
+      profile,
+      streamResult,
       runAnalyze,
       onClose,
     };
