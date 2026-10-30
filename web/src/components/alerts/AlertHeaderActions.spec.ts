@@ -106,7 +106,8 @@ describe("AlertHeaderActions", () => {
     } as any);
     await mountActions({ unackedGroups: 2 });
     const button = find("alerts-alertdetail-ack");
-    expect(button.text()).toBe("Acknowledge 2 firing groups");
+    expect(button.text()).toBe("Acknowledge");
+    expect(button.findComponent({ name: "OTooltip" }).props("content")).toBe("All 2 firing groups");
     await button.trigger("click");
     await flushPromises();
     expect(alerts.ackAlert).toHaveBeenCalledWith("default", "a1", { all_groups: true }, "ops");

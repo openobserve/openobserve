@@ -769,6 +769,15 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
     let outcome = correlation.outcome;
+    // D23: a firing joining an acknowledged incident is acknowledged too, so nobody is re-paged.
+    if !matches!(
+        outcome,
+        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+    ) && let Some(alert_id) = alert.id.map(|id| id.to_string())
+    {
+        crate::alerts::ack::join_acked_incident(&alert.org_id, outcome.incident_id(), &alert_id)
+            .await;
+    }
 
     // The on-call record routing opened; its team decides L0 for the incident.
     #[cfg(feature = "enterprise")]
@@ -3130,30 +3139,25 @@ async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::Transa
     Ok(())
 }
 
-/// An incident ack made anywhere but an alert's own ack acks every firing row of its alerts (§5.6).
-async fn ack_incident_alerts(org_id: &str, incident_id: &str, user_id: &str) {
-    if crate::alerts::ack::propagating() {
-        return;
-    }
-    let alerts = match infra::table::alert_incidents::get_incident_alerts(incident_id).await {
-        Ok(rows) => rows,
+/// The event and the super-cluster status of an ack change the one ack wrote.
+/// [weak: a lost event or publish is logged; the row change stands]
+pub async fn record_ack_change(
+    org_id: &str,
+    incident_id: &str,
+    status: config::meta::alerts::incidents::IncidentStatus,
+    event: IncidentEvent,
+) {
+    let muted = match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(m) => m.is_some_and(|m| m.muted_by_downtime_id.is_some()),
         Err(e) => {
-            log::warn!("[incidents] could not list the alerts of {incident_id} to ack them: {e}");
-            return;
+            log::error!("[incidents] could not read {org_id}/{incident_id} after an ack: {e}");
+            false
         }
     };
-    let mut ids: Vec<String> = alerts.into_iter().map(|a| a.alert_id).collect();
-    ids.sort();
-    ids.dedup();
-    for alert_id in ids {
-        crate::alerts::ack::ack_from_elsewhere(
-            org_id,
-            &alert_id,
-            user_id,
-            config::meta::alerts::ack::AckSource::Incident,
-        )
-        .await;
+    if let Err(e) = append_event_unless_muted(org_id, incident_id, event, muted).await {
+        log::error!("[incidents] could not record the ack of {org_id}/{incident_id}: {e}");
     }
+    publish_status(org_id, incident_id, &status.to_string()).await;
 }
 
 /// Update incident status
@@ -3174,10 +3178,9 @@ pub async fn update_status_as(
     user_id: &str,
     quiet: bool,
 ) -> Result<Incident, anyhow::Error> {
-    // Acknowledging goes through a dedicated atomic path so the actor and
-    // timestamp land on the row itself (not just the event log) and a
-    // second/concurrent acknowledge can't silently overwrite the first
-    // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    if is_the_one_ack(org_id, incident_id, status).await? {
+        return through_the_one_ack(org_id, incident_id, status, user_id).await;
+    }
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
     let muted_before = reads_mute_before(
         status,
@@ -3187,20 +3190,7 @@ pub async fn update_status_as(
     ) && infra::table::alert_incidents::get(org_id, incident_id)
         .await?
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    let updated = if status == "acknowledged" {
-        infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Incident not found"))?
-    } else {
-        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
-    };
-    // The ack guard left a resolved row alone: record and replicate nothing.
-    if status == "acknowledged" && updated.status != "acknowledged" {
-        return model_to_incident(updated).await;
-    }
-    if status == "acknowledged" && updated.acknowledged_by.as_deref() == Some(user_id) {
-        ack_incident_alerts(org_id, incident_id, user_id).await;
-    }
+    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
 
     let muted = status_change_is_muted(
         quiet || muted_before,
@@ -3221,7 +3211,6 @@ pub async fn update_status_as(
     // Emit status change event
     use config::meta::alerts::incidents::IncidentEvent;
     let event = match status {
-        "acknowledged" => Some(IncidentEvent::acknowledged(user_id)),
         "resolved" => Some(IncidentEvent::resolved(Some(user_id.to_string()))),
         "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
         _ => None,
@@ -3254,7 +3243,58 @@ pub async fn update_status_as(
         .await;
     }
 
-    #[cfg(feature = "enterprise")]
+    publish_status(org_id, incident_id, status).await;
+    model_to_incident(updated).await
+}
+
+/// Acknowledging, and reopening an acknowledged incident, are the one ack's (AK-2).
+async fn is_the_one_ack(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+) -> Result<bool, anyhow::Error> {
+    Ok(match status {
+        "acknowledged" => true,
+        "open" => infra::table::alert_incidents::get(org_id, incident_id)
+            .await?
+            .is_some_and(|m| m.status == "acknowledged"),
+        _ => false,
+    })
+}
+
+async fn through_the_one_ack(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    use crate::alerts::ack::{self, AckError, Problem};
+
+    let problem = Problem::Incident {
+        org_id: org_id.to_string(),
+        incident_id: incident_id.to_string(),
+    };
+    let source = config::meta::alerts::ack::AckSource::Incident;
+    let done = if status == "acknowledged" {
+        ack::acknowledge(&problem, user_id, source)
+            .await
+            .map(|_| ())
+    } else {
+        ack::unack(&problem, user_id, source).await.map(|_| ())
+    };
+    match done {
+        // A resolved incident has nothing to acknowledge; the answer is the incident as it stands.
+        Ok(()) | Err(AckError::Conflict(_)) => {}
+        Err(AckError::NotFound) => anyhow::bail!("Incident not found"),
+        Err(e) => anyhow::bail!("could not change the ack of {incident_id}: {e:?}"),
+    }
+    let model = infra::table::alert_incidents::get(org_id, incident_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    model_to_incident(model).await
+}
+
+async fn publish_status(org_id: &str, incident_id: &str, status: &str) {
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
@@ -3270,8 +3310,6 @@ pub async fn update_status_as(
             "[SUPER_CLUSTER] Failed to publish incident update_status: org_id: {org_id}, error: {e}"
         );
     }
-
-    model_to_incident(updated).await
 }
 
 /// Records the resolved event of the auto-resolve job; a muted incident notifies nobody (D3).

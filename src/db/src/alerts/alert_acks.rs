@@ -36,6 +36,17 @@ pub async fn claim(ack: &AlertAck) -> Result<bool> {
     Ok(won)
 }
 
+/// Moves the ack while `from` still holds it, then replicates it; false when it did not.
+pub async fn take_over(ack: &AlertAck, from: &str) -> Result<bool> {
+    let moved = infra::table::alert_acks::take_over_with_outbox(ack, from)
+        .await?
+        .is_some();
+    if moved {
+        publish(ack).await;
+    }
+    Ok(moved)
+}
+
 /// Unacks the firing; on a change, replicates the row as it now stands.
 pub async fn unack(
     org_id: &str,

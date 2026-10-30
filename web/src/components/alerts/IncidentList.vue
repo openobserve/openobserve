@@ -366,7 +366,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
-import { incidentsQuery } from "@/services/incidents.queries";
+import { incidentsQuery, setIncidentStatus } from "@/services/incidents.queries";
+import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
 import {
   defineComponent,
   ref,
@@ -885,19 +887,28 @@ export default defineComponent({
     ) => {
       try {
         const org = store.state.selectedOrganization.identifier;
-        await incidentsService.updateStatus(org, incident.id, newStatus);
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.statusUpdated"),
-        });
+        const res = await setIncidentStatus(org, incident.id, newStatus, incident.status);
+        // Only the one ack's routes answer with what they did.
+        const { ack } = res as { ack?: AckAlertResponse | UnackAlertResponse };
+        toast(
+          incidentStatusToast(
+            newStatus,
+            ack,
+            incident.title || incident.id,
+            store.state.userInfo?.email,
+            t,
+          ) ?? { variant: "success", message: t("alerts.incidents.statusUpdated") },
+        );
         // Post-write reload: must reach the server.
         loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.statusUpdateFailed"),
-        });
+        toast(
+          incidentRefusalToast(error, newStatus, t) ?? {
+            variant: "error",
+            message: t("alerts.incidents.statusUpdateFailed"),
+          },
+        );
         console.error("Failed to update incident status:", error);
       }
     };

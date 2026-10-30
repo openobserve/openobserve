@@ -21,10 +21,11 @@ use config::{
     meta::{
         alerts::{
             ack::{
-                AckAction, AckConflict, AckIncidentRef, AckOncallOutcome, AckRequest, AckResponse,
-                AckSource, AckView, ActRefusal, AlertAck, AlertAckSummary, OnCallPersonRef,
-                PersonRef, RefusalCode, RefusalRule, UnackRequest, UnackResponse,
+                AckAction, AckConflict, AckIncidentRef, AckOncallOutcome, AckResponse, AckSource,
+                AckView, ActRefusal, AlertAck, AlertAckSummary, OnCallPersonRef, PersonRef,
+                RefusalCode, RefusalRule, StillPaging, UnackResponse,
             },
+            incidents::IncidentStatus,
             state::{AlertState, ROLLUP_GROUP_KEY},
         },
         self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
@@ -35,11 +36,6 @@ use config::{
 };
 
 use crate::alerts::lifecycle;
-
-tokio::task_local! {
-    /// The alert whose own ack is propagating, so the incident hook does not write it back.
-    static ACK_ORIGIN: String;
-}
 
 const CAN_ACT_SHOWN: usize = 2;
 const ON_CALL_SHOWN: usize = 3;
@@ -105,6 +101,137 @@ impl From<infra::errors::Error> for AckError {
     fn from(e: infra::errors::Error) -> Self {
         Self::Internal(e.to_string())
     }
+}
+
+/// What the caller asks of the problem's acknowledgement.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Verb {
+    Acknowledge,
+    TakeOver,
+    Unack,
+    /// An unack for a hand-off: the hand-off, not the unack, restarts the page it moves.
+    HandOff,
+}
+
+/// Which firing groups of an alert an ack names.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Groups {
+    One {
+        group_key: String,
+        firing_started_at: Option<i64>,
+    },
+    All,
+}
+
+/// What a person acknowledges: the firing's incident if it is in one, else the firing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Problem {
+    Firing { target: AckTarget, groups: Groups },
+    Incident { org_id: String, incident_id: String },
+}
+
+impl Problem {
+    pub fn org_id(&self) -> &str {
+        match self {
+            Self::Firing { target, .. } => &target.org_id,
+            Self::Incident { org_id, .. } => org_id,
+        }
+    }
+}
+
+/// One record that carries the problem's acknowledgement.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AckRecord {
+    Firing {
+        alert_id: String,
+        group_key: String,
+        firing_started_at: i64,
+    },
+    Incident {
+        incident_id: String,
+    },
+}
+
+/// A record and who holds it now; `named` when the caller asked for it rather than carried it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HeldRecord {
+    pub record: AckRecord,
+    pub holder: Option<String>,
+    pub named: bool,
+}
+
+/// One open page of the problem; `acked_by` is set while it is acknowledged.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpenPage {
+    pub response_id: String,
+    pub team: String,
+    pub acked_by: Option<String>,
+    /// The current firing's page, not one left open by an earlier firing (D34).
+    pub current: bool,
+}
+
+/// Everything [`plan`] decides from.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlanFacts {
+    pub verb: Verb,
+    pub actor: String,
+    pub records: Vec<HeldRecord>,
+    /// Firing groups of the alert the caller did not name that no ack holds.
+    pub other_groups_unacked: u32,
+    /// Who holds the firing groups of the alert the caller did not name.
+    pub other_holders: Vec<String>,
+    pub pages: Vec<OpenPage>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RecordWrite {
+    Claim,
+    Move { from: String },
+    Clear { holder: String },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PageStep {
+    Stop { by: String },
+    MoveTo { from: String },
+    Restart { holder: String },
+    Leave,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Answer {
+    Changed,
+    AlreadyYours,
+    HeldBy(String),
+    NothingFiring,
+    NotHeld,
+}
+
+/// The writes, page steps and answer of one verb, in the order they are carried out.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AckPlan {
+    pub writes: Vec<(AckRecord, RecordWrite)>,
+    pub pages: Vec<(String, PageStep)>,
+    pub still_paging: Vec<StillPaging>,
+    pub answer: Answer,
+}
+
+/// What carrying a plan out did, for the route's answer.
+#[derive(Debug, Default)]
+struct Outcome {
+    changed: bool,
+    acks: Vec<AckView>,
+    incident: Option<AckIncidentRef>,
+    oncall: Option<AckOncallOutcome>,
+    other_groups_unacked: u32,
+}
+
+/// The facts and the targets of the alerts they name.
+struct Gathered {
+    facts: PlanFacts,
+    targets: HashMap<String, AckTarget>,
+    held: HashMap<(String, String), AlertAck>,
+    incident_status: Option<IncidentStatus>,
 }
 
 /// One open on-call response for the alert or its incident, and the people behind it.
@@ -253,107 +380,284 @@ pub async fn resolve_target(org_id: &str, alert_id: &str) -> Result<AckTarget, A
     }
 }
 
-/// Lets the actor act on the alert, or says who is on call and who could act instead.
-pub async fn authorize(target: &AckTarget, actor: &str, act: Act) -> Result<Via, ActRefusal> {
-    let facts = gather_facts(target, actor).await;
+/// Decides every write and page step of one verb on the problem. [pure]
+pub fn plan(f: &PlanFacts) -> AckPlan {
+    match f.verb {
+        Verb::Acknowledge | Verb::TakeOver => plan_hold(f),
+        Verb::Unack | Verb::HandOff => plan_release(f),
+    }
+}
+
+/// The alert or incident a page's subject names, without its impacted and group suffixes. [pure]
+pub fn source_of_page(source_id: &str) -> &str {
+    let origin = source_id.split(":impacted:").next().unwrap_or(source_id);
+    origin.split(":group:").next().unwrap_or(origin)
+}
+
+/// The firing's problem: its incident if it is in one, else the firing. [strong] (reads)
+pub async fn problem_of_alert(
+    org_id: &str,
+    alert_id: &str,
+    groups: Groups,
+) -> Result<Problem, AckError> {
+    let target = resolve_target(org_id, alert_id).await?;
+    problem_of_target(target, groups).await
+}
+
+/// [`problem_of_alert`] for an alert already resolved. [strong] (reads)
+pub async fn problem_of_target(target: AckTarget, groups: Groups) -> Result<Problem, AckError> {
+    Ok(match incident_of(&target).await? {
+        Some(incident_id) => Problem::Incident {
+            org_id: target.org_id.clone(),
+            incident_id,
+        },
+        None => Problem::Firing { target, groups },
+    })
+}
+
+/// The problem behind a page: its incident, or its alert with every group. [strong] (reads)
+pub async fn problem_of_page(org_id: &str, response_id: &str) -> Result<Problem, AckError> {
+    use config::meta::oncall::SubjectType;
+
+    let Some(page) = infra::table::oncall_responses::get(org_id, response_id).await? else {
+        return Err(AckError::NotFound);
+    };
+    match page.subject.subject_type {
+        SubjectType::Incident => Ok(Problem::Incident {
+            org_id: org_id.to_string(),
+            incident_id: source_of_page(&page.subject.source_id).to_string(),
+        }),
+        SubjectType::Alert => {
+            problem_of_alert(org_id, source_of_page(&page.subject.source_id), Groups::All).await
+        }
+    }
+}
+
+/// Lets the actor act on the problem; `Refused` says who can act instead. [strong] (reads)
+pub async fn authorize_problem(p: &Problem, actor: &str, act: Act) -> Result<Via, AckError> {
+    let pages = problem_pages(p).await?;
+    let facts = gather_facts(p, actor, &pages).await;
     if let Some(via) = decide(actor, &facts) {
         return Ok(via);
     }
-    let editors = org_editors(&target.org_id).await;
+    let editors = org_editors(p.org_id()).await;
+    Err(AckError::Refused(refusal(act, &facts, &editors)))
+}
+
+/// Lets the actor act on the alert's problem; `Refused` says who can. [strong] (reads)
+pub async fn authorize(target: &AckTarget, actor: &str, act: Act) -> Result<Via, AckError> {
+    let problem = problem_of_target(target.clone(), Groups::All).await?;
+    authorize_problem(&problem, actor, act).await
+}
+
+/// A page whose alert is gone: root, the role rule or its team may act. [strong] (reads)
+#[cfg(feature = "enterprise")]
+pub async fn authorize_orphan_page(
+    page: &config::meta::oncall::response::Response,
+    actor: &str,
+    act: Act,
+) -> Result<Via, ActRefusal> {
+    let facts = AuthorizeFacts {
+        root: db::user::is_root_user(actor),
+        fga_enabled: o2_openfga::config::get_config().enabled,
+        // With OpenFGA on there is no alert left to hold edit rights on.
+        fga_allows: false,
+        role: crate::users::get_user(Some(&page.org_id), actor)
+            .await
+            .map(|u| u.role),
+        responders: responders_of(&page.org_id, std::slice::from_ref(page)).await,
+    };
+    if let Some(via) = decide(actor, &facts) {
+        return Ok(via);
+    }
+    let editors = org_editors(&page.org_id).await;
     Err(refusal(act, &facts, &editors))
 }
 
-/// Acks the group's current firing, or every firing group with `all_groups` (§5.3).
-pub async fn ack(
-    target: &AckTarget,
-    req: &AckRequest,
+/// Whether `may_edit` admits the alert, or any alert of the incident (D24). [strong] (reads)
+#[cfg(feature = "enterprise")]
+pub async fn may_edit_any_alert_with<F, Fut>(p: &Problem, may_edit: F) -> bool
+where
+    F: Fn(AckTarget) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    let targets = match p {
+        Problem::Firing { target, .. } => vec![target.clone()],
+        Problem::Incident {
+            org_id,
+            incident_id,
+        } => {
+            let ids = match incident_alert_ids(incident_id).await {
+                Ok(ids) => ids,
+                Err(e) => {
+                    log::warn!("[ALERT_ACK] could not list the alerts of {incident_id}: {e:?}");
+                    vec![]
+                }
+            };
+            let mut targets = Vec::with_capacity(ids.len());
+            for id in ids {
+                if let Ok(t) = resolve_target(org_id, &id).await {
+                    targets.push(t);
+                }
+            }
+            targets
+        }
+    };
+    for target in targets {
+        if may_edit(target).await {
+            return true;
+        }
+    }
+    false
+}
+
+/// Acknowledges the problem as `actor` and stops its pages.
+/// [weak: the problem's ack is written first; a failed page stop leaves that page escalating and is
+/// logged; a retry finds the ack in place and stops the remaining pages]
+pub async fn acknowledge(
+    p: &Problem,
     actor: &str,
     source: AckSource,
 ) -> Result<AckResponse, AckError> {
-    let rows = if req.all_groups {
-        firing_rows(target).await
-    } else if target.multi_alert == (req.group_key == ROLLUP_GROUP_KEY) {
-        // A multi-alert is acked per group, any other alert on its own row.
-        return Err(AckError::Conflict(AckConflict::NotFiring));
-    } else {
-        let current = current_firing(target, &req.group_key).await?;
-        let Some(started) = current else {
-            return Err(AckError::Conflict(AckConflict::NotFiring));
-        };
-        if req.firing_started_at.is_some_and(|f| f != started) {
-            return Err(AckError::Conflict(AckConflict::FiringChanged {
-                firing_started_at: started,
-            }));
-        }
-        vec![(req.group_key.clone(), started)]
-    };
-    if rows.is_empty() {
-        return Err(AckError::Conflict(AckConflict::NotFiring));
-    }
-    let (acks, changed, previous_holders) =
-        write_acks(target, &rows, actor, source, req.take_over).await?;
-    let other_groups_unacked = other_groups_unacked(target).await;
-    let (incident, oncall) = if changed {
-        propagate(target, actor, other_groups_unacked, &previous_holders).await
-    } else {
-        (None, None)
-    };
-    Ok(AckResponse {
-        changed,
-        acks,
-        incident,
-        oncall,
-        other_groups_unacked,
-    })
+    hold(p, Verb::Acknowledge, actor, source).await
 }
 
-/// Unacks the group's firing; repeats resume one silence window after the unack (§5.5).
-pub async fn unack(
-    target: &AckTarget,
-    req: &UnackRequest,
+/// Moves the problem's ack to `actor` on every record and page. [weak: same as acknowledge]
+pub async fn take_over(
+    p: &Problem,
+    actor: &str,
+    source: AckSource,
+) -> Result<AckResponse, AckError> {
+    hold(p, Verb::TakeOver, actor, source).await
+}
+
+/// Clears the problem's ack and restarts the pages it stopped at step 1.
+/// [weak: the ack is cleared first; a page that fails to restart stays acknowledged until the next
+/// unack; one restarted with no ladder armed is logged and left to `reconcile_abandoned`]
+pub async fn unack(p: &Problem, actor: &str, source: AckSource) -> Result<UnackResponse, AckError> {
+    release(p, Verb::Unack, actor, source).await
+}
+
+/// Clears the problem's ack for a hand-off, which restarts the page it moves.
+/// [weak: a record that fails to clear is an error; the ones cleared before it stay cleared, and a
+/// retry clears the rest]
+pub async fn release_for_hand_off(
+    p: &Problem,
     actor: &str,
     source: AckSource,
 ) -> Result<UnackResponse, AckError> {
-    let firing = match req.firing_started_at {
-        Some(f) => Some(f),
-        None => current_firing(target, &req.group_key).await?,
+    release(p, Verb::HandOff, actor, source).await
+}
+
+/// A firing that joins an acknowledged incident takes the incident's ack, so nobody is re-paged.
+/// [weak: a row that fails to write is logged and the firing reads unacknowledged; the next join
+/// writes it]
+#[cfg(feature = "enterprise")]
+pub async fn join_acked_incident(org_id: &str, incident_id: &str, alert_id: &str) {
+    let holder = match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(Some(m)) if m.status == "acknowledged" => m.acknowledged_by,
+        Ok(_) => None,
+        Err(e) => {
+            log::error!("[ALERT_ACK] could not read incident {incident_id} for a join: {e}");
+            None
+        }
     };
-    let Some(firing) = firing else {
-        return Ok(UnackResponse {
-            changed: false,
-            ack: None,
+    let Some(holder) = holder else {
+        return;
+    };
+    let target = match resolve_target(org_id, alert_id).await {
+        Ok(t) => t,
+        Err(e) => {
+            log::error!("[ALERT_ACK] {alert_id} joined {incident_id} and could not be read: {e:?}");
+            return;
+        }
+    };
+    let acks = match infra::table::alert_acks::list_for_alert(org_id, alert_id).await {
+        Ok(acks) => acks,
+        Err(e) => {
+            log::error!("[ALERT_ACK] could not read the acks of {alert_id} for a join: {e}");
+            return;
+        }
+    };
+    for (group_key, started) in firing_rows(&target).await {
+        if acks
+            .iter()
+            .any(|a| a.group_key == group_key && a.in_force_for(Some(started)))
+        {
+            continue;
+        }
+        if let Err(e) = write_firing(
+            &target,
+            &group_key,
+            started,
+            &RecordWrite::Claim,
+            &holder,
+            AckSource::Incident,
+        )
+        .await
+        {
+            log::error!("[ALERT_ACK] could not carry {incident_id}'s ack to {alert_id}: {e:?}");
+        }
+    }
+}
+
+/// Snoozes each open page of the alert's problem until `until`, for at most a day.
+/// [weak: each page is snoozed on its own; one that fails, or pages that cannot be read, say why in
+/// `refused`]
+#[cfg(feature = "enterprise")]
+pub async fn snooze_pages_until(
+    target: &AckTarget,
+    actor: &str,
+    until: i64,
+    now: i64,
+) -> Vec<config::meta::downtimes::MutedPage> {
+    use config::meta::downtimes::MutedPage;
+    use o2_enterprise::enterprise::oncall::{escalation, service::OncallError};
+
+    let pages = match problem_of_target(target.clone(), Groups::All).await {
+        Ok(problem) => problem_pages(&problem).await,
+        Err(e) => Err(e),
+    };
+    let pages = match pages {
+        Ok(pages) => pages,
+        Err(e) => {
+            log::error!("[ALERT_MUTE] pages of {} not read: {e:?}", target.alert_id);
+            return vec![MutedPage {
+                refused: Some("the alert's open pages could not be read".to_string()),
+                ..MutedPage::default()
+            }];
+        }
+    };
+    let minutes = snooze_minutes(until, now);
+    let mut out = Vec::new();
+    for page in pages {
+        let team = team_name(&page.org_id, page.team()).await;
+        let (snoozed_until, refused) =
+            match escalation::snooze(&page.org_id, &page.id, actor, minutes, now).await {
+                Ok(Some(r)) => (r.snoozed_until, None),
+                Ok(None) => (None, Some("the page is gone".to_string())),
+                Err(e) if e.downcast_ref::<OncallError>().is_some() => (None, Some(e.to_string())),
+                Err(e) => {
+                    log::error!("[ALERT_MUTE] could not snooze page {}: {e}", page.id);
+                    (None, Some("the page could not be snoozed".to_string()))
+                }
+            };
+        out.push(MutedPage {
+            response_id: page.id,
+            team,
+            snoozed_until,
+            refused,
         });
-    };
-    let at = now_micros();
-    let Some(row) = db::alerts::alert_acks::unack(
-        &target.org_id,
-        &target.alert_id,
-        &req.group_key,
-        firing,
-        actor,
-        at,
-    )
-    .await?
-    else {
-        return Ok(UnackResponse {
-            changed: false,
-            ack: None,
-        });
-    };
-    reopen_silence(target, &req.group_key, firing, at).await;
-    record_event(
-        target,
-        &req.group_key,
-        actor,
-        AckAction::Unack,
-        source,
-        None,
-    );
-    lifecycle::on_view_changed(&target.org_id, &target.alert_id, Some(&req.group_key)).await;
-    Ok(UnackResponse {
-        changed: true,
-        ack: Some(row.view()),
-    })
+    }
+    out
+}
+
+/// Whole minutes from `now` to `until`, rounded up, within one minute and a day. [pure]
+pub fn snooze_minutes(until: i64, now: i64) -> i64 {
+    const MINUTE: i64 = 60 * 1_000_000;
+    const DAY_MINUTES: i64 = 24 * 60;
+    let left = until.saturating_sub(now).max(0);
+    ((left + MINUTE - 1) / MINUTE).clamp(1, DAY_MINUTES)
 }
 
 /// The acks in force, per group, for the alert detail.
@@ -431,33 +735,6 @@ pub fn summary(acks: &[AlertAck], firing: &HashMap<String, i64>) -> Option<Alert
     })
 }
 
-/// Whether this task runs inside an alert's own ack propagation.
-pub fn propagating() -> bool {
-    ACK_ORIGIN.try_with(|_| ()).is_ok()
-}
-
-/// Acks every firing group of the alert for an ack made elsewhere (incident), skipping the rule.
-pub async fn ack_from_elsewhere(org_id: &str, alert_id: &str, actor: &str, source: AckSource) {
-    if propagating() {
-        return;
-    }
-    let target = match resolve_target(org_id, alert_id).await {
-        Ok(t) => t,
-        Err(AckError::NotFound) => return,
-        Err(e) => {
-            log::warn!("[ALERT_ACK] could not resolve {alert_id} for a {source:?} ack: {e:?}");
-            return;
-        }
-    };
-    let rows = firing_rows(&target).await;
-    if rows.is_empty() {
-        return;
-    }
-    if let Err(e) = write_acks(&target, &rows, actor, source, false).await {
-        log::error!("[ALERT_ACK] could not write the {source:?} ack of {alert_id}: {e:?}");
-    }
-}
-
 /// A row from another region landed: reopen the silence of an unack and refresh its messages.
 pub async fn after_replicated(ack: &AlertAck) {
     if let Some(at) = ack.unacked_at {
@@ -471,6 +748,62 @@ pub async fn after_replicated(ack: &AlertAck) {
         }
     }
     lifecycle::on_view_changed(&ack.org_id, &ack.alert_id, Some(&ack.group_key)).await;
+}
+
+/// Open responses on the alert subject and on the subject of the incident its firing joined.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn open_responses(
+    org_id: &str,
+    alert_id: &str,
+) -> Vec<config::meta::oncall::response::Response> {
+    use config::meta::oncall::subject::SubjectType;
+
+    if !o2_enterprise::enterprise::oncall::is_enabled() {
+        return vec![];
+    }
+    let mut found = Vec::new();
+    let mut subjects = vec![(SubjectType::Alert, alert_id.to_string())];
+    if let Some(incident_id) = firing_incident(org_id, alert_id).await {
+        subjects.push((SubjectType::Incident, incident_id));
+    }
+    for (kind, source) in subjects {
+        match open_for_source(org_id, kind, &source).await {
+            Ok(pages) => found.extend(pages.into_iter().map(|(page, _)| page)),
+            // A view shows what it can read.
+            Err(e) => log::warn!("[ALERT_ACK] could not read the pages of {source}: {e:?}"),
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    found.retain(|r| seen.insert(r.id.clone()));
+    found
+}
+
+/// The incident the alert's firing belongs to, for a view: a failed read reads as none.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn firing_incident(org_id: &str, alert_id: &str) -> Option<String> {
+    match firing_incident_checked(org_id, alert_id).await {
+        Ok(id) => id,
+        Err(e) => {
+            log::warn!("[ALERT_ACK] could not read the incident of {alert_id}: {e:?}");
+            None
+        }
+    }
+}
+
+/// The incident the alert's firing belongs to: the episode's, else the open one by alert id.
+#[cfg(feature = "enterprise")]
+async fn firing_incident_checked(org_id: &str, alert_id: &str) -> Result<Option<String>, AckError> {
+    let episode = infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY)
+        .await?
+        .and_then(|s| s.episode_incident_id);
+    if episode.is_some() {
+        return Ok(episode);
+    }
+    Ok(
+        infra::table::alert_incidents::find_open_incident_containing_alert(org_id, alert_id)
+            .await?
+            .map(|m| m.id),
+    )
 }
 
 /// The rows an ack can name: a multi-alert's firing groups, else the alert's own row.
@@ -503,105 +836,6 @@ async fn current_firing(target: &AckTarget, group_key: &str) -> Result<Option<i6
     Ok(infra::table::alert_states::get(&target.alert_id, group_key)
         .await?
         .and_then(|s| s.firing_started_at))
-}
-
-/// Writes one ack per row; a row already acked keeps its ack unless `take_over` moves it.
-async fn write_acks(
-    target: &AckTarget,
-    rows: &[(String, i64)],
-    actor: &str,
-    source: AckSource,
-    take_over: bool,
-) -> Result<(Vec<AckView>, bool, Vec<String>), AckError> {
-    let mut views = Vec::with_capacity(rows.len());
-    let mut changed = false;
-    let mut previous_holders = Vec::new();
-    for (group_key, started) in rows {
-        let now = now_micros();
-        let held = infra::table::alert_acks::get(&target.org_id, &target.alert_id, group_key)
-            .await?
-            .filter(|a| a.in_force_for(Some(*started)));
-        let taken_over_from = match held {
-            Some(h) if !take_over || h.acked_by.eq_ignore_ascii_case(actor) => {
-                views.push(h.view());
-                continue;
-            }
-            Some(h) => Some(h.acked_by),
-            None => None,
-        };
-        let ack = AlertAck {
-            org_id: target.org_id.clone(),
-            alert_id: target.alert_id.clone(),
-            group_key: group_key.clone(),
-            firing_started_at: *started,
-            acked_by: actor.to_string(),
-            acked_at: now,
-            ack_source: source,
-            taken_over_from: taken_over_from.clone(),
-            unacked_at: None,
-            unacked_by: None,
-            updated_at: now,
-        };
-        let won = if taken_over_from.is_some() {
-            db::alerts::alert_acks::put(&ack).await?;
-            true
-        } else {
-            db::alerts::alert_acks::claim(&ack).await?
-        };
-        if !won {
-            // Lost a race to another ack of the same firing: answer with theirs.
-            if let Some(theirs) =
-                infra::table::alert_acks::get(&target.org_id, &target.alert_id, group_key).await?
-            {
-                views.push(theirs.view());
-            }
-            continue;
-        }
-        changed = true;
-        if let Some(holder) = &taken_over_from {
-            previous_holders.push(holder.clone());
-        }
-        let action = if taken_over_from.is_some() {
-            AckAction::TakeOver
-        } else {
-            AckAction::Ack
-        };
-        record_event(target, group_key, actor, action, source, taken_over_from);
-        lifecycle::on_view_changed(&target.org_id, &target.alert_id, Some(group_key)).await;
-        views.push(ack.view());
-    }
-    Ok((views, changed, previous_holders))
-}
-
-/// Groups of a multi-alert still firing with no ack in force (R-132).
-async fn other_groups_unacked(target: &AckTarget) -> u32 {
-    if !target.multi_alert {
-        return 0;
-    }
-    let firing: Vec<(String, i64)> =
-        match infra::table::alert_states::firing_groups(&target.alert_id, None).await {
-            Ok(rows) => rows,
-            Err(e) => {
-                log::warn!(
-                    "[ALERT_ACK] could not list the firing groups of {}: {e}",
-                    target.alert_id
-                );
-                return 0;
-            }
-        };
-    let acks = infra::table::alert_acks::list_for_alert(&target.org_id, &target.alert_id)
-        .await
-        .unwrap_or_default();
-    let acked: HashMap<&str, &AlertAck> = acks.iter().map(|a| (a.group_key.as_str(), a)).collect();
-    let open = firing
-        .iter()
-        .filter(|(key, started)| {
-            !acked
-                .get(key.as_str())
-                .is_some_and(|a| a.in_force_for(Some(*started)))
-        })
-        .count();
-    u32::try_from(open).unwrap_or(u32::MAX)
 }
 
 /// Unack reopens the silence window from the unack time, through each kind's delivery state.
@@ -691,30 +925,21 @@ fn record_event(
 }
 
 #[cfg(feature = "enterprise")]
-async fn gather_facts(target: &AckTarget, actor: &str) -> AuthorizeFacts {
+async fn gather_facts(
+    p: &Problem,
+    actor: &str,
+    pages: &[config::meta::oncall::response::Response],
+) -> AuthorizeFacts {
     let root = db::user::is_root_user(actor);
     let fga_enabled = o2_openfga::config::get_config().enabled;
-    let fga_allows = !root
-        && fga_enabled
-        && crate::auth::check_permissions(
-            &target.alert_id,
-            &target.org_id,
-            actor,
-            "alerts",
-            "PUT",
-            Some(&target.folder_id),
-            false,
-            true,
-            false,
-        )
-        .await;
-    let role = crate::users::get_user(Some(&target.org_id), actor)
+    let fga_allows = !root && fga_enabled && may_edit_any_alert(p, actor).await;
+    let role = crate::users::get_user(Some(p.org_id()), actor)
         .await
         .map(|u| u.role);
     let responders = if root {
         vec![]
     } else {
-        responder_teams(target).await
+        responders_of(p.org_id(), pages).await
     };
     AuthorizeFacts {
         root,
@@ -726,9 +951,13 @@ async fn gather_facts(target: &AckTarget, actor: &str) -> AuthorizeFacts {
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn gather_facts(target: &AckTarget, actor: &str) -> AuthorizeFacts {
+async fn gather_facts(
+    p: &Problem,
+    actor: &str,
+    _pages: &[config::meta::oncall::response::Response],
+) -> AuthorizeFacts {
     let root = db::user::is_root_user(actor);
-    let role = crate::users::get_user(Some(&target.org_id), actor)
+    let role = crate::users::get_user(Some(p.org_id()), actor)
         .await
         .map(|u| u.role);
     AuthorizeFacts {
@@ -738,89 +967,56 @@ async fn gather_facts(target: &AckTarget, actor: &str) -> AuthorizeFacts {
     }
 }
 
-/// Open responses on the alert subject and on the subject of the incident its firing joined.
+/// OpenFGA edit on the alert, or on any alert of the incident (D24).
 #[cfg(feature = "enterprise")]
-pub(crate) async fn open_responses(
-    org_id: &str,
-    alert_id: &str,
-) -> Vec<config::meta::oncall::response::Response> {
-    use config::meta::oncall::subject::SubjectType;
-    use infra::table::oncall_responses;
-
-    if !o2_enterprise::enterprise::oncall::is_enabled() {
-        return vec![];
-    }
-    let mut found = Vec::new();
-    let mut subjects = vec![(SubjectType::Alert, alert_id.to_string())];
-    if let Some(incident_id) = firing_incident(org_id, alert_id).await {
-        subjects.push((SubjectType::Incident, incident_id));
-    }
-    for (kind, source) in subjects {
-        if let Ok(Some(r)) = oncall_responses::latest_open_for_source(org_id, kind, &source).await {
-            found.push(r);
-        }
-        if let Ok(rs) = oncall_responses::open_group_records_for_source(org_id, kind, &source).await
-        {
-            found.extend(rs);
-        }
-    }
-    let mut seen = std::collections::HashSet::new();
-    found.retain(|r| seen.insert(r.id.clone()));
-    found
+async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
+    may_edit_any_alert_with(p, |target: AckTarget| async move {
+        crate::auth::check_permissions(
+            &target.alert_id,
+            &target.org_id,
+            actor,
+            "alerts",
+            "PUT",
+            Some(&target.folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+    })
+    .await
 }
 
+/// The members of every team with an open page on the problem, owner or impacted.
 #[cfg(feature = "enterprise")]
-async fn responder_teams(target: &AckTarget) -> Vec<ResponderTeam> {
-    let mut teams = Vec::new();
-    for response in open_responses(&target.org_id, &target.alert_id).await {
-        let team_id = response.team().to_string();
-        if team_id.is_empty() {
+async fn responders_of(
+    org_id: &str,
+    pages: &[config::meta::oncall::response::Response],
+) -> Vec<ResponderTeam> {
+    let mut teams: Vec<ResponderTeam> = Vec::new();
+    for page in pages {
+        let team_id = page.team().to_string();
+        if team_id.is_empty() || teams.iter().any(|t| t.team_id == team_id) {
             continue;
         }
         let members = infra::table::oncall_teams::list_members(&team_id)
             .await
             .map(|m| m.into_iter().map(|m| m.user_email).collect())
             .unwrap_or_default();
-        let team_name = infra::table::oncall_teams::get_cached(&target.org_id, &team_id)
-            .await
-            .ok()
-            .flatten()
-            .map_or_else(|| team_id.clone(), |t| t.name);
-        let on_call = o2_enterprise::enterprise::oncall::service::who_is_on_call(
-            &target.org_id,
-            &team_id,
-            None,
-        )
-        .await
-        .map(|positions| positions.into_iter().map(|p| p.user_email).collect())
-        .unwrap_or_default();
+        let on_call =
+            o2_enterprise::enterprise::oncall::service::who_is_on_call(org_id, &team_id, None)
+                .await
+                .map(|positions| positions.into_iter().map(|p| p.user_email).collect())
+                .unwrap_or_default();
         teams.push(ResponderTeam {
-            response_id: response.id.clone(),
+            response_id: page.id.clone(),
+            team_name: team_name(org_id, &team_id).await,
             team_id,
-            team_name,
             members,
             on_call,
         });
     }
     teams
-}
-
-/// The incident the alert's firing belongs to: the episode's, else the open one by alert id.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn firing_incident(org_id: &str, alert_id: &str) -> Option<String> {
-    let episode = infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY)
-        .await
-        .ok()
-        .flatten()
-        .and_then(|s| s.episode_incident_id);
-    if episode.is_some() {
-        return episode;
-    }
-    infra::table::alert_incidents::find_open_incident_containing_alert(org_id, alert_id)
-        .await
-        .ok()
-        .flatten()
-        .map(|m| m.id)
 }
 
 async fn org_editors(org_id: &str) -> Vec<(String, UserRole, Option<String>)> {
@@ -848,160 +1044,803 @@ async fn org_editors(org_id: &str) -> Vec<(String, UserRole, Option<String>)> {
     out
 }
 
-/// Ack → the firing's incident (unless a downtime muted it) and, under the group rule, the pages.
-#[cfg(feature = "enterprise")]
-async fn propagate(
-    target: &AckTarget,
+fn same(a: &str, b: &str) -> bool {
+    a.trim().eq_ignore_ascii_case(b.trim())
+}
+
+fn plan_hold(f: &PlanFacts) -> AckPlan {
+    let take_over = f.verb == Verb::TakeOver;
+    let named: Vec<&HeldRecord> = f.records.iter().filter(|r| r.named).collect();
+    let free = named.iter().any(|r| r.holder.is_none());
+    let other = named
+        .iter()
+        .find_map(|r| r.holder.as_ref().filter(|h| !same(h, &f.actor)));
+    // Someone else holds all of it: nothing moves, and the stops their ack left unfinished finish
+    // as them.
+    if let Some(holder) = other
+        && !take_over
+        && !free
+    {
+        let (pages, still_paging) = hold_pages(f, holder, false);
+        return AckPlan {
+            writes: vec![],
+            pages,
+            still_paging,
+            answer: Answer::HeldBy(holder.clone()),
+        };
+    }
+    let writes = f
+        .records
+        .iter()
+        .filter_map(|r| hold_write(r, &f.actor, take_over).map(|w| (r.record.clone(), w)))
+        .collect();
+    let changed = named
+        .iter()
+        .any(|r| hold_write(r, &f.actor, take_over).is_some());
+    let (pages, still_paging) = hold_pages(f, &f.actor, take_over);
+    let answer = match (named.is_empty(), changed) {
+        (true, _) => Answer::NothingFiring,
+        (false, true) => Answer::Changed,
+        (false, false) => Answer::AlreadyYours,
+    };
+    AckPlan {
+        writes,
+        pages,
+        still_paging,
+        answer,
+    }
+}
+
+fn hold_write(r: &HeldRecord, actor: &str, take_over: bool) -> Option<RecordWrite> {
+    match &r.holder {
+        None => Some(RecordWrite::Claim),
+        Some(h) if same(h, actor) => None,
+        Some(h) if take_over => Some(RecordWrite::Move { from: h.clone() }),
+        Some(_) => None,
+    }
+}
+
+/// Each page's step when `by` holds the problem, and the pages left paging.
+fn hold_pages(
+    f: &PlanFacts,
+    by: &str,
+    take_over: bool,
+) -> (Vec<(String, PageStep)>, Vec<StillPaging>) {
+    let mut still_paging = Vec::new();
+    let pages = f
+        .pages
+        .iter()
+        .map(|p| {
+            let step = hold_step(p, f, by, take_over);
+            if step == PageStep::Leave && p.acked_by.is_none() {
+                still_paging.push(StillPaging {
+                    response_id: p.response_id.clone(),
+                    team: p.team.clone(),
+                });
+            }
+            (p.response_id.clone(), step)
+        })
+        .collect();
+    (pages, still_paging)
+}
+
+/// A take-over moves only a current page whose holder holds no other group of the alert.
+fn hold_step(p: &OpenPage, f: &PlanFacts, by: &str, take_over: bool) -> PageStep {
+    match &p.acked_by {
+        None if f.other_groups_unacked > 0 => PageStep::Leave,
+        None => PageStep::Stop { by: by.to_string() },
+        Some(h) if same(h, by) => PageStep::Leave,
+        Some(h) if take_over && p.current && !f.other_holders.iter().any(|o| same(o, h)) => {
+            PageStep::MoveTo { from: h.clone() }
+        }
+        Some(_) => PageStep::Leave,
+    }
+}
+
+/// An unack restarts the current pages an ack stopped (D34); a hand-off leaves them be.
+fn plan_release(f: &PlanFacts) -> AckPlan {
+    let held = f.records.iter().any(|r| r.named && r.holder.is_some());
+    let writes = if held {
+        f.records
+            .iter()
+            .filter_map(|r| {
+                r.holder
+                    .as_ref()
+                    .map(|h| (r.record.clone(), RecordWrite::Clear { holder: h.clone() }))
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+    let pages = f
+        .pages
+        .iter()
+        .map(|p| {
+            let step = match (&p.acked_by, f.verb) {
+                (Some(h), Verb::Unack) if p.current => PageStep::Restart { holder: h.clone() },
+                _ => PageStep::Leave,
+            };
+            (p.response_id.clone(), step)
+        })
+        .collect();
+    AckPlan {
+        writes,
+        pages,
+        still_paging: vec![],
+        answer: if held {
+            Answer::Changed
+        } else {
+            Answer::NotHeld
+        },
+    }
+}
+
+async fn hold(
+    p: &Problem,
+    verb: Verb,
     actor: &str,
-    other_groups_unacked: u32,
-    previous_holders: &[String],
-) -> (Option<AckIncidentRef>, Option<AckOncallOutcome>) {
-    let incident = ACK_ORIGIN
-        .scope(target.alert_id.clone(), ack_incident(target, actor))
-        .await;
-    let oncall = ACK_ORIGIN
-        .scope(
-            target.alert_id.clone(),
-            ack_pages(target, actor, other_groups_unacked, previous_holders),
-        )
-        .await;
-    (incident, oncall)
+    source: AckSource,
+) -> Result<AckResponse, AckError> {
+    let g = gather(p, verb, actor).await?;
+    let plan = plan(&g.facts);
+    // Nothing fires and no page is open: there is nothing to acknowledge at all.
+    if plan.answer == Answer::NothingFiring && g.facts.pages.is_empty() {
+        return Err(AckError::Conflict(AckConflict::NotFiring));
+    }
+    let out = carry_out(p, &g, &plan, actor, source).await?;
+    Ok(AckResponse {
+        changed: out.changed,
+        acks: out.acks,
+        incident: out.incident,
+        oncall: out.oncall,
+        other_groups_unacked: out.other_groups_unacked,
+    })
+}
+
+async fn release(
+    p: &Problem,
+    verb: Verb,
+    actor: &str,
+    source: AckSource,
+) -> Result<UnackResponse, AckError> {
+    let g = gather(p, verb, actor).await?;
+    let plan = plan(&g.facts);
+    let out = carry_out(p, &g, &plan, actor, source).await?;
+    Ok(UnackResponse {
+        changed: out.changed,
+        ack: out.acks.into_iter().next(),
+    })
+}
+
+/// Reads who holds each record of the problem and which of its pages are open. [strong] (reads)
+async fn gather(p: &Problem, verb: Verb, actor: &str) -> Result<Gathered, AckError> {
+    let mut pages = Vec::new();
+    for (r, current) in marked_problem_pages(p).await? {
+        let acked_by = (r.state == config::meta::oncall::ResponseState::Acknowledged)
+            .then(|| r.acked_by.clone())
+            .flatten();
+        pages.push(OpenPage {
+            team: team_name(&r.org_id, r.team()).await,
+            response_id: r.id,
+            acked_by,
+            current,
+        });
+    }
+    let mut g = Gathered {
+        facts: PlanFacts {
+            verb,
+            actor: actor.to_string(),
+            records: vec![],
+            other_groups_unacked: 0,
+            other_holders: vec![],
+            pages,
+        },
+        targets: HashMap::new(),
+        held: HashMap::new(),
+        incident_status: None,
+    };
+    match p {
+        Problem::Firing { target, groups } => gather_firing(&mut g, target, groups).await?,
+        Problem::Incident {
+            org_id,
+            incident_id,
+        } => gather_incident(&mut g, org_id, incident_id).await?,
+    }
+    Ok(g)
+}
+
+async fn gather_firing(
+    g: &mut Gathered,
+    target: &AckTarget,
+    groups: &Groups,
+) -> Result<(), AckError> {
+    let acks = infra::table::alert_acks::list_for_alert(&target.org_id, &target.alert_id).await?;
+    let named = match groups {
+        Groups::All => firing_rows(target).await,
+        Groups::One {
+            group_key,
+            firing_started_at,
+        } => one_row(target, group_key, *firing_started_at, g.facts.verb).await?,
+    };
+    for (group_key, started) in &named {
+        push_firing(g, target, group_key, *started, &acks, true);
+    }
+    if let Groups::One { group_key, .. } = groups
+        && target.multi_alert
+    {
+        for (key, started) in firing_rows(target).await {
+            if &key == group_key {
+                continue;
+            }
+            match acks
+                .iter()
+                .find(|a| a.group_key == key && a.in_force_for(Some(started)))
+            {
+                Some(a) => g.facts.other_holders.push(a.acked_by.clone()),
+                None => g.facts.other_groups_unacked += 1,
+            }
+        }
+    }
+    g.targets.insert(target.alert_id.clone(), target.clone());
+    Ok(())
+}
+
+/// The one row a group ack names; an unack names the firing it is given, or the current one.
+async fn one_row(
+    target: &AckTarget,
+    group_key: &str,
+    firing_started_at: Option<i64>,
+    verb: Verb,
+) -> Result<Vec<(String, i64)>, AckError> {
+    if matches!(verb, Verb::Unack | Verb::HandOff) {
+        let firing = match firing_started_at {
+            Some(f) => Some(f),
+            None => current_firing(target, group_key).await?,
+        };
+        return Ok(firing
+            .map(|f| vec![(group_key.to_string(), f)])
+            .unwrap_or_default());
+    }
+    // A multi-alert is acked per group, any other alert on its own row.
+    if target.multi_alert == (group_key == ROLLUP_GROUP_KEY) {
+        return Err(AckError::Conflict(AckConflict::NotFiring));
+    }
+    let Some(started) = current_firing(target, group_key).await? else {
+        return Err(AckError::Conflict(AckConflict::NotFiring));
+    };
+    if firing_started_at.is_some_and(|f| f != started) {
+        return Err(AckError::Conflict(AckConflict::FiringChanged {
+            firing_started_at: started,
+        }));
+    }
+    Ok(vec![(group_key.to_string(), started)])
+}
+
+fn push_firing(
+    g: &mut Gathered,
+    target: &AckTarget,
+    group_key: &str,
+    started: i64,
+    acks: &[AlertAck],
+    named: bool,
+) {
+    let held = acks
+        .iter()
+        .find(|a| a.group_key == group_key && a.in_force_for(Some(started)));
+    g.facts.records.push(HeldRecord {
+        record: AckRecord::Firing {
+            alert_id: target.alert_id.clone(),
+            group_key: group_key.to_string(),
+            firing_started_at: started,
+        },
+        holder: held.map(|a| a.acked_by.clone()),
+        named,
+    });
+    if let Some(a) = held {
+        g.held
+            .insert((target.alert_id.clone(), group_key.to_string()), a.clone());
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn gather_incident(
+    g: &mut Gathered,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<(), AckError> {
+    let Some(model) = infra::table::alert_incidents::get(org_id, incident_id).await? else {
+        return Err(AckError::NotFound);
+    };
+    let status: IncidentStatus = model.status.parse().unwrap_or_default();
+    g.incident_status = Some(status);
+    // A resolved incident has nothing to acknowledge or clear; reopening it is its own verb.
+    if status == IncidentStatus::Resolved {
+        return Ok(());
+    }
+    g.facts.records.push(HeldRecord {
+        record: AckRecord::Incident {
+            incident_id: incident_id.to_string(),
+        },
+        holder: (status == IncidentStatus::Acknowledged)
+            .then_some(model.acknowledged_by)
+            .flatten(),
+        named: true,
+    });
+    for alert_id in incident_alert_ids(incident_id).await? {
+        let target = match resolve_target(org_id, &alert_id).await {
+            Ok(t) => t,
+            Err(AckError::NotFound) => continue,
+            Err(e) => return Err(e),
+        };
+        let acks = infra::table::alert_acks::list_for_alert(org_id, &alert_id).await?;
+        for (group_key, started) in firing_rows(&target).await {
+            push_firing(g, &target, &group_key, started, &acks, false);
+        }
+        g.targets.insert(alert_id, target);
+    }
+    Ok(())
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn propagate(
-    _target: &AckTarget,
-    _actor: &str,
-    _other_groups_unacked: u32,
-    _previous_holders: &[String],
-) -> (Option<AckIncidentRef>, Option<AckOncallOutcome>) {
-    (None, None)
+async fn gather_incident(
+    _g: &mut Gathered,
+    _org_id: &str,
+    _incident_id: &str,
+) -> Result<(), AckError> {
+    Err(AckError::NotFound)
 }
 
+/// The alerts of an incident, each once.
 #[cfg(feature = "enterprise")]
-async fn ack_incident(target: &AckTarget, actor: &str) -> Option<AckIncidentRef> {
-    use config::meta::alerts::incidents::IncidentStatus;
-
-    let id = firing_incident(&target.org_id, &target.alert_id).await?;
-    let model = infra::table::alert_incidents::get(&target.org_id, &id)
-        .await
-        .ok()
-        .flatten()?;
-    let status: IncidentStatus = model.status.parse().unwrap_or_default();
-    // A downtime's mute owns a muted incident (AC-P2.3.3); an incident ack of it is left alone.
-    if model.muted_by_downtime_id.is_some() || status != IncidentStatus::Open {
-        return Some(AckIncidentRef { id, status });
-    }
-    match crate::alerts::incidents::update_status(&target.org_id, &id, "acknowledged", actor).await
-    {
-        Ok(updated) => Some(AckIncidentRef {
-            id,
-            status: updated.status,
-        }),
-        Err(e) => {
-            log::error!("[ALERT_ACK] could not acknowledge incident {id}: {e}");
-            Some(AckIncidentRef { id, status })
-        }
-    }
+async fn incident_alert_ids(incident_id: &str) -> Result<Vec<String>, AckError> {
+    let mut ids: Vec<String> = infra::table::alert_incidents::get_incident_alerts(incident_id)
+        .await?
+        .into_iter()
+        .map(|a| a.alert_id)
+        .collect();
+    ids.sort();
+    ids.dedup();
+    Ok(ids)
 }
 
-/// Acks the open pages only when no other group fires un-acked; otherwise they keep paging.
-#[cfg(feature = "enterprise")]
-async fn ack_pages(
-    target: &AckTarget,
+/// Carries the plan out: the named records first, so a lost race writes nothing else.
+async fn carry_out(
+    p: &Problem,
+    g: &Gathered,
+    plan: &AckPlan,
     actor: &str,
-    other_groups_unacked: u32,
-    previous_holders: &[String],
-) -> Option<AckOncallOutcome> {
-    use config::meta::alerts::ack::StillPaging;
-
-    let teams = responder_teams(target).await;
-    if teams.is_empty() {
-        return None;
-    }
-    let mut outcome = AckOncallOutcome::default();
-    let let_go = holders_who_let_go(target, previous_holders).await;
-    for team in teams {
-        for previous_holder in &let_go {
-            if let Err(e) = o2_enterprise::enterprise::oncall::escalation::take_over_as(
-                &target.org_id,
-                &team.response_id,
-                previous_holder,
-                actor,
-            )
-            .await
-            {
-                log::error!(
-                    "[ALERT_ACK] could not transfer page {}: {e}",
-                    team.response_id
-                );
+    source: AckSource,
+) -> Result<Outcome, AckError> {
+    let mut views: HashMap<(String, String), AckView> =
+        g.held.iter().map(|(k, a)| (k.clone(), a.view())).collect();
+    let mut won_named = false;
+    let mut lost_named = false;
+    let mut incident_status = g.incident_status;
+    for (record, write) in &plan.writes {
+        let named = g
+            .facts
+            .records
+            .iter()
+            .any(|r| &r.record == record && r.named);
+        let won = match record {
+            AckRecord::Incident { incident_id } => {
+                let won = write_incident(p.org_id(), incident_id, write, actor).await?;
+                if won {
+                    incident_status = Some(status_after(write));
+                } else if *write == RecordWrite::Claim {
+                    // Someone else's ack landed first; theirs stands and nothing else moves.
+                    incident_status = Some(IncidentStatus::Acknowledged);
+                    break;
+                }
+                won
             }
-        }
-        let still = StillPaging {
-            response_id: team.response_id.clone(),
-            team: team.team_name.clone(),
+            AckRecord::Firing {
+                alert_id,
+                group_key,
+                firing_started_at,
+            } => {
+                let Some(target) = g.targets.get(alert_id) else {
+                    return Err(AckError::Internal(format!("no target read for {alert_id}")));
+                };
+                let src = if matches!(p, Problem::Incident { .. }) {
+                    AckSource::Incident
+                } else {
+                    source
+                };
+                let (view, won) =
+                    write_firing(target, group_key, *firing_started_at, write, actor, src).await?;
+                let key = (alert_id.clone(), group_key.clone());
+                match view {
+                    Some(v) => views.insert(key, v),
+                    None => views.remove(&key),
+                };
+                won
+            }
         };
-        if other_groups_unacked > 0 {
-            outcome.still_paging.push(still);
+        won_named |= named && won;
+        lost_named |= named && !won;
+    }
+    // Every write asked for lost a race: the winner's own press stops the pages, as the winner.
+    let (oncall, stepped) = if lost_named && !won_named {
+        (None, false)
+    } else {
+        step_pages(p.org_id(), g, plan, actor).await
+    };
+    let page_only = matches!(plan.answer, Answer::NothingFiring | Answer::NotHeld);
+    Ok(Outcome {
+        changed: won_named || (page_only && stepped),
+        acks: ordered_views(&g.facts.records, &mut views),
+        incident: incident_ref(p, incident_status),
+        oncall,
+        other_groups_unacked: g.facts.other_groups_unacked,
+    })
+}
+
+fn ordered_views(
+    records: &[HeldRecord],
+    views: &mut HashMap<(String, String), AckView>,
+) -> Vec<AckView> {
+    records
+        .iter()
+        .filter_map(|r| match &r.record {
+            AckRecord::Firing {
+                alert_id,
+                group_key,
+                ..
+            } => views.remove(&(alert_id.clone(), group_key.clone())),
+            AckRecord::Incident { .. } => None,
+        })
+        .collect()
+}
+
+fn status_after(write: &RecordWrite) -> IncidentStatus {
+    match write {
+        RecordWrite::Claim | RecordWrite::Move { .. } => IncidentStatus::Acknowledged,
+        RecordWrite::Clear { .. } => IncidentStatus::Open,
+    }
+}
+
+fn incident_ref(p: &Problem, status: Option<IncidentStatus>) -> Option<AckIncidentRef> {
+    match (p, status) {
+        (Problem::Incident { incident_id, .. }, Some(status)) => Some(AckIncidentRef {
+            id: incident_id.clone(),
+            status,
+        }),
+        _ => None,
+    }
+}
+
+/// Writes one firing row; the view is the row as it stands after, and `true` when this write won.
+async fn write_firing(
+    target: &AckTarget,
+    group_key: &str,
+    started: i64,
+    write: &RecordWrite,
+    actor: &str,
+    source: AckSource,
+) -> Result<(Option<AckView>, bool), AckError> {
+    let now = now_micros();
+    let ack = |taken_over_from: Option<String>| AlertAck {
+        org_id: target.org_id.clone(),
+        alert_id: target.alert_id.clone(),
+        group_key: group_key.to_string(),
+        firing_started_at: started,
+        acked_by: actor.to_string(),
+        acked_at: now,
+        ack_source: source,
+        taken_over_from,
+        unacked_at: None,
+        unacked_by: None,
+        updated_at: now,
+    };
+    let (row, action, from) = match write {
+        RecordWrite::Claim => {
+            let row = ack(None);
+            if !db::alerts::alert_acks::claim(&row).await? {
+                // Lost a race to another ack of the same firing: answer with theirs.
+                let theirs =
+                    infra::table::alert_acks::get(&target.org_id, &target.alert_id, group_key)
+                        .await?;
+                return Ok((theirs.map(|t| t.view()), false));
+            }
+            (row, AckAction::Ack, None)
+        }
+        RecordWrite::Move { from } => {
+            let row = ack(Some(from.clone()));
+            if !db::alerts::alert_acks::take_over(&row, from).await? {
+                // The holder this read named let go or was taken over meanwhile: theirs stands.
+                let theirs =
+                    infra::table::alert_acks::get(&target.org_id, &target.alert_id, group_key)
+                        .await?;
+                return Ok((theirs.map(|t| t.view()), false));
+            }
+            (row, AckAction::TakeOver, Some(from.clone()))
+        }
+        RecordWrite::Clear { .. } => {
+            let Some(row) = db::alerts::alert_acks::unack(
+                &target.org_id,
+                &target.alert_id,
+                group_key,
+                started,
+                actor,
+                now,
+            )
+            .await?
+            else {
+                return Ok((None, false));
+            };
+            reopen_silence(target, group_key, started, now).await;
+            (row, AckAction::Unack, None)
+        }
+    };
+    record_event(target, group_key, actor, action, source, from);
+    lifecycle::on_view_changed(&target.org_id, &target.alert_id, Some(group_key)).await;
+    Ok((Some(row.view()), true))
+}
+
+/// Writes the incident row and its one event; `true` when this write won.
+#[cfg(feature = "enterprise")]
+async fn write_incident(
+    org_id: &str,
+    incident_id: &str,
+    write: &RecordWrite,
+    actor: &str,
+) -> Result<bool, AckError> {
+    use config::meta::alerts::incidents::IncidentEvent;
+    use infra::table::alert_incidents;
+
+    let (won, event) = match write {
+        RecordWrite::Claim => {
+            let Some(m) = alert_incidents::acknowledge(org_id, incident_id, actor).await? else {
+                return Err(AckError::NotFound);
+            };
+            let won = m.status == "acknowledged"
+                && m.acknowledged_by.as_deref().is_some_and(|h| same(h, actor));
+            (won, IncidentEvent::acknowledged(actor))
+        }
+        RecordWrite::Move { from } => (
+            alert_incidents::take_over_acknowledgement(org_id, incident_id, from, actor).await?,
+            IncidentEvent::acknowledged(actor),
+        ),
+        RecordWrite::Clear { holder } => (
+            alert_incidents::unacknowledge(org_id, incident_id, holder).await?,
+            IncidentEvent::reopened(actor, "Unacknowledged"),
+        ),
+    };
+    if won {
+        let status = status_after(write);
+        crate::alerts::incidents::record_ack_change(org_id, incident_id, status, event).await;
+    }
+    Ok(won)
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn write_incident(
+    _org_id: &str,
+    _incident_id: &str,
+    _write: &RecordWrite,
+    _actor: &str,
+) -> Result<bool, AckError> {
+    Err(AckError::NotFound)
+}
+
+/// Runs each page step (a failure is logged and still paging); true when any took effect.
+#[cfg(feature = "enterprise")]
+async fn step_pages(
+    org_id: &str,
+    g: &Gathered,
+    plan: &AckPlan,
+    actor: &str,
+) -> (Option<AckOncallOutcome>, bool) {
+    if plan.pages.is_empty() {
+        return (None, false);
+    }
+    let mut outcome = AckOncallOutcome {
+        acknowledged: vec![],
+        still_paging: plan.still_paging.clone(),
+        stopped: vec![],
+    };
+    let mut stepped = false;
+    for (response_id, step) in &plan.pages {
+        if *step == PageStep::Leave {
             continue;
         }
-        match o2_enterprise::enterprise::oncall::escalation::acknowledge_as(
-            &target.org_id,
-            &team.response_id,
-            actor,
-        )
-        .await
-        {
-            Ok(_) => outcome.acknowledged.push(team.response_id),
-            Err(e) => {
-                log::info!("[ALERT_ACK] page {} still paging: {e}", team.response_id);
-                outcome.still_paging.push(still);
-            }
-        }
-    }
-    Some(outcome)
-}
-
-/// Pages have no group, so one moves only once its holder acks no other firing group.
-#[cfg(feature = "enterprise")]
-async fn holders_who_let_go(target: &AckTarget, previous_holders: &[String]) -> Vec<String> {
-    if previous_holders.is_empty() {
-        return vec![];
-    }
-    let acks =
-        match infra::table::alert_acks::list_for_alert(&target.org_id, &target.alert_id).await {
-            Ok(acks) => acks,
-            Err(e) => {
-                log::warn!(
-                    "[ALERT_ACK] could not list the acks of {}; pages stay put: {e}",
-                    target.alert_id
-                );
-                return vec![];
-            }
+        let page = || StillPaging {
+            response_id: response_id.clone(),
+            team: g
+                .facts
+                .pages
+                .iter()
+                .find(|p| &p.response_id == response_id)
+                .map(|p| p.team.clone())
+                .unwrap_or_default(),
         };
-    let firing: HashMap<String, i64> = firing_rows(target).await.into_iter().collect();
-    let_go_of(previous_holders, &acks, &firing)
-}
-
-#[cfg(feature = "enterprise")]
-fn let_go_of(
-    previous_holders: &[String],
-    acks: &[AlertAck],
-    firing: &HashMap<String, i64>,
-) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    for holder in previous_holders {
-        let still_holds = acks.iter().any(|a| {
-            a.acked_by.eq_ignore_ascii_case(holder)
-                && firing
-                    .get(&a.group_key)
-                    .is_some_and(|started| a.in_force_for(Some(*started)))
-        });
-        if !still_holds && !out.iter().any(|h| h.eq_ignore_ascii_case(holder)) {
-            out.push(holder.clone());
+        match step_page(org_id, response_id, step, actor).await {
+            Ok(false) => {}
+            Ok(true) => {
+                stepped = true;
+                if !matches!(step, PageStep::Restart { .. }) {
+                    outcome.acknowledged.push(response_id.clone());
+                    outcome.stopped.push(page());
+                }
+            }
+            Err(e) => {
+                log::error!("[ALERT_ACK] page {response_id}: {step:?} failed: {e}");
+                if matches!(step, PageStep::Stop { .. }) {
+                    outcome.still_paging.push(page());
+                }
+            }
         }
     }
-    out
+    (Some(outcome), stepped)
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn step_pages(
+    _org_id: &str,
+    _g: &Gathered,
+    _plan: &AckPlan,
+    _actor: &str,
+) -> (Option<AckOncallOutcome>, bool) {
+    (None, false)
+}
+
+/// One page step through the enterprise ladder functions; true when it changed the page.
+#[cfg(feature = "enterprise")]
+async fn step_page(
+    org_id: &str,
+    response_id: &str,
+    step: &PageStep,
+    actor: &str,
+) -> Result<bool, anyhow::Error> {
+    use config::meta::oncall::ResponseState;
+    use o2_enterprise::enterprise::oncall::escalation;
+
+    let held_by = |r: Option<config::meta::oncall::response::Response>, who: &str| {
+        r.is_some_and(|r| {
+            r.state == ResponseState::Acknowledged
+                && r.acked_by.as_deref().is_some_and(|h| same(h, who))
+        })
+    };
+    match step {
+        PageStep::Leave => Ok(false),
+        PageStep::Stop { by } => {
+            let after = escalation::acknowledge_as(org_id, response_id, by).await?;
+            Ok(held_by(Some(after), by))
+        }
+        PageStep::MoveTo { from } => {
+            escalation::take_over_as(org_id, response_id, from, actor).await?;
+            Ok(held_by(
+                infra::table::oncall_responses::get(org_id, response_id).await?,
+                actor,
+            ))
+        }
+        PageStep::Restart { holder } => {
+            match escalation::reopen(org_id, response_id, actor, holder).await {
+                Ok(reopened) => Ok(reopened.is_some()),
+                // `reopen` can fail after the restart committed; then the page did restart.
+                Err(e) => {
+                    let after = infra::table::oncall_responses::get(org_id, response_id).await?;
+                    if after.is_some_and(|r| r.state.is_escalating()) {
+                        log::error!(
+                            "[ALERT_ACK] page {response_id} restarted without its ladder armed: {e}"
+                        );
+                        return Ok(true);
+                    }
+                    Err(e)
+                }
+            }
+        }
+    }
+}
+
+/// The open pages of the problem: its subjects' pages and the impacted teams' pages they opened.
+async fn problem_pages(
+    p: &Problem,
+) -> Result<Vec<config::meta::oncall::response::Response>, AckError> {
+    Ok(marked_problem_pages(p)
+        .await?
+        .into_iter()
+        .map(|(page, _)| page)
+        .collect())
+}
+
+/// [`problem_pages`], each marked current or left over from an earlier firing (D34).
+#[cfg(feature = "enterprise")]
+async fn marked_problem_pages(
+    p: &Problem,
+) -> Result<Vec<(config::meta::oncall::response::Response, bool)>, AckError> {
+    use config::meta::oncall::SubjectType;
+
+    if !o2_enterprise::enterprise::oncall::is_enabled() {
+        return Ok(vec![]);
+    }
+    let org_id = p.org_id();
+    let mut subjects = match p {
+        Problem::Firing { target, .. } => vec![(SubjectType::Alert, target.alert_id.clone())],
+        Problem::Incident { incident_id, .. } => vec![(SubjectType::Incident, incident_id.clone())],
+    };
+    if let Problem::Incident { incident_id, .. } = p {
+        let alerts = incident_alert_ids(incident_id).await?;
+        subjects.extend(alerts.into_iter().map(|a| (SubjectType::Alert, a)));
+    }
+    let mut found = Vec::new();
+    for (kind, source) in subjects {
+        found.extend(open_for_source(org_id, kind, &source).await?);
+    }
+    let owners: Vec<(String, bool)> = found.iter().map(|(r, now)| (r.id.clone(), *now)).collect();
+    for (owner, now) in owners {
+        let impacted = infra::table::oncall_responses::list_impacted(org_id, &owner).await?;
+        found.extend(impacted.into_iter().map(|r| (r, now)));
+    }
+    let mut seen = std::collections::HashSet::new();
+    found.retain(|(r, _)| {
+        r.closed_at.is_none() && !r.state.is_terminal() && seen.insert(r.id.clone())
+    });
+    Ok(found)
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn marked_problem_pages(
+    _p: &Problem,
+) -> Result<Vec<(config::meta::oncall::response::Response, bool)>, AckError> {
+    Ok(vec![])
+}
+
+/// Every open page of a subject and its open per-group pages; only the newest firing's is current.
+#[cfg(feature = "enterprise")]
+async fn open_for_source(
+    org_id: &str,
+    kind: config::meta::oncall::SubjectType,
+    source: &str,
+) -> Result<Vec<(config::meta::oncall::response::Response, bool)>, AckError> {
+    use infra::table::oncall_responses;
+
+    // Newest first, so the first record is the current firing's.
+    let records = oncall_responses::open_records_for_source(org_id, kind, source).await?;
+    let mut found: Vec<_> = records
+        .into_iter()
+        .enumerate()
+        .map(|(i, r)| (r, i == 0))
+        .collect();
+    let groups = oncall_responses::open_group_records_for_source(org_id, kind, source).await?;
+    found.extend(groups.into_iter().map(|r| (r, true)));
+    Ok(found)
+}
+
+/// A team's display name; a teamless page has none.
+#[cfg(feature = "enterprise")]
+async fn team_name(org_id: &str, team_id: &str) -> String {
+    if team_id.is_empty() {
+        return String::new();
+    }
+    infra::table::oncall_teams::get_cached(org_id, team_id)
+        .await
+        .ok()
+        .flatten()
+        .map_or_else(|| team_id.to_string(), |t| t.name)
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn team_name(_org_id: &str, team_id: &str) -> String {
+    team_id.to_string()
+}
+
+/// The incident the alert's firing is in, unless a downtime mutes it (then it is the mute's).
+#[cfg(feature = "enterprise")]
+async fn incident_of(target: &AckTarget) -> Result<Option<String>, AckError> {
+    let Some(id) = firing_incident_checked(&target.org_id, &target.alert_id).await? else {
+        return Ok(None);
+    };
+    Ok(infra::table::alert_incidents::get(&target.org_id, &id)
+        .await?
+        .filter(|m| m.muted_by_downtime_id.is_none())
+        .map(|_| id))
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn incident_of(_target: &AckTarget) -> Result<Option<String>, AckError> {
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -1146,25 +1985,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn a_holder_lets_go_only_with_no_in_force_ack_left_on_the_alert() {
-        let firing: HashMap<String, i64> =
-            [("g1".to_string(), 100), ("g2".to_string(), 300)].into();
-        let alice = |key: &str, started: i64| AlertAck {
-            acked_by: "alice@acme.com".into(),
-            ..ack(key, started, 5)
-        };
-        let holders = vec!["ALICE@acme.com".to_string(), "alice@acme.com".to_string()];
-        assert!(let_go_of(&holders, &[alice("g2", 300)], &firing).is_empty());
-        assert_eq!(
-            let_go_of(&holders, &[alice("g2", 200)], &firing),
-            vec!["ALICE@acme.com".to_string()],
-            "an ack of an older firing holds nothing"
-        );
-        assert_eq!(let_go_of(&holders, &[], &firing).len(), 1);
-    }
-
     #[test]
     fn only_acks_of_the_current_firing_are_in_force_and_summarised() {
         let states: HashMap<String, AlertState> = [
@@ -1191,12 +2011,323 @@ mod tests {
         assert!(summary(&acks, &HashMap::new()).is_none());
     }
 
-    #[tokio::test]
-    async fn the_origin_guard_is_set_only_inside_an_alerts_own_propagation() {
-        assert!(!propagating());
-        let inside = ACK_ORIGIN
-            .scope("a1".to_string(), async { propagating() })
-            .await;
-        assert!(inside);
+    fn firing(group: &str, holder: Option<&str>, named: bool) -> HeldRecord {
+        HeldRecord {
+            record: AckRecord::Firing {
+                alert_id: "a1".into(),
+                group_key: group.into(),
+                firing_started_at: 100,
+            },
+            holder: holder.map(str::to_string),
+            named,
+        }
+    }
+
+    fn incident(holder: Option<&str>) -> HeldRecord {
+        HeldRecord {
+            record: AckRecord::Incident {
+                incident_id: "i1".into(),
+            },
+            holder: holder.map(str::to_string),
+            named: true,
+        }
+    }
+
+    fn page(id: &str, acked_by: Option<&str>) -> OpenPage {
+        OpenPage {
+            response_id: id.into(),
+            team: format!("team-{id}"),
+            acked_by: acked_by.map(str::to_string),
+            current: true,
+        }
+    }
+
+    /// A page left open by an earlier firing of the same alert.
+    fn leftover(id: &str, acked_by: Option<&str>) -> OpenPage {
+        OpenPage {
+            current: false,
+            ..page(id, acked_by)
+        }
+    }
+
+    fn facts_for(verb: Verb, records: Vec<HeldRecord>, pages: Vec<OpenPage>) -> PlanFacts {
+        PlanFacts {
+            verb,
+            actor: "bo@acme.io".into(),
+            records,
+            other_groups_unacked: 0,
+            other_holders: vec![],
+            pages,
+        }
+    }
+
+    fn claim(r: &HeldRecord) -> (AckRecord, RecordWrite) {
+        (r.record.clone(), RecordWrite::Claim)
+    }
+
+    #[test]
+    fn the_plan_decides_every_write_and_page_step_of_each_verb() {
+        use PageStep::{Leave, MoveTo, Restart};
+        let stop = |by: &str| PageStep::Stop { by: by.into() };
+        let ana = Some("ana@acme.io");
+        let moved = |r: &HeldRecord| {
+            (
+                r.record.clone(),
+                RecordWrite::Move {
+                    from: "ana@acme.io".into(),
+                },
+            )
+        };
+        let cleared = |r: &HeldRecord| {
+            (
+                r.record.clone(),
+                RecordWrite::Clear {
+                    holder: "ana@acme.io".into(),
+                },
+            )
+        };
+        let from_ana = || MoveTo {
+            from: "ana@acme.io".into(),
+        };
+        let restart = || Restart {
+            holder: "ana@acme.io".into(),
+        };
+        let still = |id: &str| StillPaging {
+            response_id: id.into(),
+            team: format!("team-{id}"),
+        };
+        let one_of_three = PlanFacts {
+            other_groups_unacked: 2,
+            ..facts_for(
+                Verb::Acknowledge,
+                vec![firing("g1", None, true)],
+                vec![page("p1", None)],
+            )
+        };
+        let holder_keeps_another_group = PlanFacts {
+            other_holders: vec!["ANA@acme.io".into()],
+            ..facts_for(
+                Verb::TakeOver,
+                vec![firing("g1", ana, true)],
+                vec![page("p1", ana)],
+            )
+        };
+        #[allow(clippy::type_complexity)]
+        let cases: Vec<(
+            &str,
+            PlanFacts,
+            Vec<(AckRecord, RecordWrite)>,
+            Vec<(&str, PageStep)>,
+            Vec<StillPaging>,
+            Answer,
+        )> = vec![
+            (
+                "a free firing is claimed and its page stops",
+                facts_for(
+                    Verb::Acknowledge,
+                    vec![firing("", None, true)],
+                    vec![page("p1", None)],
+                ),
+                vec![claim(&firing("", None, true))],
+                vec![("p1", stop("bo@acme.io"))],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "one group of three leaves the page paging",
+                one_of_three,
+                vec![claim(&firing("g1", None, true))],
+                vec![("p1", Leave)],
+                vec![still("p1")],
+                Answer::Changed,
+            ),
+            (
+                "an incident stops its owner and its impacted page",
+                facts_for(
+                    Verb::Acknowledge,
+                    vec![incident(None), firing("", None, false)],
+                    vec![page("owner", None), page("impacted", None)],
+                ),
+                vec![claim(&incident(None)), claim(&firing("", None, false))],
+                vec![
+                    ("owner", stop("bo@acme.io")),
+                    ("impacted", stop("bo@acme.io")),
+                ],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "held by someone else writes nothing and finishes the holder's stops as the holder",
+                facts_for(
+                    Verb::Acknowledge,
+                    vec![incident(ana), firing("", ana, false)],
+                    vec![page("p1", None)],
+                ),
+                vec![],
+                vec![("p1", stop("ana@acme.io"))],
+                vec![],
+                Answer::HeldBy("ana@acme.io".into()),
+            ),
+            (
+                "the holder's retry stops the page a failed stop left paging",
+                facts_for(
+                    Verb::Acknowledge,
+                    vec![firing("", Some("Bo@acme.io"), true)],
+                    vec![page("p1", None)],
+                ),
+                vec![],
+                vec![("p1", stop("bo@acme.io"))],
+                vec![],
+                Answer::AlreadyYours,
+            ),
+            (
+                "a take over moves every record and page",
+                facts_for(
+                    Verb::TakeOver,
+                    vec![incident(ana), firing("", ana, false)],
+                    vec![page("owner", ana), page("impacted", ana)],
+                ),
+                vec![moved(&incident(ana)), moved(&firing("", ana, false))],
+                vec![("owner", from_ana()), ("impacted", from_ana())],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "a page stays with a holder who still acks another group",
+                holder_keeps_another_group,
+                vec![moved(&firing("g1", ana, true))],
+                vec![("p1", Leave)],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "an unack clears every record and restarts the pages it stopped",
+                facts_for(
+                    Verb::Unack,
+                    vec![incident(ana), firing("", ana, false)],
+                    vec![page("owner", ana), page("paging", None)],
+                ),
+                vec![cleared(&incident(ana)), cleared(&firing("", ana, false))],
+                vec![("owner", restart()), ("paging", Leave)],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "a hand-off clears the records and leaves the pages to the hand-off",
+                facts_for(
+                    Verb::HandOff,
+                    vec![firing("", ana, true)],
+                    vec![page("owner", ana)],
+                ),
+                vec![cleared(&firing("", ana, true))],
+                vec![("owner", Leave)],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "an unack with nothing held still restarts the page an ack stopped",
+                facts_for(
+                    Verb::Unack,
+                    vec![firing("", None, true)],
+                    vec![page("p1", ana)],
+                ),
+                vec![],
+                vec![("p1", restart())],
+                vec![],
+                Answer::NotHeld,
+            ),
+            (
+                "D34: an unack restarts only the current firing's page",
+                facts_for(
+                    Verb::Unack,
+                    vec![firing("", ana, true)],
+                    vec![page("now", ana), leftover("old", ana)],
+                ),
+                vec![cleared(&firing("", ana, true))],
+                vec![("now", restart()), ("old", Leave)],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "D34: a take over moves only the current firing's page",
+                facts_for(
+                    Verb::TakeOver,
+                    vec![firing("", ana, true)],
+                    vec![page("now", ana), leftover("old", ana)],
+                ),
+                vec![moved(&firing("", ana, true))],
+                vec![("now", from_ana()), ("old", Leave)],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "D34: an ack still stops a leftover page",
+                facts_for(
+                    Verb::Acknowledge,
+                    vec![firing("", None, true)],
+                    vec![leftover("old", None)],
+                ),
+                vec![claim(&firing("", None, true))],
+                vec![("old", stop("bo@acme.io"))],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "a hand-off with nothing held leaves the page to the hand-off",
+                facts_for(Verb::HandOff, vec![], vec![page("p1", ana)]),
+                vec![],
+                vec![("p1", Leave)],
+                vec![],
+                Answer::NotHeld,
+            ),
+            (
+                "nothing firing still stops the open page",
+                facts_for(
+                    Verb::Acknowledge,
+                    vec![],
+                    vec![page("p1", None), page("p2", ana)],
+                ),
+                vec![],
+                vec![("p1", stop("bo@acme.io")), ("p2", Leave)],
+                vec![],
+                Answer::NothingFiring,
+            ),
+        ];
+        for (name, facts, writes, pages, still_paging, answer) in cases {
+            let got = plan(&facts);
+            assert_eq!(got.writes, writes, "{name}");
+            let pages: Vec<(String, PageStep)> = pages
+                .into_iter()
+                .map(|(id, step)| (id.to_string(), step))
+                .collect();
+            assert_eq!(got.pages, pages, "{name}");
+            assert_eq!(got.still_paging, still_paging, "{name}");
+            assert_eq!(got.answer, answer, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_mute_snoozes_its_pages_for_its_whole_minutes_up_to_a_day() {
+        const MINUTE: i64 = 60 * 1_000_000;
+        for (until, minutes) in [
+            (30 * MINUTE, 30),
+            (30 * MINUTE + 1, 31),
+            (0, 1),
+            (48 * 60 * MINUTE, 24 * 60),
+        ] {
+            assert_eq!(snooze_minutes(until, 0), minutes, "{until}");
+        }
+    }
+
+    #[test]
+    fn a_page_names_its_source_without_the_group_or_impacted_suffix() {
+        for (page_source, source) in [
+            ("a1", "a1"),
+            ("a1:group:host=web-1", "a1"),
+            ("i1:impacted:team_2", "i1"),
+            ("a1:group:host=web-1:impacted:team_2", "a1"),
+        ] {
+            assert_eq!(source_of_page(page_source), source, "{page_source}");
+        }
     }
 }

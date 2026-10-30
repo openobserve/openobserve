@@ -137,6 +137,146 @@ describe("useAlertActions", () => {
     expect(lastToast()?.message).toBe("You took over the acknowledgement of cpu-high");
   });
 
+  it("names who it was taken over from", async () => {
+    vi.mocked(alerts.ackAlert).mockResolvedValue({
+      data: {
+        changed: true,
+        acks: [{ ...ack("me@acme.io"), taken_over_from: "carol@acme.io" }],
+        other_groups_unacked: 0,
+      },
+    } as any);
+    await mountActions().takeOver(target, { groupKey: "" });
+    expect(lastToast()?.message).toBe("You took over from carol@acme.io");
+  });
+
+  it("says which teams' paging the ack stopped", async () => {
+    vi.mocked(alerts.ackAlert).mockResolvedValue({
+      data: {
+        changed: true,
+        acks: [ack("me@acme.io")],
+        oncall: {
+          acknowledged: ["p1"],
+          still_paging: [],
+          stopped: [{ response_id: "p1", team: "Payments" }],
+        },
+        other_groups_unacked: 0,
+      },
+    } as any);
+    await mountActions().acknowledge(target);
+    expect(lastToast()?.message).toBe("Acknowledged cpu-high · paging stopped for Payments");
+  });
+
+  it("offers Acknowledge all after one group while others still fire and page", async () => {
+    vi.mocked(alerts.ackAlert).mockResolvedValue({
+      data: {
+        changed: true,
+        acks: [ack("me@acme.io", "g1")],
+        oncall: { acknowledged: [], still_paging: [{ response_id: "p1", team: "Payments" }] },
+        other_groups_unacked: 2,
+      },
+    } as any);
+    await mountActions().acknowledge(target, { groupKey: "g1" });
+    const shown = lastToast();
+    expect(shown?.message).toBe(
+      "1 group acknowledged · 2 still unacknowledged · Payments still paged",
+    );
+    expect(shown?.action?.label).toBe("Acknowledge all");
+    await shown?.action?.handler();
+    expect(alerts.ackAlert).toHaveBeenLastCalledWith("acme", "a1", { all_groups: true }, "ops");
+  });
+
+  it("says the ack is already yours on a double click", async () => {
+    vi.mocked(alerts.ackAlert).mockResolvedValue({
+      data: { changed: false, acks: [ack("me@acme.io")], other_groups_unacked: 0 },
+    } as any);
+    await mountActions().acknowledge(target);
+    expect(lastToast()).toEqual({ variant: "info", message: "Already acknowledged by you" });
+  });
+
+  it("offers Take over when someone was faster", async () => {
+    vi.mocked(alerts.ackAlert).mockResolvedValue({
+      data: { changed: false, acks: [ack("carol@acme.io")], other_groups_unacked: 0 },
+    } as any);
+    await mountActions().acknowledge(target);
+    const shown = lastToast();
+    expect(shown?.action?.label).toBe("Take over");
+    await shown?.action?.handler();
+    expect(alerts.ackAlert).toHaveBeenLastCalledWith(
+      "acme",
+      "a1",
+      { group_key: "", take_over: true },
+      "ops",
+    );
+  });
+
+  it("says which pages a mute snoozed and which it could not", async () => {
+    vi.mocked(alerts.muteAlert).mockResolvedValue({
+      data: {
+        downtime_id: "d1",
+        version: 1,
+        ends_at: 1_786_586_400_000_000,
+        pages: [
+          { response_id: "p1", team: "Payments", snoozed_until: 1_786_586_400_000_000 },
+          { response_id: "p2", team: "", refused: "This page has no team yet." },
+        ],
+      },
+    } as any);
+    await mountActions().mute(target, { minutes: 60 });
+    const message = lastToast()?.message ?? "";
+    expect(message).toContain(" · Payments page snoozed until ");
+    expect(message).toContain(" · page not snoozed: This page has no team yet.");
+  });
+
+  it("keeps the group count when an all-groups ack also stops paging", async () => {
+    vi.mocked(alerts.ackAlert).mockResolvedValue({
+      data: {
+        changed: true,
+        acks: [ack("me@acme.io", "g1"), ack("me@acme.io", "g2")],
+        oncall: {
+          acknowledged: ["p1"],
+          still_paging: [],
+          stopped: [{ response_id: "p1", team: "Payments" }],
+        },
+        other_groups_unacked: 0,
+      },
+    } as any);
+    await mountActions().acknowledge(target, { allGroups: true });
+    expect(lastToast()?.message).toBe(
+      "Acknowledged 2 groups of cpu-high · paging stopped for Payments",
+    );
+  });
+
+  it("takes over every group when the faster ack was an all-groups one", async () => {
+    vi.mocked(alerts.ackAlert).mockResolvedValue({
+      data: { changed: false, acks: [ack("carol@acme.io", "g1")], other_groups_unacked: 0 },
+    } as any);
+    await mountActions().acknowledge(target, { allGroups: true });
+    await lastToast()?.action?.handler();
+    expect(alerts.ackAlert).toHaveBeenLastCalledWith(
+      "acme",
+      "a1",
+      { all_groups: true, take_over: true },
+      "ops",
+    );
+  });
+
+  it.each([
+    ["unacknowledge", "You can't unacknowledge this."],
+    ["takeOver", "You can't take this over."],
+  ] as const)("titles a refused %s with its own verb", async (verb, title) => {
+    const refused = httpError(403, {
+      code: "ack_refused",
+      message: "refused",
+      rule: "role",
+      on_call: [],
+      can_act: [{ email: "root@acme.io" }],
+    });
+    vi.mocked(alerts.ackAlert).mockRejectedValue(refused);
+    vi.mocked(alerts.unackAlert).mockRejectedValue(refused);
+    await mountActions()[verb](target, { groupKey: "" });
+    expect(lastToast()?.title).toBe(title);
+  });
+
   it("shows a refusal with who is on call and who can act", async () => {
     vi.mocked(alerts.ackAlert).mockRejectedValue(
       httpError(403, {
@@ -151,8 +291,8 @@ describe("useAlertActions", () => {
     expect(ok).toBe(false);
     expect(lastToast()).toMatchObject({
       variant: "error",
-      title: expect.stringContaining("You can't acknowledge this alert"),
-      message: "On call: Dana. Can act: root@acme.io",
+      title: "You can't acknowledge this.",
+      message: "On call: Dana. Can also act: root@acme.io",
     });
   });
 

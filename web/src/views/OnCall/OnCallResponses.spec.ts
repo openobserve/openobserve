@@ -243,7 +243,7 @@ const stubs = {
   },
   OSelect: { name: "OSelect", props: ["options", "disabled", "width"], template: "<select />" },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
-  OTooltip: { name: "OTooltip", template: "<span />" },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
   // Mirrors the real OButton: `emits` declared (without it the listener also
   // falls through and every handler runs twice), and the event is passed on,
   // which row actions need in order to stop the row-click navigating.
@@ -506,6 +506,27 @@ describe("OnCallResponses", () => {
     /// case a responder most needs to see, not one to bury under "handled"
     /// next to pages that already have an owner — "Nobody yet" under a
     /// heading that says a human owns each of these was the bug.
+    it("hints that a row's Acknowledge stops paging its team and shows on the alert", async () => {
+      const wrapper = await withPages([page({ id: "resp_1" })]);
+      const ack = wrapper.find('[data-test^="oncall-row-ack-"]');
+      expect(ack.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        `Stops paging ${team.name}. Shows as acknowledged on the alert.`,
+      );
+    });
+
+    it("says incident in an incident row's hint", async () => {
+      const wrapper = await withPages([
+        page({
+          id: "resp_1",
+          subject: { subject_type: "incident", source_id: "inc_1", firing: 1 },
+        }),
+      ]);
+      const ack = wrapper.find('[data-test^="oncall-row-ack-"]');
+      expect(ack.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        `Stops paging ${team.name}. Shows as acknowledged on the incident.`,
+      );
+    });
+
     it("keeps an exhausted-ladder page in the ringing run until somebody claims it", async () => {
       service.escalationProgress.mockResolvedValue({
         data: {

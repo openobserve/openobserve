@@ -454,16 +454,31 @@ const oncall = {
     data: { oncall_team?: string; dimensions: Record<string, string> };
   }) => http().post<RoutingPreview>(`/api/${org_identifier}/oncall/routing/preview`, data),
 
-  /// Claims the page and stops the ladder.
+  /// Acknowledges the page's problem, which stops every page of it; `take_over` moves someone else's.
   acknowledgeResponse: ({
+    org_identifier,
+    response_id,
+    take_over,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    take_over?: boolean;
+  }) =>
+    http().post<OnCallResponse & { ack?: { changed: boolean } | null }>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+      ...(take_over ? [{ take_over }] : []),
+    ),
+
+  /// Clears the acknowledgement of the page's problem; the pages it stopped restart at step 1.
+  unacknowledgeResponse: ({
     org_identifier,
     response_id,
   }: {
     org_identifier: string;
     response_id: string;
   }) =>
-    http().post<OnCallResponse>(
-      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+    http().post<OnCallResponse & { ack?: { changed: boolean } | null }>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/unacknowledge`,
     ),
 
   /// Quiets the page for a while WITHOUT claiming it — the record stays open

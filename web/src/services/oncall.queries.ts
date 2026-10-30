@@ -686,6 +686,24 @@ export const acknowledgeResponseMutation = (org: string) =>
     meta: { invalidates: responseWriteScopes(org), silentError: true },
   });
 
+export const takeOverResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.acknowledgeResponse({
+        org_identifier: org,
+        response_id: responseId,
+        take_over: true,
+      }),
+    meta: { invalidates: responseWriteScopes(org), silentError: true },
+  });
+
+export const unacknowledgeResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.unacknowledgeResponse({ org_identifier: org, response_id: responseId }),
+    meta: { invalidates: responseWriteScopes(org), silentError: true },
+  });
+
 /** The ladder resumes on its own when the snooze lapses — see the live tier on the reads. */
 export const snoozeResponseMutation = (org: string) =>
   mutationOptions({

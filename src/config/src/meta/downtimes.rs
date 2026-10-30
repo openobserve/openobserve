@@ -701,6 +701,20 @@ pub struct AlertMuteResponse {
     pub end_on_clear: Option<EndOnClear>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_groups: Option<Vec<AlertGroupRef>>,
+    /// The open on-call pages of the alert's problem the mute snoozed, or tried to.
+    #[serde(default)]
+    pub pages: Vec<MutedPage>,
+}
+
+/// One page a mute snoozed until it ends; `refused` says why it was not.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MutedPage {
+    pub response_id: String,
+    pub team: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snoozed_until: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refused: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
