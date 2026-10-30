@@ -76,6 +76,7 @@ pub mod rum_analytics;
 pub mod score_configs;
 #[cfg(feature = "enterprise")]
 pub mod scorers;
+pub mod security;
 pub mod service_accounts;
 pub mod service_streams;
 pub mod short_url;

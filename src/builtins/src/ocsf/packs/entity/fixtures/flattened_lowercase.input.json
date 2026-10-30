@@ -1,0 +1,8 @@
+{
+  "user_name": "carol",
+  "sourceipaddress": "198.51.100.7",
+  "computer_name": "ws-3",
+  "device_hostname": "preset-host",
+  "severity_text": "warn",
+  "event_outcome": "failed"
+}

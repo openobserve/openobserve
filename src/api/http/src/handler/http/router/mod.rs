@@ -31,8 +31,8 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
     kv, metrics_usage, model_pricing, organization, public_dashboards, query_history,
-    rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status, status_pages,
-    stream, synthetics, users,
+    rum_analytics, security, service_accounts, short_url, slack, slos, sourcemaps, status,
+    status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1235,6 +1235,9 @@ pub fn service_routes() -> Router {
         // Announcement banners: read by every org, authored on the meta org
         .route("/{org_id}/announcements", get(announcements::get_announcements))
         .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
+
+        // Built-in OCSF packs: read-only, no org data
+        .route("/{org_id}/security/ocsf/packs", get(security::list_ocsf_packs))
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))

@@ -1,0 +1,91 @@
+# entity@1: OCSF Base Event for any log with a user, IP or host. A column is skipped when the event already has it.
+user_value = null
+for_each(["user", "username", "user_name", "principal", "account"]) -> |_index, key| {
+  value = get(., [key]) ?? null
+  if key == "user" && is_object(value) {
+    value = get(value, ["name"]) ?? null
+  }
+  if user_value == null && is_string(value) && value != "" {
+    user_value = value
+  }
+}
+
+ip_value = null
+for_each(["src_ip", "source_ip", "client_ip", "sourceipaddress", "remote_addr", "ip"]) -> |_index, key| {
+  value = get(., [key]) ?? null
+  if ip_value == null && is_string(value) && value != "" {
+    ip_value = value
+  }
+}
+
+host_value = null
+for_each(["host", "hostname", "computer", "computer_name", "host_name"]) -> |_index, key| {
+  value = get(., [key]) ?? null
+  if host_value == null && is_string(value) && value != "" {
+    host_value = value
+  }
+}
+
+level_text = null
+for_each(["level", "log_level", "loglevel", "severity", "severity_text"]) -> |_index, key| {
+  value = get(., [key]) ?? null
+  if level_text == null && is_string(value) {
+    level_text = downcase(strip_whitespace(string(value) ?? ""))
+  }
+}
+
+outcome_text = null
+for_each(["outcome", "result", "event_outcome", "action_result"]) -> |_index, key| {
+  value = get(., [key]) ?? null
+  if outcome_text == null && is_string(value) {
+    outcome_text = downcase(strip_whitespace(string(value) ?? ""))
+  }
+}
+
+severity_ids = {"debug": 1, "trace": 1, "info": 1, "notice": 2, "warn": 3, "warning": 3, "error": 4, "err": 4, "critical": 5, "crit": 5, "alert": 5, "emergency": 6, "emerg": 6, "fatal": 6}
+severity_names = ["Unknown", "Informational", "Low", "Medium", "High", "Critical", "Fatal"]
+severity_id = 1
+if is_string(level_text) {
+  severity_id = int(get(severity_ids, [string(level_text) ?? ""]) ?? null) ?? 1
+}
+
+status_id = 0
+if includes(["success", "succeeded", "ok", "allow", "allowed"], outcome_text) {
+  status_id = 1
+} else if includes(["failure", "failed", "fail", "deny", "denied", "error"], outcome_text) {
+  status_id = 2
+}
+
+if !exists(.class_uid) { .class_uid = 0 }
+if !exists(.class_name) { .class_name = "Base Event" }
+if !exists(.category_uid) { .category_uid = 0 }
+if !exists(.category_name) { .category_name = "Uncategorized" }
+if !exists(.activity_id) { .activity_id = 0 }
+if !exists(.activity_name) { .activity_name = "Unknown" }
+if !exists(.type_uid) { .type_uid = 0 }
+if !exists(.severity_id) { .severity_id = severity_id }
+if !exists(.severity) { .severity = get(severity_names, [severity_id]) ?? "Informational" }
+if !exists(.status_id) { .status_id = status_id }
+if !exists(.time) { .time = to_unix_timestamp(now(), unit: "milliseconds") }
+
+if user_value != null && !exists(.actor_user_name) && !exists(.actor_user.name) && !exists(.actor.user_name) && !exists(.actor.user.name) && (!exists(.actor) || is_object(.actor)) && (!exists(.actor.user) || is_object(.actor.user)) {
+  .actor.user.name = user_value
+}
+if ip_value != null && !exists(.src_endpoint_ip) && !exists(.src_endpoint.ip) && (!exists(.src_endpoint) || is_object(.src_endpoint)) {
+  .src_endpoint.ip = ip_value
+}
+if host_value != null && !exists(.device_hostname) && !exists(.device.hostname) && (!exists(.device) || is_object(.device)) {
+  .device.hostname = host_value
+}
+if !exists(.metadata_product_name) && !exists(.metadata_product.name) && !exists(.metadata.product_name) && !exists(.metadata.product.name) && (!exists(.metadata) || is_object(.metadata)) && (!exists(.metadata.product) || is_object(.metadata.product)) {
+  .metadata.product.name = "__O2_STREAM__"
+}
+if !exists(.metadata_product_vendor_name) && !exists(.metadata_product.vendor_name) && !exists(.metadata.product_vendor_name) && !exists(.metadata.product.vendor_name) && (!exists(.metadata) || is_object(.metadata)) && (!exists(.metadata.product) || is_object(.metadata.product)) {
+  .metadata.product.vendor_name = "Unknown"
+}
+
+if !exists(.metadata_version) && !exists(.metadata.version) && (!exists(.metadata) || is_object(.metadata)) {
+  .metadata.version = "1.6.0"
+}
+if !exists(.o2_ocsf_pack) { .o2_ocsf_pack = "entity@1" }
+.
