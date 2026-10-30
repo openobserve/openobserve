@@ -110,7 +110,7 @@ describe("box plot", () => {
         'max(latency_ms) as "y_axis_1_max", count(latency_ms) as "y_axis_1_count" ' +
         'FROM "demo_app"  GROUP BY "x_axis_1" LIMIT 10000',
     );
-        schema.queries[0].config.limit = 500;
+    schema.queries[0].config.limit = 500;
     schema.queries[0].fields.x[0] = { ...schema.queries[0].fields.x[0], sortBy: "ASC" };
     expect(build()).toMatch(/GROUP BY "x_axis_1" ORDER BY "x_axis_1" ASC LIMIT 500$/);
   });
