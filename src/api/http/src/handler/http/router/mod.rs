@@ -4380,6 +4380,14 @@ mod tests {
     }
 
     #[test]
+    fn jira_setup_is_published_with_its_403() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let post = &spec["paths"]["/api/{org_id}/alerts/destinations/jira/setup"]["post"];
+        assert_eq!(post["operationId"], "JiraDestinationSetup", "{post}");
+        assert!(post["responses"]["403"].is_object(), "{post}");
+    }
+
+    #[test]
     fn query_history_list_publishes_both_response_shapes() {
         let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
         let ok = &spec["paths"]["/api/{org_id}/query_history"]["get"]["responses"]["200"];

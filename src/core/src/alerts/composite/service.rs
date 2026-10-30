@@ -373,8 +373,7 @@ async fn persist(
     Ok(definition)
 }
 
-/// Jira refuses a composite as it refuses an alert; a composite is never real-time, multi-alert or
-/// grouped, so only the silence floor can refuse it.
+/// The alert's Jira rules; a composite is never real-time or multi-alert, so only silence refuses.
 async fn validate_jira_destinations(
     org: &str,
     destinations: &[String],

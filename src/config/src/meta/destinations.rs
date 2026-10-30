@@ -659,8 +659,7 @@ mod tests {
     fn test_prebuilt_destinations() {
         let prebuilt = Destination::prebuilt_destinations();
 
-        // Should have 9 prebuilt destinations: Slack, Teams, PagerDuty, Discord, Generic Webhook,
-        // Opsgenie, ServiceNow, Jira, Email
+        // Slack, Teams, PagerDuty, Discord, Generic Webhook, Opsgenie, ServiceNow, Jira and Email.
         assert_eq!(prebuilt.len(), 9);
 
         // Check that each destination has expected properties

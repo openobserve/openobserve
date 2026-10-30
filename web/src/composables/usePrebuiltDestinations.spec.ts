@@ -827,9 +827,6 @@ describe("usePrebuiltDestinations", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Jira (spec section 1: stored destination; section 2: test_issue)
-  // -------------------------------------------------------------------------
   describe("jira", () => {
     const jiraCloud = {
       deployment: "cloud",

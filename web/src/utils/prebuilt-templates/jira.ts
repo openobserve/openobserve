@@ -154,10 +154,7 @@ export const jiraFieldInputValues = (fields: Record<string, unknown>): Record<st
     ]),
   );
 
-/**
- * Jira prebuilt destination configuration. The server builds the ticket text
- * from the alert data, so this template is a placeholder that is never sent.
- */
+// The server builds the ticket text from the alert data, so this template is never sent.
 export const jiraTemplate = {
   name: "prebuilt_jira",
   body: JSON.stringify(

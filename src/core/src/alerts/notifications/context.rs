@@ -38,7 +38,7 @@ pub struct NotificationContext {
     pub stream_type: String,
     pub stream_name: String,
     pub alert_name: String,
-    /// The composite's id for a composite alert; empty when no alert stands behind the send.
+    /// The alert's id (a composite's own id) that labels its Jira ticket; empty with no alert.
     pub alert_id: String,
     /// Set only by the incident sender, so alert attributes cannot claim an incident's ticket.
     pub incident_id: String,

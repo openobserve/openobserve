@@ -753,8 +753,7 @@ fn summary(ctx: &NotificationContext) -> String {
     cut(&text, SUMMARY_MAX_CHARS)
 }
 
-/// The `(operator, threshold)` the evaluation compared; `alert_threshold` is only the group-count
-/// gate for aggregate alerts.
+/// The `(operator, threshold)` evaluated; an aggregate's `alert_threshold` is only its group gate.
 fn evaluated_threshold(ctx: &NotificationContext) -> (&str, &str) {
     let level_value = match ctx.alert_level.as_str() {
         "warning" => &ctx.alert_threshold_warn,
@@ -1418,8 +1417,7 @@ mod tests {
         }
     }
 
-    /// A Jira site whose search finds `open` and whose OPS-142 sits in status `category`, recording
-    /// each call as `METHOD /path` and its body. Its createmeta lists come in two pages.
+    /// A Jira site that finds `open`, puts OPS-142 in `category`, logs calls, pages createmeta.
     async fn jira_site(open: Option<&'static str>, category: &'static str) -> (String, Seen) {
         let seen: Seen = Arc::default();
         let log = seen.clone();

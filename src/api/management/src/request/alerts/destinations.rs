@@ -314,6 +314,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"}))
@@ -352,8 +353,7 @@ pub async fn jira_setup(
     }
 }
 
-/// 403 when the call would use a saved destination's token that `may_edit` refuses: the route only
-/// checks the org.
+/// 403 when a saved token's destination fails `may_edit`, since the route only checks the org.
 #[cfg(any(feature = "enterprise", test))]
 async fn saved_token_refusal(
     req: &jira::SetupRequest,
