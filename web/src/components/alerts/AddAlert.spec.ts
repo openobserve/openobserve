@@ -1286,6 +1286,82 @@ describe("AddAlert (OForm owner)", () => {
       );
     });
 
+    describe("measure switched to event count", () => {
+      const measureAlert = () =>
+        savedAlert({
+          stream_type: "metrics",
+          query_condition: {
+            ...savedAlert().query_condition,
+            aggregation: {
+              function: "avg",
+              group_by: [],
+              having: { column: "field2", operator: ">=", value: 90 },
+            },
+          },
+        });
+      const mountWithQuery = async () => {
+        wrapper = mountAlert(
+          { isUpdated: true, modelValue: measureAlert() },
+          {
+            attachTo: document.body,
+            global: {
+              provide: { store },
+              plugins: [i18n, router],
+              stubs: { ...stubs, QueryConfig: false },
+            },
+          },
+        );
+        await flushPromises();
+        document.dispatchEvent(new Event("pointerdown"));
+        await flushPromises();
+      };
+      const pickEventCount = async () => {
+        wrapper
+          .findComponent({ name: "Step2QueryConfig" })
+          .findAllComponents({ name: "OSelect" })
+          .find((c: any) => c.props("modelValue") === "avg")!
+          .vm.$emit("update:modelValue", "total_events");
+        await flushPromises();
+      };
+      const savedMeasure = { function: "avg", having: { column: "field2", value: 90 } };
+
+      it("counts the switch as an unsaved change", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toBeNull();
+        expect(wrapper.vm.unsavedChanges).toEqual([
+          { path: "aggregation_enabled", before: true, after: false },
+        ]);
+      });
+
+      it("Discard brings the saved measure back", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        await wrapper.vm.discardChanges();
+        await flushPromises();
+        expect(wrapper.vm.isAggregationEnabled).toBe(true);
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toMatchObject(
+          savedMeasure,
+        );
+        expect(wrapper.vm.unsavedChanges).toEqual([]);
+      });
+
+      it("a header Disable before Discard keeps the saved measure as the baseline", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        wrapper.vm.form.setFieldValue("description", "an unsaved edit");
+        await flushPromises();
+        await wrapper.vm.editHeader.toggleEnabled();
+        await flushPromises();
+        await wrapper.vm.discardChanges();
+        await flushPromises();
+        expect(wrapper.vm.form.state.values.enabled).toBe(false);
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toMatchObject(
+          savedMeasure,
+        );
+      });
+    });
+
     it.each([
       ["holdFor", { pending_period_sec: 300 }, ["pending_period_sec", 0]],
       ["holdFor", { pending_period_sec: 300 }, ["pending_period_sec", -5]],

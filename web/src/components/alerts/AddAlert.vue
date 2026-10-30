@@ -869,7 +869,12 @@ import {
 } from "@/utils/alerts/alertReadBack";
 import config from "@/aws-exports";
 import { getUUID } from "@/utils/zincutils";
-import type { AlertSectionId, AlertSectionSlot, AlertSectionTargets } from "./alertFormSections";
+import {
+  AGGREGATION_ENABLED_FIELD,
+  type AlertSectionId,
+  type AlertSectionSlot,
+  type AlertSectionTargets,
+} from "./alertFormSections";
 import {
   useAlertFormSections,
   checkEveryLabel,
@@ -1192,8 +1197,13 @@ export default defineComponent({
       const id = alertForm.activeFolderId.value;
       return (Array.isArray(id) ? id[0] : id) || undefined;
     });
+    // Switching the measure off drops the aggregation from the payload, so the switch is tracked with the values.
+    const trackedValues = computed(() => ({
+      ...alertForm.formData.value,
+      [AGGREGATION_ENABLED_FIELD]: alertForm.isAggregationEnabled.value,
+    }));
     const unsaved = useAlertUnsavedChanges({
-      values: alertForm.formData,
+      values: trackedValues,
       enabled: () => isEditingAlert.value,
       ready: alertForm.formReady,
     });
@@ -1206,19 +1216,15 @@ export default defineComponent({
         unsaved.acceptSaved("enabled", enabled);
       },
     });
-    const baselineAggregation = ref(alertForm.isAggregationEnabled.value);
-    watch(unsaved.baseline, () => {
-      baselineAggregation.value = alertForm.isAggregationEnabled.value;
-    });
-
     const discardChanges = async () => {
-      const base = unsaved.baseline.value;
-      if (!base) return;
+      const saved = unsaved.baseline.value;
+      if (!saved) return;
+      const { [AGGREGATION_ENABLED_FIELD]: aggregationEnabled, ...base } = saved;
       const current = alertForm.formData.value;
       const streamChanged =
         current.stream_type !== base.stream_type || current.stream_name !== base.stream_name;
       alertForm.resetForm(cloneDeep(base));
-      alertForm.isAggregationEnabled.value = baselineAggregation.value;
+      alertForm.isAggregationEnabled.value = aggregationEnabled === true;
       // Steps hold local copies of what they first read, so they remount on the restored values.
       alertEditorDraft.formKey.value += 1;
       if (streamChanged && base.stream_name) {

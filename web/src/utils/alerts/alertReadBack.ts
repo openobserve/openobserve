@@ -31,6 +31,7 @@ export interface ReadBackAlert {
   query_condition?: {
     type?: string;
     aggregation?: {
+      multi_alert?: boolean;
       function?: string;
       having?: { column?: string; operator?: string; value?: number | string | null };
     } | null;
@@ -130,6 +131,15 @@ function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: bool
   ) {
     return t("alerts.readBack.measureIn", {
       fn: qc.aggregation.function ?? "",
+      field: having.column,
+      op: operatorSymbol(having.operator),
+      value: having.value ?? "",
+      window,
+    });
+  }
+  // SQL multi-alert fires per returned row whose chosen column passes the test, not on a row count.
+  if (qc.type === "sql" && qc.aggregation?.multi_alert && having?.column) {
+    return t("alerts.readBack.sqlRowValue", {
       field: having.column,
       op: operatorSymbol(having.operator),
       value: having.value ?? "",

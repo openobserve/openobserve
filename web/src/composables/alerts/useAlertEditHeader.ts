@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, ref, type ComputedRef } from "vue";
+import { computed, onScopeDispose, ref, watch, type ComputedRef } from "vue";
 import { useQuery, useMutation } from "@tanstack/vue-query";
 import { formatInTimeZone } from "date-fns-tz";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -26,6 +26,9 @@ import alertsService from "@/services/alerts";
 import type { ActiveDowntime } from "@/services/downtimes";
 import type { EnableAlertResponseBody, TriggerAlertResponseBody } from "@/ts/interfaces/alert";
 import { toast } from "@/lib/feedback/Toast/useToast";
+
+// Longer delays overflow setTimeout and fire at once, so a long mute re-checks in steps.
+const MAX_TIMER_MS = 2_147_483_647;
 
 export interface AlertEditHeaderInput {
   alertId: () => string;
@@ -95,16 +98,57 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
       ) ?? null,
   );
 
-  // undefined = nothing done here yet, so the list row decides.
+  // undefined = the list row decides; an action here holds only until a list read started after it lands.
   const localMute = ref<AlertMuteRef | null | undefined>(undefined);
   const localEnabled = ref<boolean | undefined>(undefined);
+  let localGen = 0;
+  let readGen = -1;
+  const holdLocal = () => {
+    localGen += 1;
+  };
+  watch(
+    () => listQuery.isFetching.value,
+    (fetching) => {
+      if (fetching) {
+        readGen = localGen;
+      } else if (readGen === localGen && listQuery.isSuccess.value) {
+        localMute.value = undefined;
+        localEnabled.value = undefined;
+      }
+    },
+    { flush: "sync" },
+  );
 
-  const muted = computed<AlertMuteRef | null>(() => {
+  const activeMute = computed<AlertMuteRef | null>(() => {
     if (localMute.value !== undefined) return localMute.value;
     const downtime = row.value?.active_downtime;
     // A group mute is ended from its group's row, so it does not mute the whole alert here.
     if (!downtime || downtime.alert_groups?.length) return null;
     return { id: downtime.id, ends_at: downtime.ends_at, version: downtime.version };
+  });
+
+  const now = ref(Date.now());
+  let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+  watch(
+    [activeMute, now],
+    ([mute]) => {
+      clearTimeout(expiryTimer);
+      if (!mute) return;
+      const endsMs = mute.ends_at / 1000;
+      const left = endsMs - Date.now();
+      if (left > 0) {
+        expiryTimer = setTimeout(() => (now.value = Date.now()), Math.min(left, MAX_TIMER_MS));
+      } else if (now.value < endsMs) {
+        now.value = Date.now();
+      }
+    },
+    { immediate: true },
+  );
+  onScopeDispose(() => clearTimeout(expiryTimer));
+
+  const muted = computed<AlertMuteRef | null>(() => {
+    const mute = activeMute.value;
+    return mute && mute.ends_at / 1000 > now.value ? mute : null;
   });
 
   const mutedUntilText = computed<I18nText>(() =>
@@ -132,6 +176,7 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
   const muteFor = async (seconds: number): Promise<boolean> => {
     const result = await actions.createMute(target(), { minutes: seconds / 60 });
     if (!result) return false;
+    holdLocal();
     localMute.value = { id: result.downtime_id, ends_at: result.ends_at, version: result.version };
     return true;
   };
@@ -140,7 +185,10 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
     const current = muted.value;
     if (!current) return false;
     const ok = await actions.endMute(target(), current.id);
-    if (ok) localMute.value = null;
+    if (ok) {
+      holdLocal();
+      localMute.value = null;
+    }
     return ok;
   };
 
@@ -177,6 +225,7 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
         enabled: !enabled.value,
         folderId: input.folderId(),
       });
+      holdLocal();
       localEnabled.value =
         (res?.data as EnableAlertResponseBody | undefined)?.enabled ?? !enabled.value;
       input.onEnabledSaved?.(localEnabled.value);

@@ -12506,6 +12506,7 @@
       "eventsIn": "{condition} turn up in {window}",
       "measureIn": "{fn} of {field} is {op} {value} over {window}",
       "sqlRows": "the query returns {op} {value} rows in {window}",
+      "sqlRowValue": "the query returns a row where {field} is {op} {value} in {window}",
       "promql": "the value is {op} {value}",
       "realtime": "a matching event arrives",
       "hold": ", for at least {duration}",
@@ -12587,6 +12588,7 @@
           "workflows": "Workflows",
           "composite": "Combined condition",
           "children": "Alerts combined",
+          "aggregation": "Aggregate",
           "enabled": "Enabled"
         }
       },

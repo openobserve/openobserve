@@ -25,6 +25,7 @@ import {
   type AlertSectionId,
 } from "@/components/alerts/alertFormSections";
 import { alertConditionText } from "@/utils/alerts/alertCondition";
+import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import type { ReadBackAlert } from "@/utils/alerts/alertReadBack";
 
 export type FieldMetaMap = Record<string, { errors?: readonly unknown[] } | undefined>;
@@ -121,7 +122,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       const anomaly = input.anomalyConfig.value ?? {};
       return anomaly.alert_enabled ? (anomaly.alert_destination_ids?.length ?? 0) : 0;
     }
-    return (fd.destinations?.length ?? 0) + (fd.workflows?.length ?? 0);
+    const oncall = hasDeliveryTarget({ oncall_team: fd.oncall_team }) ? 1 : 0;
+    return (fd.destinations?.length ?? 0) + (fd.workflows?.length ?? 0) + oncall;
   };
 
   const schedulePhrase = (fd: AlertSectionsFormData): I18nText => {
