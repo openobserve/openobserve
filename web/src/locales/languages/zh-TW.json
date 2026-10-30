@@ -9958,8 +9958,8 @@
       "raiseThresholdDesc": "讓觸發值遠離觀測到的穩定狀態。",
       "lengthenEvaluationWindow": "延長評估時間範圍",
       "lengthenEvaluationWindowDesc": "擴大時間範圍，讓短暫的尖峰不再觸發警示。",
-      "enableDeduplication": "啟用去重",
-      "enableDeduplicationDesc": "將去重時間範圍內的重複觸發合併。",
+      "enableDeduplication": "開啟抑制重複通知",
+      "enableDeduplicationDesc": "每次狀態變更時通知一次，而非每次評估都通知。",
       "reviewForDeletion": "審查是否刪除",
       "reviewForDeletionDesc": "在淘汰警示前，先確認查詢仍符合實際情況。",
       "fixAlertQuery": "修正警示查詢",
@@ -10276,12 +10276,8 @@
     "organizationIdLabel": "組織 ID",
     "alertCreationTitle": "建立警示",
     "noAlertsFound": "找不到任何警示",
-    "suppressedByDeduplication": "已由去重功能抑制",
-    "occurrence": "{count} 次發生 | {count} 次發生",
     "groupedNotification": "分組通知",
     "alertsBatchedTogether": "警示批次合併",
-    "notificationSent": "通知已傳送",
-    "occurrencesDeduplicated": "已去重的發生次數",
     "alertExecutionDetails": "警示執行詳細資料",
     "evaluationTime": "評估時間",
     "queryTime": "查詢時間",
@@ -10331,15 +10327,7 @@
     "serviceGraphTooltipTo": "至：{time}",
     "serviceGraphTooltipTemporalCorrelation": "時間相關性",
     "serviceGraphTooltipServiceDependency": "服務相依性",
-    "totalAlerts": "警示總數",
-    "usingDeduplication": "使用去重",
-    "deduplicationConfiguredTooltip": "已設定去重的警示",
-    "suppressionRate24h": "抑制率 (24 小時)",
     "suppressed": "已抑制 /",
-    "total": "總計",
-    "passedLabel": "通過:",
-    "pendingBatches": "待處理批次",
-    "pendingBatchesTooltip": "等待分組的警示",
     "historyTimeline": {
       "firing": "觸發中",
       "ok": "正常",
@@ -10360,7 +10348,8 @@
     "endTime": "結束時間",
     "duration": "持續時間",
     "retries": "重試次數",
-    "dedup": "去重",
+    "suppression": "抑制",
+    "suppressedAsRepeat": "因重複而抑制",
     "validation": {
       "streamTypeRequired": "Stream 類型為必填項。",
       "streamNameRequired": "Stream 名稱為必填項。",
@@ -10552,15 +10541,6 @@
     "all": "全部",
     "history": "警示歷史紀錄",
     "searcHistory": "輸入警示名稱",
-    "deduplication": {
-      "fingerprintFields": "將相似警示分組依據",
-      "fingerprintFieldsHint": "選擇使警示相似的欄位 (例如 hostname、service)。留空以根據查詢自動偵測。",
-      "fingerprintFieldsTooltip": "選擇哪些欄位應符合才將警示視為重複。例如，選擇 'hostname' 表示來自相同主機的警示會被分組在一起。不同類型的警示 (例如高 CPU vs 高記憶體) 即使來自相同主機也不會被分組。留空以根據查詢類型自動偵測。",
-      "timeWindow": "在以下時間內視為相同",
-      "timeWindowHint": "分組相似警示的時間區段。留空以符合檢查間隔。",
-      "timeWindowTooltip": "記住近期警示以進行分組的時間長度。如果在此時間內發生相似的警示，將不會再次傳送。留空以使用警示的檢查間隔。",
-      "fingerprintFieldsHelp": "留空以根據查詢自動偵測（SQL：GROUP BY 欄位，PromQL：標籤，自訂：條件欄位）"
-    },
     "summary": {
       "scrollToBottom": "捲動至底部",
       "title": "摘要",
@@ -10608,38 +10588,15 @@
         "defaultConditions": "當設定的條件被滿足時發出警示"
       }
     },
-    "correlation": {
-      "title": "警示關聯",
-      "description": "設定警示在整個組織中如何被關聯和去重複。具有相同指紋值的警示將被分組在一起。",
-      "semanticFieldNote": "注意：語意欄位對應在「服務識別」分頁中設定。",
-      "enableOrgLevel": "啟用組織層級去重複",
-      "enableOrgLevelTooltip": "為此組織中的所有警示啟用去重複和關聯功能",
-      "enableCrossAlert": "啟用跨警示去重複",
-      "enableCrossAlertTooltip": "當不同警示共用相同指紋時允許相互去重複",
-      "fingerprintGroups": "跨警示指紋群組",
-      "fingerprintGroupsTooltip": "選擇用於跨警示指紋辨識的語意群組。具有相同維度值的警示將被去重複。",
-      "fingerprintGroupsHint": "請至少選擇一個語意群組以進行跨警示去重複",
-      "fingerprintGroupsRequired": "必須選擇至少一個語意群組",
-      "defaultWindow": "預設關聯視窗 (分鐘)",
-      "defaultWindowTooltip": "在沒有語意欄位符合的情況下，指定期間內的警示和資料視為相關",
-      "defaultWindowDescription": "在沒有語意欄位符合的情況下，指定期間內的警示和資料視為相關",
-      "defaultWindowPlaceholder": "預設使用警示期間",
-      "cancelButton": "取消",
-      "saveButton": "儲存",
-      "settingsSaved": "組織重複資料刪除設定已成功儲存",
-      "settingsSaveError": "儲存設定失敗"
-    },
     "placeholders": {
       "typeSomething": "輸入內容",
       "value": "值",
       "selectColumn": "選擇欄位",
       "savedFunctions": "已儲存的函式",
-      "autoUsesCheckInterval": "自動 (使用檢查間隔)",
       "addTag": "新增標籤並按 Enter"
     },
     "steps": {
       "compareWithPast": "與過去比較",
-      "deduplication": "去重複",
       "advanced": "進階"
     },
     "stepCaptions": {
@@ -10647,7 +10604,6 @@
       "conditions": "觸發警示的條件",
       "compareWithPast": "將目前結果與另一個時間區段的資料進行比較",
       "alertSettings": "設定警示規則並選擇通知方式。",
-      "deduplication": "將相似的警示分組在一起，避免多次傳送相同的警示。",
       "advanced": "上下文變數、說明和列範本"
     },
     "failedToFetchHistory": "擷取警示歷史紀錄失敗",
@@ -10670,8 +10626,6 @@
         "closeActions": "關閉操作",
         "viewAlertHistory": "檢視警示歷史",
         "actionsFor": "操作對象：",
-        "configureDedup": "設定去重複",
-        "configureDedupTooltip": "為此警示設定去重複",
         "editAlert": "編輯警示",
         "editAlertTooltip": "編輯警示組態",
         "viewHistory": "檢視歷史紀錄",
@@ -11451,6 +11405,8 @@
       "recoveryChatMessage": "新的「已解決」訊息",
       "keepFiringFor": "持續觸發時間",
       "keepFiringForTooltip": "條件解除後等待這麼久才恢復。0 表示立即恢復。",
+      "suppressRepeats": "抑制重複通知",
+      "suppressRepeatsTooltip": "當警示開始觸發或變更等級時通知一次，而非每次評估都通知。若保持關閉，則會在每個靜默期後繼續收到提醒。",
       "keepFiringForInvalid": "請輸入 0 秒或以上",
       "keepFiringForTooLong": "最多輸入 86400 秒 (24 小時)"
     },
@@ -13952,7 +13908,6 @@
       "identityConfigNoSets": "儲存前請至少設定一個身分集合。",
       "discoveredServicesTab": "已發現的服務",
       "serviceDiscoveryTab": "偵測規則",
-      "alertCorrelationTab": "警示分組",
       "fieldAliasesTab": "欄位對應",
       "fieldAliasesSaved": "欄位別名儲存成功",
       "fieldAliasesSaveError": "儲存欄位別名失敗",
@@ -21502,7 +21457,6 @@
     "alerts": {
       "failedToNavigateToAlert": "無法導覽至警示",
       "alertNotFound": "找不到警示",
-      "alertNotFoundInAlerts": "在 {count} 個警示中找不到警示 \"{name}\"",
       "failedToLoadAlerts": "載入警示失敗",
       "alertsDeletedSuccessfully": "{count} 個警示已成功刪除 | {count} 個警示已成功刪除",
       "failedToDeleteAlerts": "刪除 {count} 個警示失敗 | 刪除 {count} 個警示失敗",
@@ -21571,7 +21525,6 @@
       "pleaseWaitWhileLoadingTemplates": "正在載入範本，請稍候...",
       "alertSavedSuccessfully": "警示已成功儲存。",
       "alertUpdatedSuccessfully": "警示已成功更新。",
-      "openingDedupConfig": "正在開啟 {name} 的重複資料排除設定",
       "editingAlert": "正在編輯警示：{name}",
       "ack": {
         "acked": "已確認 {name}",
@@ -26383,7 +26336,7 @@
       "logged": "已記錄"
     },
     "policy": {
-      "gateHint": "在對現有警示的變更中，只有去重複會自行套用，並附帶先前狀態的快照與審查期：檢查通過則保留，失敗則回復。其他所有變更都需等待一鍵核准。",
+      "gateHint": "在對現有警示的變更中，只有開啟抑制重複通知會自行套用，並附帶先前狀態快照與檢閱期間：若檢查通過則保留，若失敗則復原。其他所有變更都需要一鍵核准。",
       "off": "關閉",
       "suggest": "建議",
       "auto": "自動",
@@ -26402,7 +26355,7 @@
         "gateDesc": "暫緩發送通知，直到調查完成，最多等待 2 分鐘。失敗時採開放策略：若分診逾時或失敗，仍會發送通知，並說明調查仍在進行或已失敗，原因則於討論串中接續說明。"
       },
       "classes": {
-        "EnableDeduplication": "為數分鐘內重複出現的警示開啟去重功能。",
+        "EnableDeduplication": "為每次評估都通知的警示開啟抑制重複通知。",
         "CreateDetector": "針對服務的請求、錯誤或延遲建立異常偵測器。",
         "RaiseThreshold": "提高在健康狀況良好時仍觸發的閾值。",
         "LengthenEvaluationWindow": "延長反覆震盪之警示的時間範圍。",
@@ -26951,10 +26904,10 @@
           "on": "連線警示"
         },
         "L-302": {
-          "done": "將 3 個 checkout 延遲警示合併為一個",
-          "why": "它們有 94% 的時間會同時觸發，因此一次變慢就通知您 3 次。",
-          "from": "3 個警示",
-          "to": "1",
+          "done": "已為 3 個結帳延遲警示開啟抑制重複通知",
+          "why": "它們在持續觸發期間每次評估都通知，因此單一次變慢就向您發送了 120 次通知。",
+          "from": "每次評估",
+          "to": "每次變更一次",
           "on": "checkout 延遲"
         },
         "L-303": {
@@ -27011,7 +26964,7 @@
         "checkoutPaged": "我因 checkout 付款失敗呼叫了值班。",
         "recsHeld": "我把 recommendations 的一個小問題留到週五摘要。",
         "diskApproved": "您核准將 ingest-1 的磁碟警示提高到 {to}%。",
-        "latencyGrouped": "我將三個 checkout 變慢警示合併成一個，這樣單一變慢只會呼叫值班一次。",
+        "latencyGrouped": "我已為三個結帳延遲警示開啟抑制重複通知，因此單一次變慢只會通知一次。",
         "queueFixed": "我新增了 orders 佇列工作者，但佇列持續增長，所以我把它們還原並呼叫值班。",
         "loginPaged": "我因登入緩慢呼叫了值班。",
         "queuePermission": "您允許我自行新增佇列工作者，最多 8 個。",

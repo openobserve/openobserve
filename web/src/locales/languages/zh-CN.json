@@ -9963,8 +9963,8 @@
       "raiseThresholdDesc": "将触发值调整到远离观测到的稳定状态的位置。",
       "lengthenEvaluationWindow": "延长评估窗口",
       "lengthenEvaluationWindowDesc": "扩大时间范围，使短暂尖峰不再触发告警。",
-      "enableDeduplication": "启用去重",
-      "enableDeduplicationDesc": "在去重窗口内合并重复触发。",
+      "enableDeduplication": "开启重复通知抑制",
+      "enableDeduplicationDesc": "每次状态变化时通知一次，而不是每次评估都通知。",
       "reviewForDeletion": "评估是否删除",
       "reviewForDeletionDesc": "在停用告警前，确认查询仍然符合实际情况。",
       "fixAlertQuery": "修复告警查询",
@@ -10281,12 +10281,8 @@
     "organizationIdLabel": "组织 ID",
     "alertCreationTitle": "创建告警",
     "noAlertsFound": "未找到告警",
-    "suppressedByDeduplication": "被去重抑制",
-    "occurrence": "{count} 次 | {count} 次",
     "groupedNotification": "分组通知",
     "alertsBatchedTogether": "告警批量合并",
-    "notificationSent": "通知已发送",
-    "occurrencesDeduplicated": "已去重的发生次数",
     "alertExecutionDetails": "告警执行详情",
     "evaluationTime": "评估时间",
     "queryTime": "查询时间",
@@ -10336,15 +10332,7 @@
     "serviceGraphTooltipTo": "到：{time}",
     "serviceGraphTooltipTemporalCorrelation": "时间相关性",
     "serviceGraphTooltipServiceDependency": "服务依赖",
-    "totalAlerts": "告警总数",
-    "usingDeduplication": "使用去重",
-    "deduplicationConfiguredTooltip": "已配置去重的告警",
-    "suppressionRate24h": "抑制率（24小时）",
     "suppressed": "已抑制 /",
-    "total": "总数",
-    "passedLabel": "已通过：",
-    "pendingBatches": "待处理批次",
-    "pendingBatchesTooltip": "等待分组的告警",
     "historyTimeline": {
       "firing": "触发中",
       "ok": "正常",
@@ -10365,7 +10353,8 @@
     "endTime": "结束时间",
     "duration": "持续时间",
     "retries": "重试次数",
-    "dedup": "去重",
+    "suppression": "抑制",
+    "suppressedAsRepeat": "作为重复通知被抑制",
     "validation": {
       "streamTypeRequired": "Stream 类型为必填项。",
       "streamNameRequired": "Stream 名称为必填项。",
@@ -10557,15 +10546,6 @@
     "all": "全部",
     "history": "告警历史",
     "searcHistory": "输入告警名称",
-    "deduplication": {
-      "fingerprintFields": "指纹字段",
-      "fingerprintFieldsHint": "选择用于重复数据删除的字段。留空以便根据查询类型自动检测。",
-      "fingerprintFieldsTooltip": "用于创建用于告警重复数据删除的唯一指纹的字段。指纹包括告警名称 + 指标/条件 + 选定字段，可确保不同的告警类型（例如 CPU 高压与高内存）不会同时消除重复数据，即使它们监控的是相同的实体。留空以便自动检测：SQL 查询使用 WHERE 子句列 + 分组按列，PromQL 使用指标名称 + 标签维度，自定义查询使用条件字段。",
-      "timeWindow": "时间窗口（分钟）",
-      "timeWindowHint": "追踪告警指纹需要多长时间。留空以使用告警周期。",
-      "timeWindowTooltip": "跟踪和删除重复告警指纹的持续时间。如果在此窗口内出现具有相同指纹的告警，则该告警将被抑制。留空以使用告警评估期。",
-      "fingerprintFieldsHelp": "留空以根据查询自动检测（SQL：GROUP BY 列，PromQL：标签，自定义：条件字段）"
-    },
     "summary": {
       "scrollToBottom": "滚动到底部",
       "title": "摘要",
@@ -10613,38 +10593,15 @@
         "defaultConditions": "满足配置条件时提醒我"
       }
     },
-    "correlation": {
-      "title": "告警关联",
-      "description": "配置组织内告警的关联和重复数据删除方式。指纹值匹配的告警将分组在一起。",
-      "semanticFieldNote": "注意：语义字段映射在 “服务标识” 选项卡中配置。",
-      "enableOrgLevel": "启用组织级重复数据删除",
-      "enableOrgLevelTooltip": "为该组织中的所有告警启用重复数据删除和关联功能",
-      "enableCrossAlert": "启用跨告警重复数据删除",
-      "enableCrossAlertTooltip": "允许不同的告警在共享相同指纹时相互删除重复数据",
-      "fingerprintGroups": "交叉告警指纹组",
-      "fingerprintGroupsTooltip": "选择使用哪些语义组进行交叉告警指纹识别。如果告警在这些维度上共享相同的值，则会删除重复数据。",
-      "fingerprintGroupsHint": "为跨告警重复数据删除选择至少一个语义组",
-      "fingerprintGroupsRequired": "必须至少选择一个语义组",
-      "defaultWindow": "默认关联窗口（分钟）",
-      "defaultWindowTooltip": "在没有语义字段匹配的情况下，给定持续时间的告警和数据被认为是相关的",
-      "defaultWindowDescription": "在没有语义字段匹配的情况下，给定持续时间的告警和数据被认为是相关的",
-      "defaultWindowPlaceholder": "默认使用告警周期",
-      "cancelButton": "取消",
-      "saveButton": "保存设置",
-      "settingsSaved": "组织去重设置保存成功",
-      "settingsSaveError": "保存设置失败"
-    },
     "placeholders": {
       "typeSomething": "输入一些东西",
       "value": "值",
       "selectColumn": "选择列",
       "savedFunctions": "保存的函数",
-      "autoUsesCheckInterval": "自动（使用检查间隔）",
       "addTag": "添加标签并按回车"
     },
     "steps": {
       "compareWithPast": "与过去比较",
-      "deduplication": "重复数据删除",
       "advanced": "高级"
     },
     "stepCaptions": {
@@ -10652,7 +10609,6 @@
       "conditions": "什么条件触发告警",
       "compareWithPast": "将当前结果与其他时间段的数据进行比较",
       "alertSettings": "设置您的告警规则，并选择您希望如何收到通知。",
-      "deduplication": "通过将相似告警分组，避免重复发送相同告警。",
       "advanced": "上下文变量、描述和行模板"
     },
     "failedToFetchHistory": "无法获取告警历史记录",
@@ -10675,8 +10631,6 @@
         "closeActions": "关闭操作",
         "viewAlertHistory": "查看告警历史",
         "actionsFor": "针对以下各项的操作：",
-        "configureDedup": "配置重复数据删除",
-        "configureDedupTooltip": "为此告警配置重复数据删除",
         "editAlert": "编辑告警",
         "editAlertTooltip": "编辑告警配置",
         "viewHistory": "查看历史",
@@ -11456,6 +11410,8 @@
       "recoveryChatMessage": "新的“已恢复”消息",
       "keepFiringFor": "持续触发时长",
       "keepFiringForTooltip": "条件清除后等待此时长再恢复。0 表示立即恢复。",
+      "suppressRepeats": "抑制重复通知",
+      "suppressRepeatsTooltip": "告警开始触发或级别发生变化时通知一次，而不是每次评估都通知。保持关闭可在每个静默期后继续收到提醒。",
       "keepFiringForInvalid": "请输入 0 或更大的秒数",
       "keepFiringForTooLong": "最多输入 86400 秒（24 小时）"
     },
@@ -13957,7 +13913,6 @@
       "identityConfigNoSets": "保存前至少配置一个身份集。",
       "discoveredServicesTab": "已发现的服务",
       "serviceDiscoveryTab": "检测规则",
-      "alertCorrelationTab": "告警关联",
       "fieldAliasesTab": "字段映射",
       "fieldAliasesSaved": "字段别名保存成功",
       "fieldAliasesSaveError": "保存字段别名失败",
@@ -21507,7 +21462,6 @@
     "alerts": {
       "failedToNavigateToAlert": "导航到告警失败",
       "alertNotFound": "未找到告警",
-      "alertNotFoundInAlerts": "在 {count} 个告警中未找到告警 \"{name}\"",
       "failedToLoadAlerts": "加载告警失败",
       "alertsDeletedSuccessfully": "{count} 个告警已成功删除 | {count} 个告警已成功删除",
       "failedToDeleteAlerts": "删除 {count} 个告警失败 | 删除 {count} 个告警失败",
@@ -21576,7 +21530,6 @@
       "pleaseWaitWhileLoadingTemplates": "正在加载模板，请稍候...",
       "alertSavedSuccessfully": "告警保存成功。",
       "alertUpdatedSuccessfully": "告警更新成功。",
-      "openingDedupConfig": "正在为 {name} 打开去重配置",
       "editingAlert": "正在编辑告警：{name}",
       "ack": {
         "acked": "已确认 {name}",
@@ -26388,7 +26341,7 @@
       "logged": "已记录"
     },
     "policy": {
-      "gateHint": "在对现有告警的更改中，只有去重可单独应用，并带有先前状态快照和审核窗口：检查通过则保留，失败则回滚。其他所有更改都需一键批准。",
+      "gateHint": "在对现有告警的更改中，只有开启重复通知抑制会自动应用，并附带变更前状态快照和审查窗口：检查通过则保留，失败则回滚。其他所有更改都需要等待一键批准。",
       "off": "关闭",
       "suggest": "建议",
       "auto": "自动",
@@ -26407,7 +26360,7 @@
         "gateDesc": "将告警暂缓到调查完成，最长 2 分钟。失败时放行：如果分诊超时或失败，仍会发出告警，并说明调查仍在进行或已失败，原因会在同一线程中跟进。"
       },
       "classes": {
-        "EnableDeduplication": "为在几分钟内重复出现的告警开启去重。",
+        "EnableDeduplication": "为每次评估都通知的告警开启重复通知抑制。",
         "CreateDetector": "针对服务的请求、错误或延迟创建异常检测器。",
         "RaiseThreshold": "提高在健康日也会触发的阈值。",
         "LengthenEvaluationWindow": "延长反复抖动告警的评估窗口。",
@@ -26956,10 +26909,10 @@
           "on": "连接告警"
         },
         "L-302": {
-          "done": "将 3 个 checkout 延迟告警合并为一个",
-          "why": "它们有 94% 的时间同时触发，因此一次变慢就向您呼叫了 3 次。",
-          "from": "3 个告警",
-          "to": "1",
+          "done": "为 3 个结账延迟告警开启了重复通知抑制",
+          "why": "这些告警持续处于触发中时，每次评估都会通知，因此一次变慢就让您收到了 120 次通知。",
+          "from": "每次评估",
+          "to": "每次变更时通知一次",
           "on": "checkout 延迟"
         },
         "L-303": {
@@ -27016,7 +26969,7 @@
         "checkoutPaged": "我就 checkout 支付失败问题呼叫了值班。",
         "recsHeld": "我把 recommendations 的一个小问题留到了周五的摘要。",
         "diskApproved": "您批准将 ingest-1 上的磁盘告警阈值提高到 {to}%。",
-        "latencyGrouped": "我把 checkout 的三个变慢告警合并为一个，这样单个变慢只会呼叫一次。",
+        "latencyGrouped": "我为三个结账缓慢告警开启了重复通知抑制，因此单次变慢只会通知一次。",
         "queueFixed": "我为 orders 增加了队列 worker，但队列仍在增长，所以我把它们改了回来，并呼叫了值班。",
         "loginPaged": "我就登录变慢问题呼叫了值班。",
         "queuePermission": "您允许我自行增加队列 worker，最多 8 个。",

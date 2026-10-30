@@ -417,15 +417,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:multiTimeRange="updateMultiTimeRange"
                   />
                 </div>
-
-                <!-- Deduplication (scheduled only) -->
-                <div v-if="formData.is_real_time === 'false'">
-                  <Deduplication
-                    :deduplication="formData.deduplication"
-                    :columns="filteredColumns"
-                    @update:deduplication="updateDeduplication"
-                  />
-                </div>
               </div>
 
               <div v-show="activeTab === 'anomaly-config'" data-tab-pane="anomaly-config">
@@ -650,7 +641,6 @@ import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
 import AlertSettings from "./steps/AlertSettings.vue";
 import CompareWithPast from "./steps/CompareWithPast.vue";
-import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
 import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDropdown.vue";
 import PreviewAlert from "./PreviewAlert.vue";
@@ -712,7 +702,6 @@ export default defineComponent({
     QueryConfig,
     AlertSettings,
     CompareWithPast,
-    Deduplication,
     Advanced,
     PreviewAlert,
     AlertSummary,

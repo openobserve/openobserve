@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>{{ row.retries }}</template>
           </template>
 
-          <template #cell-dedup="{ row }">
+          <template #cell-suppression="{ row }">
             <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
             <OTruncatedText
               v-else-if="ackSuppressedBy(row)"
@@ -256,19 +256,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.ack.history.dedupSuppressed", { who: raw(ackSuppressedBy(row)) }) }}
             </OTruncatedText>
-            <span v-else-if="!row.dedup_enabled" class="text-text-secondary">-</span>
-            <div v-else-if="row.dedup_suppressed" class="text-status-error-text">
-              <OIcon name="block" size="sm">
-                <OTooltip>
-                  <template #content>
-                    {{ t("alerts.suppressedByDeduplication") }}
-                    <div v-if="row.dedup_count">
-                      {{ t("alerts.occurrence", { count: row.dedup_count }, row.dedup_count) }}
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-            </div>
+            <OTruncatedText
+              v-else-if="row.repeat_suppressed === true"
+              class="text-text-secondary text-xs"
+              data-test="alert-history-repeat-suppressed"
+            >
+              {{ t("alerts.suppressedAsRepeat") }}
+            </OTruncatedText>
             <div v-else-if="row.grouped" class="text-primary flex items-center justify-center">
               <OIcon name="group-work" size="md">
                 <OTooltip>
@@ -280,21 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
               <span class="ms-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
-            <div v-else class="text-status-positive flex items-center justify-center">
-              <OIcon name="check-circle" size="md">
-                <OTooltip>
-                  <template #content>
-                    {{ t("alerts.notificationSent") }}
-                    <div v-if="row.dedup_count && row.dedup_count > 1">
-                      {{ row.dedup_count }} {{ t("alerts.occurrencesDeduplicated") }}
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="ms-1 text-xs">
-                ×{{ row.dedup_count }}
-              </span>
-            </div>
+            <span v-else class="text-text-secondary">—</span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -777,11 +757,11 @@ const columns = ref<OTableColumnDef[]>([
     meta: { align: "right" },
   },
   {
-    id: "dedup",
-    header: t("alerts.dedup"),
+    id: "suppression",
+    header: t("alerts.suppression"),
     sortable: false,
-    size: 80,
-    maxSize: 80,
+    size: 112,
+    maxSize: 112,
     cell: " ",
     meta: { align: "left" },
   },

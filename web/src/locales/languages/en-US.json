@@ -9961,8 +9961,8 @@
       "raiseThresholdDesc": "Move the trigger value away from the observed steady state.",
       "lengthenEvaluationWindow": "Lengthen evaluation window",
       "lengthenEvaluationWindowDesc": "Widen the period so a short spike no longer trips the alert.",
-      "enableDeduplication": "Enable deduplication",
-      "enableDeduplicationDesc": "Collapse repeat firings inside a deduplication window.",
+      "enableDeduplication": "Turn on suppress repeats",
+      "enableDeduplicationDesc": "Notify once per state change instead of on every evaluation.",
       "reviewForDeletion": "Review for deletion",
       "reviewForDeletionDesc": "Confirm the query still matches reality before retiring the alert.",
       "fixAlertQuery": "Fix alert query",
@@ -10279,12 +10279,8 @@
     "organizationIdLabel": "Organization Id",
     "alertCreationTitle": "Alert Creation",
     "noAlertsFound": "No alerts found",
-    "suppressedByDeduplication": "Suppressed by deduplication",
-    "occurrence": "{count} occurrence | {count} occurrences",
     "groupedNotification": "Grouped notification",
     "alertsBatchedTogether": "alerts batched together",
-    "notificationSent": "Notification sent",
-    "occurrencesDeduplicated": "occurrences deduplicated",
     "alertExecutionDetails": "Alert Execution Details",
     "evaluationTime": "Evaluation Time",
     "queryTime": "Query Time",
@@ -10334,15 +10330,7 @@
     "serviceGraphTooltipTo": "To: {time}",
     "serviceGraphTooltipTemporalCorrelation": "Temporal correlation",
     "serviceGraphTooltipServiceDependency": "Service dependency",
-    "totalAlerts": "Total Alerts",
-    "usingDeduplication": "Using Deduplication",
-    "deduplicationConfiguredTooltip": "Alerts with deduplication configured",
-    "suppressionRate24h": "Suppression Rate (24h)",
     "suppressed": "suppressed /",
-    "total": "total",
-    "passedLabel": "Passed:",
-    "pendingBatches": "Pending Batches",
-    "pendingBatchesTooltip": "Alerts waiting to be grouped together",
     "historyTimeline": {
       "firing": "Firing",
       "ok": "Ok",
@@ -10363,7 +10351,8 @@
     "endTime": "End Time",
     "duration": "Duration",
     "retries": "Retries",
-    "dedup": "Dedup",
+    "suppression": "Suppression",
+    "suppressedAsRepeat": "Suppressed as a repeat",
     "validation": {
       "streamTypeRequired": "Stream type is required.",
       "streamNameRequired": "Stream name is required.",
@@ -10555,15 +10544,6 @@
     "all": "All",
     "history": "Alert History",
     "searcHistory": "Enter Alert Name",
-    "deduplication": {
-      "fingerprintFields": "Group similar alerts by",
-      "fingerprintFieldsHint": "Select fields that make alerts similar (e.g., hostname, service). Leave empty to auto-detect based on your query.",
-      "fingerprintFieldsTooltip": "Choose which fields should match for alerts to be considered duplicates. For example, selecting 'hostname' means alerts from the same host will be grouped together. Different alert types (e.g., High CPU vs High Memory) are never grouped, even if they come from the same host. Leave empty for automatic detection based on your query type.",
-      "timeWindow": "Consider alerts identical within",
-      "timeWindowHint": "Time period to group similar alerts. Leave empty to match your check interval.",
-      "timeWindowTooltip": "How long to remember recent alerts for grouping. If a similar alert happens within this time, it won't be sent again. Leave empty to use your alert's check interval.",
-      "fingerprintFieldsHelp": "Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
-    },
     "summary": {
       "scrollToBottom": "Scroll to bottom",
       "title": "Summary",
@@ -10611,38 +10591,15 @@
         "defaultConditions": "Alert me when the configured conditions are met"
       }
     },
-    "correlation": {
-      "title": "Alert Correlation",
-      "description": "Configure how alerts are correlated and deduplicated across the organization. Alerts with matching fingerprint values will be grouped together.",
-      "semanticFieldNote": "Note: Semantic field mappings are configured in the Service Identity tab.",
-      "enableOrgLevel": "Enable Organization-Level Deduplication",
-      "enableOrgLevelTooltip": "Enable deduplication and correlation features for all alerts in this organization",
-      "enableCrossAlert": "Enable Cross-Alert Deduplication",
-      "enableCrossAlertTooltip": "Allow different alerts to deduplicate each other when they share the same fingerprint",
-      "fingerprintGroups": "Cross-Alert Fingerprint Groups",
-      "fingerprintGroupsTooltip": "Select which semantic groups to use for cross-alert fingerprinting. Alerts will be deduplicated if they share the same values for these dimensions.",
-      "fingerprintGroupsHint": "Select at least one semantic group for cross-alert deduplication",
-      "fingerprintGroupsRequired": "At least one semantic group must be selected",
-      "defaultWindow": "Default Correlation Window (minutes)",
-      "defaultWindowTooltip": "In absence of semantic field match, alerts and data from given duration is considered related",
-      "defaultWindowDescription": "In absence of semantic field match, alerts and data from given duration is considered related",
-      "defaultWindowPlaceholder": "Use alert period by default",
-      "cancelButton": "Cancel",
-      "saveButton": "Save",
-      "settingsSaved": "Organization deduplication settings saved successfully",
-      "settingsSaveError": "Failed to save settings"
-    },
     "placeholders": {
       "typeSomething": "Type something",
       "value": "Value",
       "selectColumn": "Select column",
       "savedFunctions": "Saved functions",
-      "autoUsesCheckInterval": "Auto (uses check interval)",
       "addTag": "Add tag and press Enter"
     },
     "steps": {
       "compareWithPast": "Compare with Past",
-      "deduplication": "Deduplication",
       "advanced": "Advanced"
     },
     "stepCaptions": {
@@ -10650,7 +10607,6 @@
       "conditions": "What should trigger the alert",
       "compareWithPast": "Compare current results with data from another time period",
       "alertSettings": "Set your alert rules and choose how you'd like to be notified.",
-      "deduplication": "Avoid sending the same alert multiple times by grouping similar alerts together.",
       "advanced": "Context variables, description, and row template"
     },
     "failedToFetchHistory": "Failed to fetch alert history",
@@ -10673,8 +10629,6 @@
         "closeActions": "Close actions",
         "viewAlertHistory": "View Alert History",
         "actionsFor": "Actions for:",
-        "configureDedup": "Configure Dedup",
-        "configureDedupTooltip": "Configure deduplication for this alert",
         "editAlert": "Edit Alert",
         "editAlertTooltip": "Edit alert configuration",
         "viewHistory": "View History",
@@ -11454,6 +11408,8 @@
       "recoveryChatMessage": "new \"Resolved\" message",
       "keepFiringFor": "Keep firing for",
       "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "suppressRepeats": "Suppress repeats",
+      "suppressRepeatsTooltip": "Notify once when the alert starts firing or changes level, not on every evaluation. Leave it off to keep getting reminders after each silence period.",
       "keepFiringForInvalid": "Enter 0 or more seconds",
       "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
     },
@@ -13955,7 +13911,6 @@
       "identityConfigNoSets": "Configure at least one identity set before saving.",
       "discoveredServicesTab": "Discovered Services",
       "serviceDiscoveryTab": "Detection Rules",
-      "alertCorrelationTab": "Alert Grouping",
       "fieldAliasesTab": "Field Mappings",
       "fieldAliasesSaved": "Field aliases saved successfully",
       "fieldAliasesSaveError": "Failed to save field aliases",
@@ -21505,7 +21460,6 @@
     "alerts": {
       "failedToNavigateToAlert": "Failed to navigate to alert",
       "alertNotFound": "Alert not found",
-      "alertNotFoundInAlerts": "Alert \"{name}\" not found in {count} alerts",
       "failedToLoadAlerts": "Failed to load alerts",
       "alertsDeletedSuccessfully": "{count} alert deleted successfully | {count} alerts deleted successfully",
       "failedToDeleteAlerts": "Failed to delete {count} alert | Failed to delete {count} alerts",
@@ -21574,7 +21528,6 @@
       "pleaseWaitWhileLoadingTemplates": "Please wait while loading templates...",
       "alertSavedSuccessfully": "Alert saved successfully.",
       "alertUpdatedSuccessfully": "Alert updated successfully.",
-      "openingDedupConfig": "Opening dedup configuration for: {name}",
       "editingAlert": "Editing alert: {name}",
       "ack": {
         "acked": "Acknowledged {name}",
@@ -26386,7 +26339,7 @@
       "logged": "Logged"
     },
     "policy": {
-      "gateHint": "Among changes to existing alerts, only deduplication applies on its own, with a prior-state snapshot and a review window: kept if its checks pass, rolled back if they fail. Everything else waits for one-click approval.",
+      "gateHint": "Among changes to existing alerts, only turning on suppress repeats applies on its own, with a prior-state snapshot and a review window: kept if its checks pass, rolled back if they fail. Everything else waits for one-click approval.",
       "off": "Off",
       "suggest": "Suggest",
       "auto": "Auto",
@@ -26405,7 +26358,7 @@
         "gateDesc": "Hold the page until the investigation lands, for up to 2 minutes. Fails open: if triage times out or fails, it pages anyway, says the investigation is still running or failed, and the cause follows in the thread."
       },
       "classes": {
-        "EnableDeduplication": "Turn on deduplication for an alert that repeats within minutes.",
+        "EnableDeduplication": "Turn on suppress repeats for an alert that notifies on every evaluation.",
         "CreateDetector": "Create an anomaly detector on a service's requests, errors or latency.",
         "RaiseThreshold": "Raise a threshold that fires on healthy days.",
         "LengthenEvaluationWindow": "Lengthen the window of an alert that flaps.",
@@ -26954,10 +26907,10 @@
           "on": "connection alert"
         },
         "L-302": {
-          "done": "Grouped the 3 checkout latency alerts into one",
-          "why": "They went off together 94% of the time, so one slowdown paged you 3 times.",
-          "from": "3 alerts",
-          "to": "1",
+          "done": "Turned on suppress repeats for the 3 checkout latency alerts",
+          "why": "They notified on every evaluation while they stayed firing, so one slowdown paged you 120 times.",
+          "from": "Every evaluation",
+          "to": "Once per change",
           "on": "checkout latency"
         },
         "L-303": {
@@ -27014,7 +26967,7 @@
         "checkoutPaged": "I paged on-call about checkout failing payments.",
         "recsHeld": "I held a minor problem with recommendations for Friday's summary.",
         "diskApproved": "You approved raising the disk alert on ingest-1 to {to}%.",
-        "latencyGrouped": "I grouped the three checkout slowness alerts into one, so a single slowdown pages once.",
+        "latencyGrouped": "I turned on suppress repeats for the three checkout slowness alerts, so a single slowdown pages once.",
         "queueFixed": "I added orders queue workers, but the queue kept growing, so I put them back and paged on-call.",
         "loginPaged": "I paged on-call about slow sign-in.",
         "queuePermission": "You allowed me to add queue workers on my own, up to 8.",

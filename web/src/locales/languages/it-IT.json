@@ -9963,8 +9963,8 @@
       "raiseThresholdDesc": "Allontana il valore di attivazione dallo stato stazionario osservato.",
       "lengthenEvaluationWindow": "Allunga la finestra di valutazione",
       "lengthenEvaluationWindowDesc": "Amplia il periodo in modo che un picco breve non attivi più l'avviso.",
-      "enableDeduplication": "Abilita la deduplicazione",
-      "enableDeduplicationDesc": "Raggruppa le attivazioni ripetute all'interno di una finestra di deduplicazione.",
+      "enableDeduplication": "Attiva soppressione ripetizioni",
+      "enableDeduplicationDesc": "Notifica una volta per cambio di stato invece che a ogni valutazione.",
       "reviewForDeletion": "Verifica per l'eliminazione",
       "reviewForDeletionDesc": "Verifica che la query corrisponda ancora alla realtà prima di dismettere l'avviso.",
       "fixAlertQuery": "Correggi la query dell'avviso",
@@ -10281,12 +10281,8 @@
     "organizationIdLabel": "ID organizzazione",
     "alertCreationTitle": "Creazione avviso",
     "noAlertsFound": "Nessun avviso trovato",
-    "suppressedByDeduplication": "Soppresso dalla deduplicazione",
-    "occurrence": "{count} occorrenza | {count} occorrenze",
     "groupedNotification": "Notifica raggruppata",
     "alertsBatchedTogether": "avvisi raggruppati insieme",
-    "notificationSent": "Notifica inviata",
-    "occurrencesDeduplicated": "occorrenze deduplicate",
     "alertExecutionDetails": "Dettagli esecuzione avviso",
     "evaluationTime": "Tempo di valutazione",
     "queryTime": "Tempo di query",
@@ -10336,15 +10332,7 @@
     "serviceGraphTooltipTo": "A: {time}",
     "serviceGraphTooltipTemporalCorrelation": "Correlazione temporale",
     "serviceGraphTooltipServiceDependency": "Dipendenza del servizio",
-    "totalAlerts": "Totale avvisi",
-    "usingDeduplication": "Uso della deduplicazione",
-    "deduplicationConfiguredTooltip": "Avvisi con deduplicazione configurata",
-    "suppressionRate24h": "Tasso di soppressione (24h)",
     "suppressed": "soppressi /",
-    "total": "totale",
-    "passedLabel": "Superati:",
-    "pendingBatches": "Batch in sospeso",
-    "pendingBatchesTooltip": "Avvisi in attesa di essere raggruppati",
     "historyTimeline": {
       "firing": "Attivo",
       "ok": "Ok",
@@ -10365,7 +10353,8 @@
     "endTime": "Ora di fine",
     "duration": "Durata",
     "retries": "Tentativi",
-    "dedup": "Dedup",
+    "suppression": "Soppressione",
+    "suppressedAsRepeat": "Soppresso come ripetizione",
     "validation": {
       "streamTypeRequired": "Il tipo di Stream è obbligatorio.",
       "streamNameRequired": "Il nome dello Stream è obbligatorio.",
@@ -10557,15 +10546,6 @@
     "all": "Tutti",
     "history": "Cronologia avvisi",
     "searcHistory": "Inserisci il nome dell'avviso",
-    "deduplication": {
-      "fingerprintFields": "Raggruppa avvisi simili per",
-      "fingerprintFieldsHint": "Seleziona i campi da utilizzare per la deduplicazione. Lascia vuoto per il rilevamento automatico in base al tipo di query.",
-      "fingerprintFieldsTooltip": "Scegli quali campi devono corrispondere perché gli avvisi siano considerati duplicati. Ad esempio, selezionando 'hostname' gli avvisi provenienti dallo stesso host verranno raggruppati. Tipi di avviso diversi (ad esempio, CPU elevata e memoria elevata) non vengono mai raggruppati, anche se provengono dallo stesso host. Lascia vuoto per il rilevamento automatico in base al tipo di query.",
-      "timeWindow": "Finestra temporale (minuti)",
-      "timeWindowHint": "Per quanto tempo tenere traccia delle impronte digitali degli avvisi. Lascia vuoto per utilizzare il periodo di avviso.",
-      "timeWindowTooltip": "Durata del monitoraggio e della deduplicazione delle impronte digitali degli avvisi. Se viene visualizzato un avviso con la stessa impronta digitale all'interno di questa finestra, verrà soppresso. Lascia vuoto per utilizzare il periodo di valutazione degli avvisi.",
-      "fingerprintFieldsHelp": "Lascia vuoto per rilevamento automatico basato sulla query (SQL: colonne GROUP BY, PromQL: etichette, Personalizzato: campi condizione)"
-    },
     "summary": {
       "scrollToBottom": "Scorri verso il basso",
       "title": "Riepilogo",
@@ -10613,38 +10593,15 @@
         "defaultConditions": "Avvisami quando le condizioni configurate sono soddisfatte"
       }
     },
-    "correlation": {
-      "title": "Correlazione degli avvisi",
-      "description": "Configura il modo in cui gli avvisi sono correlati e deduplicati in tutta l'organizzazione. Gli avvisi con valori di impronte digitali corrispondenti verranno raggruppati.",
-      "semanticFieldNote": "Nota: le mappature semantiche dei campi sono configurate nella scheda Identità del servizio.",
-      "enableOrgLevel": "Abilita la deduplicazione a livello di organizzazione",
-      "enableOrgLevelTooltip": "Abilita le funzionalità di deduplicazione e correlazione per tutti gli avvisi di questa organizzazione",
-      "enableCrossAlert": "Abilita la deduplicazione tra avvisi",
-      "enableCrossAlertTooltip": "Consenti la deduplicazione reciproca di diversi avvisi quando condividono la stessa impronta digitale",
-      "fingerprintGroups": "Gruppi di impronte digitali tra avvisi",
-      "fingerprintGroupsTooltip": "Seleziona i gruppi semantici da utilizzare per il fingerprinting tra avvisi incrociati. Gli avvisi verranno deduplicati se condividono gli stessi valori per queste dimensioni.",
-      "fingerprintGroupsHint": "Seleziona almeno un gruppo semantico per la deduplicazione tra avvisi",
-      "fingerprintGroupsRequired": "È necessario selezionare almeno un gruppo semantico",
-      "defaultWindow": "Finestra di correlazione predefinita (minuti)",
-      "defaultWindowTooltip": "In assenza di corrispondenza semantica dei campi, gli avvisi e i dati di una determinata durata sono considerati correlati",
-      "defaultWindowDescription": "In assenza di corrispondenza semantica dei campi, gli avvisi e i dati di una determinata durata sono considerati correlati",
-      "defaultWindowPlaceholder": "Usa il periodo di avviso per impostazione predefinita",
-      "cancelButton": "Annulla",
-      "saveButton": "Salva",
-      "settingsSaved": "Impostazioni di deduplicazione dell'organizzazione salvate con successo",
-      "settingsSaveError": "Salvataggio impostazioni fallito"
-    },
     "placeholders": {
       "typeSomething": "Digita qualcosa",
       "value": "Valore",
       "selectColumn": "Seleziona colonna",
       "savedFunctions": "Funzioni salvate",
-      "autoUsesCheckInterval": "Auto (utilizza l'intervallo di controllo)",
       "addTag": "Aggiungi un tag e premi Invio"
     },
     "steps": {
       "compareWithPast": "Confronta con il passato",
-      "deduplication": "Deduplicazione",
       "advanced": "Avanzato"
     },
     "stepCaptions": {
@@ -10652,7 +10609,6 @@
       "conditions": "Cosa dovrebbe attivare l'avviso",
       "compareWithPast": "Confronta i risultati attuali con i dati di un altro periodo di tempo",
       "alertSettings": "Imposta le regole per gli avvisi e scegli come ricevere le notifiche.",
-      "deduplication": "Evita di inviare lo stesso avviso più volte raggruppando avvisi simili.",
       "advanced": "Variabili di contesto, descrizione e template di riga"
     },
     "failedToFetchHistory": "Impossibile recuperare la cronologia degli avvisi",
@@ -10675,8 +10631,6 @@
         "closeActions": "Chiudi azioni",
         "viewAlertHistory": "Visualizza cronologia avvisi",
         "actionsFor": "Azioni per:",
-        "configureDedup": "Configura Dedup",
-        "configureDedupTooltip": "Configura la deduplicazione per questo avviso",
         "editAlert": "Modifica avviso",
         "editAlertTooltip": "Modifica la configurazione degli avvisi",
         "viewHistory": "Visualizza cronologia",
@@ -11456,6 +11410,8 @@
       "recoveryChatMessage": "nuovo messaggio \"Risolto\"",
       "keepFiringFor": "Mantieni attivo per",
       "keepFiringForTooltip": "Attendi questo tempo dopo che la condizione è cessata prima di ripristinare. 0 ripristina immediatamente.",
+      "suppressRepeats": "Sopprimi ripetizioni",
+      "suppressRepeatsTooltip": "Notifica una volta quando l'avviso inizia a essere attivo o cambia livello, non a ogni valutazione. Lascialo disattivato per continuare a ricevere promemoria dopo ogni periodo di silenzio.",
       "keepFiringForInvalid": "Inserisci 0 o più secondi",
       "keepFiringForTooLong": "Inserisci al massimo 86400 secondi (24 ore)"
     },
@@ -13957,7 +13913,6 @@
       "identityConfigNoSets": "Configura almeno un set di identità prima di salvare.",
       "discoveredServicesTab": "Servizi scoperti",
       "serviceDiscoveryTab": "Regole di rilevamento",
-      "alertCorrelationTab": "Correlazione degli avvisi",
       "fieldAliasesTab": "Mappature dei campi",
       "fieldAliasesSaved": "Alias dei campi salvati con successo",
       "fieldAliasesSaveError": "Impossibile salvare gli alias dei campi",
@@ -21507,7 +21462,6 @@
     "alerts": {
       "failedToNavigateToAlert": "Impossibile passare all'avviso",
       "alertNotFound": "Avviso non trovato",
-      "alertNotFoundInAlerts": "Avviso \"{name}\" non trovato tra {count} avvisi",
       "failedToLoadAlerts": "Impossibile caricare gli avvisi",
       "alertsDeletedSuccessfully": "{count} avviso eliminato con successo | {count} avvisi eliminati con successo",
       "failedToDeleteAlerts": "Impossibile eliminare {count} avviso | Impossibile eliminare {count} avvisi",
@@ -21576,7 +21530,6 @@
       "pleaseWaitWhileLoadingTemplates": "Attendere mentre si caricano i template...",
       "alertSavedSuccessfully": "Avviso salvato con successo.",
       "alertUpdatedSuccessfully": "Avviso aggiornato con successo.",
-      "openingDedupConfig": "Apertura configurazione di deduplicazione per: {name}",
       "editingAlert": "Modifica avviso: {name}",
       "ack": {
         "acked": "Presa in carico: {name}",
@@ -26388,7 +26341,7 @@
       "logged": "Registrato"
     },
     "policy": {
-      "gateHint": "Tra le modifiche agli avvisi esistenti, solo la deduplicazione si applica da sola, con un'istantanea dello stato precedente e una finestra di revisione: mantenuta se i suoi controlli passano, ripristinata se falliscono. Tutto il resto attende l'approvazione con un clic.",
+      "gateHint": "Tra le modifiche agli avvisi esistenti, solo l'attivazione della soppressione delle ripetizioni viene applicata automaticamente, con uno snapshot dello stato precedente e una finestra di revisione: mantenuta se le verifiche hanno esito positivo, annullata se falliscono. Tutto il resto attende l'approvazione con un clic.",
       "off": "Disattivato",
       "suggest": "Suggerisci",
       "auto": "Auto",
@@ -26407,7 +26360,7 @@
         "gateDesc": "Trattiene la notifica finché l'indagine non si conclude, per un massimo di 2 minuti. Fails open: se il triage va in timeout o fallisce, invia comunque la notifica, indica che l'indagine è ancora in corso o è fallita, e la causa segue nel thread."
       },
       "classes": {
-        "EnableDeduplication": "Attiva la deduplicazione per un avviso che si ripete nel giro di pochi minuti.",
+        "EnableDeduplication": "Attiva la soppressione delle ripetizioni per un avviso che notifica a ogni valutazione.",
         "CreateDetector": "Crea un rilevatore di anomalie su richieste, errori o latenza di un servizio.",
         "RaiseThreshold": "Alza una soglia che scatta in giorni sani.",
         "LengthenEvaluationWindow": "Allunga la finestra di un avviso che oscilla.",
@@ -26956,10 +26909,10 @@
           "on": "avviso di connessione"
         },
         "L-302": {
-          "done": "Ho raggruppato i 3 avvisi di latenza di checkout in uno",
-          "why": "Scattavano insieme nel 94% dei casi, quindi un rallentamento ti ha avvisato 3 volte.",
-          "from": "3 avvisi",
-          "to": "1",
+          "done": "Attivata la soppressione delle ripetizioni per i 3 avvisi di latenza del checkout",
+          "why": "Notificavano a ogni valutazione mentre rimanevano attivi, quindi un singolo rallentamento ti ha inviato 120 notifiche.",
+          "from": "Ogni valutazione",
+          "to": "Una volta per cambio",
           "on": "latenza di checkout"
         },
         "L-303": {
@@ -27016,7 +26969,7 @@
         "checkoutPaged": "Ho avvisato la reperibilità per i pagamenti non riusciti di checkout.",
         "recsHeld": "Ho messo da parte un problema minore con recommendations per il riepilogo di venerdì.",
         "diskApproved": "Hai approvato l'innalzamento dell'avviso sul disco di ingest-1 al {to}%.",
-        "latencyGrouped": "Ho raggruppato i tre avvisi di lentezza di checkout in uno solo, così un singolo rallentamento genera una sola notifica.",
+        "latencyGrouped": "Ho attivato la soppressione delle ripetizioni per i tre avvisi di lentezza del checkout, così un singolo rallentamento invia una sola notifica.",
         "queueFixed": "Ho aggiunto worker alla coda di orders, ma la coda continuava a crescere, quindi li ho ripristinati e ho avvisato la reperibilità.",
         "loginPaged": "Ho avvisato la reperibilità per l'accesso lento.",
         "queuePermission": "Mi hai autorizzato ad aggiungere worker alla coda in autonomia, fino a 8.",
