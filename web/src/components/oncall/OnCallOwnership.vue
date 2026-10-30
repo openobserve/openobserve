@@ -110,7 +110,7 @@ import type {
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { identityDimensions } from "@/utils/oncall";
+import { identityDimensions, SERVICE_DIMENSION } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -133,7 +133,22 @@ const aliases = ref<{ id: string; display?: string }[]>([]);
 const catalogue = ref<DimensionCatalogue>({ present: [], values: {} });
 /// Discovered services, so a rule can claim one whole identity rather than be
 /// assembled a dimension at a time.
-const services = ref<DiscoveredService[]>([]);
+const discovered = ref<DiscoveredService[]>([]);
+
+/// Discovery's services plus the ones this team's rules already name, which discovery may never have seen.
+const services = computed<DiscoveredService[]>(() => {
+  const known = new Set(discovered.value.map((one) => one.name));
+  const fromRules = [
+    ...new Set(
+      rules.value
+        .map((rule) => rule.dimensions?.[SERVICE_DIMENSION])
+        .filter((name): name is string => !!name),
+    ),
+  ]
+    .filter((name) => !known.has(name))
+    .map((name) => ({ name, setId: "default", identity: {} }));
+  return [...discovered.value, ...fromRules].sort((a, b) => a.name.localeCompare(b.name));
+});
 /// The org's identity sets. `distinguish_by` is ordered, so it is also the
 /// hierarchy — cluster contains namespace — which is what lets the rule editor
 /// offer levels to claim instead of a flat list of registry rows.
@@ -193,7 +208,8 @@ async function fetchServices() {
     const seen = new Map<string, DiscoveredService>();
     for (const row of rows) {
       const name = String(row.service_name ?? "");
-      if (!name) continue;
+      // A record with no service is filed under its stream's name, which routing ignores, so offering it would claim nothing.
+      if (!name || row.named_after_stream === true) continue;
       const identity = (row.disambiguation ?? {}) as Record<string, string>;
       const existing = seen.get(name);
       // One row per service. A service seen both with and without its
@@ -203,9 +219,9 @@ async function fetchServices() {
         seen.set(name, { name, setId: String(row.set_id ?? "default"), identity });
       }
     }
-    services.value = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+    discovered.value = [...seen.values()];
   } catch {
-    services.value = [];
+    discovered.value = [];
   }
 }
 
