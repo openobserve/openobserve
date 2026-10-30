@@ -8711,6 +8711,8 @@
     "previewView": "Vue de l'aperçu",
     "previewChart": "Graphique",
     "previewData": "Données",
+    "showRawData": "Afficher les données brutes",
+    "showChart": "Afficher le graphique",
     "dataViewEmpty": "Aucune ligne renvoyée",
     "dataViewCapped": "Affichage des {shown} premières lignes sur {total}",
     "logExplorer": {

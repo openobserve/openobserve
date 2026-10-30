@@ -225,13 +225,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </OTooltip>
         </OIcon>
-        <PanelViewToggle
-          v-if="showDataViewToggle"
-          v-model="previewView"
-          icon-only
-          :class="isDataView ? '' : [hoverRevealClass, '@max-[12rem]/panelbar:hidden']"
-          data-test-prefix="dashboard-panel"
-        />
         <OButton
           :class="hoverRevealClass"
           v-if="!viewOnly && !simplifiedPanelView"
@@ -386,6 +379,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OTooltip>
             </template>
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="showDataViewToggle && !isLayoutEditing"
+            data-test="dashboard-panel-data-view-toggle"
+            @select="previewView = isDataView ? 'chart' : 'data'"
+          >
+            <template #icon-left
+              ><OIcon :name="isDataView ? 'show-chart' : 'table-chart'" size="sm"
+            /></template>
+            {{ isDataView ? t("panel.showChart") : t("panel.showRawData") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
@@ -660,7 +663,6 @@ import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import PanelDataView from "./addPanel/PanelDataView.vue";
-import PanelViewToggle from "./PanelViewToggle.vue";
 import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -771,7 +773,6 @@ export default defineComponent({
     OSkeleton,
     PanelSchemaRenderer,
     PanelDataView,
-    PanelViewToggle,
     PanelBar,
     QueryInspector,
     ConfirmDialog,
@@ -847,7 +848,7 @@ export default defineComponent({
     } = usePanelDataView({
       panelType: () => props.data?.type,
       renderer: PanleSchemaRendererRef,
-      enabled: () => !props.kiosk,
+      enabled: () => !props.kiosk && !props.viewOnly && !props.simplifiedPanelView,
     });
 
     const exemplarsEligible = computed(() => isExemplarEligible(props.data));

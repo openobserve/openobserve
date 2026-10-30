@@ -8711,6 +8711,8 @@
     "previewView": "预览视图",
     "previewChart": "图表",
     "previewData": "数据",
+    "showRawData": "显示原始数据",
+    "showChart": "显示图表",
     "dataViewEmpty": "未返回任何行",
     "dataViewCapped": "显示 {total} 行中的前 {shown} 行",
     "logExplorer": {

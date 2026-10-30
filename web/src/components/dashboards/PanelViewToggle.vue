@@ -25,19 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       value="chart"
       size="xs"
       icon-left="show-chart"
-      :tooltip="iconOnly ? t('panel.previewChart') : undefined"
-      :aria-label="iconOnly ? t('panel.previewChart') : undefined"
       :data-test="`${dataTestPrefix}-preview-view-chart`"
-      ><template v-if="!iconOnly">{{ t("panel.previewChart") }}</template></OToggleGroupItem
+      >{{ t("panel.previewChart") }}</OToggleGroupItem
     >
     <OToggleGroupItem
       value="data"
       size="xs"
       icon-left="table-chart"
-      :tooltip="iconOnly ? t('panel.previewData') : undefined"
-      :aria-label="iconOnly ? t('panel.previewData') : undefined"
       :data-test="`${dataTestPrefix}-preview-view-data`"
-      ><template v-if="!iconOnly">{{ t("panel.previewData") }}</template></OToggleGroupItem
+      >{{ t("panel.previewData") }}</OToggleGroupItem
     >
   </OToggleGroup>
 </template>
@@ -48,14 +44,10 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { PanelPreviewView } from "@/composables/dashboard/usePanelDataView";
 import { useI18nTyped } from "@/types/i18n";
 
-withDefaults(
-  defineProps<{
-    modelValue: PanelPreviewView;
-    dataTestPrefix: string;
-    iconOnly?: boolean;
-  }>(),
-  { iconOnly: false },
-);
+defineProps<{
+  modelValue: PanelPreviewView;
+  dataTestPrefix: string;
+}>();
 
 const emit = defineEmits<{ "update:modelValue": [value: PanelPreviewView] }>();
 

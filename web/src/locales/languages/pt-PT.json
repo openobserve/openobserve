@@ -8711,6 +8711,8 @@
     "previewView": "Vista de pré-visualização",
     "previewChart": "Gráfico",
     "previewData": "Dados",
+    "showRawData": "Mostrar dados brutos",
+    "showChart": "Mostrar gráfico",
     "dataViewEmpty": "Nenhuma linha devolvida",
     "dataViewCapped": "A mostrar as primeiras {shown} de {total} linhas",
     "logExplorer": {

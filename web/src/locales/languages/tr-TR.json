@@ -8711,6 +8711,8 @@
     "previewView": "Önizleme görünümü",
     "previewChart": "Grafik",
     "previewData": "Veri",
+    "showRawData": "Ham veriyi göster",
+    "showChart": "Grafiği göster",
     "dataViewEmpty": "Hiç satır döndürülmedi",
     "dataViewCapped": "{total} satırın ilk {shown} tanesi gösteriliyor",
     "logExplorer": {

@@ -8706,6 +8706,8 @@
     "previewView": "預覽檢視",
     "previewChart": "圖表",
     "previewData": "資料",
+    "showRawData": "顯示原始資料",
+    "showChart": "顯示圖表",
     "dataViewEmpty": "未傳回任何資料列",
     "dataViewCapped": "顯示 {total} 列中的前 {shown} 列",
     "logExplorer": {

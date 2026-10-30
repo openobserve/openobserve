@@ -8711,6 +8711,8 @@
     "previewView": "Voorbeeldweergave",
     "previewChart": "Grafiek",
     "previewData": "Gegevens",
+    "showRawData": "Ruwe gegevens tonen",
+    "showChart": "Grafiek tonen",
     "dataViewEmpty": "Geen rijen geretourneerd",
     "dataViewCapped": "De eerste {shown} van {total} rijen worden getoond",
     "logExplorer": {

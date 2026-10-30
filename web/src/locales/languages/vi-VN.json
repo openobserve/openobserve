@@ -8711,6 +8711,8 @@
     "previewView": "Chế độ xem trước",
     "previewChart": "Biểu đồ",
     "previewData": "Dữ liệu",
+    "showRawData": "Hiển thị dữ liệu thô",
+    "showChart": "Hiển thị biểu đồ",
     "dataViewEmpty": "Không có hàng nào được trả về",
     "dataViewCapped": "Đang hiển thị {shown} hàng đầu tiên trong số {total} hàng",
     "logExplorer": {

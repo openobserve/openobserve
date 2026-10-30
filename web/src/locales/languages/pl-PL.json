@@ -8711,6 +8711,8 @@
     "previewView": "Widok podglądu",
     "previewChart": "Wykres",
     "previewData": "Dane",
+    "showRawData": "Pokaż surowe dane",
+    "showChart": "Pokaż wykres",
     "dataViewEmpty": "Nie zwrócono żadnych wierszy",
     "dataViewCapped": "Wyświetlanie pierwszych {shown} z {total} wierszy",
     "logExplorer": {

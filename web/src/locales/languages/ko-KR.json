@@ -8711,6 +8711,8 @@
     "previewView": "미리보기 보기",
     "previewChart": "차트",
     "previewData": "데이터",
+    "showRawData": "원시 데이터 표시",
+    "showChart": "차트 표시",
     "dataViewEmpty": "반환된 행이 없습니다",
     "dataViewCapped": "{total}개 행 중 처음 {shown}개 표시 중",
     "logExplorer": {

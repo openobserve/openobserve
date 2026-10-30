@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <PanelViewToggle
                       v-if="showDataViewToggle"
                       v-model="previewView"
-                      class="ms-2 me-auto"
+                      class="my-2 ms-2 me-auto"
                       data-test-prefix="panel-editor"
                     />
 

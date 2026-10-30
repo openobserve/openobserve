@@ -8711,6 +8711,8 @@
     "previewView": "عرض المعاينة",
     "previewChart": "مخطط",
     "previewData": "بيانات",
+    "showRawData": "عرض البيانات الخام",
+    "showChart": "عرض المخطط",
     "dataViewEmpty": "لم يتم إرجاع أي صفوف",
     "dataViewCapped": "عرض أول {shown} من {total} صف",
     "logExplorer": {

@@ -8711,6 +8711,8 @@
     "previewView": "Vorschauansicht",
     "previewChart": "Diagramm",
     "previewData": "Daten",
+    "showRawData": "Rohdaten anzeigen",
+    "showChart": "Diagramm anzeigen",
     "dataViewEmpty": "Keine Zeilen zurückgegeben",
     "dataViewCapped": "Die ersten {shown} von {total} Zeilen werden angezeigt",
     "logExplorer": {

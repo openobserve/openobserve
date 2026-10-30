@@ -8711,6 +8711,8 @@
     "previewView": "Режим предпросмотра",
     "previewChart": "График",
     "previewData": "Данные",
+    "showRawData": "Показать исходные данные",
+    "showChart": "Показать график",
     "dataViewEmpty": "Строки не возвращены",
     "dataViewCapped": "Показаны первые {shown} из {total} строк",
     "logExplorer": {
