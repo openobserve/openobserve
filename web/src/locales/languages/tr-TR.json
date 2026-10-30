@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Bu görünüm için ağ verisi yok",
     "apiEmptyDescription": "Seçilen akışta bu zaman aralığında hiçbir kaynak veya ağ isteği yok. Uygulama HTTP çağrılarını enstrümante ettiğinde ağ metrikleri görünür.",
     "skipInactivity": "Hareketsizliği Atla",
+    "fullScreen": "Tam ekran",
+    "exitFullScreen": "Tam ekrandan çık",
     "error": "Hata",
     "errorCount": "Hata Sayısı",
     "all": "Hepsi",
@@ -8525,6 +8527,8 @@
       "urlHidden": "Erişim yok",
       "urlHiddenHint": "Bu bağlantının gösterge panosunu görüntüleyemediğiniz için genel URL'si gizlendi.",
       "orgDisabledHint": "Bu kuruluş için herkese açık bağlantılar kapatıldı",
+      "orgDisabledBanner": "Bu kuruluş için herkese açık bağlantılar kapalı olduğundan hiçbir bağlantı sunulmuyor. Bir yönetici bunları yeniden açabilir.",
+      "disabledPaused": "Devre dışı · Duraklatıldı",
       "takeOver": "Devral",
       "takeOverTitle": "Bu bağlantı devralınsın mı?",
       "takeOverBody": "Yayınlayan siz olursunuz. Genel sayfa, görmenize izin verilen içeriği gösterir; bu, öncekinden daha fazla ya da daha az olabilir. URL'ye sahip herkes erişimini korur ve bağlantı hemen etkinleşir.",
@@ -18784,7 +18788,9 @@
     "dataFresh": "Veriler taze",
     "dataGettingStale": "Veriler bayatlanıyor",
     "dataStale": "Veriler bayat",
-    "lastRefreshed": "Son yenileme: {time}"
+    "lastRefreshed": "Son yenileme: {time}",
+    "refresh": "Yenile",
+    "refreshWithAge": "Yenile, son yenileme {age}"
   },
   "synthetics": {
     "variables": {

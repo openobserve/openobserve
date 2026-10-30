@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "このビューのネットワークデータがありません",
     "apiEmptyDescription": "選択したストリームには、この時間範囲のリソースまたはネットワーク リクエストがありません。ネットワーク メトリクスは、アプリが HTTP 呼び出しを計測すると表示されます。",
     "skipInactivity": "非アクティブ期間をスキップ",
+    "fullScreen": "全画面表示",
+    "exitFullScreen": "全画面表示を終了",
     "error": "エラー",
     "errorCount": "エラー数",
     "all": "すべて",
@@ -8525,6 +8527,8 @@
       "urlHidden": "アクセス権なし",
       "urlHiddenHint": "このリンクのダッシュボードを閲覧できないため、公開 URL は表示されません。",
       "orgDisabledHint": "この組織では公開リンクが無効になっています",
+      "orgDisabledBanner": "この組織ではパブリックリンクが無効になっているため、リンクは提供されません。管理者は再度有効にできます。",
+      "disabledPaused": "無効 · 一時停止",
       "takeOver": "引き継ぐ",
       "takeOverTitle": "このリンクを引き継ぎますか？",
       "takeOverBody": "あなたが公開者になります。公開ページには、あなたが閲覧を許可されている内容が表示されます。これまでより多くなることも少なくなることもあります。URL を知っている人は引き続きアクセスでき、リンクはすぐに公開状態になります。",
@@ -18784,7 +18788,9 @@
     "dataFresh": "データは新鮮",
     "dataGettingStale": "データが古くなっている",
     "dataStale": "データが古い",
-    "lastRefreshed": "最終更新: {time}"
+    "lastRefreshed": "最終更新: {time}",
+    "refresh": "更新",
+    "refreshWithAge": "更新、最終更新 {age}"
   },
   "synthetics": {
     "variables": {

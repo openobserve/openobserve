@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Nessun dato di rete per questa vista",
     "apiEmptyDescription": "Lo stream selezionato non ha richieste di risorse o di rete in questo intervallo di tempo. Le metriche di rete compaiono quando l'app strumenta le sue chiamate HTTP.",
     "skipInactivity": "Salta l'inattività",
+    "fullScreen": "Schermo intero",
+    "exitFullScreen": "Esci da schermo intero",
     "error": "Errore",
     "errorCount": "Numero errori",
     "all": "Tutti",
@@ -8525,6 +8527,8 @@
       "urlHidden": "Nessun accesso",
       "urlHiddenHint": "Non puoi visualizzare la dashboard di questo link, quindi il suo URL pubblico è nascosto.",
       "orgDisabledHint": "I link pubblici sono disattivati per questa organizzazione",
+      "orgDisabledBanner": "I link pubblici sono disattivati per questa organizzazione, quindi nessun link viene servito. Un amministratore può riattivarli.",
+      "disabledPaused": "Disattivato · In pausa",
       "takeOver": "Prendi in carico",
       "takeOverTitle": "Prendere in carico questo link?",
       "takeOverBody": "Diventi tu l'autore della pubblicazione. La pagina pubblica mostrerà ciò che sei autorizzato a vedere, che può essere più o meno di prima. Chi ha l'URL mantiene l'accesso e il link torna attivo subito.",
@@ -18784,7 +18788,9 @@
     "dataFresh": "I dati sono freschi",
     "dataGettingStale": "I dati stanno diventando obsoleti",
     "dataStale": "I dati sono obsoleti",
-    "lastRefreshed": "Ultimo aggiornamento: {time}"
+    "lastRefreshed": "Ultimo aggiornamento: {time}",
+    "refresh": "Aggiorna",
+    "refreshWithAge": "Aggiorna, ultimo aggiornamento {age}"
   },
   "synthetics": {
     "variables": {

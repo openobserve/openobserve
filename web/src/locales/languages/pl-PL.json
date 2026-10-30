@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Brak danych sieciowych dla tego widoku",
     "apiEmptyDescription": "Wybrany strumień nie ma żądań zasobów ani sieci w tym zakresie czasu. Metryki sieci pojawią się, gdy aplikacja zacznie instrumentować swoje wywołania HTTP.",
     "skipInactivity": "Pomiń nieaktywność",
+    "fullScreen": "Pełny ekran",
+    "exitFullScreen": "Wyjdź z pełnego ekranu",
     "error": "Błąd",
     "errorCount": "Liczba błędów",
     "all": "Wszystkie",
@@ -8525,6 +8527,8 @@
       "urlHidden": "Brak dostępu",
       "urlHiddenHint": "Nie możesz wyświetlić pulpitu tego linku, więc jego publiczny URL jest ukryty.",
       "orgDisabledHint": "Linki publiczne są wyłączone w tej organizacji",
+      "orgDisabledBanner": "Linki publiczne są wyłączone dla tej organizacji, więc żaden link nie jest udostępniany. Administrator może je ponownie włączyć.",
+      "disabledPaused": "Wyłączone · Wstrzymane",
       "takeOver": "Przejmij",
       "takeOverTitle": "Przejąć ten link?",
       "takeOverBody": "Staniesz się osobą publikującą. Strona publiczna pokaże to, co masz prawo widzieć, a to może być więcej lub mniej niż wcześniej. Każdy, kto ma URL, zachowuje dostęp, a link jest od teraz aktywny.",
@@ -18784,7 +18788,9 @@
     "dataFresh": "Dane są świeże",
     "dataGettingStale": "Dane zaczynają się przedawniać",
     "dataStale": "Dane są nieaktualne",
-    "lastRefreshed": "Ostatnie odświeżenie: {time}"
+    "lastRefreshed": "Ostatnie odświeżenie: {time}",
+    "refresh": "Odśwież",
+    "refreshWithAge": "Odśwież, ostatnio odświeżono {age}"
   },
   "synthetics": {
     "variables": {
