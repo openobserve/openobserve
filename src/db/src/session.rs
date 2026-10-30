@@ -59,14 +59,13 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
                 }
                 return Err(anyhow::anyhow!("Session expired"));
             }
+            // Token is valid only when its expiration metadata is present.
+            return Ok(token_value);
         } else {
-            log::debug!(
-                "Session found in cache but NO EXPIRY INFO cached: {}",
-                session_id
-            );
+            // Do not allow a cache entry without expiry metadata to bypass validation.
+            log::warn!("Session cache missing expiry metadata: {}", session_id);
+            USER_SESSIONS.remove(session_id);
         }
-        // Token is valid and not expired
-        return Ok(token_value);
     }
 
     // Cache miss - fetch from DB
