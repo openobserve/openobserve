@@ -52,6 +52,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-status-positive": "#208a3c",
   "--color-surface-subtle": "#f5f5f5",
   "--color-white": "#ffffff",
+  "--color-black": "#000000",
   "--color-tooltip-text": "#262626",
   "--color-tooltip-bg": "#ffffff",
   "--color-tooltip-border": "#ededed",

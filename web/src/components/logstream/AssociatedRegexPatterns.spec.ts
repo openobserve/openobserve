@@ -893,6 +893,98 @@ describe("AssociatedRegexPatterns.vue", () => {
     });
   });
 
+  describe("Drop policy test output", () => {
+    const dropped = '[data-test="associated-regex-patterns-field-dropped"]';
+    const hint = "regex_patterns.click_test_input_hint";
+    const pick = async (policy: string, testString: string, pattern = "\\d+") => {
+      const vm = wrapper.vm as any;
+      vm.userClickedPattern = { pattern };
+      // The pattern watcher resets policy and input on the next tick.
+      await nextTick();
+      vm.policy = policy;
+      vm.testString = testString;
+      await nextTick();
+      return vm;
+    };
+    const runTest = async (policy: string, testString: string, pattern?: string) => {
+      vi.mocked(regexPatternsService.test).mockResolvedValueOnce({
+        data: { results: [""] },
+      } as any);
+      const vm = await pick(policy, testString, pattern);
+      await vm.testStringOutput();
+      await nextTick();
+      return vm;
+    };
+
+    it("shows Field dropped when a Drop test returns an empty result", async () => {
+      const vm = await runTest("DropField", "123");
+      expect(vm.testedPolicy).toBe("DropField");
+      expect(vm.outputString).toBe("");
+      expect(wrapper.find(dropped).exists()).toBe(true);
+      expect(wrapper.find(dropped).text()).toBe("regex_patterns.field_dropped");
+      expect(wrapper.text()).not.toContain(hint);
+    });
+
+    it("does not show Field dropped when a Redact test returns an empty result", async () => {
+      const vm = await runTest("Redact", "abc", ".*");
+      expect(vm.testedPolicy).toBe("Redact");
+      expect(wrapper.find(dropped).exists()).toBe(false);
+      expect(wrapper.text()).toContain(hint);
+    });
+
+    it("shows the click hint again after the inputs reset", async () => {
+      const vm = await runTest("DropField", "123");
+      vm.resetInputValues();
+      vm.expandState.outputString = true;
+      await nextTick();
+      expect(vm.testedPolicy).toBe(null);
+      expect(wrapper.find(dropped).exists()).toBe(false);
+      expect(wrapper.text()).toContain(hint);
+    });
+
+    it.each([
+      ["policy", "Redact"],
+      ["testString", "456"],
+    ])("clears Field dropped when %s changes after a Drop test", async (key, value) => {
+      const vm = await runTest("DropField", "123");
+      expect(wrapper.find(dropped).exists()).toBe(true);
+      vm[key] = value;
+      await nextTick();
+      expect(vm.testedPolicy).toBe(null);
+      expect(wrapper.find(dropped).exists()).toBe(false);
+    });
+
+    it("does not show Field dropped after clearing a non-empty Drop result", async () => {
+      vi.mocked(regexPatternsService.test).mockResolvedValueOnce({
+        data: { results: ["no digits"] },
+      } as any);
+      const vm = await pick("DropField", "no digits");
+      await vm.testStringOutput();
+      await nextTick();
+      expect(vm.testedPolicy).toBe(null);
+      vm.outputString = "";
+      await nextTick();
+      expect(wrapper.find(dropped).exists()).toBe(false);
+      expect(wrapper.text()).toContain(hint);
+    });
+
+    it("does not mark a Drop result when the policy changes while the test is running", async () => {
+      let resolveTest: (value: unknown) => void = () => {};
+      vi.mocked(regexPatternsService.test).mockReturnValueOnce(
+        new Promise((resolve) => (resolveTest = resolve)) as any,
+      );
+      const vm = await pick("DropField", "123");
+      const pending = vm.testStringOutput();
+      vm.policy = "Redact";
+      await nextTick();
+      resolveTest({ data: { results: [""] } });
+      await pending;
+      await nextTick();
+      expect(vm.testedPolicy).toBe(null);
+      expect(wrapper.find(dropped).exists()).toBe(false);
+    });
+  });
+
   describe("checkIfPatternIsAppliedAndUpdate Function", () => {
     it("should return true for applied pattern", () => {
       const vm = wrapper.vm as any;

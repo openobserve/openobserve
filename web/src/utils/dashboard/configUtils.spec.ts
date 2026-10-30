@@ -40,6 +40,7 @@ import {
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
+  pruneDependentOptions,
 } from "./configUtils";
 
 describe("configUtils", () => {
@@ -1190,9 +1191,10 @@ describe("configUtils", () => {
       expect(shouldShowNoValueReplacement(data, false)).toBe(false);
     });
 
-    it("should return false for table chart in non-promql mode", () => {
-      const data = { data: { type: "table" } };
-      expect(shouldShowNoValueReplacement(data, false)).toBe(false);
+    it.each(["metric", "gauge", "table"])("shows for %s in SQL and PromQL mode", (type) => {
+      const data = { data: { type } };
+      expect(shouldShowNoValueReplacement(data, false)).toBe(true);
+      expect(shouldShowNoValueReplacement(data, true)).toBe(true);
     });
   });
 
@@ -1556,5 +1558,170 @@ describe("configUtils", () => {
       expect(shouldShowAxisConfig(panel)).toBe(false);
       expect(shouldShowCartesianAxisConfig(panel)).toBe(false);
     });
+  });
+
+  describe("bar gauge", () => {
+    const panel = {
+      data: {
+        type: "bar-gauge",
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    };
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel)).toBe(false);
+      expect(shouldShowLegendsToggle(panel)).toBe(false);
+      expect(shouldShowAxisConfig(panel)).toBe(false);
+    });
+
+    it("keeps the PromQL query type and shows the no-value text", () => {
+      expect(shouldShowPromQLQueryType(panel)).toBe(true);
+      expect(shouldShowNoValueReplacement(panel, true)).toBe(true);
+    });
+  });
+  describe("distribution", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("keeps the legend toggle and gridlines but not legend placement or axis width", () => {
+      const distribution = panel("distribution");
+      expect(shouldShowGridlines(distribution)).toBe(true);
+      expect(shouldShowLegendsToggle(distribution)).toBe(true);
+      expect(shouldShowLegendPosition(distribution)).toBe(false);
+      expect(shouldShowLegendType(distribution)).toBe(false);
+      expect(shouldShowLegendWidth(distribution)).toBe(false);
+      expect(shouldShowAxisConfig(distribution)).toBe(false);
+    });
+  });
+  describe("treemap", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("treemap"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("treemap"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("treemap"))).toBe(false);
+    });
+  });
+  describe("sunburst", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("sunburst"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("sunburst"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("sunburst"))).toBe(false);
+    });
+  });
+  describe("funnel", () => {
+    const panel = {
+      data: {
+        type: "funnel",
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    };
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel)).toBe(false);
+      expect(shouldShowLegendsToggle(panel)).toBe(false);
+      expect(shouldShowLegendPosition(panel)).toBe(false);
+      expect(shouldShowAxisConfig(panel)).toBe(false);
+    });
+  });
+  describe("node graph", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel("node-graph"))).toBe(false);
+      expect(shouldShowLegendsToggle(panel("node-graph"))).toBe(false);
+      expect(shouldShowLegendPosition(panel("node-graph"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("node-graph"))).toBe(false);
+    });
+  });
+});
+
+describe("pruneDependentOptions", () => {
+  it("drops the saved values of options whose parent no longer applies", () => {
+    const config: Record<string, any> = {
+      scatter_size_min: 2,
+      scatter_size_max: 30,
+      y_axis_scale: "linear",
+      y_axis_log_base: 2,
+      map_cluster: false,
+      map_cluster_radius: 40,
+      connect_nulls: false,
+      connect_nulls_threshold: 300,
+    };
+    pruneDependentOptions(config);
+    expect(config).toEqual({ y_axis_scale: "linear", map_cluster: false, connect_nulls: false });
+  });
+
+  it("keeps them while the parent applies", () => {
+    const config = {
+      scatter_size_field: "count",
+      scatter_size_min: 2,
+      y_axis_scale: "log",
+      y_axis_log_base: 2,
+      map_cluster: true,
+      map_cluster_radius: 40,
+      connect_nulls: true,
+      connect_nulls_threshold: 300,
+    };
+    const before = { ...config };
+    pruneDependentOptions(config);
+    expect(config).toEqual(before);
   });
 });

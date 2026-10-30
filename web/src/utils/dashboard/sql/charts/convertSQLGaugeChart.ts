@@ -155,6 +155,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
                   chartMax,
                   store.state.theme,
                   panelSchema?.config?.color?.colorBySeries,
+                  panelSchema?.config,
                 ) ??
                 null),
           },
@@ -162,7 +163,8 @@ export function applyGaugeChart(ctx: SQLContext): void {
       ],
       ...gaugeOverrideTooltip(seriesOverrides, name),
       detail: {
-        valueAnimation: true,
+        // A counting label keeps animating after a same-value re-render snaps the dial, so a throttled tab freezes it on a stale number.
+        valueAnimation: false,
         offsetCenter: [0, 0],
       },
     };

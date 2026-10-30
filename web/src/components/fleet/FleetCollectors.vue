@@ -262,13 +262,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("fleet.collectors.rename") }}
           </ODropdownItem>
           <ODropdownItem
-            icon-left="drive-file-move"
-            :data-test="`fleet-collectors-row-move-${row.id}`"
-            @select="openMove([row])"
-          >
-            {{ t("fleet.collectors.moveToFleet") }}
-          </ODropdownItem>
-          <ODropdownItem
             icon-left="delete"
             variant="destructive"
             :data-test="`fleet-collectors-row-remove-${row.id}`"
@@ -280,15 +273,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #selection-actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="drive-file-move"
-          data-test="fleet-collectors-bulk-move"
-          @click="openMove(selectedRows)"
-        >
-          {{ t("fleet.collectors.moveToFleet") }}
-        </OButton>
         <OButton
           variant="outline"
           size="sm"
@@ -346,13 +330,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODrawer>
 
-    <FleetMoveDialog
-      v-model:open="moveOpen"
-      :collector-ids="moveIds"
-      :source-fleet-id="moveSource"
-      @moved="onMoved"
-    />
-
     <FleetNameDialog
       v-model:open="renameOpen"
       :title="t('fleet.collectors.renameTitle')"
@@ -402,7 +379,6 @@ import { queryClient } from "@/composables/query/queryClient";
 import { fleetKeys } from "@/services/fleet.querykeys";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetCollectorDrawer from "./FleetCollectorDrawer.vue";
-import FleetMoveDialog from "./FleetMoveDialog.vue";
 import FleetNameDialog from "./FleetNameDialog.vue";
 import FleetRemoveDialog from "./FleetRemoveDialog.vue";
 import { useCollectorActions } from "./useCollectorActions";
@@ -443,9 +419,6 @@ const osFilter = ref<string | null>(null);
 const selectedIds = ref<string[]>([]);
 
 const drawerOpen = ref(false);
-const moveOpen = ref(false);
-const moveIds = ref<string[]>([]);
-const moveSource = ref("");
 const renameOpen = ref(false);
 const renameTarget = ref<CollectorRow | null>(null);
 const mobileFiltersOpen = ref(false);
@@ -464,7 +437,6 @@ onMounted(() => {
 watch(orgId, () => {
   selectedIds.value = [];
   drawerOpen.value = false;
-  moveOpen.value = false;
   renameOpen.value = false;
   mobileFiltersOpen.value = false;
 });
@@ -706,18 +678,6 @@ const selectedRows = computed(() => {
   const ids = new Set(selectedIds.value);
   return tableRows.value.filter((c) => ids.has(c.id));
 });
-
-// A mixed selection names no source, so every readable fleet is a destination.
-function openMove(targets: CollectorRow[]) {
-  const sources = new Set(targets.map((c) => c.fleetId));
-  moveIds.value = targets.map((c) => c.id);
-  moveSource.value = sources.size === 1 ? [...sources][0] : "";
-  moveOpen.value = true;
-}
-
-function onMoved() {
-  selectedIds.value = [];
-}
 
 function openRename(row: CollectorRow) {
   renameTarget.value = row;

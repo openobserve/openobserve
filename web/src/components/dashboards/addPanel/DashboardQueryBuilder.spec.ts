@@ -213,6 +213,10 @@ const i18n = createI18n({
         rowFields: "Row Fields",
         valueFields: "Value Fields",
         breakdown: "Breakdown",
+        value: "Value",
+        wellGroup: "Group",
+        wellSubgroup: "Sub-group",
+        wellSize: "Size",
         joins: "Joins",
         addJoin: "Add Join",
       },
@@ -543,6 +547,43 @@ describe("DashboardQueryBuilder", () => {
       wrapper.unmount();
       wrapper = createWrapper({ "data.type": "bar" });
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
+    });
+
+    it("names the x, y and breakdown wells by chart orientation", () => {
+      const wells = (type: string) => {
+        wrapper?.unmount();
+        wrapper = createWrapper({ "data.type": type });
+        return [
+          wrapper.vm.currentXLabel,
+          wrapper.vm.currentYLabel,
+          wrapper.vm.currentBreakdownLabel,
+        ];
+      };
+      expect(wells("sunburst")).toEqual(["Group", "Size", "Sub-group"]);
+      expect(wells("bar")).toEqual(["X-Axis", "Y-Axis", "Breakdown"]);
+      expect(wells("h-bar")).toEqual(["Y-Axis", "X-Axis", "Breakdown"]);
+      wrapper.unmount();
+      wrapper = createWrapper({ "data.type": "sunburst" });
+      const text = wrapper.text();
+      expect(text).toContain("Group");
+      expect(text).toContain("Sub-group");
+      expect(text).toContain("Size");
+      expect(text).not.toContain("X-Axis");
+    });
+
+    it("names the treemap wells by their job", () => {
+      wrapper?.unmount();
+      wrapper = createWrapper({ "data.type": "treemap" });
+      expect([
+        wrapper.vm.currentXLabel,
+        wrapper.vm.currentYLabel,
+        wrapper.vm.currentBreakdownLabel,
+      ]).toEqual(["Group", "Size", "Sub-group"]);
+      const text = wrapper.text();
+      expect(text).toContain("Group");
+      expect(text).toContain("Sub-group");
+      expect(text).toContain("Size");
+      expect(text).not.toContain("X-Axis");
     });
 
     it("should handle x-axis field removal", async () => {

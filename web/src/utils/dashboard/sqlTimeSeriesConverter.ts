@@ -20,6 +20,7 @@ import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { chartColor } from "../chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
+import { sortTooltipParams } from "./tooltipSort";
 import { stackTotalRows } from "./stackTotals";
 
 /**
@@ -182,10 +183,7 @@ export const applyAutoSQLTimeSeries = (
 
         const date = new Date(name[0].data[0]);
 
-        // sort tooltip array based on value
-        name.sort((a: any, b: any) => {
-          return (b.value[1] || 0) - (a.value[1] || 0);
-        });
+        sortTooltipParams(name, panelSchema?.config, (it: any) => it.value[1]);
 
         // if hovered series name is not null then move it to first position
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -415,10 +413,7 @@ export const applyCustomSQLTimeSeries = (
 
           const date = new Date(name?.[0]?.data?.[0]);
 
-          // sort tooltip array based on value
-          name?.sort((a: any, b: any) => {
-            return (b?.value?.[1] || 0) - (a?.value?.[1] || 0);
-          });
+          sortTooltipParams(name, panelSchema?.config, (it: any) => it?.value?.[1]);
 
           // if hovered series name is not null then move it to first position
           if (hoveredSeriesState?.value?.hoveredSeriesName) {
