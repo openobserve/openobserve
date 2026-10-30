@@ -23,7 +23,7 @@ import {
   type IndicatorMatch,
   type SweepType,
 } from "@/utils/security/intel";
-import { loadTaggedStreams, securityStreamNames } from "@/utils/security/streams";
+import { securitySourceNames } from "@/utils/security/sourceSelection";
 
 /** Queries per sweep. Past this the sweep stops and says it is partial. */
 export const MAX_SWEEP_QUERIES = 200;
@@ -107,9 +107,9 @@ export function useIntelSweep() {
     partial.value = false;
     try {
       const all = await streamService.nameList(orgId, "logs", false);
-      const names = securityStreamNames(
+      const names = securitySourceNames(
+        orgId,
         (all.data?.list ?? []).map((s: any) => String(s.name)),
-        loadTaggedStreams(orgId),
       );
       if (mySeq !== seq) return;
       streams.value = names;

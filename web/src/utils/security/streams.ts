@@ -29,13 +29,6 @@ export function saveTaggedStreams(orgId: string, names: string[]) {
   }
 }
 
-/** Auto-detected names first, then hand-added ones, never duplicated. */
-export function securityStreamNames(all: string[], tagged: string[]): string[] {
-  const auto = all.filter((name) => SECURITY_STREAM_RE.test(name));
-  const extra = tagged.filter((name) => all.includes(name) && !auto.includes(name));
-  return [...auto, ...extra];
-}
-
 /**
  * live  — reported within the quiet threshold.
  * quiet — reported before, has since gone silent (the case worth a look).
@@ -78,4 +71,3 @@ export function widerPeriodFor(
   if (!last || last >= windowStartUs) return null;
   return WIDER_PERIODS.find(([, span]) => nowUs - span <= last)?.[0] ?? null;
 }
-

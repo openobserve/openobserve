@@ -35,7 +35,10 @@ import SecurityRecordDrawer, {
   type RecordTab,
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecurityKeyValues, { type KeyValueRow } from "@/components/security/SecurityKeyValues.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
+import { useAlertHistorySummary } from "@/composables/security/useAlertHistorySummary";
+import { isErrorOutcome, isFiringOutcome } from "@/utils/alerts/runOutcome";
 import searchService from "@/services/search";
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
@@ -144,43 +147,83 @@ function onRange(value: unknown) {
   range.value = value as RangeKey;
   customWindow.value = null;
   syncUrl();
-  void fetchHistory();
+  void fetchAll();
 }
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 const {
   byName,
+  byId,
   siemRows,
   loading: rulesLoading,
-  hydrating,
-  unchecked,
   load: loadDetections,
+  loadFull: loadFullDetection,
 } = useSiemDetections();
 
 // Paging, the newest-rows cap, row dedupe and the server's max_query_range
 // narrowing are handled by the shared history window.
 const historyWindow = useAlertHistoryWindow();
+const summary = useAlertHistorySummary();
 const history = computed(() => historyWindow.rows.value as FiringRow[]);
 const historyTotal = computed(() => historyWindow.total.value);
 const loading = computed(() => historyWindow.loading.value);
-const error = computed(() =>
-  historyWindow.error.value === "" ? "" : historyWindow.error.value || t("siem.alerts.loadError"),
+const error = computed(
+  () => historyWindow.error.value || (siemOnly.value ? summary.error.value : ""),
 );
 const lastRunAt = ref<number | null>(null);
+const summaryAt = ref<number | null>(null);
 
-async function fetchHistory() {
+// Silenced runs are mostly "normal", so the Silenced facet needs every outcome.
+const SIGNAL_OUTCOMES = ["firing", "notify_failed", "error"];
+const outcomeFilter = computed(() =>
+  showEvaluations.value || facet.value === "silenced" ? undefined : SIGNAL_OUTCOMES,
+);
+const siemIds = computed(() => siemRows.value.map((d) => String(d.alert.id ?? "")).filter(Boolean));
+
+async function fetchRows() {
   if (!orgId.value) return;
-  windowEndMs.value = customWindow.value?.endMs ?? Date.now();
-  await historyWindow.load(orgId.value, windowStartMs.value, windowEndMs.value);
+  await historyWindow.load(orgId.value, windowStartMs.value, windowEndMs.value, {
+    alertIds: siemOnly.value ? siemIds.value : undefined,
+    outcomes: outcomeFilter.value,
+  });
   if (!historyWindow.error.value) lastRunAt.value = Date.now();
 }
 
-const capped = computed(() => historyTotal.value > history.value.length);
+async function fetchSummary() {
+  if (!orgId.value || !siemOnly.value) return;
+  await summary.load(orgId.value, windowStartMs.value, windowEndMs.value, {
+    alertIds: siemIds.value,
+    bucketMs: bucketMsFor(windowMs.value),
+  });
+  // Stamped on failure too, or the tiles would stay skeletons; a superseded load leaves it to the newer one.
+  if (!summary.loading.value) summaryAt.value = Date.now();
+}
+
+const inFlight = ref(0);
+async function fetchAll() {
+  if (!orgId.value) return;
+  inFlight.value += 1;
+  try {
+    windowEndMs.value = customWindow.value?.endMs ?? Date.now();
+    const rules = loadDetections(orgId.value);
+    // The SIEM-only fetches filter on detection ids, so they need the list first.
+    if (siemOnly.value) await rules;
+    await Promise.all([rules, fetchRows(), fetchSummary()]);
+  } finally {
+    inFlight.value -= 1;
+  }
+}
+watch(siemOnly, () => void fetchAll());
+watch(
+  () => outcomeFilter.value?.join(",") ?? "",
+  () => void fetchRows(),
+);
+
+const capped = computed(() => historyWindow.capped.value);
 const cappedFromMs = computed(() => {
   const last = history.value[history.value.length - 1];
   return last ? Math.floor(last.timestamp / 1000) : windowStartMs.value;
 });
-const rulesPending = computed(() => rulesLoading.value || hydrating.value);
 
 // ── Rows ─────────────────────────────────────────────────────────────────────
 interface Firing {
@@ -196,7 +239,9 @@ interface Firing {
 
 const joined = computed<Firing[]>(() =>
   history.value.map((row) => {
-    const detection = byName.value.get(row.alert_name) ?? null;
+    // An id, when the server sends one, is authoritative: a same-named ordinary alert must not match.
+    const detection =
+      (row.alert_id ? byId.value.get(row.alert_id) : byName.value.get(row.alert_name)) ?? null;
     return {
       id: firingKey(row),
       row,
@@ -229,28 +274,57 @@ const firings = computed(() =>
   base.value.filter((f) => f.status === "firing" || f.status === "notify_failed"),
 );
 
-const counts = computed(() => {
-  const c: Record<Facet, number> = {
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0,
-    info: 0,
-    unknown: 0,
-    error: 0,
-    silenced: 0,
-  };
+const emptyCounts = (): Record<Facet, number> => ({
+  critical: 0,
+  high: 0,
+  medium: 0,
+  low: 0,
+  info: 0,
+  unknown: 0,
+  error: 0,
+  silenced: 0,
+});
+const facetOfTone = (tone: SeverityTone) =>
+  (Object.keys(FACET_TONES) as Facet[]).find((k) => FACET_TONES[k]!.includes(tone));
+
+/** Exact firing and error totals for SIEM detections, mapped to a severity through the rule's Sigma level. */
+const summaryCounts = computed(() => {
+  const c = emptyCounts();
+  for (const row of summary.rows.value) {
+    const detection = byId.value.get(row.alertId);
+    if (!detection) continue;
+    if (isFiringOutcome(row.outcome)) {
+      const facetKey = facetOfTone(toneOfSigmaLevel(detection.meta.level));
+      if (facetKey) c[facetKey] += row.n;
+    } else if (isErrorOutcome(row.outcome)) {
+      c.error += row.n;
+    }
+  }
+  return c;
+});
+
+const rowCounts = computed(() => {
+  const c = emptyCounts();
   for (const f of firings.value) {
-    const facetKey = (Object.keys(FACET_TONES) as Facet[]).find((k) =>
-      FACET_TONES[k]!.includes(f.tone),
-    );
+    const facetKey = facetOfTone(f.tone);
     if (facetKey) c[facetKey] += 1;
   }
   for (const f of base.value) if (f.status === "error") c.error += 1;
-  // Counted over every in-scope run, not only signals, or it would read 0.
-  for (const f of siemScoped.value) if (f.row.is_silenced) c.silenced += 1;
   return c;
 });
+
+const counts = computed(() => {
+  if (siemOnly.value) {
+    return {
+      ...summaryCounts.value,
+      silenced: summary.rows.value.reduce((sum, row) => sum + row.silenced, 0),
+    };
+  }
+  const c = rowCounts.value;
+  c.silenced = siemScoped.value.filter((f) => f.row.is_silenced).length;
+  return c;
+});
+const statsLoading = computed(() => (siemOnly.value ? summaryAt.value : lastRunAt.value) === null);
 
 const filtered = computed(() => {
   const needle = search.value.trim().toLowerCase();
@@ -305,16 +379,40 @@ const chartSeries = computed(() =>
     token: TONE_TOKEN[tone],
   })),
 );
-const chartBuckets = computed(() =>
-  bucketize(
-    firings.value
-      .filter((f) => f.tone !== "unknown")
-      .map((f) => ({ timeMs: f.timeMs, key: f.tone as (typeof SEVERITY_TONES)[number] })),
+type ChartTone = (typeof SEVERITY_TONES)[number];
+const chartBuckets = computed(() => {
+  if (!siemOnly.value) {
+    return bucketize(
+      firings.value
+        .filter((f) => f.tone !== "unknown")
+        .map((f) => ({ timeMs: f.timeMs, key: f.tone as ChartTone })),
+      windowStartMs.value,
+      windowEndMs.value,
+      bucketMsFor(windowMs.value),
+      SEVERITY_TONES,
+    );
+  }
+  // The server may widen the bucket for long windows, so its width wins.
+  const width = summary.bucketMs.value || bucketMsFor(windowMs.value);
+  const buckets = bucketize<ChartTone>(
+    [],
     windowStartMs.value,
     windowEndMs.value,
-    bucketMsFor(windowMs.value),
+    width,
     SEVERITY_TONES,
-  ),
+  );
+  const first = buckets[0]?.ts ?? 0;
+  for (const row of summary.rows.value) {
+    const detection = byId.value.get(row.alertId);
+    if (!detection || !isFiringOutcome(row.outcome)) continue;
+    const tone = toneOfSigmaLevel(detection.meta.level);
+    const bucket = buckets[Math.floor((row.bucketMs - first) / width)];
+    if (bucket && tone !== "unknown") bucket.counts[tone] += row.n;
+  }
+  return buckets;
+});
+const chartLoading = computed(
+  () => rulesLoading.value || (siemOnly.value ? summary.loading.value : loading.value),
 );
 
 // ── Table ────────────────────────────────────────────────────────────────────
@@ -399,17 +497,86 @@ function onEmptyAction(id?: string) {
 // the newest-rows cap, and the drawer must not vanish mid-read.
 const pinned = ref<Firing | null>(null);
 const selected = computed<Firing | null>(() => {
-  const live = joined.value.find((f) => f.id === selectedKey.value);
+  // In SIEM-only mode a link or pinned drawer must not surface an ordinary alert.
+  const inScope = (f: Firing | null) => !!f && (!siemOnly.value || !!f.detection);
+  const live = siemScoped.value.find((f) => f.id === selectedKey.value) ?? null;
   if (live) return live;
-  return pinned.value && pinned.value.id === selectedKey.value ? pinned.value : null;
+  const kept = pinned.value && pinned.value.id === selectedKey.value ? pinned.value : null;
+  return inScope(kept) ? kept : null;
 });
 watch(selected, (f) => {
   if (f) pinned.value = f;
 });
+watch(
+  () => selected.value?.detection?.alert.id,
+  (id) => {
+    if (id) void loadFullDetection(orgId.value, String(id));
+  },
+);
 /** A linked record that is not in the loaded window — said, not silently ignored. */
 const selectedMissing = computed(
   () => !!selectedKey.value && !selected.value && !loading.value && lastRunAt.value !== null,
 );
+const notices = computed<SecurityNotice[]>(() => {
+  const out: SecurityNotice[] = [];
+  if (error.value) {
+    out.push({ key: "error", tone: "error", text: error.value, dataTest: "security-alerts-error" });
+  }
+  const narrowedFrom = historyWindow.effectiveStartMs.value;
+  if (narrowedFrom) {
+    out.push({
+      key: "narrowed",
+      tone: "warning",
+      text: t("siem.mitrePage.historyNarrowed", { from: new Date(narrowedFrom).toLocaleString() }),
+      dataTest: "security-alerts-narrowed",
+    });
+  }
+  if (capped.value) {
+    out.push({
+      key: "capped",
+      tone: "warning",
+      text: t(siemOnly.value ? "siem.alerts.cappedRows" : "siem.alerts.capped", {
+        n: formatEventCount(history.value.length),
+        total: formatEventCount(historyTotal.value),
+        from: new Date(cappedFromMs.value).toLocaleString(),
+      }),
+      dataTest: "security-alerts-capped",
+    });
+  }
+  if (siemOnly.value && summary.partial.value) {
+    out.push({
+      key: "summary-partial",
+      tone: "warning",
+      text: t("siem.alerts.summaryPartial"),
+      dataTest: "security-alerts-summary-partial",
+    });
+  }
+  const custom = customWindow.value;
+  if (custom) {
+    out.push({
+      key: "custom-window",
+      tone: "info",
+      text: t("siem.alerts.customWindow", {
+        from: new Date(custom.startMs).toLocaleString(),
+        to: new Date(custom.endMs).toLocaleString(),
+      }),
+      actionLabel: t("siem.alerts.backToRange", { range: t(`siem.alerts.range.${range.value}`) }),
+      onAction: () => onRange(range.value),
+      dataTest: "security-alerts-custom-window",
+    });
+  }
+  if (selectedMissing.value) {
+    out.push({
+      key: "missing",
+      tone: "warning",
+      text: t("siem.alerts.missing"),
+      actionLabel: t("siem.alerts.dismiss"),
+      onAction: close,
+      dataTest: "security-alerts-missing",
+    });
+  }
+  return out;
+});
 const isFiringStatus = computed(
   () => selected.value?.status === "firing" || selected.value?.status === "notify_failed",
 );
@@ -703,13 +870,16 @@ function openDetection() {
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 function refresh() {
-  void fetchHistory();
+  void fetchAll();
+}
+function autoRefresh() {
+  if (inFlight.value > 0 || document.visibilityState === "hidden") return;
+  refresh();
 }
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
-  void loadDetections(orgId.value);
-  void fetchHistory();
-  timer = setInterval(refresh, 60_000);
+  void fetchAll();
+  timer = setInterval(autoRefresh, 60_000);
   syncUrl();
 });
 onUnmounted(() => {
@@ -744,105 +914,18 @@ onUnmounted(() => {
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
-      <div class="px-page-edge flex shrink-0 flex-col gap-2 pt-3">
-        <OBanner
-          v-if="error"
-          variant="error-soft"
-          icon="error-outline"
-          dense
-          data-test="security-alerts-error"
-        >
-          {{ error }}
-        </OBanner>
-        <OBanner
-          v-if="historyWindow.effectiveStartMs.value"
-          variant="warning"
-          icon="schedule"
-          dense
-          data-test="security-alerts-narrowed"
-        >
-          {{
-            t("siem.mitrePage.historyNarrowed", {
-              from: new Date(historyWindow.effectiveStartMs.value).toLocaleString(),
-            })
-          }}
-        </OBanner>
-        <OBanner
-          v-if="capped"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-alerts-capped"
-        >
-          {{
-            t("siem.alerts.capped", {
-              n: formatEventCount(history.length),
-              total: formatEventCount(historyTotal),
-              from: new Date(cappedFromMs).toLocaleString(),
-            })
-          }}
-        </OBanner>
-        <OBanner
-          v-if="unchecked > 0"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-alerts-unchecked"
-        >
-          {{ t("siem.overview.uncheckedRules", unchecked) }}
-        </OBanner>
-        <OBanner
-          v-if="customWindow"
-          variant="info"
-          icon="schedule"
-          dense
-          inline-actions
-          data-test="security-alerts-custom-window"
-        >
-          {{
-            t("siem.alerts.customWindow", {
-              from: new Date(customWindow.startMs).toLocaleString(),
-              to: new Date(customWindow.endMs).toLocaleString(),
-            })
-          }}
-          <template #actions>
-            <OButton
-              variant="ghost"
-              size="sm"
-              data-test="security-alerts-custom-window-clear"
-              @click="onRange(range)"
-            >
-              {{ t("siem.alerts.backToRange", { range: t(`siem.alerts.range.${range}`) }) }}
-            </OButton>
-          </template>
-        </OBanner>
-        <OBanner
-          v-if="selectedMissing"
-          variant="warning"
-          icon="search-off"
-          dense
-          inline-actions
-          data-test="security-alerts-missing"
-        >
-          {{ t("siem.alerts.missing") }}
-          <template #actions>
-            <OButton
-              variant="ghost"
-              size="sm"
-              data-test="security-alerts-missing-dismiss"
-              @click="close"
-            >
-              {{ t("siem.alerts.dismiss") }}
-            </OButton>
-          </template>
-        </OBanner>
-      </div>
+      <SecurityNotices
+        :notices="notices"
+        class="mx-page-edge mt-3 shrink-0"
+        data-test="security-alerts-notices"
+      />
 
       <!-- Firings by severity (facets) and when they happened -->
       <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
         <OStatStrip
+          compact
           :items="stats"
-          :loading="lastRunAt === null"
+          :loading="statsLoading"
           selectable
           :selected-key="facet"
           data-test="security-alerts-stats"
@@ -852,7 +935,7 @@ onUnmounted(() => {
           <SecuritySeverityChart
             :buckets="chartBuckets"
             :series="chartSeries"
-            :loading="loading || rulesPending"
+            :loading="chartLoading"
             :min="windowStartMs"
             :max="windowEndMs"
             :highlight="facet && facet !== 'error' && facet !== 'silenced' ? facet : null"
@@ -866,7 +949,7 @@ onUnmounted(() => {
         :data="filtered"
         :columns="columns"
         row-key="id"
-        :loading="(loading && !history.length) || (rulesPending && siemOnly && !base.length)"
+        :loading="(loading || rulesLoading) && !history.length"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
         :show-global-filter="false"
@@ -915,7 +998,7 @@ onUnmounted(() => {
             variant="outline"
             size="icon-sm"
             icon-left="refresh"
-            :loading="loading"
+            :loading="inFlight > 0"
             data-test="security-alerts-refresh"
             @click="refresh"
           >
@@ -986,12 +1069,12 @@ onUnmounted(() => {
             size="block"
             icon="task-alt"
             :title="
-              siemOnly && !siemRows.length && !rulesPending
+              siemOnly && !siemRows.length && !rulesLoading
                 ? t('siem.alerts.noDetections')
                 : t('siem.alerts.empty')
             "
             :description="
-              siemOnly && !siemRows.length && !rulesPending
+              siemOnly && !siemRows.length && !rulesLoading
                 ? t('siem.alerts.noDetectionsHint')
                 : t('siem.alerts.emptyHint')
             "

@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
   checksByRule,
   detectionState,
-  firingsByName,
   groupByLogsource,
   installedBySigmaId,
   rulesForSource,
@@ -100,17 +99,7 @@ describe("groupByLogsource", () => {
 });
 
 describe("detection state", () => {
-  it("counts firings per rule from history, ignoring normal runs", () => {
-    const h = (alert_name: string, status: string, timestamp: number) =>
-      ({ alert_name, status, timestamp }) as any;
-    const map = firingsByName([
-      h("a", "firing", 10),
-      h("a", "notify_failed", 30),
-      h("a", "normal", 99),
-      h("b", "normal", 5),
-    ]);
-    expect(map.get("a")).toEqual({ count: 2, lastUs: 30 });
-    expect(map.has("b")).toBe(false);
+  it("converts ms to µs and treats 0 as unknown", () => {
     expect(toMicros(1_700_000_000_000)).toBe(1_700_000_000_000_000);
     expect(toMicros(0)).toBeNull();
   });

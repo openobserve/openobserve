@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      this thing been doing": activity over time, who and what it touched, and
      a jump into the raw events. -->
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -39,7 +39,9 @@ import SecurityRecordDrawer, {
   type RecordTab,
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import {
+  createLimiter,
   runPool,
   runSql,
   useSecurityStreamPlans,
@@ -47,13 +49,16 @@ import {
 import { useTableRowNavigation } from "@/composables/security/useTableRowNavigation";
 import {
   ENTITY_KINDS,
+  LARGE_STREAM_SLICE_US,
   SIGNAL_THRESHOLDS,
   entityAggSql,
   entitySignals,
   entityTimelineSql,
+  estimateRowsInWindow,
   failureRate,
   mergeEntities,
   relatedSql,
+  shouldLimitWindow,
   type AggHit,
   type EntityKind,
   type EntityRow,
@@ -62,7 +67,7 @@ import {
 } from "@/utils/security/entities";
 import { histogramInterval, histogramKeyToMs } from "@/utils/security/eventQuery";
 import { severityRailColor, type SeverityTone } from "@/utils/security/severity";
-import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
+import { b64EncodeUnicode, formatCompactCount, formatEventCount } from "@/utils/formatters";
 
 const { t } = useI18n();
 const store = useStore();
@@ -108,6 +113,7 @@ function syncUrl() {
 // ── Data ─────────────────────────────────────────────────────────────────────
 const {
   plans,
+  names: streamNames,
   unreadable,
   loading: plansLoading,
   error: plansError,
@@ -116,62 +122,222 @@ const {
 
 /** Rows per stream and kind; past this the page says it is showing the top. */
 const ENTITY_LIMIT = 500;
+type StreamStatus = "loading" | "done" | "failed";
+
+interface StreamRun {
+  plan: StreamPlan;
+  startUs: number;
+  endUs: number;
+  /** Estimated rows over the full window, set when the run was cut to the last hour. */
+  limitedRows: number | null;
+  hits: Partial<Record<EntityKind, AggHit[]>>;
+  pending: number;
+  failed: boolean;
+  partial: boolean;
+  ctrl: AbortController;
+}
+
 const rowsByKind = ref<Record<EntityKind, EntityRow[]>>({ user: [], ip: [], host: [] });
 const cappedKinds = ref<Set<EntityKind>>(new Set());
 const failedStreams = ref<string[]>([]);
 /** Streams whose answer the engine marked partial or whose functions errored. */
 const partialStreams = ref<string[]>([]);
-const loading = ref(false);
+const streamStatus = ref<Record<string, StreamStatus>>({});
+const limitedStreams = ref<{ stream: string; rows: number }[]>([]);
 const lastRunAt = ref<number | null>(null);
+/** Some query of the current run has answered, so the table has something to show. */
+const answered = ref(false);
+/** A refresh is between its start and its last answer, plan stage included. */
+const running = ref(false);
+const loading = computed(
+  () =>
+    running.value || plansLoading.value || Object.values(streamStatus.value).includes("loading"),
+);
 let seq = 0;
+let runs = new Map<string, StreamRun>();
+let controller: AbortController | null = null;
+/** Every page query, drawer included, shares these slots. */
+const limit = createLimiter();
+/** Large streams the user chose to read over the whole window; reset with the range. */
+const fullWindow = new Set<string>();
 
-async function refresh() {
-  if (!orgId.value) return;
-  const mine = ++seq;
-  loading.value = true;
-  windowEndUs.value = Date.now() * 1000;
-  const start = windowStartUs.value;
+/** Queues one stream's aggregates; each answer is merged into the table as it lands. */
+function startRun(plan: StreamPlan, mine: number, signal: AbortSignal) {
   const end = windowEndUs.value;
-  await loadPlans(orgId.value, start, end);
-  const failed = new Set<string>();
-  const partial = new Set<string>();
-  const capped = new Set<EntityKind>();
-  const jobs = ENTITY_KINDS.flatMap((k) =>
-    plans.value.flatMap((plan) => {
-      const sql = entityAggSql(plan, k, ENTITY_LIMIT);
-      return sql ? [{ k, plan, sql }] : [];
-    }),
+  const estimate = estimateRowsInWindow(plan.volume, windowStartUs.value, end);
+  const limited = !fullWindow.has(plan.stream) && shouldLimitWindow(estimate, windowUs.value);
+  const ctrl = new AbortController();
+  signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+  const jobs = ENTITY_KINDS.flatMap((k) => {
+    const sql = entityAggSql(plan, k, ENTITY_LIMIT);
+    return sql ? [{ k, sql }] : [];
+  });
+  const run: StreamRun = {
+    plan,
+    startUs: limited ? end - LARGE_STREAM_SLICE_US : windowStartUs.value,
+    endUs: end,
+    limitedRows: limited && jobs.length ? estimate : null,
+    hits: {},
+    pending: jobs.length,
+    failed: false,
+    partial: false,
+    ctrl,
+  };
+  runs.get(plan.stream)?.ctrl.abort();
+  runs.set(plan.stream, run);
+  return jobs.map(
+    ({ k, sql }) =>
+      () =>
+        limit(async () => {
+          try {
+            const res = await runSql(orgId.value, sql, run.startUs, run.endUs, -1, {
+              signal: ctrl.signal,
+            });
+            if (res.partial || res.functionError) run.partial = true;
+            run.hits[k] = res.hits as unknown as AggHit[];
+          } catch {
+            run.failed = true;
+          }
+          run.pending -= 1;
+          if (mine !== seq || runs.get(plan.stream) !== run) return;
+          answered.value = true;
+          publishRows();
+          publishStatus();
+        }),
   );
-  const settled = await runPool(jobs.map((j) => () => runSql(orgId.value, j.sql, start, end)));
-  if (mine !== seq) return;
+}
+
+function publishStatus() {
+  const status: Record<string, StreamStatus> = {};
+  for (const name of unreadable.value) status[name] = "failed";
+  for (const [stream, run] of runs) {
+    status[stream] = run.pending ? "loading" : run.failed ? "failed" : "done";
+  }
+  streamStatus.value = status;
+  limitedStreams.value = [...runs.values()]
+    .filter((r) => r.limitedRows !== null)
+    .map((r) => ({ stream: r.plan.stream, rows: r.limitedRows! }))
+    .sort((a, b) => a.stream.localeCompare(b.stream));
+}
+
+function publishRows() {
   const perKind: Record<EntityKind, { plan: StreamPlan; hits: AggHit[] }[]> = {
     user: [],
     ip: [],
     host: [],
   };
-  settled.forEach((r, i) => {
-    const { k, plan } = jobs[i];
-    if (r.status === "rejected") {
-      failed.add(plan.stream);
-      return;
+  const capped = new Set<EntityKind>();
+  const failed = new Set<string>(unreadable.value);
+  const partial = new Set<string>();
+  for (const [stream, run] of runs) {
+    for (const k of ENTITY_KINDS) {
+      const hits = run.hits[k];
+      if (!hits) continue;
+      if (hits.length >= ENTITY_LIMIT) capped.add(k);
+      perKind[k].push({ plan: run.plan, hits });
     }
-    if (r.value.partial || r.value.functionError) partial.add(plan.stream);
-    const hits = r.value.hits as unknown as AggHit[];
-    if (hits.length >= ENTITY_LIMIT) capped.add(k);
-    perKind[k].push({ plan, hits });
-  });
+    if (run.failed) failed.add(stream);
+    if (run.partial) partial.add(stream);
+  }
   rowsByKind.value = {
     user: mergeEntities(perKind.user),
     ip: mergeEntities(perKind.ip),
     host: mergeEntities(perKind.host),
   };
   cappedKinds.value = capped;
-  failedStreams.value = [...new Set([...failed, ...unreadable.value])].sort();
+  failedStreams.value = [...failed].sort();
   partialStreams.value = [...partial].sort();
-  loading.value = false;
+  if (pendingEntity.value && allRows.value.some((r) => r.value === pendingEntity.value)) {
+    restorePending();
+  }
+}
+
+async function refresh() {
+  if (!orgId.value) return;
+  const mine = ++seq;
+  controller?.abort();
+  const ctrl = new AbortController();
+  controller = ctrl;
+  windowEndUs.value = Date.now() * 1000;
+  streamStatus.value = {};
+  limitedStreams.value = [];
+  answered.value = false;
+  running.value = true;
+  await loadPlans(orgId.value, windowStartUs.value, windowEndUs.value, { signal: ctrl.signal });
+  if (mine !== seq) return;
+  for (const run of runs.values()) run.ctrl.abort();
+  runs = new Map();
+  const tasks = plans.value.flatMap((plan) => startRun(plan, mine, ctrl.signal));
+  publishStatus();
+  await runPool(tasks);
+  if (mine !== seq) return;
+  publishRows();
+  publishStatus();
+  running.value = false;
   lastRunAt.value = Date.now();
   if (pendingEntity.value) restorePending();
   else reopenSelected();
+}
+
+const notices = computed<SecurityNotice[]>(() => {
+  const out: SecurityNotice[] = [];
+  const partial = [
+    cappedKinds.value.has(kind.value) ? t("siem.entities.capped", { n: ENTITY_LIMIT }) : "",
+    failedStreams.value.length
+      ? t("siem.entities.failedStreams", { streams: failedStreams.value.join(", ") })
+      : "",
+    partialStreams.value.length
+      ? t("siem.entities.partialStreams", { streams: partialStreams.value.join(", ") })
+      : "",
+  ].filter(Boolean);
+  if (partial.length) {
+    out.push({
+      key: "partial",
+      tone: "warning",
+      text: partial.join(" "),
+      dataTest: "security-entities-partial",
+    });
+  }
+  const limited = limitedStreams.value;
+  if (limited.length) {
+    const vars = { window: t(`siem.range.${range.value}`), slice: t("siem.range.1h") };
+    out.push({
+      key: "limited",
+      tone: "info",
+      text:
+        limited.length === 1
+          ? t("siem.entities.limited", {
+              ...vars,
+              stream: limited[0].stream,
+              rows: formatCompactCount(Math.round(limited[0].rows)),
+            })
+          : t("siem.entities.limitedMany", {
+              ...vars,
+              n: limited.length,
+              streams: limited
+                .map((l) => `${l.stream} (~${formatCompactCount(Math.round(l.rows))})`)
+                .join(", "),
+            }),
+      actionLabel: t("siem.entities.runFull"),
+      onAction: () => limited.forEach((l) => void runFullWindow(l.stream)),
+      dataTest: "security-entities-limited",
+    });
+  }
+  return out;
+});
+
+/** Re-reads one large stream over the whole window instead of its last hour. */
+async function runFullWindow(stream: string) {
+  const plan = plans.value.find((p) => p.stream === stream);
+  if (!plan || !controller || plansLoading.value) return;
+  fullWindow.add(stream);
+  const mine = seq;
+  const tasks = startRun(plan, mine, controller.signal);
+  publishStatus();
+  await runPool(tasks);
+  if (mine !== seq) return;
+  lastRunAt.value = Date.now();
+  reopenSelected();
 }
 
 /** After a reload the open drawer must show the new window's numbers, or close. */
@@ -183,11 +349,21 @@ function reopenSelected() {
 }
 
 onMounted(() => void refresh());
-watch(orgId, () => void refresh());
+onBeforeUnmount(() => {
+  seq += 1;
+  detailSeq += 1;
+  controller?.abort();
+  detailController?.abort();
+});
+watch(orgId, () => {
+  fullWindow.clear();
+  void refresh();
+});
 
 function onRange(value: unknown) {
   if (!value || value === range.value) return;
   range.value = value as RangeKey;
+  fullWindow.clear();
   syncUrl();
   void refresh();
 }
@@ -212,9 +388,10 @@ function toneFor(signals: EntitySignal[]): SeverityTone {
   return "info";
 }
 
+// A stream still loading may hold the events that keep a rate or spread under its threshold.
 const allRows = computed<Row[]>(() =>
   rowsByKind.value[kind.value].map((r) => {
-    const signals = entitySignals(kind.value, r);
+    const signals = loading.value ? [] : entitySignals(kind.value, r);
     return { ...r, signals, tone: toneFor(signals) };
   }),
 );
@@ -436,10 +613,13 @@ const detailLoading = ref(false);
 /** Streams whose drawer queries failed; shown in the drawer, not swallowed. */
 const detailFailed = ref<string[]>([]);
 let detailSeq = 0;
+let detailController: AbortController | null = null;
 const RELATED_LIMIT = 10;
 
 async function loadDetail(row: Row) {
   const mine = ++detailSeq;
+  detailController?.abort();
+  const { signal } = (detailController = new AbortController());
   detailLoading.value = true;
   timeline.value = [];
   related.value = { user: [], ip: [], host: [] };
@@ -457,12 +637,16 @@ async function loadDetail(row: Row) {
   };
   const jobs: { stream: string; run: () => Promise<void> }[] = [];
   for (const plan of inStreams) {
+    // A large stream's drawer reads the same slice its table row was counted over.
+    const run = runs.get(plan.stream);
+    const from = run?.startUs ?? start;
+    const to = run?.endUs ?? end;
     const tl = entityTimelineSql(plan, k, row.value, interval.sql);
     if (tl) {
       jobs.push({
         stream: plan.stream,
         run: async () => {
-          const { hits } = await runSql(orgId.value, tl, start, end);
+          const { hits } = await runSql(orgId.value, tl, from, to, -1, { signal });
           for (const h of hits) {
             const ts = histogramKeyToMs(h.zo_ts);
             if (ts === null) continue;
@@ -482,7 +666,7 @@ async function loadDetail(row: Row) {
       jobs.push({
         stream: plan.stream,
         run: async () => {
-          const { hits } = await runSql(orgId.value, sql, start, end);
+          const { hits } = await runSql(orgId.value, sql, from, to, -1, { signal });
           for (const h of hits) {
             const v = String(h.zo_value ?? "");
             if (!v) continue;
@@ -496,7 +680,7 @@ async function loadDetail(row: Row) {
       });
     }
   }
-  const settled = await runPool(jobs.map((j) => j.run));
+  const settled = await runPool(jobs.map((j) => () => limit(j.run)));
   const failed = new Set<string>();
   settled.forEach((r, i) => r.status === "rejected" && failed.add(jobs[i].stream));
   if (mine !== detailSeq) return;
@@ -600,6 +784,14 @@ function onEmptyAction(id?: string) {
   }
 }
 
+const STATUS_TAG: Record<StreamStatus, { variant: BadgeVariant; icon: string }> = {
+  loading: { variant: "default-soft", icon: "hourglass-empty" },
+  done: { variant: "success-soft", icon: "check-circle" },
+  failed: { variant: "error-soft", icon: "error-outline" },
+};
+const statusOf = (stream: string): StreamStatus => streamStatus.value[stream] ?? "loading";
+const tableLoading = computed(() => loading.value && !lastRunAt.value && !answered.value);
+
 const noSources = computed(
   () => !plansLoading.value && !loading.value && !plansError.value && plans.value.length === 0,
 );
@@ -654,24 +846,29 @@ const noSources = computed(
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
-      <OBanner
-        v-if="cappedKinds.has(kind) || failedStreams.length || partialStreams.length"
-        variant="warning"
-        icon="warning-amber"
-        dense
+      <SecurityNotices
+        :notices="notices"
         class="mx-page-edge mt-2"
-        data-test="security-entities-partial"
+        data-test="security-entities-notices"
+      />
+
+      <div
+        v-if="loading && streamNames.length"
+        class="mx-page-edge mt-2 flex flex-wrap items-center gap-1"
+        data-test="security-entities-sources"
       >
-        <template v-if="cappedKinds.has(kind)">{{
-          t("siem.entities.capped", { n: ENTITY_LIMIT })
-        }}</template>
-        <template v-if="failedStreams.length">
-          {{ t("siem.entities.failedStreams", { streams: failedStreams.join(", ") }) }}
-        </template>
-        <template v-if="partialStreams.length">
-          {{ t("siem.entities.partialStreams", { streams: partialStreams.join(", ") }) }}
-        </template>
-      </OBanner>
+        <span class="text-text-secondary text-xs">{{ t("siem.entities.sourcesLoading") }}</span>
+        <OTag
+          v-for="name in streamNames"
+          :key="name"
+          :variant="STATUS_TAG[statusOf(name)].variant"
+          :icon="STATUS_TAG[statusOf(name)].icon"
+          size="xs"
+          class="font-mono"
+          :data-test="`security-entities-source-${name}`"
+          >{{ name }}<OTooltip :content="t(`siem.entities.sourceStatus.${statusOf(name)}`)"
+        /></OTag>
+      </div>
 
       <OEmptyState
         v-if="noSources"
@@ -687,7 +884,7 @@ const noSources = computed(
         :data="filteredRows"
         :columns="columns"
         row-key="value"
-        :loading="loading && !lastRunAt"
+        :loading="tableLoading"
         :error="plansError || null"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
@@ -704,8 +901,9 @@ const noSources = computed(
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
+              compact
               :items="stats"
-              :loading="loading && !lastRunAt"
+              :loading="tableLoading"
               selectable
               :selected-key="signalFilter === 'all' ? null : signalFilter"
               data-test="security-entities-stats"

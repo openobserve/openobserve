@@ -18,7 +18,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import SecurityNotices from "@/components/security/SecurityNotices.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -31,20 +31,16 @@ import SecurityRecordDrawer, {
   type RecordTab,
 } from "@/components/security/SecurityRecordDrawer.vue";
 import { useSiemDetections } from "@/composables/security/useSiemDetections";
-import { fetchHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
+import { useAlertHistorySummary } from "@/composables/security/useAlertHistorySummary";
 import { ocsfClassesIn, withRecentActivity } from "@/composables/security/streamActivity";
 import { runPool } from "@/composables/security/useSecurityStreamPlans";
+import { isErrorOutcome } from "@/utils/alerts/runOutcome";
 import incidentsService from "@/services/incidents";
 import config from "@/aws-exports";
 import streamService from "@/services/stream";
 import { bestMatch, isSecuritySource } from "@/utils/security/classify";
-import { isEvalError } from "@/utils/security/history";
-import {
-  loadTaggedStreams,
-  securityStreamNames,
-  sourceHealth,
-  type SourceHealth,
-} from "@/utils/security/streams";
+import { sourceHealth, type SourceHealth } from "@/utils/security/streams";
+import { securitySourceNames } from "@/utils/security/sourceSelection";
 import {
   CONTROLS,
   FRAMEWORKS,
@@ -72,15 +68,9 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "")
 const streams = ref<any[]>([]);
 const streamsLoading = ref(false);
 const lastRunAt = ref<number | null>(null);
-const {
-  siemRows,
-  loading: rulesLoading,
-  hydrating,
-  unchecked,
-  load: loadDetections,
-} = useSiemDetections();
+const { siemRows, loading: rulesLoading, load: loadDetections } = useSiemDetections();
 
-// ── Detection runs: per detection, so the history cap cannot hide one ───────
+// ── Detection runs: one summary over every enabled detection ────────────────
 interface Runs {
   evaluations: number;
   errors: number;
@@ -88,64 +78,64 @@ interface Runs {
 }
 const runs = ref<Map<string, Runs>>(new Map());
 const runsLoading = ref(false);
-/** A 1-minute rule writes 1440 rows a day, so three pages cover any schedule. */
-const RUN_PAGES = 3;
-const RUN_CONCURRENCY = 4;
+const runsLoaded = ref(false);
+const runSummary = useAlertHistorySummary();
+const RUN_WINDOW_MS = 24 * 3_600_000;
 
 async function loadRuns(seq: number) {
   runsLoading.value = true;
   const end = Date.now();
-  const start = end - 24 * 3_600_000;
-  const queue = siemRows.value
+  const alertIds = siemRows.value
     .filter(({ alert }) => alert.enabled && alert.id)
-    .map(({ alert }) => ({ id: String(alert.id), name: String(alert.name ?? "") }));
-  const out = new Map<string, Runs>();
-  const worker = async () => {
-    for (let item = queue.shift(); item; item = queue.shift()) {
-      try {
-        const { rows, complete } = await fetchHistoryWindow(orgId.value, start, end, {
-          alertId: item.id,
-          maxPages: RUN_PAGES,
-        });
-        // A skipped run looked at nothing, so it is not an evaluation.
-        out.set(item.name, {
-          evaluations: rows.filter((r) => r.status !== "skipped").length,
-          errors: rows.filter(isEvalError).length,
-          complete,
-        });
-      } catch {
-        // Unreadable history is not "did not run": leave it unread.
-        out.set(item.name, { evaluations: 0, errors: 0, complete: false });
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: RUN_CONCURRENCY }, worker));
+    .map(({ alert }) => String(alert.id));
+  // One bucket for the whole window: only per-detection totals are needed.
+  await runSummary.load(orgId.value, end - RUN_WINDOW_MS, end, {
+    alertIds,
+    bucketMs: RUN_WINDOW_MS,
+  });
   if (seq !== refreshSeq) return;
+  // Unreadable or truncated history is not "did not run": leave it unread.
+  const complete = !runSummary.error.value && !runSummary.partial.value;
+  const out = new Map<string, Runs>(
+    alertIds.map((id) => [id, { evaluations: 0, errors: 0, complete }]),
+  );
+  for (const row of runSummary.rows.value) {
+    const r = out.get(row.alertId);
+    if (!r) continue;
+    // A skipped run looked at nothing, so it is not an evaluation.
+    if (row.outcome !== "skipped") r.evaluations += row.n;
+    if (isErrorOutcome(row.outcome)) r.errors += row.n;
+  }
   runs.value = out;
   runsLoading.value = false;
+  runsLoaded.value = true;
 }
 
 // ── Cases: from the incidents stats API, never from a build flag ─────────────
 const caseCount = ref<number | null>(null);
 // The stats endpoint's total_incidents is a placeholder 0, so the list's total is used.
 const casesAvailable = config.isEnterprise === "true" || config.isCloud === "true";
+const casesLoaded = ref(false);
 async function loadCaseCount() {
   if (!casesAvailable) {
     caseCount.value = null;
+    casesLoaded.value = true;
     return;
   }
   try {
-    const res = await incidentsService.list(orgId.value, undefined, 1, 0);
+    const res = await incidentsService.list(orgId.value, undefined, 1, 0, undefined, true);
     const n = Number(res.data?.total);
     caseCount.value = Number.isFinite(n) ? n : null;
   } catch {
     // 403/404: the deployment cannot say, which is "not assessable".
     caseCount.value = null;
   }
+  casesLoaded.value = true;
 }
 
 /** OCSF class uids per OCSF-native stream, over the last week. */
 const ocsfClasses = ref<Map<string, number[]>>(new Map());
+const streamsLoaded = ref(false);
 let streamsSeq = 0;
 async function loadStreams() {
   const seq = ++streamsSeq;
@@ -158,9 +148,9 @@ async function loadStreams() {
     const list = res.data?.list ?? [];
     streams.value = list;
     ocsfClasses.value = new Map();
-    const names = securityStreamNames(
+    const names = securitySourceNames(
+      org,
       list.map((s: any) => String(s.name)),
-      loadTaggedStreams(org),
     );
     // Stats lag ingestion, and an OCSF stream says what it records only through
     // the classes in it, so both are read from the data and patched in after.
@@ -174,7 +164,10 @@ async function loadStreams() {
   } catch {
     if (seq === streamsSeq) streams.value = [];
   } finally {
-    if (seq === streamsSeq) streamsLoading.value = false;
+    if (seq === streamsSeq) {
+      streamsLoading.value = false;
+      streamsLoaded.value = true;
+    }
   }
 }
 
@@ -209,27 +202,40 @@ async function loadOcsfClasses(
 }
 
 let refreshSeq = 0;
+async function loadDetectionRuns(seq: number) {
+  await loadDetections(orgId.value);
+  if (seq === refreshSeq) await loadRuns(seq);
+}
 async function refresh() {
   if (!orgId.value) return;
   const seq = ++refreshSeq;
-  await Promise.all([loadStreams(), loadDetections(orgId.value), loadCaseCount()]);
-  // Runs are read per detection, so the rule list has to be known first.
-  await loadRuns(seq);
+  await Promise.all([loadStreams(), loadDetectionRuns(seq), loadCaseCount()]);
   if (seq === refreshSeq) lastRunAt.value = Date.now();
 }
 onMounted(refresh);
-watch(orgId, refresh);
+watch(orgId, () => {
+  streamsLoaded.value = false;
+  runsLoaded.value = false;
+  casesLoaded.value = false;
+  void refresh();
+});
 
-const loading = computed(
-  () => streamsLoading.value || rulesLoading.value || hydrating.value || runsLoading.value,
-);
-const ready = computed(
-  () => lastRunAt.value !== null && !rulesLoading.value && !hydrating.value && !runsLoading.value,
-);
+const loading = computed(() => streamsLoading.value || rulesLoading.value || runsLoading.value);
+const ready = computed(() => streamsLoaded.value && runsLoaded.value && casesLoaded.value);
+
+function requirementReady(req: Requirement): boolean {
+  if (DETECTION_KINDS.has(req.kind)) return runsLoaded.value;
+  if (req.kind === "caseManagement") return casesLoaded.value;
+  return streamsLoaded.value;
+}
+/** A control's row shows once the signals its own requirements read are in. */
+function controlReady(result: ControlResult): boolean {
+  return result.control.requirements.every(requirementReady);
+}
 
 const sources = computed<SourceSignal[]>(() => {
   const all = streams.value.map((s) => String(s.name));
-  const names = securityStreamNames(all, loadTaggedStreams(orgId.value));
+  const names = securitySourceNames(orgId.value, all);
   const byName = new Map(streams.value.map((s) => [String(s.name), s]));
   return names.map((name) => {
     const stream = byName.get(name);
@@ -254,7 +260,7 @@ const sources = computed<SourceSignal[]>(() => {
 const detections = computed<DetectionSignal[]>(() =>
   siemRows.value.map(({ alert, meta }) => {
     const name = String(alert.name ?? "");
-    const r = runs.value.get(name);
+    const r = alert.id ? runs.value.get(String(alert.id)) : undefined;
     return {
       name,
       enabled: !!alert.enabled,
@@ -409,13 +415,20 @@ function evidenceSummary(result: ControlResult): string {
   return parts.join(" · ") || "—";
 }
 
-type Row = { id: string; ref: string; status: ControlStatus; result: ControlResult };
+type Row = {
+  id: string;
+  ref: string;
+  status: ControlStatus;
+  result: ControlResult;
+  pending: boolean;
+};
 const rows = computed<Row[]>(() =>
   shownResults.value.map((r) => ({
     id: r.control.id,
     ref: r.control.ref,
     status: r.status,
     result: r,
+    pending: !controlReady(r),
   })),
 );
 
@@ -458,7 +471,7 @@ function step(delta: number) {
   const i = selectedIndex.value;
   if (i === null) return;
   const next = rows.value[i + delta];
-  if (next) selectedId.value = next.id;
+  if (next && !next.pending) selectedId.value = next.id;
 }
 
 const DRAWER_TONE: Record<ControlStatus, "success" | "medium" | "critical" | "neutral"> = {
@@ -550,18 +563,17 @@ function go(path: string) {
     </template>
 
     <div class="flex flex-col gap-4 pb-4">
-      <OBanner variant="info" icon="info-outline" dense data-test="security-compliance-disclaimer">
-        {{ t("siem.compliance.disclaimer") }}
-      </OBanner>
-      <OBanner
-        v-if="unchecked > 0"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-compliance-unchecked"
-      >
-        {{ t("siem.compliance.uncheckedRules", unchecked) }}
-      </OBanner>
+      <SecurityNotices
+        :notices="[
+          {
+            key: 'disclaimer',
+            tone: 'info',
+            text: t('siem.compliance.disclaimer'),
+            dataTest: 'security-compliance-disclaimer',
+          },
+        ]"
+        data-test="security-compliance-notices"
+      />
 
       <div class="flex flex-col gap-1">
         <h2 class="text-text-heading text-lg font-semibold">
@@ -573,6 +585,7 @@ function go(path: string) {
       </div>
 
       <OStatStrip
+        compact
         :items="stats"
         :loading="!ready"
         selectable
@@ -583,29 +596,40 @@ function go(path: string) {
 
       <div class="bg-card-glass-bg border-border-default rounded-surface overflow-hidden border">
         <OTable
-          :data="ready ? rows : []"
+          :data="rows"
           :columns="columns"
           row-key="id"
-          :loading="!ready"
           pagination="none"
           sorting="none"
           :show-global-filter="false"
           :fill-height="false"
-          :get-row-status-color="(row: Row) => statusRailColor(row.status)"
+          :get-row-status-color="
+            (row: Row) => (row.pending ? undefined : statusRailColor(row.status))
+          "
           :row-class="(row: Row) => (row.id === selectedId ? '!bg-table-row-selected-bg' : '')"
           data-test="security-compliance-table"
-          @row-click="(row: Row) => (selectedId = row.id)"
+          @row-click="(row: Row) => (row.pending ? undefined : (selectedId = row.id))"
         >
           <template #cell-status="{ row }">
-            <OTag :variant="STATUS_VARIANT[row.status]" :icon="STATUS_ICON[row.status]" size="xs">{{
-              t(`siem.compliance.status.${row.status}`)
-            }}</OTag>
+            <OSkeleton v-if="row.pending" type="text" class="w-16" />
+            <OTag
+              v-else
+              :variant="STATUS_VARIANT[row.status]"
+              :icon="STATUS_ICON[row.status]"
+              size="xs"
+              >{{ t(`siem.compliance.status.${row.status}`) }}</OTag
+            >
           </template>
           <template #cell-ref="{ row }">
             <span class="text-text-secondary font-mono text-xs">{{ row.ref }}</span>
           </template>
+          <template #cell-evidence="{ row }">
+            <OSkeleton v-if="row.pending" type="text" class="w-24" />
+            <span v-else>{{ evidenceSummary(row.result) }}</span>
+          </template>
           <template #cell-requirements="{ row }">
-            <span class="text-xs tabular-nums">{{
+            <OSkeleton v-if="row.pending" type="text" class="w-12" />
+            <span v-else class="text-xs tabular-nums">{{
               t("siem.compliance.metOf", {
                 met: row.result.requirements.filter((x) => x.status === "met").length,
                 total: row.result.requirements.length,

@@ -26,8 +26,10 @@ const props = withDefaults(
     selectable?: boolean;
     /** Key of the currently-selected tile (draws the ring). */
     selectedKey?: string | null;
+    /** Default for every item's `compact` (an item's own setting wins). */
+    compact?: boolean;
   }>(),
-  { items: () => [], loading: false, selectable: false, selectedKey: null },
+  { items: () => [], loading: false, selectable: false, selectedKey: null, compact: false },
 );
 
 const emit = defineEmits<{ select: [key: string] }>();
@@ -52,6 +54,7 @@ const onCardClick = (item: StatItem) => {
       :tone="item.tone"
       :trend="item.trend"
       :max="item.max"
+      :compact="item.compact ?? compact"
       :clickable="selectable && item.selectable !== false"
       :selected="selectable && item.selectable !== false && selectedKey === item.key"
       :data-test="item.dataTest"

@@ -150,6 +150,7 @@ use crate::{
         openobserve_api_management::request::alerts::move_alerts,
         openobserve_api_management::request::alerts::list_alert_tags,
         openobserve_api_management::request::alerts::history::get_alert_history,
+        openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
         openobserve_api_management::request::alerts::incidents::list_incidents,
         openobserve_api_management::request::alerts::incidents::get_incident,
         openobserve_api_management::request::alerts::incidents::update_incident,

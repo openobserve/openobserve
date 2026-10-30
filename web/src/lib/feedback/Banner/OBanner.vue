@@ -25,7 +25,6 @@ const ariaRole = computed(() =>
 
 const hasDefaultSlot = computed(() => !!slots.default);
 const hasIconSlot = computed(() => !!slots.icon);
-const hasActionsSlot = computed(() => !!slots.actions);
 const showContentProp = computed(() => !hasDefaultSlot.value && !!props.content);
 const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
 
@@ -59,20 +58,20 @@ const variantClass = computed(() => {
       variantClass,
     ]"
   >
-    <div :class="['flex flex-row items-start gap-3', inlineActions ? 'flex-1' : '']">
+    <div :class="['flex min-w-0 flex-row items-start gap-3', inlineActions ? 'flex-1' : '']">
       <div v-if="showIconArea" class="flex shrink-0 items-start">
         <slot name="icon">
           <OIcon :name="icon" size="sm" />
         </slot>
       </div>
 
-      <div class="flex-1 text-sm">
+      <div class="min-w-0 flex-1 text-sm">
         <slot />
         <template v-if="showContentProp">{{ content }}</template>
       </div>
     </div>
 
-    <div v-if="hasActionsSlot">
+    <div v-if="$slots.actions">
       <slot name="actions" />
     </div>
   </div>

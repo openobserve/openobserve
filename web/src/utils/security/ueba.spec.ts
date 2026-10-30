@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { acceptOutcome, planStream } from "./entities";
 import {
+  NOVELTY_SIGNALS,
   UEBA_THRESHOLDS,
   UEBA_WEIGHTS,
   buildProfiles,
@@ -12,6 +13,7 @@ import {
   scoreAll,
   scoreUser,
   toneOfRisk,
+  withholdSignals,
   type HourHit,
   type IpHit,
 } from "./ueba";
@@ -220,5 +222,39 @@ describe("scoring", () => {
       "high",
       "critical",
     ]);
+  });
+});
+
+describe("withholdSignals", () => {
+  it("drops novelty signals as not evaluated and re-scores the rest", () => {
+    const now = profile([hour("eve", 3, 40)], [ip("eve", "8.8.8.8", 40)]).get("eve")!;
+    const risk = scoreUser(now, null, W);
+    expect(risk.signals.map((s) => s.kind)).toEqual(["first_seen"]);
+    const held = withholdSignals(risk, NOVELTY_SIGNALS);
+    expect(held.signals).toEqual([]);
+    expect(held.score).toBe(0);
+    expect(held.tone).toBe("info");
+    expect(held.withheld).toEqual(expect.arrayContaining(NOVELTY_SIGNALS));
+  });
+
+  it("marks unusual hours as not judged once they are withheld", () => {
+    const base = profile([hour("ann", 9, 50)]).get("ann")!;
+    const now = profile([hour("ann", 3, 6)]).get("ann")!;
+    const risk = scoreUser(now, base, W);
+    expect(risk.hoursEligible).toBe(true);
+    expect(risk.signals.map((s) => s.kind)).toContain("new_hours");
+    const held = withholdSignals(risk, NOVELTY_SIGNALS);
+    expect(held.hoursEligible).toBe(false);
+    expect(held.signals.map((s) => s.kind)).not.toContain("new_hours");
+  });
+
+  it("keeps signals it was not asked to drop", () => {
+    const base = profile([hour("bob", 9, 10)]).get("bob")!;
+    const now = profile([hour("bob", 9, 400)]).get("bob")!;
+    const risk = scoreUser(now, base, W);
+    expect(risk.signals.map((s) => s.kind)).toContain("volume");
+    const held = withholdSignals(risk, NOVELTY_SIGNALS);
+    expect(held.signals.map((s) => s.kind)).toContain("volume");
+    expect(held.score).toBe(UEBA_WEIGHTS.volume);
   });
 });

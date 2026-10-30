@@ -11259,10 +11259,26 @@
       "operation": "Operation",
       "resource": "Resource"
     },
+    "notices": {
+      "more": "{n} more",
+      "less": "Show less",
+      "readMore": "Read more",
+      "tone": {
+        "error": "Error",
+        "warning": "Warning",
+        "info": "Information"
+      }
+    },
     "fieldGroup": {
       "event": "Event",
       "actor": "Actor",
-      "network": "Network",
+      "src": "Source endpoint",
+      "dst": "Destination endpoint",
+      "network": "Connection",
+      "http": "HTTP",
+      "process": "Process and file",
+      "cloud": "Cloud and API",
+      "finding": "Finding",
       "device": "Device",
       "metadata": "Metadata",
       "other": "Other fields"
@@ -11306,7 +11322,8 @@
       "subtitle": "What fired, what is open, and whether your sources are still reporting",
       "autoRefreshOn": "Auto-refresh every minute is on",
       "autoRefreshOff": "Auto-refresh is off",
-      "historyError": "Could not load detection history",
+      "historyError": "Could not load detection history: {reason}",
+      "rulesError": "Could not load detections: {reason}",
       "noDetections": "No SIEM detections are enabled yet, so nothing here can fire. Enable detections from the Sigma catalog to start monitoring.",
       "browseDetections": "Browse detections",
       "stat": {
@@ -11347,8 +11364,7 @@
       "explore": "Explore",
       "noSources": "No security sources yet",
       "noSourcesHint": "Ingest CloudTrail, Okta, VPC Flow or syslog. Streams with security, audit, auth or firewall in the name appear here automatically.",
-      "historyCapped": "Showing the newest {n} of {total} evaluations in this window, back to {from}. Counts and charts cover that span only; pick a shorter window for complete numbers.",
-      "uncheckedRules": "{n} alert was not checked for SIEM metadata, so its firings are not counted here. | {n} alerts were not checked for SIEM metadata, so their firings are not counted here."
+      "summaryPartial": "This window has more alert history than one summary can hold, so counts and charts are a lower bound; pick a shorter window for complete numbers."
     },
     "events": {
       "title": "Security Events",
@@ -11368,6 +11384,17 @@
       "sources": "Sources",
       "addSource": "Add a stream as a source",
       "removeSource": "Remove from sources",
+      "autoSource": "Selected automatically: {label}, {n}% match",
+      "nameSource": "Selected because its name looks like a security source",
+      "autoTag": "auto",
+      "suggested": "Suggested",
+      "suggestedSource": "Looks like {label} ({n}% match)",
+      "addSuggested": "Add as a source",
+      "dismissSuggestion": "Dismiss",
+      "showMore": "Show {n} more",
+      "showFewer": "Show fewer",
+      "classShare": "{uid} {pct}%",
+      "classifying": "Checking streams for security data",
       "searchFields": "Search fields",
       "addColumn": "Show as column",
       "removeColumn": "Hide column",
@@ -11377,6 +11404,14 @@
       "confidence": "{n}% match",
       "telemetryOnly": "Telemetry only",
       "matchedOn": "matched on {fields}",
+      "ocsfCategory": "OCSF category: {name}",
+      "ocsfClass": "OCSF class: {name} ({uid})",
+      "rulesMatch": "Rules match {logsource}",
+      "rulesMatchHint": "The Sigma logsource detections are matched against, not the OCSF category",
+      "product": "Product: {name}",
+      "classMix": "Classes in the last hour: {mix}",
+      "objects": "OCSF objects",
+      "missingSignals": "Not seen: {fields}",
       "detections": "{n} detection | {n} detections",
       "firing": "{n} firing | {n} firing",
       "rulesFor": "Sigma rules for {source}",
@@ -11400,6 +11435,8 @@
       "noEventsLastReported": "{stream} has nothing in this time range. It last reported {ago}.",
       "searchWider": "Search the last {period}",
       "searchFailed": "Search failed",
+      "cancel": "Cancel",
+      "cancelled": "Search cancelled",
       "latestCount": "Latest {n} matching event | Latest {n} matching events",
       "sql": "SQL",
       "invertFilter": "Switch between include and exclude",
@@ -11505,8 +11542,9 @@
       "showEvaluations": "Show all evaluations",
       "count": "{n} row | {n} rows",
       "refresh": "Refresh",
-      "loadError": "Could not load alert history",
       "capped": "Showing the newest {n} of {total} evaluations in this window, back to {from}. Counts cover that span only; pick a shorter window for complete numbers.",
+      "cappedRows": "The table lists the newest {n} of {total} matching runs, back to {from}. The severity counts cover the whole window.",
+      "summaryPartial": "Severity counts hit the server's row limit and may be low; pick a shorter window for complete numbers.",
       "notSiem": "Not a SIEM rule",
       "notSiemTitle": "Not a SIEM detection",
       "notSiemHint": "This alert has no Sigma metadata, so there is no rule to show. It is listed because SIEM-only is off.",
@@ -11543,6 +11581,8 @@
       "refresh": "Refresh",
       "loadError": "Could not load cases",
       "openError": "Could not open the case",
+      "hiddenAlerts": "{n} firing from non-security alerts in this case is hidden | {n} firings from non-security alerts in this case are hidden",
+      "noSecurityAlerts": "This case was opened by alerts that are not security detections, so they are not shown here",
       "updateError": "Could not update the case",
       "commentError": "Could not post the comment",
       "analysisError": "Root-cause analysis failed",
@@ -11625,7 +11665,7 @@
     "mitrePage": {
       "title": "MITRE ATT&CK",
       "subtitle": "Which techniques your enabled detections cover, and which fired",
-      "historyCapped": "Firings are counted from the newest {n} of {total} evaluations in this window; pick a shorter window for complete numbers.",
+      "summaryPartial": "This window has more alert history than one summary can hold, so firing counts are a lower bound; pick a shorter window for complete numbers.",
       "stat": {
         "firing": "Techniques firing",
         "gaps": "Coverage gaps",
@@ -11691,9 +11731,7 @@
       "anySeverity": "Any severity",
       "scopeSiem": "SIEM detections",
       "scopeAll": "All alerts",
-      "identifying": "Identifying detections…",
       "notSiem": "Alert",
-      "unchecked": "{n} alert was not checked for SIEM metadata, so it may be missing from this list. | {n} alerts were not checked for SIEM metadata, so they may be missing from this list.",
       "scheduleValue": "Every {every}m over {over}m",
       "minutes": "{n} minute | {n} minutes",
       "stat": {
@@ -11801,7 +11839,8 @@
       "notFired": "Did not fire",
       "firedTimes": "Once, {when} | {n} times, last {when}",
       "firedCount": "Fired once in 24h | Fired {n} times in 24h",
-      "firingsCapped": "Firing counts cover the newest {n} of {total} evaluations in the last 24 hours; older firings in that window are not counted.",
+      "firingsPartial": "Too many evaluations in the last 24 hours to count them all; firing counts are a lower bound.",
+      "firingsNarrowed": "Firing counts start at {from}: the history store limits how far back one query can look.",
       "ago": {
         "now": "just now",
         "minutes": "{n}m ago",
@@ -11816,8 +11855,7 @@
         "periodGap": "Shorter than the run interval: minutes between runs would never be checked"
       },
       "nameTaken": "A detection or alert named “{name}” already exists. Its history would merge with this one, so pick another stream or remove the existing one first.",
-      "loadError": "Failed to load detection rules",
-      "firingsNarrowed": "Firing counts start at {from}: the history store limits how far back one query can look."
+      "loadError": "Failed to load detection rules"
     },
     "content": {
       "title": "Content",
@@ -11909,8 +11947,7 @@
         "severityId": "Severity",
         "statusId": "Outcome"
       },
-      "cannotRun": "Cannot run on your data",
-      "unchecked": "{n} alert was not checked for SIEM metadata, so a rule shown as not installed may be running there. | {n} alerts were not checked for SIEM metadata, so rules shown as not installed may be running there."
+      "cannotRun": "Cannot run on your data"
     },
     "entities": {
       "title": "Entities",
@@ -11995,6 +12032,15 @@
       "openEvents": "Open in Events",
       "huntInEvents": "Hunt in Events",
       "partialStreams": "Partial results from: {streams}",
+      "limited": "{stream}: ~{rows} rows in {window}. Showing the last {slice}.",
+      "runFull": "Run full window",
+      "limitedMany": "{n} large sources show only the last {slice} of {window}: {streams}",
+      "sourcesLoading": "Reading sources:",
+      "sourceStatus": {
+        "loading": "Loading",
+        "done": "Loaded",
+        "failed": "Could not read"
+      },
       "loadError": "Could not load security sources",
       "detailFailed": "Some of this entity’s data could not be read: {streams}."
     },
@@ -12071,6 +12117,11 @@
       "openEntity": "Open entity",
       "withheld": "Some baseline data came back incomplete, so these signals were not evaluated: {signals}.",
       "currentPartial": "The current window returned partial data; counts may be low.",
+      "limited": "{stream}: ~{rows} rows in {window} and its {baseline} baseline. Reading only the last {slice} and the {slice} before the window, so first-seen, new-IP and unusual-hours signals are not evaluated, nor volume and failure-rate signals for its users.",
+      "limitedMany": "{n} large sources are read over only the last {slice} of {window} and the {slice} before it, not the full {baseline} baseline, so first-seen, new-IP and unusual-hours signals are not evaluated for them, nor volume and failure-rate signals for their users: {streams}",
+      "provisional": "Still reading sources: first-seen, new-IP and unusual-hours signals appear once every source has answered.",
+      "limitedTag": "Last {slice}",
+      "limitedTagHint": "Some of this user's events come from a source too large for the full window; those are counted over the last {slice} only.",
       "excluded": "Left out (their data could not be read in both windows): {streams}.",
       "loadError": "Could not load security sources",
       "spanHours": "{n} hour | {n} hours",
@@ -12340,7 +12391,6 @@
         "endpoint": "endpoint activity",
         "cloud": "cloud provider activity"
       },
-      "uncheckedRules": "{n} alert was not checked for SIEM metadata, so it is left out of detection coverage here. | {n} alerts were not checked for SIEM metadata, so they are left out of detection coverage here.",
       "field": {
         "actor": "actor",
         "time": "time",

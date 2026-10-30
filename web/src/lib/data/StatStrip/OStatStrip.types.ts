@@ -49,6 +49,8 @@ export interface StatItem {
    * `value / max` (e.g. this state's share of the total). Omit for no bar.
    */
   max?: number;
+  /** Show a numeric value as "819.5K"; the exact number moves to the tooltip. */
+  compact?: boolean;
   /**
    * When the strip is `selectable`, set this to false to make THIS tile a plain
    * display (not a clickable filter) — e.g. a "Total" tile. Defaults to true.

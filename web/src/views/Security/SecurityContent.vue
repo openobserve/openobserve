@@ -25,7 +25,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -76,13 +76,34 @@ watch(tab, (value) => router.replace({ query: { ...route.query, tab: value } }))
 const {
   siemRows,
   loading: rulesLoading,
-  hydrating,
-  unchecked,
+  error: rulesError,
   load: loadDetections,
 } = useSiemDetections();
 const streams = ref<StreamSchema[]>([]);
 const streamsLoading = ref(false);
 const streamsError = ref("");
+
+const notices = computed<SecurityNotice[]>(() => {
+  const out: SecurityNotice[] = [];
+  if (streamsError.value) {
+    out.push({
+      key: "streams-error",
+      tone: "error",
+      text: streamsError.value,
+      dataTest: "security-content-streams-error",
+    });
+  }
+  // Without the rule list every rule would read as "not installed", so the gap is said.
+  if (rulesError.value) {
+    out.push({
+      key: "rules-error",
+      tone: "error",
+      text: t("siem.overview.rulesError", { reason: rulesError.value }),
+      dataTest: "security-content-rules-error",
+    });
+  }
+  return out;
+});
 
 async function loadStreams() {
   streamsLoading.value = true;
@@ -113,14 +134,8 @@ const catalog = computed(() => sigmaCatalog());
 const installed = computed(() => installedBySigmaId(siemRows.value));
 const bySource = computed(() => streamsBySource(streams.value));
 const fieldsByStream = computed(() => new Map(streams.value.map((s) => [s.name, s.fields])));
-/** Installed state is only trustworthy once every detection has been identified. */
-const installPending = computed(() => rulesLoading.value || hydrating.value);
-/**
- * "Not installed" can only be claimed when every alert was checked: past the
- * hydration limit a rule may be running as an alert nobody identified. An
- * installed rule is still known to be installed.
- */
-const notInstalledKnown = computed(() => !installPending.value && unchecked.value === 0);
+/** Installed state is only trustworthy once the alert list has loaded. */
+const installPending = computed(() => rulesLoading.value || !!rulesError.value);
 
 // ── Rules ────────────────────────────────────────────────────────────────────
 interface RuleRow {
@@ -160,7 +175,7 @@ const ruleRows = computed<RuleRow[]>(() =>
 );
 
 /** Applies to your data and would run there, but no detection runs it yet. */
-const isReady = (r: RuleRow) => r.runnable.length > 0 && !r.installed && notInstalledKnown.value;
+const isReady = (r: RuleRow) => r.runnable.length > 0 && !r.installed && !installPending.value;
 
 type RuleFacet = "ready" | "installed" | "applies";
 const ruleFacet = ref<RuleFacet | null>(null);
@@ -205,7 +220,7 @@ const ruleStats = computed<StatItem[]>(() => [
   {
     key: "ready",
     label: t("siem.content.stat.ready"),
-    value: streamsLoading.value || !notInstalledKnown.value ? "—" : ruleCounts.value.ready,
+    value: streamsLoading.value || installPending.value ? "—" : ruleCounts.value.ready,
     icon: "lightbulb",
     tone: "warning",
     max: ruleRows.value.length,
@@ -526,9 +541,7 @@ const ruleFacts = computed<RecordFact[]>(() => {
         ? "—"
         : detections
           ? t("siem.content.detectionCount", detections)
-          : notInstalledKnown.value
-            ? t("siem.content.notInstalled")
-            : "—",
+          : t("siem.content.notInstalled"),
     },
     { label: t("siem.content.field.author"), value: rule.author },
     { label: t("siem.content.field.modified"), value: rule.modified ?? rule.date },
@@ -750,26 +763,11 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
-      <OBanner
-        v-if="unchecked > 0"
-        variant="warning"
-        icon="warning-amber"
-        dense
+      <SecurityNotices
+        :notices="notices"
         class="mx-page-edge mt-2"
-        data-test="security-content-unchecked"
-      >
-        {{ t("siem.content.unchecked", unchecked) }}
-      </OBanner>
-      <OBanner
-        v-if="streamsError"
-        variant="error-soft"
-        icon="error-outline"
-        dense
-        class="mx-page-edge mt-2"
-        data-test="security-content-streams-error"
-      >
-        {{ streamsError }}
-      </OBanner>
+        data-test="security-content-notices"
+      />
 
       <!-- ── Rules ──────────────────────────────────────────────────────── -->
       <OTable
@@ -793,6 +791,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
+              compact
               :items="ruleStats"
               selectable
               :selected-key="ruleFacet"
@@ -874,7 +873,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           <OTag v-else-if="row.installed" variant="success-soft" icon="check-circle" size="xs">{{
             t("siem.content.installed")
           }}</OTag>
-          <span v-else-if="!notInstalledKnown" class="text-text-secondary">—</span>
           <OTag v-else-if="row.runnable.length" variant="warning-soft" icon="lightbulb" size="xs">{{
             t("siem.content.readyToInstall")
           }}</OTag>
@@ -916,6 +914,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
+              compact
               :items="sourceStats"
               selectable
               :selected-key="sourceFacet"

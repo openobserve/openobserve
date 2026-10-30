@@ -62,7 +62,21 @@ export interface StreamPlan {
   outcomeColumn: string | null;
   /** SQL boolean expression for a failed event, or null when the stream says nothing readable. */
   failure: string | null;
+  /** Row count and time span from the stream's stats; absent when unknown. */
+  volume?: StreamVolume | null;
 }
+
+export interface StreamVolume {
+  docNum: number;
+  /** Microseconds. */
+  timeMinUs: number;
+  timeMaxUs: number;
+}
+
+/** Above this many estimated rows in the window, a stream defaults to its last hour. */
+export const LARGE_STREAM_ROWS = 50_000_000;
+/** The slice a large stream is cut to, µs. */
+export const LARGE_STREAM_SLICE_US = 3_600_000_000;
 
 export const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 export { quoteString };
@@ -137,6 +151,36 @@ export function acceptOutcome(
     failure: outcomeInterpretable(sample) ? failurePredicate(plan.outcomeColumn) : null,
     outcomeColumn: null,
   };
+}
+
+/** Reads the `/streams` stats block; null when it lacks a row count or time span. */
+export function volumeFromStats(stats: unknown): StreamVolume | null {
+  const s = (stats ?? {}) as Record<string, unknown>;
+  const docNum = Number(s.doc_num);
+  const timeMinUs = Number(s.doc_time_min);
+  const timeMaxUs = Number(s.doc_time_max);
+  // A missing time reads as 0 (1970), which would spread the rows over decades.
+  if (!(docNum > 0) || !(timeMinUs > 0) || !(timeMaxUs >= timeMinUs)) return null;
+  return { docNum, timeMinUs, timeMaxUs };
+}
+
+/** Rows expected in [startUs, endUs], from the overlap with the stream's history at an even rate. */
+export function estimateRowsInWindow(
+  volume: StreamVolume | null | undefined,
+  startUs: number,
+  endUs: number,
+): number | null {
+  if (!volume || !(volume.docNum > 0) || !(endUs > startUs)) return null;
+  const overlap = Math.min(endUs, volume.timeMaxUs) - Math.max(startUs, volume.timeMinUs);
+  const span = volume.timeMaxUs - volume.timeMinUs;
+  if (!(span > 0)) return overlap >= 0 ? volume.docNum : 0;
+  if (overlap <= 0) return 0;
+  return (volume.docNum * overlap) / span;
+}
+
+/** Whether a stream should be cut to its last hour instead of the whole window. */
+export function shouldLimitWindow(estimate: number | null, windowUs: number): boolean {
+  return estimate !== null && estimate > LARGE_STREAM_ROWS && windowUs > LARGE_STREAM_SLICE_US;
 }
 
 const failSum = (plan: StreamPlan) =>

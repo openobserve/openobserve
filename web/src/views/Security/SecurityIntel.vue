@@ -41,6 +41,7 @@ import SecurityKeyValues, { type KeyValueRow } from "@/components/security/Secur
 import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.vue";
 import SecurityIntelAddDialog from "@/components/security/SecurityIntelAddDialog.vue";
 import SecurityIntelImportDialog from "@/components/security/SecurityIntelImportDialog.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import threatIntel, {
   INTEL_READ_LIMIT,
   RemoveRefused,
@@ -256,6 +257,73 @@ const stats = computed<StatItem[]>(() => [
     dataTest: "security-intel-stat-lists",
   },
 ]);
+
+const notices = computed<SecurityNotice[]>(() => {
+  const out: SecurityNotice[] = [];
+  const add = (key: string, tone: SecurityNotice["tone"], text: string) =>
+    out.push({ key, tone, text, dataTest: `security-intel-${key}` });
+  // A load error is shown by the tables themselves, in place of their rows.
+  if (sweep.partial.value)
+    add("partial", "warning", t("siem.intel.partial", { n: MAX_SWEEP_QUERIES }));
+  if (sweep.partialResults.value) {
+    add("partial-results", "warning", t("siem.intel.caveat.partial", sweep.partialResults.value));
+  }
+  if (sweep.failed.value)
+    add("failed", "warning", t("siem.intel.failedQueries", sweep.failed.value));
+  if (unreadTables.value.length) {
+    add(
+      "unread-tables",
+      "warning",
+      t(
+        "siem.intel.unreadTables",
+        { lists: unreadTables.value.join(", ") },
+        unreadTables.value.length,
+      ),
+    );
+  }
+  if (noIndicatorColumn.value.length) {
+    add(
+      "no-indicator-column",
+      "warning",
+      t(
+        "siem.intel.noIndicatorColumn",
+        { lists: noIndicatorColumn.value.join(", ") },
+        noIndicatorColumn.value.length,
+      ),
+    );
+  }
+  if (skippedRows.value.length) {
+    add(
+      "skipped-rows",
+      "info",
+      t("siem.intel.skippedRows", {
+        detail: skippedRows.value.map((x) => `${x.table} (${x.n})`).join(", "),
+      }),
+    );
+  }
+  if (sweep.unreadStreams.value.length) {
+    add(
+      "unread-streams",
+      "warning",
+      t(
+        "siem.intel.unreadStreams",
+        { streams: sweep.unreadStreams.value.join(", ") },
+        sweep.unreadStreams.value.length,
+      ),
+    );
+  }
+  if (truncated.value.length) {
+    add(
+      "truncated",
+      "warning",
+      t("siem.intel.truncated", {
+        lists: truncated.value.join(", "),
+        n: formatEventCount(INTEL_READ_LIMIT),
+      }),
+    );
+  }
+  return out;
+});
 
 function onStat(key: string) {
   if (key === "matched" || key === "hits") tab.value = "matches";
@@ -861,6 +929,7 @@ async function onSaved() {
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <OContent class="border-border-default flex shrink-0 flex-col gap-2 border-b py-3">
         <OStatStrip
+          compact
           :items="stats"
           :loading="loading && !indicators.length"
           selectable
@@ -868,15 +937,7 @@ async function onSaved() {
           data-test="security-intel-stats"
           @select="onStat"
         />
-        <OBanner
-          v-if="loadError"
-          variant="error-soft"
-          icon="error-outline"
-          dense
-          data-test="security-intel-load-error"
-        >
-          {{ loadError }}
-        </OBanner>
+        <SecurityNotices :notices="notices" data-test="security-intel-notices" />
         <div
           v-if="sweep.running.value"
           class="flex items-center gap-3 text-xs"
@@ -891,101 +952,6 @@ async function onSaved() {
             class="flex-1"
           />
         </div>
-        <OBanner
-          v-if="sweep.partial.value"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-intel-partial"
-        >
-          {{ t("siem.intel.partial", { n: MAX_SWEEP_QUERIES }) }}
-        </OBanner>
-        <OBanner
-          v-if="sweep.partialResults.value"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-intel-partial-results"
-        >
-          {{ t("siem.intel.caveat.partial", sweep.partialResults.value) }}
-        </OBanner>
-        <OBanner
-          v-if="sweep.failed.value"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-intel-failed"
-        >
-          {{ t("siem.intel.failedQueries", sweep.failed.value) }}
-        </OBanner>
-        <OBanner
-          v-if="unreadTables.length"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-intel-unread-tables"
-        >
-          {{
-            t("siem.intel.unreadTables", { lists: unreadTables.join(", ") }, unreadTables.length)
-          }}
-        </OBanner>
-        <OBanner
-          v-if="noIndicatorColumn.length"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-intel-no-indicator-column"
-        >
-          {{
-            t(
-              "siem.intel.noIndicatorColumn",
-              { lists: noIndicatorColumn.join(", ") },
-              noIndicatorColumn.length,
-            )
-          }}
-        </OBanner>
-        <OBanner
-          v-if="skippedRows.length"
-          variant="info"
-          icon="info-outline"
-          dense
-          data-test="security-intel-skipped-rows"
-        >
-          {{
-            t("siem.intel.skippedRows", {
-              detail: skippedRows.map((x) => `${x.table} (${x.n})`).join(", "),
-            })
-          }}
-        </OBanner>
-        <OBanner
-          v-if="sweep.unreadStreams.value.length"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-intel-unread-streams"
-        >
-          {{
-            t(
-              "siem.intel.unreadStreams",
-              { streams: sweep.unreadStreams.value.join(", ") },
-              sweep.unreadStreams.value.length,
-            )
-          }}
-        </OBanner>
-        <OBanner
-          v-if="truncated.length"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-intel-truncated"
-        >
-          {{
-            t("siem.intel.truncated", {
-              lists: truncated.join(", "),
-              n: formatEventCount(INTEL_READ_LIMIT),
-            })
-          }}
-        </OBanner>
       </OContent>
 
       <OTabs

@@ -13,8 +13,7 @@
 
 import { runPool, runSql } from "./useSecurityStreamPlans";
 import { QUIET_AFTER_US, sourceHealth } from "@/utils/security/streams";
-
-const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
+import { quoteIdent } from "@/utils/security/sql";
 
 type StreamRow = { name: string; stats?: Record<string, any> } & Record<string, any>;
 
@@ -71,6 +70,17 @@ export async function ocsfClassesIn(
   startUs: number,
   endUs: number,
 ): Promise<number[]> {
+  return (await ocsfClassCounts(orgId, stream, column, startUs, endUs)).map((c) => c.uid);
+}
+
+/** Rows per OCSF class uid over the window, most frequent first. */
+export async function ocsfClassCounts(
+  orgId: string,
+  stream: string,
+  column: string,
+  startUs: number,
+  endUs: number,
+): Promise<{ uid: number; n: number }[]> {
   const col = quoteIdent(column);
   const { hits } = await runSql(
     orgId,
@@ -79,5 +89,7 @@ export async function ocsfClassesIn(
     startUs,
     endUs,
   );
-  return hits.map((h) => Number(h.zo_class)).filter((uid) => Number.isInteger(uid) && uid > 0);
+  return hits
+    .map((h) => ({ uid: Number(h.zo_class), n: Number(h.zo_n) || 0 }))
+    .filter((c) => Number.isInteger(c.uid) && c.uid > 0);
 }

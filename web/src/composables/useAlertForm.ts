@@ -94,6 +94,7 @@ import {
 } from "@/utils/alerts/anomalyFilterOperators";
 import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import config from "@/aws-exports";
+import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 
@@ -2203,6 +2204,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // re-enables in the same tick and repeat clicks fire duplicate saves.
       const request = callAlert
         .then((res: { data: any }) => {
+          invalidateSiemDetections();
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2240,6 +2242,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
         .then((res: { data: any }) => {
+          invalidateSiemDetections();
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();

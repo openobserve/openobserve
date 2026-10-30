@@ -24,6 +24,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import alertsService from "@/services/alerts";
+import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
 import destinationService from "@/services/alert_destination";
 import streamService from "@/services/stream";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -170,7 +171,8 @@ const ocsfBridgeText = computed(() => {
   const guard = [t("siem.detections.ocsfGuard.class", { uid: profile.classUid })];
   if (profile.activityId !== undefined)
     guard.push(t("siem.detections.ocsfGuard.activity", { id: profile.activityId }));
-  if (profile.product) guard.push(t("siem.detections.ocsfGuard.product", { name: profile.product }));
+  if (profile.product)
+    guard.push(t("siem.detections.ocsfGuard.product", { name: profile.product }));
   return t("siem.detections.ocsfBridge", { stream: pickedStream.value, guard: guard.join(", ") });
 });
 
@@ -343,6 +345,7 @@ async function save() {
   saving.value = true;
   try {
     await alertsService.create_by_alert_id(props.orgId, payload);
+    invalidateSiemDetections(props.orgId);
     toast({ variant: "success", message: t("siem.detections.created", { name: payload.name }) });
     emit("created", payload.name);
     emit("update:open", false);

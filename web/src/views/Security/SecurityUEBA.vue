@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      each shown with the numbers that raised it. The page says plainly that
      these are heuristics over the chosen windows. -->
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -33,24 +33,34 @@ import SecurityRecordDrawer, {
   type RecordFact,
   type RecordTab,
 } from "@/components/security/SecurityRecordDrawer.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import {
+  createLimiter,
   runPool,
   runSql,
   useSecurityStreamPlans,
 } from "@/composables/security/useSecurityStreamPlans";
-import type { StreamPlan } from "@/utils/security/entities";
 import { useTableRowNavigation } from "@/composables/security/useTableRowNavigation";
-import { isExternalIp } from "@/utils/security/entities";
 import {
+  LARGE_STREAM_SLICE_US,
+  estimateRowsInWindow,
+  isExternalIp,
+  shouldLimitWindow,
+  type StreamPlan,
+} from "@/utils/security/entities";
+import {
+  NOVELTY_SIGNALS,
   UEBA_THRESHOLDS,
   buildProfiles,
   hoursSql,
   ipsSql,
   scoreAll,
+  withholdSignals,
   type HourHit,
   type IpHit,
   type UebaSignal,
   type UebaSignalKind,
+  type UebaWindows,
   type UserRisk,
 } from "@/utils/security/ueba";
 import {
@@ -59,7 +69,7 @@ import {
   toneLabelKey,
   type SeverityTone,
 } from "@/utils/security/severity";
-import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
+import { b64EncodeUnicode, formatCompactCount, formatEventCount } from "@/utils/formatters";
 
 const { t } = useI18n();
 const store = useStore();
@@ -98,6 +108,7 @@ function syncUrl() {
 // ── Data ─────────────────────────────────────────────────────────────────────
 const {
   plans,
+  names: streamNames,
   unreadable,
   loading: plansLoading,
   error: plansError,
@@ -108,7 +119,29 @@ const {
 // withholds the signals that need every row, and the page says so.
 const HOURS_LIMIT = 50000;
 const IPS_LIMIT = 20000;
+type StreamStatus = "loading" | "done" | "failed";
+type Pair = { stream: string; hours: HourHit[]; ips: IpHit[]; failureKnown: boolean };
+type Span = readonly [number, number];
+
+interface StreamRun {
+  plan: StreamPlan;
+  /** Estimated rows over the full windows, set when the run was cut to the slices around now. */
+  limitedRows: number | null;
+  now: Pair;
+  base: Pair;
+  /** The current window came back cut short. */
+  nowCut: boolean;
+  /** A baseline aggregate came back cut short. */
+  baseCut: { hours: boolean; ips: boolean };
+  hasHistory: boolean;
+  pending: number;
+  failed: boolean;
+  ctrl: AbortController;
+}
+
 const risks = ref<UserRisk[]>([]);
+/** Users with events from a stream read only over its slices, so their counts are low. */
+const limitedUsers = ref<Set<string>>(new Set());
 /** Signals withheld org-wide because a baseline aggregate came back incomplete. */
 const withheld = ref<UebaSignalKind[]>([]);
 /** The current window was cut short: counts are lower bounds. */
@@ -117,115 +150,250 @@ const currentPartial = ref(false);
 const excludedStreams = ref<string[]>([]);
 /** Streams with no data in the baseline window: their users cannot be "first seen". */
 const noHistoryStreams = ref<string[]>([]);
-const loading = ref(false);
+const streamStatus = ref<Record<string, StreamStatus>>({});
+const limitedStreams = ref<{ stream: string; rows: number }[]>([]);
 const lastRunAt = ref<number | null>(null);
+/** Some stream of the current run has been scored, so the table has something to show. */
+const answered = ref(false);
+/** A refresh is between its start and its last answer, plan stage included. */
+const running = ref(false);
+/** Scores so far lack streams still loading, so novelty signals are held back. */
+const provisional = ref(false);
+const loading = computed(
+  () =>
+    running.value || plansLoading.value || Object.values(streamStatus.value).includes("loading"),
+);
 let seq = 0;
+let runs = new Map<string, StreamRun>();
+let controller: AbortController | null = null;
+/** Every page query shares these slots. */
+const limit = createLimiter();
+/** Large streams the user chose to read over the whole window; reset with the window. */
+const fullWindow = new Set<string>();
 
-type Pair = { stream: string; hours: HourHit[]; ips: IpHit[]; failureKnown: boolean };
-
-async function refresh() {
-  if (!orgId.value) return;
-  const mine = ++seq;
-  loading.value = true;
-  nowUs.value = Date.now() * 1000;
-  await loadPlans(orgId.value, baselineStart.value, nowUs.value);
-  const windows = {
-    now: [currentStart.value, nowUs.value] as const,
-    base: [baselineStart.value, currentStart.value] as const,
+function pageWindows(): UebaWindows {
+  return {
+    currentStart: currentStart.value,
+    currentEnd: nowUs.value,
+    baselineStart: baselineStart.value,
   };
-  const complete = { hours: true, ips: true, streamsWithHistory: new Set<string>() };
-  let partialNow = false;
-  const excluded = new Set<string>(unreadable.value);
+}
 
-  // Four queries per stream, run through the pool; a stream counts only if all four answered.
-  type Job = { plan: StreamPlan; agg: "hours" | "ips"; win: "now" | "base"; sql: string };
-  const jobs: Job[] = plans.value.flatMap((plan) => {
-    const h = hoursSql(plan, HOURS_LIMIT);
-    if (!h) return [];
-    const i = ipsSql(plan, IPS_LIMIT);
-    return (["now", "base"] as const).flatMap((win) => [
-      { plan, agg: "hours" as const, win, sql: h },
-      ...(i ? [{ plan, agg: "ips" as const, win, sql: i }] : []),
-    ]);
-  });
-  const settled = await runPool(
-    jobs.map((j) => () => runSql(orgId.value, j.sql, ...windows[j.win])),
+const blankPair = (plan: StreamPlan): Pair => ({
+  stream: plan.stream,
+  hours: [],
+  ips: [],
+  failureKnown: !!plan.failure,
+});
+
+/** Queues one stream's four aggregates; it is scored once all of them have answered. */
+function startRun(plan: StreamPlan, mine: number, signal: AbortSignal) {
+  const h = hoursSql(plan, HOURS_LIMIT);
+  if (!h) return [];
+  const i = ipsSql(plan, IPS_LIMIT);
+  const w = pageWindows();
+  const estimate = estimateRowsInWindow(plan.volume, w.baselineStart, w.currentEnd);
+  const limited =
+    !fullWindow.has(plan.stream) && shouldLimitWindow(estimate, w.currentEnd - w.baselineStart);
+  const spans: Record<"now" | "base", Span> = limited
+    ? {
+        now: [Math.max(w.currentStart, w.currentEnd - LARGE_STREAM_SLICE_US), w.currentEnd],
+        base: [w.currentStart - LARGE_STREAM_SLICE_US, w.currentStart],
+      }
+    : { now: [w.currentStart, w.currentEnd], base: [w.baselineStart, w.currentStart] };
+  const ctrl = new AbortController();
+  signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+  const jobs = (["now", "base"] as const).flatMap((win) => [
+    { agg: "hours" as const, win, sql: h },
+    ...(i ? [{ agg: "ips" as const, win, sql: i }] : []),
+  ]);
+  const run: StreamRun = {
+    plan,
+    limitedRows: limited ? estimate : null,
+    now: blankPair(plan),
+    base: blankPair(plan),
+    nowCut: false,
+    baseCut: { hours: false, ips: false },
+    hasHistory: false,
+    pending: jobs.length,
+    failed: false,
+    ctrl,
+  };
+  runs.get(plan.stream)?.ctrl.abort();
+  runs.set(plan.stream, run);
+  return jobs.map(
+    ({ agg, win, sql }) =>
+      () =>
+        limit(async () => {
+          try {
+            const res = await runSql(orgId.value, sql, ...spans[win], -1, { signal: ctrl.signal });
+            const cap = agg === "hours" ? HOURS_LIMIT : IPS_LIMIT;
+            const cut = res.hits.length >= cap || res.partial || !!res.functionError;
+            if (win === "base") {
+              if (agg === "hours" && res.hits.length) run.hasHistory = true;
+              // A baseline missing rows makes "never seen before" unknowable.
+              if (cut) run.baseCut[agg] = true;
+            } else if (cut) run.nowCut = true;
+            run[win][agg] = res.hits as never;
+          } catch {
+            run.failed = true;
+          }
+          run.pending -= 1;
+          if (mine !== seq || runs.get(plan.stream) !== run) return;
+          if (!run.pending) {
+            answered.value = true;
+            publishRisks();
+          }
+          publishStatus();
+        }),
   );
-  if (mine !== seq) return;
+}
 
-  const byStream = new Map<string, { now: Pair; base: Pair }>();
-  const failed = new Set<string>();
-  settled.forEach((r, idx) => {
-    const { plan, agg, win } = jobs[idx];
-    if (r.status === "rejected") {
-      failed.add(plan.stream);
-      return;
-    }
-    const res = r.value;
-    const cap = agg === "hours" ? HOURS_LIMIT : IPS_LIMIT;
-    const cut = res.hits.length >= cap || res.partial || !!res.functionError;
-    if (win === "base") {
-      if (agg === "hours" && res.hits.length) complete.streamsWithHistory.add(plan.stream);
-      // A baseline missing rows makes "never seen before" unknowable.
-      if (cut) complete[agg] = false;
-    } else if (cut) partialNow = true;
-    const entry = byStream.get(plan.stream) ?? {
-      now: { stream: plan.stream, hours: [], ips: [], failureKnown: !!plan.failure },
-      base: { stream: plan.stream, hours: [], ips: [], failureKnown: !!plan.failure },
-    };
-    entry[win][agg] = res.hits as never;
-    byStream.set(plan.stream, entry);
-  });
-  // Without its baseline a stream would make every user "first seen": drop it whole.
-  for (const st of failed) {
-    byStream.delete(st);
-    excluded.add(st);
+function publishStatus() {
+  const status: Record<string, StreamStatus> = {};
+  for (const plan of plans.value) status[plan.stream] = "done";
+  for (const name of unreadable.value) status[name] = "failed";
+  for (const [stream, run] of runs) {
+    status[stream] = run.pending ? "loading" : run.failed ? "failed" : "done";
   }
-  const ok = [...byStream.values()];
-  risks.value = scoreAll(
-    buildProfiles(ok.map((x) => x.now)),
-    buildProfiles(ok.map((x) => x.base)),
-    {
-      currentStart: currentStart.value,
-      currentEnd: nowUs.value,
-      baselineStart: baselineStart.value,
-    },
+  streamStatus.value = status;
+  limitedStreams.value = [...runs.values()]
+    .filter((r) => r.limitedRows !== null)
+    .map((r) => ({ stream: r.plan.stream, rows: r.limitedRows! }))
+    .sort((a, b) => a.stream.localeCompare(b.stream));
+}
+
+/** Scores every stream that has answered; a failed stream is dropped whole. */
+function publishRisks() {
+  const all = [...runs.values()];
+  const ok = all.filter((r) => !r.pending && !r.failed);
+  // A stream still loading may hold the history that makes a user not new.
+  const final = !all.some((r) => r.pending);
+  const cutStreams = new Set(ok.filter((r) => r.limitedRows !== null).map((r) => r.plan.stream));
+  const complete = {
+    hours: !ok.some((r) => r.baseCut.hours),
+    ips: !ok.some((r) => r.baseCut.ips),
+    streamsWithHistory: new Set(ok.filter((r) => r.hasHistory).map((r) => r.plan.stream)),
+  };
+  const scored = scoreAll(
+    buildProfiles(ok.map((r) => r.now)),
+    buildProfiles(ok.map((r) => r.base)),
+    pageWindows(),
     complete,
   );
+  const touchesCut = (r: UserRisk) =>
+    [...r.current.streams, ...(r.baseline?.streams ?? [])].some((st) => cutStreams.has(st));
+  // A cut stream's one-slice baseline cannot say "never seen", nor weigh its user's volume or failure rate.
+  const held = (r: UserRisk): UebaSignalKind[] => [
+    ...(!final || cutStreams.size ? NOVELTY_SIGNALS : []),
+    ...(touchesCut(r) ? (["volume", "failure_jump"] as UebaSignalKind[]) : []),
+  ];
+  risks.value = scored
+    .map((r) => (held(r).length ? withholdSignals(r, held(r)) : r))
+    .sort((a, b) => b.score - a.score || b.current.events - a.current.events);
+  limitedUsers.value = new Set(scored.filter(touchesCut).map((r) => r.user));
+  provisional.value = !final;
+  if (!final) return;
   withheld.value = [
     ...(complete.hours
       ? []
       : (["volume", "new_hours", "first_seen", "failure_jump"] as UebaSignalKind[])),
     ...(complete.ips ? [] : (["new_ip"] as UebaSignalKind[])),
   ];
-  currentPartial.value = partialNow;
+  currentPartial.value = ok.some((r) => r.nowCut);
   noHistoryStreams.value = ok
-    .map((x) => x.now.stream)
-    .filter((st) => !complete.streamsWithHistory.has(st))
+    .filter((r) => !r.hasHistory && r.limitedRows === null)
+    .map((r) => r.plan.stream)
     .sort();
-  excludedStreams.value = [...excluded].sort();
-  loading.value = false;
+  excludedStreams.value = [
+    ...new Set([...unreadable.value, ...all.filter((r) => r.failed).map((r) => r.plan.stream)]),
+  ].sort();
+}
+
+async function refresh() {
+  if (!orgId.value) return;
+  const mine = ++seq;
+  controller?.abort();
+  const ctrl = new AbortController();
+  controller = ctrl;
+  nowUs.value = Date.now() * 1000;
+  streamStatus.value = {};
+  limitedStreams.value = [];
+  withheld.value = [];
+  currentPartial.value = false;
+  excludedStreams.value = [];
+  noHistoryStreams.value = [];
+  answered.value = false;
+  running.value = true;
+  await loadPlans(orgId.value, baselineStart.value, nowUs.value, {
+    signal: ctrl.signal,
+    requireUser: true,
+  });
+  if (mine !== seq) return;
+  for (const run of runs.values()) run.ctrl.abort();
+  runs = new Map();
+  const tasks = plans.value.flatMap((plan) => startRun(plan, mine, ctrl.signal));
+  publishStatus();
+  await runPool(tasks);
+  if (mine !== seq) return;
+  publishRisks();
+  publishStatus();
+  running.value = false;
   lastRunAt.value = Date.now();
   const want = pendingUser.value ?? selected.value?.user ?? null;
   pendingUser.value = null;
-  if (!want) return;
-  // Re-resolve after every reload so the drawer shows this run's numbers.
-  const r = risks.value.find((x) => x.user === want);
+  if (want) reselect(want);
+}
+
+/** Re-resolves the drawer's user so it shows this run's numbers, or closes. */
+function reselect(user: string) {
+  const r = risks.value.find((x) => x.user === user);
   if (r) openUser(r);
   else closeDrawer();
 }
 
+/** Re-scores one large stream over the full windows instead of its slices. */
+async function runFullWindow(stream: string) {
+  const plan = plans.value.find((p) => p.stream === stream);
+  if (!plan || !controller || plansLoading.value) return;
+  fullWindow.add(stream);
+  const mine = seq;
+  const tasks = startRun(plan, mine, controller.signal);
+  publishStatus();
+  await runPool(tasks);
+  if (mine !== seq) return;
+  publishRisks();
+  lastRunAt.value = Date.now();
+  if (selected.value) reselect(selected.value.user);
+}
+
 onMounted(() => void refresh());
-watch(orgId, () => void refresh());
+onBeforeUnmount(() => {
+  seq += 1;
+  controller?.abort();
+});
+watch(orgId, () => {
+  fullWindow.clear();
+  void refresh();
+});
 watch(search, () => syncUrl());
 
 function onWindow(value: unknown) {
   if (!value || value === win.value) return;
   win.value = value as WindowKey;
+  fullWindow.clear();
   closeDrawer();
   syncUrl();
   void refresh();
 }
+
+const STATUS_TAG: Record<StreamStatus, { variant: BadgeVariant; icon: string }> = {
+  loading: { variant: "default-soft", icon: "hourglass-empty" },
+  done: { variant: "success-soft", icon: "check-circle" },
+  failed: { variant: "error-soft", icon: "error-outline" },
+};
+const statusOf = (stream: string): StreamStatus => streamStatus.value[stream] ?? "loading";
+const tableLoading = computed(() => loading.value && !lastRunAt.value && !answered.value);
 
 // ── Table ────────────────────────────────────────────────────────────────────
 const filtered = computed(() => {
@@ -386,6 +554,75 @@ const stats = computed<StatItem[]>(() => {
 function onStat(key: string) {
   toneFilter.value = key === "all" || toneFilter.value === key ? "all" : (key as SeverityTone);
 }
+
+const notices = computed<SecurityNotice[]>(() => {
+  const baseline = windowDef.value.baselineLabel;
+  const current = t(`siem.range.${win.value}`);
+  const out: SecurityNotice[] = [
+    {
+      key: "method",
+      tone: "info",
+      text: t("siem.ueba.method", { current, baseline }),
+      dataTest: "security-ueba-method",
+    },
+  ];
+  const partial = [
+    withheld.value.length
+      ? t("siem.ueba.withheld", {
+          signals: withheld.value.map((k) => t(`siem.ueba.signal.${k}`)).join(", "),
+        })
+      : "",
+    currentPartial.value ? t("siem.ueba.currentPartial") : "",
+    excludedStreams.value.length
+      ? t("siem.ueba.excluded", { streams: excludedStreams.value.join(", ") })
+      : "",
+    noHistoryStreams.value.length
+      ? t("siem.ueba.noHistory", { streams: noHistoryStreams.value.join(", "), baseline })
+      : "",
+  ].filter(Boolean);
+  if (partial.length) {
+    out.push({
+      key: "partial",
+      tone: "warning",
+      text: partial.join(" "),
+      dataTest: "security-ueba-partial",
+    });
+  }
+  if (provisional.value) {
+    out.push({
+      key: "provisional",
+      tone: "info",
+      text: t("siem.ueba.provisional"),
+      dataTest: "security-ueba-provisional",
+    });
+  }
+  const limited = limitedStreams.value;
+  if (limited.length) {
+    const vars = { window: current, baseline, slice: t("siem.range.1h") };
+    out.push({
+      key: "limited",
+      tone: "info",
+      text:
+        limited.length === 1
+          ? t("siem.ueba.limited", {
+              ...vars,
+              stream: limited[0].stream,
+              rows: formatCompactCount(Math.round(limited[0].rows)),
+            })
+          : t("siem.ueba.limitedMany", {
+              ...vars,
+              n: limited.length,
+              streams: limited
+                .map((l) => `${l.stream} (~${formatCompactCount(Math.round(l.rows))})`)
+                .join(", "),
+            }),
+      actionLabel: t("siem.entities.runFull"),
+      onAction: () => limited.forEach((l) => void runFullWindow(l.stream)),
+      dataTest: "security-ueba-limited",
+    });
+  }
+  return out;
+});
 
 // ── Drawer ───────────────────────────────────────────────────────────────────
 const selected = ref<UserRisk | null>(null);
@@ -606,48 +843,29 @@ const noUserSources = computed(
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
-      <OBanner
-        variant="info"
-        icon="insights"
-        dense
+      <SecurityNotices
+        :notices="notices"
         class="mx-page-edge mt-2"
-        data-test="security-ueba-method"
+        data-test="security-ueba-notices"
+      />
+
+      <div
+        v-if="loading && streamNames.length"
+        class="mx-page-edge mt-2 flex flex-wrap items-center gap-1"
+        data-test="security-ueba-sources"
       >
-        {{
-          t("siem.ueba.method", {
-            current: t(`siem.range.${win}`),
-            baseline: windowDef.baselineLabel,
-          })
-        }}
-      </OBanner>
-      <OBanner
-        v-if="
-          withheld.length || currentPartial || excludedStreams.length || noHistoryStreams.length
-        "
-        variant="warning"
-        icon="warning-amber"
-        dense
-        class="mx-page-edge mt-2"
-        data-test="security-ueba-partial"
-      >
-        <template v-if="withheld.length">{{
-          t("siem.ueba.withheld", {
-            signals: withheld.map((k) => t(`siem.ueba.signal.${k}`)).join(", "),
-          })
-        }}</template>
-        <template v-if="currentPartial"> {{ t("siem.ueba.currentPartial") }}</template>
-        <template v-if="excludedStreams.length">
-          {{ t("siem.ueba.excluded", { streams: excludedStreams.join(", ") }) }}
-        </template>
-        <template v-if="noHistoryStreams.length">
-          {{
-            t("siem.ueba.noHistory", {
-              streams: noHistoryStreams.join(", "),
-              baseline: windowDef.baselineLabel,
-            })
-          }}
-        </template>
-      </OBanner>
+        <span class="text-text-secondary text-xs">{{ t("siem.entities.sourcesLoading") }}</span>
+        <OTag
+          v-for="name in streamNames"
+          :key="name"
+          :variant="STATUS_TAG[statusOf(name)].variant"
+          :icon="STATUS_TAG[statusOf(name)].icon"
+          size="xs"
+          class="font-mono"
+          :data-test="`security-ueba-source-${name}`"
+          >{{ name }}<OTooltip :content="t(`siem.entities.sourceStatus.${statusOf(name)}`)"
+        /></OTag>
+      </div>
 
       <OEmptyState
         v-if="noUserSources"
@@ -662,7 +880,7 @@ const noUserSources = computed(
         :data="filtered"
         :columns="columns"
         row-key="user"
-        :loading="loading && !lastRunAt"
+        :loading="tableLoading"
         :error="plansError || null"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
@@ -679,8 +897,9 @@ const noUserSources = computed(
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
+              compact
               :items="stats"
-              :loading="loading && !lastRunAt"
+              :loading="tableLoading"
               selectable
               :selected-key="toneFilter === 'all' ? null : toneFilter"
               data-test="security-ueba-stats"
@@ -713,6 +932,14 @@ const noUserSources = computed(
           <div class="flex min-w-0 items-center gap-2">
             <OIcon name="person" size="sm" class="text-text-secondary shrink-0" />
             <span class="text-text-heading truncate font-medium">{{ row.user }}</span>
+            <OTag
+              v-if="limitedUsers.has(row.user)"
+              variant="default-soft"
+              size="xs"
+              :data-test="`security-ueba-limited-row-${row.user}`"
+              >{{ t("siem.ueba.limitedTag", { slice: t("siem.range.1h") })
+              }}<OTooltip :content="t('siem.ueba.limitedTagHint', { slice: t('siem.range.1h') })"
+            /></OTag>
           </div>
         </template>
         <template #cell-score="{ row }">

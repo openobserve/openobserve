@@ -28,6 +28,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -41,7 +42,10 @@ import SecurityNewDetectionDialog, {
   type NewDetectionPreset,
 } from "@/components/security/SecurityNewDetectionDialog.vue";
 import alertsService from "@/services/alerts";
-import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
+import {
+  countsByAlert,
+  useAlertHistorySummary,
+} from "@/composables/security/useAlertHistorySummary";
 import { STATUS_VARIANT, firingStatus, type FiringStatus } from "@/utils/security/firings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -49,12 +53,7 @@ import { useSiemDetections, type DetectionRow } from "@/composables/security/use
 import { whereOfDetectionSql } from "@/utils/security/detection";
 import { isFiring, type HistoryRow } from "@/utils/security/history";
 import { normalizeTactic, techniqueUrl } from "@/utils/security/mitre";
-import {
-  detectionState,
-  firingsByName,
-  toMicros,
-  type DetectionState,
-} from "@/utils/security/content";
+import { detectionState, toMicros, type DetectionState } from "@/utils/security/content";
 import {
   SEVERITY_TONES,
   severityRailColor,
@@ -79,35 +78,75 @@ const {
   rows,
   siemRows,
   loading,
-  hydrating,
   error,
-  unchecked,
   load: loadRules,
+  loadFull: loadFullRule,
   patch: patchRule,
   remove: removeRule,
 } = useSiemDetections();
 // Firings in the last day, from alert history: the alert's own
-// `last_triggered_at` is its last evaluation, not its last firing. The shared
-// window loader keeps the cap, dedupe and range narrowing identical to Overview.
-const history24h = useAlertHistoryWindow();
-const firings = computed(() => firingsByName(history24h.rows.value));
-const firingsCapped = history24h.capped;
-const firingsLoading = history24h.loading;
-const firingsError = history24h.error;
-const firingsNarrowedFrom = history24h.effectiveStartMs;
+// `last_triggered_at` is its last evaluation, not its last firing.
+const summary24h = useAlertHistorySummary();
+const firings = computed(() => countsByAlert(summary24h.rows.value));
+const firingsPartial = summary24h.partial;
+const firingsLoading = summary24h.loading;
+const firingsError = summary24h.error;
+/** Bucket width of the 24 h summary; a firing's time is known to this precision. */
+const FIRINGS_BUCKET_MS = 5 * 60_000;
+
+const notices = computed<SecurityNotice[]>(() => {
+  const out: SecurityNotice[] = [];
+  if (firingsError.value) {
+    out.push({
+      key: "firings-error",
+      tone: "error",
+      text: t("siem.detections.firingsErrorBanner", { reason: firingsError.value }),
+      dataTest: "security-detections-firings-error",
+    });
+  }
+  if (firingsPartial.value) {
+    out.push({
+      key: "firings-partial",
+      tone: "warning",
+      text: t("siem.detections.firingsPartial"),
+      dataTest: "security-detections-firings-partial",
+    });
+  }
+  if (summary24h.effectiveStartMs.value) {
+    out.push({
+      key: "firings-narrowed",
+      tone: "warning",
+      text: t("siem.detections.firingsNarrowed", {
+        from: new Date(summary24h.effectiveStartMs.value).toLocaleString(),
+      }),
+      dataTest: "security-detections-firings-narrowed",
+    });
+  }
+  return out;
+});
 
 function loadFirings() {
   const end = Date.now();
-  return history24h.load(orgId.value, end - 86_400_000, end);
+  const alertIds =
+    scope.value === "siem"
+      ? siemRows.value.map(({ alert }) => String(alert.id ?? "")).filter(Boolean)
+      : undefined;
+  return summary24h.load(orgId.value, end - 86_400_000, end, {
+    alertIds,
+    bucketMs: FIRINGS_BUCKET_MS,
+  });
 }
 
 async function refresh() {
-  await Promise.all([loadRules(orgId.value), loadFirings()]);
+  // Firings are read for the listed detections, so the rule list has to be known first.
+  await loadRules(orgId.value);
+  await loadFirings();
 }
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 const search = ref("");
 const scope = ref<"siem" | "all">("siem");
+watch(scope, () => void loadFirings());
 const severity = ref<string | null>(null);
 type Facet = "fired" | DetectionState;
 const facet = ref<Facet | null>(null);
@@ -142,7 +181,7 @@ const scoped = computed<Row[]>(() =>
   (scope.value === "siem" ? siemRows.value : rows.value).map((entry) => {
     const alert = entry.alert;
     const name = String(alert.name ?? "");
-    const fired = firings.value.get(name);
+    const fired = alert.id ? firings.value.get(String(alert.id)) : undefined;
     return {
       id: String(alert.id ?? alert.name),
       name,
@@ -152,9 +191,9 @@ const scoped = computed<Row[]>(() =>
       techniques: entry.meta.techniques,
       enabled: !!alert.enabled,
       state: detectionState(alert),
-      fired: !!fired,
-      firings: fired?.count ?? 0,
-      lastFiredUs: fired?.lastUs ?? null,
+      fired: !!fired?.firings,
+      firings: fired?.firings ?? 0,
+      lastFiredUs: fired?.lastFiringMs ? fired.lastFiringMs * 1000 : null,
       lastRunUs: toMicros(alert.last_outcome_at ?? alert.last_triggered_at),
       lastOutcome: String(alert.last_outcome ?? ""),
       schedule: scheduleOf(alert),
@@ -413,24 +452,15 @@ const shareUrl = computed(() => {
   return url.toString();
 });
 
-// `?detection=<alert id>` (share links, Alerts, Cases) opens that rule's drawer
-// once the list has loaded. A rule only counts as non-SIEM after hydration has
-// finished; before that its metadata may simply not have arrived yet.
+// A link to an ordinary alert is ignored rather than widening the page to every alert.
 function openFromDetectionParam() {
   const wanted = route.query.detection ? String(route.query.detection) : null;
   if (!wanted || selectedId.value === wanted) return;
   const row = rows.value.find((r) => String(r.alert.id) === wanted);
-  if (!row) return;
-  if (!row.meta.isSiem) {
-    if (loading.value || hydrating.value) return;
-    scope.value = "all";
-  }
+  if (!row?.meta.isSiem) return;
   selectedId.value = wanted;
 }
-watch(
-  () => [rows.value, hydrating.value, loading.value, route.query.detection] as const,
-  openFromDetectionParam,
-);
+watch(() => [rows.value, loading.value, route.query.detection] as const, openFromDetectionParam);
 
 // Keep drawer and URL in step: the param leaving (back navigation) closes the
 // drawer, and a record that leaves the list (scope switch, deletion) closes it
@@ -485,7 +515,9 @@ async function loadHistory(alertId: string) {
 watch(
   () => selected.value?.entry.alert.id,
   (id) => {
-    if (id) void loadHistory(String(id));
+    if (!id) return;
+    void loadHistory(String(id));
+    void loadFullRule(orgId.value, String(id));
   },
 );
 
@@ -677,56 +709,11 @@ watch(orgId, () => void refresh());
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
-      <OBanner
-        v-if="unchecked > 0"
-        variant="warning"
-        icon="warning-amber"
-        dense
+      <SecurityNotices
+        :notices="notices"
         class="mx-page-edge mt-2"
-        data-test="security-detections-unchecked"
-      >
-        {{ t("siem.detections.unchecked", unchecked) }}
-      </OBanner>
-
-      <OBanner
-        v-if="firingsError"
-        variant="error-soft"
-        icon="error-outline"
-        dense
-        class="mx-page-edge mt-2"
-        data-test="security-detections-firings-error"
-      >
-        {{ t("siem.detections.firingsErrorBanner", { reason: firingsError }) }}
-      </OBanner>
-      <OBanner
-        v-if="firingsCapped"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        class="mx-page-edge mt-2"
-        data-test="security-detections-firings-capped"
-      >
-        {{
-          t("siem.detections.firingsCapped", {
-            n: formatEventCount(history24h.rows.value.length),
-            total: formatEventCount(history24h.total.value),
-          })
-        }}
-      </OBanner>
-      <OBanner
-        v-if="firingsNarrowedFrom"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        class="mx-page-edge mt-2"
-        data-test="security-detections-firings-narrowed"
-      >
-        {{
-          t("siem.detections.firingsNarrowed", {
-            from: new Date(firingsNarrowedFrom).toLocaleString(),
-          })
-        }}
-      </OBanner>
+        data-test="security-detections-notices"
+      />
 
       <OTable
         ref="tableRef"
@@ -752,6 +739,7 @@ watch(orgId, () => void refresh());
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
+              compact
               :items="stats"
               :loading="loading && !rows.length"
               selectable
@@ -792,12 +780,6 @@ watch(orgId, () => void refresh());
               :placeholder="t('siem.detections.search')"
               data-test="security-detections-search"
             />
-            <span
-              v-if="hydrating"
-              class="text-text-secondary flex shrink-0 items-center gap-1.5 text-xs"
-            >
-              <OSpinner size="xs" />{{ t("siem.detections.identifying") }}
-            </span>
           </div>
         </template>
 
@@ -898,7 +880,7 @@ watch(orgId, () => void refresh());
             v-if="!loading"
             size="block"
             icon="shield-alert-outline"
-            :title="hydrating ? t('siem.detections.identifying') : t('siem.detections.emptyTitle')"
+            :title="t('siem.detections.emptyTitle')"
             :description="t('siem.detections.emptyHint')"
             :action-label="filtersActive ? undefined : t('siem.detections.createFirst')"
             action-icon="add"

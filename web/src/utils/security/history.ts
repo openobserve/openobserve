@@ -5,11 +5,13 @@
 // Every scheduled evaluation writes a history row, so most rows are a rule
 // saying "nothing here". A firing is the subset worth an analyst's attention.
 
-import { isErrorOutcome, isFiringOutcome } from "@/utils/alerts/runOutcome";
+import { isFiringOutcome } from "@/utils/alerts/runOutcome";
 
 export interface HistoryRow {
   timestamp: number;
   alert_name: string;
+  /** Present on servers that return it; preferred over the name, which is not unique. */
+  alert_id?: string;
   /** Normalised server-side: firing | normal | succeeded | error | skipped | notify_failed. */
   status: string;
   level: string;
@@ -29,9 +31,6 @@ export interface HistoryRow {
  * not a verdict (a run that saw 3 rows against a threshold of 100 is normal).
  */
 export const isFiring = (row: HistoryRow): boolean => isFiringOutcome(row.status);
-
-/** An evaluation that failed to run — rule health, not a security signal. */
-export const isEvalError = (row: HistoryRow): boolean => isErrorOutcome(row.status);
 
 /** Bucket width for a window, picked so a chart shows roughly 24–60 bars. */
 export function bucketMsFor(windowMs: number): number {

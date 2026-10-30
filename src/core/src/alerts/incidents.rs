@@ -1701,10 +1701,23 @@ pub async fn list_incidents(
     limit: u64,
     offset: u64,
 ) -> Result<(Vec<Incident>, u64), anyhow::Error> {
-    // Get total count before pagination
-    let total = infra::table::alert_incidents::count(org_id, status).await?;
+    list_incidents_filtered(org_id, status, None, limit, offset).await
+}
 
-    let incidents = infra::table::alert_incidents::list(org_id, status, limit, offset).await?;
+/// List incidents, optionally only those containing at least one of `alert_ids`.
+pub async fn list_incidents_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    alert_ids: Option<&[String]>,
+    limit: u64,
+    offset: u64,
+) -> Result<(Vec<Incident>, u64), anyhow::Error> {
+    // Get total count before pagination
+    let total = infra::table::alert_incidents::count_filtered(org_id, status, alert_ids).await?;
+
+    let incidents =
+        infra::table::alert_incidents::list_filtered(org_id, status, alert_ids, limit, offset)
+            .await?;
 
     // Get actual alert counts from junction table (source of truth)
     let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();

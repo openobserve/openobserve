@@ -5,9 +5,13 @@ import { describe, expect, it } from "vitest";
 import { toOcsfStatus } from "./ocsf";
 import {
   OUTCOME_FAILURE_WORDS,
+  OUTCOME_FALLBACK_WINDOW_US,
+  OUTCOME_SAMPLE_WINDOW_US,
   classifyOutcome,
   failurePredicate,
   outcomeInterpretable,
+  outcomeFallbackWindow,
+  outcomeSampleWindow,
 } from "./outcome";
 
 describe("outcome vocabulary", () => {
@@ -46,5 +50,24 @@ describe("outcome vocabulary", () => {
     ).toBe(false);
     expect(outcomeInterpretable([{ value: "no", n: 5 }])).toBe(false);
     expect(outcomeInterpretable([])).toBe(false);
+  });
+});
+
+describe("outcomeSampleWindow", () => {
+  it("reads only the last hour of a longer window", () => {
+    const end = 100 * OUTCOME_SAMPLE_WINDOW_US;
+    expect(outcomeSampleWindow(0, end)).toEqual([end - OUTCOME_SAMPLE_WINDOW_US, end]);
+  });
+
+  it("never reaches before the caller's window", () => {
+    expect(outcomeSampleWindow(500, 1000)).toEqual([500, 1000]);
+  });
+});
+
+describe("outcomeFallbackWindow", () => {
+  it("widens to at most a day, inside the caller's window", () => {
+    const end = 30 * OUTCOME_FALLBACK_WINDOW_US;
+    expect(outcomeFallbackWindow(0, end)).toEqual([end - OUTCOME_FALLBACK_WINDOW_US, end]);
+    expect(outcomeFallbackWindow(end - 5, end)).toEqual([end - 5, end]);
   });
 });

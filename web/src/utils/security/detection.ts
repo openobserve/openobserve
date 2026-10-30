@@ -92,7 +92,9 @@ export function detectionMetaOf(alert: Record<string, any> | null | undefined): 
 
   return {
     isSiem: marker === true || marker === "true",
-    title: readableAlertName(String(alert?.name ?? ""), String(attributes.sigma_yaml ?? "")),
+    title:
+      String(attributes.sigma_title ?? "") ||
+      readableAlertName(String(alert?.name ?? ""), String(attributes.sigma_yaml ?? "")),
     sigmaId: String(attributes.sigma_id ?? ""),
     sigmaYaml: String(attributes.sigma_yaml ?? ""),
     level: (LEVELS as string[]).includes(level) ? (level as SigmaLevel) : "medium",
@@ -230,6 +232,7 @@ export function buildDetectionAlert(input: BuildDetectionInput): Record<string, 
     context_attributes: {
       [SIEM_MARKER]: "true",
       sigma_id: rule.id ?? "",
+      sigma_title: rule.title,
       sigma_yaml: rule.yaml,
       sigma_level: rule.level ?? "medium",
       sigma_logsource: logsource,

@@ -144,6 +144,24 @@ export const formatEventCount = (num: number): string => {
   return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
 };
 
+/** Compact count for dense tiles: exact below 1 000, then "23K", "819.5K", "225.6M". */
+export const formatCompactCount = (num: number): string => {
+  if (!Number.isFinite(num)) return "";
+  const abs = Math.abs(num);
+  if (abs < 1000) return String(num);
+
+  const units = ["", "K", "M", "B", "T"];
+  let tier = Math.min(Math.floor(Math.log10(abs) / 3), units.length - 1);
+  let scaled = Number((abs / Math.pow(10, tier * 3)).toFixed(1));
+  // 999 950 rounds to 1000.0K; promote it so it prints "1M".
+  if (scaled >= 1000 && tier < units.length - 1) {
+    tier += 1;
+    scaled = Number((abs / Math.pow(10, tier * 3)).toFixed(1));
+  }
+  const sign = num < 0 ? "-" : "";
+  return sign + String(scaled) + units[tier];
+};
+
 export const formatSizeFromMB = (sizeInMB: string | number) => {
   let size = parseFloat(String(sizeInMB));
 

@@ -195,6 +195,7 @@ export function groupValueRows(groupValues: unknown): { key: string; value: stri
 
 /** The firing fields read from `IncidentWithAlerts.triggers`. */
 export interface CaseTrigger {
+  alert_id?: string;
   alert_name: string;
   alert_fired_at: number;
 }

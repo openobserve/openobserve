@@ -18,7 +18,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -28,25 +28,30 @@ import SecurityRecordDrawer, {
   type RecordTab,
 } from "@/components/security/SecurityRecordDrawer.vue";
 import { useSiemDetections } from "@/composables/security/useSiemDetections";
-import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
+import {
+  countsByAlert,
+  useAlertHistorySummary,
+} from "@/composables/security/useAlertHistorySummary";
 import { sigmaCatalog } from "@/utils/security/sigma";
 import { sigmaLogsourceLabel } from "@/utils/security/sourceTypes";
-import { isFiring } from "@/utils/security/history";
 import { techniqueUrl } from "@/utils/security/mitre";
 import {
   buildAttackMatrix,
   heatLevel,
   parentTechnique,
   summarizeMatrix,
+  type AttackMatrix,
   type MatrixDetection,
-  type MatrixFiring,
   type TechniqueCell as MatrixCell,
+  type TechniqueState,
 } from "@/utils/security/attackMatrix";
 import type { SigmaRule } from "@/utils/security/sigma";
 import { severityTagValue, toneLabelKey, toneOfSigmaLevel } from "@/utils/security/severity";
 import { formatEventCount } from "@/utils/formatters";
 
 type TechniqueCell = MatrixCell<SigmaRule>;
+
+const STATE_RANK: Record<TechniqueState, number> = { firing: 0, covered: 1, available: 2 };
 
 const { t } = useI18n();
 const store = useStore();
@@ -75,30 +80,73 @@ function onRangeChange(value: unknown) {
 // ── Data ─────────────────────────────────────────────────────────────────────
 const {
   siemRows,
-  byName,
+  byId,
   loading: rulesLoading,
-  hydrating,
-  unchecked,
+  error: rulesError,
   load: loadDetections,
 } = useSiemDetections();
-const history = useAlertHistoryWindow();
+const history = useAlertHistorySummary();
 const lastRunAt = ref<number | null>(null);
+let detectionsReady: Promise<void> = Promise.resolve();
+
+const notices = computed<SecurityNotice[]>(() => {
+  const out: SecurityNotice[] = [];
+  if (rulesError.value) {
+    out.push({
+      key: "rules-error",
+      tone: "error",
+      text: t("siem.overview.rulesError", { reason: rulesError.value }),
+      dataTest: "security-mitre-rules-error",
+    });
+  }
+  if (history.error.value) {
+    out.push({
+      key: "history-error",
+      tone: "error",
+      text: t("siem.overview.historyError", { reason: history.error.value }),
+      dataTest: "security-mitre-history-error",
+    });
+  }
+  if (history.partial.value) {
+    out.push({
+      key: "summary-partial",
+      tone: "warning",
+      text: t("siem.mitrePage.summaryPartial"),
+      dataTest: "security-mitre-summary-partial",
+    });
+  }
+  if (history.effectiveStartMs.value) {
+    out.push({
+      key: "history-narrowed",
+      tone: "warning",
+      text: t("siem.mitrePage.historyNarrowed", {
+        from: new Date(history.effectiveStartMs.value).toLocaleString(),
+      }),
+      dataTest: "security-mitre-history-narrowed",
+    });
+  }
+  return out;
+});
 
 async function loadHistory() {
+  // The summary is scoped to SIEM alert ids, which are only known once detections land.
+  await detectionsReady;
   const end = Date.now();
   const minutes = RANGES.find((r) => r.value === range.value)!.minutes;
-  await history.load(orgId.value, end - minutes * 60_000, end);
+  const alertIds = siemRows.value.map((row) => String(row.alert.id ?? "")).filter(Boolean);
+  // Fine buckets keep each technique's "last fired" within minutes of the real firing.
+  const bucketMs = Math.max(60_000, Math.ceil((minutes * 60_000) / 400));
+  await history.load(orgId.value, end - minutes * 60_000, end, { alertIds, bucketMs });
   lastRunAt.value = Date.now();
 }
 function refresh() {
-  void loadDetections(orgId.value);
+  detectionsReady = loadDetections(orgId.value);
   void loadHistory();
 }
 onMounted(refresh);
 watch(orgId, refresh);
 
-const rulesPending = computed(() => rulesLoading.value || hydrating.value);
-const loading = computed(() => rulesPending.value || history.loading.value);
+const loading = computed(() => rulesLoading.value || history.loading.value);
 
 const catalog = sigmaCatalog();
 
@@ -113,22 +161,55 @@ const detections = computed<MatrixDetection[]>(() =>
   })),
 );
 
-const firings = computed<MatrixFiring[]>(() =>
-  history.rows.value.filter(isFiring).flatMap((row) => {
-    const det = byName.value.get(row.alert_name);
-    return det
+/** One entry per detection that fired; `timeMs` is the start of its newest firing bucket. */
+const firings = computed(() =>
+  [...countsByAlert(history.rows.value)].flatMap(([alertId, counts]) => {
+    const det = byId.value.get(alertId);
+    return det && counts.firings
       ? [
           {
+            id: alertId,
             name: det.meta.title,
-            timeMs: Math.floor(row.timestamp / 1000),
+            timeMs: counts.lastFiringMs ?? 0,
             techniques: det.meta.techniques,
+            count: counts.firings,
           },
         ]
       : [];
   }),
 );
 
-const matrix = computed(() => buildAttackMatrix(catalog, detections.value, firings.value));
+/** Firings per technique, each detection counted once per technique it carries. */
+const firingsByTechnique = computed(() => {
+  const out = new Map<string, number>();
+  for (const f of firings.value) {
+    for (const tech of new Set(f.techniques.map((x) => x.trim().toUpperCase()))) {
+      out.set(tech, (out.get(tech) ?? 0) + f.count);
+    }
+  }
+  return out;
+});
+
+const byHeat = (a: TechniqueCell, b: TechniqueCell) =>
+  STATE_RANK[a.state] - STATE_RANK[b.state] || b.firings - a.firings || a.id.localeCompare(b.id);
+
+// buildAttackMatrix counts one per firing entry; exact counts are laid over it and re-sorted.
+function withFiringCounts(base: AttackMatrix<SigmaRule>): AttackMatrix<SigmaRule> {
+  const cells = new Map<string, TechniqueCell>();
+  for (const [id, cell] of base.cells) {
+    cells.set(id, { ...cell, firings: firingsByTechnique.value.get(id) ?? 0 });
+  }
+  const swap = (list: TechniqueCell[]) => list.map((c) => cells.get(c.id)!).sort(byHeat);
+  return {
+    columns: base.columns.map((col) => ({ ...col, cells: swap(col.cells) })),
+    unmapped: swap(base.unmapped),
+    cells,
+  };
+}
+
+const matrix = computed(() =>
+  withFiringCounts(buildAttackMatrix(catalog, detections.value, firings.value)),
+);
 const summary = computed(() => summarizeMatrix(matrix.value));
 
 // ── Filters ──────────────────────────────────────────────────────────────────
@@ -351,49 +432,12 @@ function openDetections() {
     </template>
 
     <div class="flex flex-col gap-4 pb-4">
-      <OBanner
-        v-if="unchecked > 0"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-mitre-unchecked"
-      >
-        {{ t("siem.overview.uncheckedRules", unchecked) }}
-      </OBanner>
-      <OBanner
-        v-if="history.capped.value"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-mitre-history-capped"
-      >
-        {{
-          t("siem.mitrePage.historyCapped", {
-            n: formatEventCount(history.rows.value.length),
-            total: formatEventCount(history.total.value),
-          })
-        }}
-      </OBanner>
-
-      <OBanner
-        v-if="history.effectiveStartMs.value"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-mitre-history-narrowed"
-      >
-        {{
-          t("siem.mitrePage.historyNarrowed", {
-            from: new Date(history.effectiveStartMs.value).toLocaleString(),
-          })
-        }}
-      </OBanner>
+      <SecurityNotices :notices="notices" data-test="security-mitre-notices" />
 
       <OStatStrip
+        compact
         :items="stats"
-        :loading="
-          (rulesPending && !siemRows.length) || (history.loading.value && lastRunAt === null)
-        "
+        :loading="(rulesLoading && !siemRows.length) || lastRunAt === null"
         selectable
         :selected-key="selectedStat"
         data-test="security-mitre-stats"
@@ -473,7 +517,7 @@ function openDetections() {
               </div>
             </div>
             <div class="flex flex-col gap-1.5 p-1.5">
-              <template v-if="rulesPending && !siemRows.length">
+              <template v-if="rulesLoading && !siemRows.length">
                 <OSkeleton v-for="n in 3" :key="n" class="h-12" />
               </template>
               <template v-else>
@@ -506,7 +550,7 @@ function openDetections() {
                 </div>
               </template>
               <span
-                v-if="!col.shown.length && !(rulesPending && !siemRows.length)"
+                v-if="!col.shown.length && !(rulesLoading && !siemRows.length)"
                 class="text-2xs text-text-secondary px-1 py-2 text-center"
                 >—</span
               >
@@ -516,7 +560,7 @@ function openDetections() {
       </div>
 
       <OEmptyState
-        v-if="filtered && !order.length && !rulesPending"
+        v-if="filtered && !order.length && !rulesLoading"
         size="block"
         icon="search-off"
         :title="t('siem.mitrePage.noMatch')"
@@ -679,12 +723,15 @@ function openDetections() {
         />
         <div v-else class="border-border-default rounded-surface overflow-hidden border">
           <div
-            v-for="(f, i) in recentFirings"
-            :key="`${f.name}-${f.timeMs}-${i}`"
+            v-for="f in recentFirings"
+            :key="f.id"
             class="border-border-subtle flex items-center gap-3 border-b px-3 py-2 last:border-b-0"
           >
             <OIcon name="local-fire-department" size="xs" class="text-status-error-text shrink-0" />
             <span class="text-text-heading min-w-0 flex-1 truncate text-sm">{{ f.name }}</span>
+            <span class="text-text-secondary text-xs tabular-nums">{{
+              t("siem.overview.firingsCount", { n: formatEventCount(f.count) }, f.count)
+            }}</span>
             <OTimeCell :value="f.timeMs" unit="ms" class="text-xs" />
           </div>
         </div>

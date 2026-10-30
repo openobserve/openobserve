@@ -164,6 +164,9 @@ const alerts = {
     const params = new URLSearchParams();
     if (query.anomaly_id) params.append("anomaly_id", query.anomaly_id);
     if (query.alert_id) params.append("alert_id", query.alert_id);
+    if (query.alert_ids) params.append("alert_ids", query.alert_ids);
+    if (query.outcome) params.append("outcome", query.outcome);
+    if (query.siem) params.append("siem", "true");
     if (query.start_time) params.append("start_time", query.start_time);
     if (query.end_time) params.append("end_time", query.end_time);
     params.append("from", query.from || "0");
@@ -171,6 +174,26 @@ const alerts = {
     if (query.sort_by) params.append("sort_by", query.sort_by);
     if (query.sort_order) params.append("sort_order", query.sort_order);
     return http().get(`/api/v2/${org_identifier}/alerts/history?${params}`);
+  },
+  /** Evaluation counts per time bucket, alert and outcome (`interval` in seconds). */
+  getHistorySummary: (
+    org_identifier: string,
+    query: {
+      start_time: number;
+      end_time: number;
+      interval?: number;
+      alert_ids?: string;
+      siem?: boolean;
+    },
+  ) => {
+    const params = new URLSearchParams({
+      start_time: String(query.start_time),
+      end_time: String(query.end_time),
+    });
+    if (query.interval) params.append("interval", String(query.interval));
+    if (query.alert_ids) params.append("alert_ids", query.alert_ids);
+    if (query.siem) params.append("siem", "true");
+    return http().get(`/api/v2/${org_identifier}/alerts/history/summary?${params}`);
   },
   getOrganizationDeduplicationConfig: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/alerts/deduplication/config`);

@@ -19,7 +19,8 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait, sea_query::LockType,
+    QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, LockType, Query},
 };
 use svix_ksuid::KsuidLike;
 
@@ -236,6 +237,22 @@ pub async fn list(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    list_filtered(org_id, status, None, limit, offset).await
+}
+
+/// Lists incidents, optionally only those containing at least one of `alert_ids`.
+pub async fn list_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    alert_ids: Option<&[String]>,
+    limit: u64,
+    offset: u64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    if alert_ids.is_some_and(|ids| ids.is_empty()) {
+        return Ok(vec![]);
+    }
+    // `limit=0` from the query string would otherwise divide by zero below.
+    let page_size = limit.max(1);
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let mut query = alert_incidents::Entity::find()
@@ -261,10 +278,13 @@ pub async fn list(
     if let Some(s) = status {
         query = query.filter(alert_incidents::Column::Status.eq(s));
     }
+    if let Some(ids) = alert_ids {
+        query = query.filter(containing_alerts(ids));
+    }
 
     query
-        .paginate(client, limit.max(1))
-        .fetch_page(offset / limit)
+        .paginate(client, page_size)
+        .fetch_page(offset / page_size)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -404,6 +424,18 @@ pub async fn count_open(org_id: &str) -> Result<u64, errors::Error> {
 
 /// Count incidents with optional status filter
 pub async fn count(org_id: &str, status: Option<&str>) -> Result<u64, errors::Error> {
+    count_filtered(org_id, status, None).await
+}
+
+/// Counts incidents, optionally only those containing at least one of `alert_ids`.
+pub async fn count_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    alert_ids: Option<&[String]>,
+) -> Result<u64, errors::Error> {
+    if alert_ids.is_some_and(|ids| ids.is_empty()) {
+        return Ok(0);
+    }
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let mut query =
@@ -411,6 +443,9 @@ pub async fn count(org_id: &str, status: Option<&str>) -> Result<u64, errors::Er
 
     if let Some(s) = status {
         query = query.filter(alert_incidents::Column::Status.eq(s));
+    }
+    if let Some(ids) = alert_ids {
+        query = query.filter(containing_alerts(ids));
     }
 
     query
@@ -678,6 +713,19 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
         .exec(client)
         .await?;
     Ok(())
+}
+
+/// Incidents whose junction rows reference any of `alert_ids`.
+fn containing_alerts(alert_ids: &[String]) -> sea_orm::Condition {
+    sea_orm::Condition::all().add(
+        Expr::col(alert_incidents::Column::Id).in_subquery(
+            Query::select()
+                .column(alert_incident_alerts::Column::IncidentId)
+                .from(alert_incident_alerts::Entity)
+                .and_where(alert_incident_alerts::Column::AlertId.is_in(alert_ids.iter().cloned()))
+                .to_owned(),
+        ),
+    )
 }
 
 #[cfg(test)]

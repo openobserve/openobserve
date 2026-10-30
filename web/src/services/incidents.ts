@@ -164,6 +164,7 @@ const incidents = {
     limit: number = 50,
     offset: number = 0,
     keyword?: string,
+    siem?: boolean,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/incidents?limit=${limit}&offset=${offset}`;
     if (status) {
@@ -171,6 +172,9 @@ const incidents = {
     }
     if (keyword) {
       url += `&keyword=${encodeURIComponent(keyword)}`;
+    }
+    if (siem) {
+      url += "&siem=true";
     }
     return http().get<ListIncidentsResponse>(url);
   },

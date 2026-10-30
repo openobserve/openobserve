@@ -903,6 +903,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
+        .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary))
         .route("/v2/{org_id}/alerts/dedup/summary", get(alerts::dedup_stats::get_dedup_summary))
 
         // Alerts - incidents must be before alerts to avoid route conflicts

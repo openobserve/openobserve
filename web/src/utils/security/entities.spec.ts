@@ -8,10 +8,15 @@ import {
   failureRate,
   entitySignals,
   entityTimelineSql,
+  estimateRowsInWindow,
   isExternalIp,
+  LARGE_STREAM_ROWS,
+  LARGE_STREAM_SLICE_US,
   mergeEntities,
   planStream,
   relatedSql,
+  shouldLimitWindow,
+  volumeFromStats,
   type EntityRow,
 } from "./entities";
 import { SOURCE_TYPE_BY_ID } from "./sourceTypes";
@@ -190,5 +195,51 @@ describe("entitySignals", () => {
     expect(isExternalIp("192.0.2.10")).toBe(false);
     expect(isExternalIp("198.51.100.23")).toBe(false);
     expect(isExternalIp("203.0.113.77")).toBe(false);
+  });
+});
+
+describe("stream volume", () => {
+  const HOUR = 3_600_000_000;
+  const DAY = 24 * HOUR;
+
+  it("reads doc_num and the µs time span from /streams stats", () => {
+    expect(volumeFromStats({ doc_num: 10, doc_time_min: 5, doc_time_max: 9 })).toEqual({
+      docNum: 10,
+      timeMinUs: 5,
+      timeMaxUs: 9,
+    });
+    expect(volumeFromStats({ doc_num: 0, doc_time_min: 5, doc_time_max: 9 })).toBeNull();
+    expect(volumeFromStats({ doc_num: 3 })).toBeNull();
+    expect(volumeFromStats(undefined)).toBeNull();
+  });
+
+  it("scales the row count to the window by the stream's ingest rate", () => {
+    // 7 days of history at 25.9B a day.
+    const volume = { docNum: 7 * 25.9e9, timeMinUs: 0, timeMaxUs: 7 * DAY };
+    expect(estimateRowsInWindow(volume, 6 * DAY, 7 * DAY)).toBeCloseTo(25.9e9);
+    expect(estimateRowsInWindow(volume, 7 * DAY - HOUR, 7 * DAY)).toBeCloseTo(25.9e9 / 24);
+  });
+
+  it("counts only the part of the window the stream has data for", () => {
+    const volume = { docNum: 1000, timeMinUs: 0, timeMaxUs: HOUR };
+    expect(estimateRowsInWindow(volume, -DAY, HOUR)).toBe(1000);
+    expect(estimateRowsInWindow(volume, HOUR / 2, DAY)).toBe(500);
+    // A stream that stopped ingesting before the window holds nothing in it.
+    expect(estimateRowsInWindow(volume, 2 * HOUR, DAY)).toBe(0);
+    expect(estimateRowsInWindow({ docNum: 5, timeMinUs: 7, timeMaxUs: 7 }, 0, HOUR)).toBe(5);
+    expect(estimateRowsInWindow({ docNum: 5, timeMinUs: 7, timeMaxUs: 7 }, 8, HOUR)).toBe(0);
+  });
+
+  it("knows nothing without stats", () => {
+    expect(estimateRowsInWindow(null, 0, DAY)).toBeNull();
+    expect(estimateRowsInWindow(undefined, 0, DAY)).toBeNull();
+    expect(estimateRowsInWindow({ docNum: 10, timeMinUs: 0, timeMaxUs: DAY }, DAY, DAY)).toBeNull();
+  });
+
+  it("cuts a stream to its last hour only when it is large and the window is longer", () => {
+    expect(shouldLimitWindow(LARGE_STREAM_ROWS + 1, DAY)).toBe(true);
+    expect(shouldLimitWindow(LARGE_STREAM_ROWS, DAY)).toBe(false);
+    expect(shouldLimitWindow(25.9e9, LARGE_STREAM_SLICE_US)).toBe(false);
+    expect(shouldLimitWindow(null, DAY)).toBe(false);
   });
 });

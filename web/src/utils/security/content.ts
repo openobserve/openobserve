@@ -7,7 +7,6 @@
 import { bestMatch } from "./classify";
 import type { DetectionRow } from "@/composables/security/useSiemDetections";
 import { isErrorOutcome } from "@/utils/alerts/runOutcome";
-import { isFiring, type HistoryRow } from "./history";
 import { applicableRules, ruleAppliesTo, type CompiledSigma, type SigmaRule } from "./sigma";
 import {
   SOURCE_TYPES,
@@ -126,29 +125,6 @@ export function toMicros(value: unknown): number | null {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   return n > 1e14 ? n : n * 1000;
-}
-
-export interface FiringSummary {
-  count: number;
-  /** Newest firing, µs. */
-  lastUs: number;
-}
-
-/**
- * Firings per alert name from alert history. `last_triggered_at` on the alert
- * is the last *evaluation*, not the last firing, so history is the only honest
- * source for "did this fire, and when".
- */
-export function firingsByName(rows: HistoryRow[]): Map<string, FiringSummary> {
-  const map = new Map<string, FiringSummary>();
-  for (const row of rows) {
-    if (!isFiring(row)) continue;
-    const entry = map.get(row.alert_name) ?? { count: 0, lastUs: 0 };
-    entry.count += 1;
-    entry.lastUs = Math.max(entry.lastUs, Number(row.timestamp) || 0);
-    map.set(row.alert_name, entry);
-  }
-  return map;
 }
 
 /**

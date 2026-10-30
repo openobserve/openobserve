@@ -39,6 +39,9 @@ pub struct ListIncidentsQuery {
     /// Offset for pagination
     #[serde(default)]
     pub offset: u64,
+    /// Only incidents that contain at least one SIEM detection
+    #[serde(default)]
+    pub siem: bool,
 }
 
 fn default_limit() -> u64 {
@@ -132,9 +135,15 @@ pub async fn list_incidents(
     Path(org_id): Path<String>,
     Query(query): Query<ListIncidentsQuery>,
 ) -> Response {
-    match openobserve_core::alerts::incidents::list_incidents(
+    let siem_ids = if query.siem {
+        Some(db::alerts::alert::resolve_siem_alert_ids(&org_id).await)
+    } else {
+        None
+    };
+    match openobserve_core::alerts::incidents::list_incidents_filtered(
         &org_id,
         query.status.as_deref(),
+        siem_ids.as_deref(),
         query.limit,
         query.offset,
     )
@@ -1165,6 +1174,7 @@ mod tests {
             status: None,
             limit: default_limit(),
             offset: 0,
+            siem: false,
         };
         assert_eq!(query.limit, 50);
         assert_eq!(query.offset, 0);
@@ -1177,10 +1187,12 @@ mod tests {
             status: Some("open".to_string()),
             limit: 100,
             offset: 25,
+            siem: true,
         };
         assert_eq!(query.status.unwrap(), "open");
         assert_eq!(query.limit, 100);
         assert_eq!(query.offset, 25);
+        assert!(query.siem);
     }
 
     #[test]

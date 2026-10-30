@@ -536,6 +536,24 @@ pub async fn resolve_alert_ids_by_tags(org_id: &str, filter_tags: &[String]) -> 
         .collect()
 }
 
+/// Ids of the org's SIEM detections (`context_attributes.siem == "true"`), from the alert cache.
+pub async fn resolve_siem_alert_ids(org_id: &str) -> Vec<String> {
+    let prefix = format!("{org_id}/");
+    let alerts_cacher = ALERTS.read().await;
+    alerts_cacher
+        .iter()
+        .filter(|(key, _)| key.starts_with(&prefix))
+        .filter(|(_, (_, alert))| {
+            alert
+                .context_attributes
+                .as_ref()
+                .and_then(|attrs| attrs.get("siem"))
+                .is_some_and(|v| v == "true")
+        })
+        .filter_map(|(_, (_, alert))| alert.id.map(|id| id.to_string()))
+        .collect()
+}
+
 /// Distinct tags in an org with occurrence counts, for the facet endpoint
 /// (PT-8b).
 ///

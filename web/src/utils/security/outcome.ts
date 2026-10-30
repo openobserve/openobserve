@@ -66,6 +66,22 @@ export function outcomeSampleSql(stream: string, column: string, limit = 50): st
   );
 }
 
+/** The outcome sample reads only this recent slice, µs; its values, not its counts, matter. */
+export const OUTCOME_SAMPLE_WINDOW_US = 3_600_000_000;
+
+/** The [start, end] µs the outcome sample scans, never wider than the caller's window. */
+export function outcomeSampleWindow(startUs: number, endUs: number): [number, number] {
+  return [Math.max(startUs, endUs - OUTCOME_SAMPLE_WINDOW_US), endUs];
+}
+
+/** A stream quiet for the last hour is sampled over at most this much of the window, µs. */
+export const OUTCOME_FALLBACK_WINDOW_US = 24 * 3_600_000_000;
+
+/** The wider [start, end] µs tried when the last hour held no outcome values. */
+export function outcomeFallbackWindow(startUs: number, endUs: number): [number, number] {
+  return [Math.max(startUs, endUs - OUTCOME_FALLBACK_WINDOW_US), endUs];
+}
+
 /** Share of sampled rows that must read as success or failure to trust the column. */
 export const OUTCOME_MIN_INTERPRETED = 0.98;
 

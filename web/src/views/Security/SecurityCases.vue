@@ -23,6 +23,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
@@ -69,7 +70,7 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "")
 // 200, which would otherwise read as "no cases".
 const available = config.isEnterprise === "true" || config.isCloud === "true";
 
-const { byName, load: loadDetections } = useSiemDetections();
+const { byName, byId, load: loadDetections } = useSiemDetections();
 
 // ── View state ───────────────────────────────────────────────────────────────
 const q = route.query as Record<string, string | undefined>;
@@ -102,9 +103,17 @@ const loading = ref(false);
 const error = ref("");
 let listSeq = 0;
 
+const notices = computed<SecurityNotice[]>(() =>
+  error.value
+    ? [{ key: "error", tone: "error", text: error.value, dataTest: "security-cases-error" }]
+    : [],
+);
+
 async function fetchTotals() {
   const results = await Promise.allSettled(
-    CASE_STATUSES.map((status) => incidentsService.list(orgId.value, status, 1, 0)),
+    CASE_STATUSES.map((status) =>
+      incidentsService.list(orgId.value, status, 1, 0, undefined, true),
+    ),
   );
   const next = { ...totals.value };
   CASE_STATUSES.forEach((status, i) => {
@@ -125,6 +134,8 @@ async function fetchCases() {
       statusFilter.value ?? undefined,
       pageSize.value,
       (currentPage.value - 1) * pageSize.value,
+      undefined,
+      true,
     );
     if (mine !== listSeq) return;
     cases.value = res.data?.incidents ?? [];
@@ -370,15 +381,25 @@ const facts = computed<RecordFact[]>(() => {
 /** Distinct detections behind the case, with their SIEM metadata where known. */
 // Firings are `triggers`; the response's `alerts` are alert definitions.
 // `alertName` joins to the detection; `name` is what is shown.
+// A case can group security firings with operational alerts on the same host; only the former belong here.
+const siemTriggers = computed(() =>
+  (detail.value?.triggers ?? []).filter((trigger) =>
+    byId.value.has(String(trigger.alert_id ?? "")),
+  ),
+);
+const hiddenTriggers = computed(
+  () => (detail.value?.triggers?.length ?? 0) - siemTriggers.value.length,
+);
+
 const detections = computed(() =>
-  caseDetections(detail.value?.triggers).map((d) => ({
+  caseDetections(siemTriggers.value).map((d) => ({
     ...d,
     name: byName.value.get(d.alertName)?.meta.title ?? readableAlertName(d.alertName),
     detection: byName.value.get(d.alertName) ?? null,
   })),
 );
 
-const alertRows = computed(() => caseFirings(detail.value?.triggers));
+const alertRows = computed(() => caseFirings(siemTriggers.value));
 
 const entityRows = computed(() =>
   groupValueRows(summary.value?.group_values).map((g) => ({
@@ -595,16 +616,9 @@ onMounted(() => {
     />
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
-        <OBanner
-          v-if="error"
-          variant="error-soft"
-          icon="error-outline"
-          dense
-          data-test="security-cases-error"
-        >
-          {{ error }}
-        </OBanner>
+        <SecurityNotices :notices="notices" data-test="security-cases-notices" />
         <OStatStrip
+          compact
           :items="stats"
           :loading="totals.open === null && loading"
           selectable
@@ -747,6 +761,18 @@ onMounted(() => {
         <OBanner v-if="detailError" variant="error-soft" icon="error-outline" dense>{{
           detailError
         }}</OBanner>
+        <OBanner
+          v-else-if="detail && !detailLoading && hiddenTriggers > 0"
+          variant="info"
+          icon="info-outline"
+          dense
+          data-test="security-cases-hidden-alerts"
+          >{{
+            siemTriggers.length
+              ? t("siem.cases.hiddenAlerts", { n: hiddenTriggers }, hiddenTriggers)
+              : t("siem.cases.noSecurityAlerts")
+          }}</OBanner
+        >
         <section class="flex flex-col gap-2">
           <h3 class="text-text-secondary text-xs font-semibold tracking-wide uppercase">
             {{ t("siem.cases.detections") }}

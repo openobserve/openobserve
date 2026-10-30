@@ -19,7 +19,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -30,11 +30,16 @@ import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.v
 import incidentsService, { type Incident } from "@/services/incidents";
 import streamService from "@/services/stream";
 import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
+import {
+  countsByAlert,
+  useAlertHistorySummary,
+} from "@/composables/security/useAlertHistorySummary";
 import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
 import { withRecentActivity } from "@/composables/security/streamActivity";
 import { bucketMsFor, bucketize, isFiring, type HistoryRow } from "@/utils/security/history";
+import { isFiringOutcome } from "@/utils/alerts/runOutcome";
 import { firingKey } from "@/utils/security/firings";
-import { tacticCoverage } from "@/utils/security/mitre";
+import { normalizeTactic, tacticCoverage, type AttackTactic } from "@/utils/security/mitre";
 import {
   SEVERITY_TONES,
   TONE_TOKEN,
@@ -44,12 +49,9 @@ import {
   toneOfSigmaLevel,
   type SeverityTone,
 } from "@/utils/security/severity";
-import {
-  loadTaggedStreams,
-  securityStreamNames,
-  sourceHealth,
-  type SourceHealth,
-} from "@/utils/security/streams";
+import { sourceHealth, type SourceHealth } from "@/utils/security/streams";
+import { securitySourceNames } from "@/utils/security/sourceSelection";
+import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { formatEventCount } from "@/utils/formatters";
 import config from "@/aws-exports";
 
@@ -86,18 +88,18 @@ function onRangeChange(value: unknown) {
 const {
   siemRows,
   byName,
+  byId,
   loading: rulesLoading,
-  hydrating,
-  unchecked,
+  error: rulesError,
   load: loadDetections,
 } = useSiemDetections();
 
-// Paged, de-duplicated history for the window (shared with MITRE/Compliance).
+/** Exact firing counts per bucket and detection, for tiles, chart and rankings. */
+const summary = useAlertHistorySummary();
+/** Newest firing rows only, for the triage queue's value and error columns. */
 const historyWindow = useAlertHistoryWindow();
 const history = historyWindow.rows;
-const historyTotal = historyWindow.total;
-const historyLoading = historyWindow.loading;
-const historyError = historyWindow.error;
+const historyError = computed(() => summary.error.value || historyWindow.error.value);
 
 const incidents = ref<Incident[]>([]);
 const casesLoading = ref(false);
@@ -107,12 +109,21 @@ const streams = ref<any[]>([]);
 const streamsLoading = ref(false);
 
 const lastRunAt = ref<number | null>(null);
-/** Firings are only known once rules are identified; until then "nothing fired" would be a lie. */
-const rulesPending = computed(() => rulesLoading.value || hydrating.value);
+let detectionsReady: Promise<void> = Promise.resolve();
+/** History is scoped to SIEM alert ids, so it cannot start before the detections land. */
+const awaitingRules = ref(true);
+const summaryLoading = computed(() => awaitingRules.value || summary.loading.value);
+/** Set once the first summary lands, so later refreshes keep the tiles instead of a skeleton. */
+const summaryLanded = ref(false);
+const triageLoading = computed(() => awaitingRules.value || historyWindow.loading.value);
 const loading = computed(
-  () => historyLoading.value || casesLoading.value || streamsLoading.value || rulesPending.value,
+  () =>
+    summaryLoading.value ||
+    triageLoading.value ||
+    casesLoading.value ||
+    streamsLoading.value ||
+    rulesLoading.value,
 );
-const firingsLoading = computed(() => historyLoading.value || rulesPending.value);
 
 const openCasesTotal = ref(0);
 
@@ -131,7 +142,9 @@ async function fetchCases(seq: number) {
     // Asked for by status so resolved cases never crowd the open ones out of
     // the page, and the count comes from the server's total, not the page.
     const [open, investigating] = await Promise.all(
-      ["open", "acknowledged"].map((status) => incidentsService.list(orgId.value, status, 50, 0)),
+      ["open", "acknowledged"].map((status) =>
+        incidentsService.list(orgId.value, status, 50, 0, undefined, true),
+      ),
     );
     if (seq !== refreshSeq) return;
     incidents.value = [...(open.data?.incidents ?? []), ...(investigating.data?.incidents ?? [])];
@@ -160,9 +173,9 @@ async function fetchStreams() {
     // The panel can render now; the freshness check below only patches it.
     streamsLoading.value = false;
     // Stats lag ingestion; a source that is receiving data must not read as silent.
-    const names = securityStreamNames(
+    const names = securitySourceNames(
+      orgId.value,
       list.map((s: any) => String(s.name)),
-      loadTaggedStreams(orgId.value),
     );
     const fresh = await withRecentActivity(orgId.value, list, names);
     if (seq === streamsSeq) streams.value = fresh;
@@ -173,38 +186,73 @@ async function fetchStreams() {
   }
 }
 
+async function fetchHistory(seq: number, startMs: number, endMs: number) {
+  await detectionsReady;
+  if (seq !== refreshSeq) return;
+  const alertIds = siemRows.value.map((row) => String(row.alert.id ?? "")).filter(Boolean);
+  awaitingRules.value = false;
+  await Promise.all([
+    summary
+      .load(orgId.value, startMs, endMs, { alertIds, bucketMs: bucketMsFor(windowMs.value) })
+      .then(() => {
+        if (seq === refreshSeq) summaryLanded.value = true;
+      }),
+    historyWindow.load(orgId.value, startMs, endMs, {
+      alertIds,
+      outcomes: ["firing", "notify_failed"],
+      maxPages: 1,
+    }),
+  ]);
+}
+
 // A range change can overlap the auto-refresh; only the latest one may land.
 let refreshSeq = 0;
+let refreshing = 0;
 
 async function refresh() {
   if (!orgId.value) return;
   const seq = ++refreshSeq;
+  refreshing += 1;
   windowEndMs.value = Date.now();
-  await Promise.all([
-    historyWindow.load(orgId.value, windowStartMs.value, windowEndMs.value),
-    fetchCases(seq),
-    fetchStreams(),
-  ]);
-  if (seq === refreshSeq) lastRunAt.value = Date.now();
+  try {
+    await Promise.all([
+      fetchHistory(seq, windowStartMs.value, windowEndMs.value),
+      fetchCases(seq),
+      fetchStreams(),
+    ]);
+    if (seq === refreshSeq) lastRunAt.value = Date.now();
+  } finally {
+    refreshing -= 1;
+  }
 }
 
-// Rules change rarely; they load once and are not part of the timed refresh.
-onMounted(() => {
-  void loadDetections(orgId.value);
+const securitySources = useSecuritySources();
+
+// Rules change rarely; they load on entry and org change, not on the timed refresh.
+function reloadAll() {
+  // Classifies new streams in the background so auto-selected sources appear without visiting Events.
+  void securitySources.load(orgId.value);
+  awaitingRules.value = true;
+  summaryLanded.value = false;
+  detectionsReady = loadDetections(orgId.value);
   void refresh();
+}
+onMounted(() => {
+  reloadAll();
   startTimer();
 });
-watch(orgId, () => {
-  void loadDetections(orgId.value);
-  void refresh();
-});
+watch(orgId, reloadAll);
 
 // ── Auto-refresh ─────────────────────────────────────────────────────────────
 const autoRefresh = ref(true);
 let timer: ReturnType<typeof setInterval> | null = null;
+function onTick() {
+  if (refreshing > 0 || document.visibilityState === "hidden") return;
+  void refresh();
+}
 function startTimer() {
   if (timer) clearInterval(timer);
-  timer = autoRefresh.value ? setInterval(() => void refresh(), 60_000) : null;
+  timer = autoRefresh.value ? setInterval(onTick, 60_000) : null;
 }
 function toggleAutoRefresh() {
   autoRefresh.value = !autoRefresh.value;
@@ -219,28 +267,31 @@ interface Firing {
   row: HistoryRow;
   detection: DetectionRow;
   tone: SeverityTone;
-  timeMs: number;
 }
 
+/** Newest firing rows, for the triage queue only; every count comes from the summary. */
 const firings = computed<Firing[]>(() =>
   history.value
     .filter(isFiring)
-    .map((row) => ({ row, detection: byName.value.get(row.alert_name) }))
+    .map((row) => ({
+      row,
+      detection: row.alert_id ? byId.value.get(row.alert_id) : byName.value.get(row.alert_name),
+    }))
     .filter((entry): entry is { row: HistoryRow; detection: DetectionRow } => !!entry.detection)
     .map(({ row, detection }) => ({
       row,
       detection,
       tone: toneOfSigmaLevel(detection.meta.level),
-      timeMs: Math.floor(row.timestamp / 1000),
     })),
 );
 
-const historyCapped = historyWindow.capped;
-/** Oldest evaluation actually loaded, so a capped window can say where it stops. */
-const historyFromMs = computed(() => {
-  const last = history.value[history.value.length - 1];
-  return last ? Math.floor(last.timestamp / 1000) : windowStartMs.value;
-});
+const firingCounts = computed(() =>
+  summary.rows.value.flatMap((row) => {
+    const detection = isFiringOutcome(row.outcome) ? byId.value.get(row.alertId) : undefined;
+    return detection ? [{ ...row, detection, tone: toneOfSigmaLevel(detection.meta.level) }] : [];
+  }),
+);
+const totalFirings = computed(() => firingCounts.value.reduce((sum, f) => sum + f.n, 0));
 
 const toneCounts = computed(() => {
   const counts: Record<SeverityTone, number> = {
@@ -251,7 +302,7 @@ const toneCounts = computed(() => {
     info: 0,
     unknown: 0,
   };
-  for (const f of firings.value) counts[f.tone] += 1;
+  for (const f of firingCounts.value) counts[f.tone] += f.n;
   return counts;
 });
 
@@ -263,36 +314,37 @@ const chartSeries = computed(() =>
   })),
 );
 
-const chartBuckets = computed(() =>
-  bucketize(
-    firings.value.map((f) => ({
-      timeMs: f.timeMs,
-      key: f.tone as (typeof SEVERITY_TONES)[number],
-    })),
-    windowStartMs.value,
-    windowEndMs.value,
-    bucketMsFor(windowMs.value),
-    SEVERITY_TONES,
-  ),
-);
-
-const topDetections = computed(() => {
-  const tally = new Map<
-    string,
-    { alertName: string; name: string; tone: SeverityTone; count: number }
-  >();
-  for (const f of firings.value) {
-    const entry = tally.get(f.row.alert_name) ?? {
-      alertName: f.row.alert_name,
-      name: f.detection.meta.title,
-      tone: f.tone,
-      count: 0,
-    };
-    entry.count += 1;
-    tally.set(f.row.alert_name, entry);
+const chartBucketMs = computed(() => summary.bucketMs.value || bucketMsFor(windowMs.value));
+const chartBuckets = computed(() => {
+  const bucketMs = chartBucketMs.value;
+  const buckets = bucketize([], windowStartMs.value, windowEndMs.value, bucketMs, SEVERITY_TONES);
+  const first = buckets[0]?.ts ?? 0;
+  for (const f of firingCounts.value) {
+    const bucket = buckets[Math.floor((f.bucketMs - first) / bucketMs)];
+    const tone = f.tone as (typeof SEVERITY_TONES)[number];
+    if (bucket && tone in bucket.counts) bucket.counts[tone] += f.n;
   }
-  return [...tally.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+  return buckets;
 });
+
+const firedDetections = computed(() =>
+  [...countsByAlert(summary.rows.value)].flatMap(([alertId, counts]) => {
+    const detection = byId.value.get(alertId);
+    if (!detection || !counts.firings) return [];
+    return [
+      {
+        alertName: String(detection.alert.name ?? ""),
+        name: detection.meta.title,
+        tone: toneOfSigmaLevel(detection.meta.level),
+        count: counts.firings,
+        tactics: detection.meta.tactics,
+      },
+    ];
+  }),
+);
+const topDetections = computed(() =>
+  [...firedDetections.value].sort((a, b) => b.count - a.count).slice(0, 8),
+);
 const topMax = computed(() => topDetections.value[0]?.count ?? 0);
 
 // ── Triage queue ─────────────────────────────────────────────────────────────
@@ -349,10 +401,9 @@ interface SourceRow {
 }
 const HEALTH_RANK: Record<SourceHealth, number> = { quiet: 0, never: 1, live: 2 };
 const sources = computed<SourceRow[]>(() => {
-  const names = securityStreamNames(
-    streams.value.map((s) => s.name),
-    loadTaggedStreams(orgId.value),
-  );
+  // Reads the reactive source set, so streams classified in the background appear as they land.
+  const known = new Set(securitySources.sourceNames.value);
+  const names = streams.value.map((s) => s.name).filter((name) => known.has(name));
   const byStream = new Map(streams.value.map((s) => [s.name, s]));
   return names
     .map((name) => {
@@ -376,12 +427,17 @@ const HEALTH_DOT: Record<SourceHealth, string> = {
 };
 
 // ── MITRE coverage ───────────────────────────────────────────────────────────
-const coverage = computed(() =>
-  tacticCoverage(
+const coverage = computed(() => {
+  const fired = new Map<AttackTactic, number>();
+  for (const d of firedDetections.value) {
+    const tactics = new Set(d.tactics.map(normalizeTactic));
+    for (const tactic of tactics) if (tactic) fired.set(tactic, (fired.get(tactic) ?? 0) + d.count);
+  }
+  return tacticCoverage(
     siemRows.value.map((row) => ({ tactics: row.meta.tactics, enabled: !!row.alert.enabled })),
-    firings.value.map((f) => ({ tactics: f.detection.meta.tactics })),
-  ),
-);
+    [],
+  ).map((entry) => ({ ...entry, firings: fired.get(entry.tactic) ?? 0 }));
+});
 const coveredTactics = computed(() => coverage.value.filter((c) => c.rules > 0).length);
 
 function tacticClass(entry: { rules: number; firings: number }) {
@@ -393,7 +449,7 @@ function tacticClass(entry: { rules: number; firings: number }) {
 
 // ── Summary strip ────────────────────────────────────────────────────────────
 const enabledRules = computed(() => siemRows.value.filter((r) => r.alert.enabled).length);
-const firingDetections = computed(() => new Set(firings.value.map((f) => f.row.alert_name)).size);
+const firingDetections = computed(() => firedDetections.value.length);
 
 const stats = computed<StatItem[]>(() => [
   {
@@ -475,9 +531,60 @@ function openSource(name?: string) {
   nav("/security/events", { ...(name ? { stream: name } : {}), period: range.value });
 }
 
+// Only claimed once the list has actually loaded; a failed load is reported, not read as empty.
 const noDetections = computed(
-  () => !rulesLoading.value && !hydrating.value && siemRows.value.length === 0,
+  () =>
+    !awaitingRules.value && !rulesLoading.value && !rulesError.value && siemRows.value.length === 0,
 );
+
+const notices = computed<SecurityNotice[]>(() => {
+  const out: SecurityNotice[] = [];
+  if (noDetections.value) {
+    out.push({
+      key: "no-detections",
+      tone: "info",
+      text: t("siem.overview.noDetections"),
+      actionLabel: t("siem.overview.browseDetections"),
+      onAction: () => nav("/security/detections"),
+      dataTest: "security-overview-no-detections",
+    });
+  }
+  if (rulesError.value) {
+    out.push({
+      key: "rules-error",
+      tone: "error",
+      text: t("siem.overview.rulesError", { reason: rulesError.value }),
+      dataTest: "security-overview-rules-error",
+    });
+  }
+  if (historyError.value) {
+    out.push({
+      key: "history-error",
+      tone: "error",
+      text: t("siem.overview.historyError", { reason: historyError.value }),
+      dataTest: "security-overview-history-error",
+    });
+  }
+  if (historyWindow.effectiveStartMs.value) {
+    out.push({
+      key: "history-narrowed",
+      tone: "warning",
+      text: t("siem.mitrePage.historyNarrowed", {
+        from: new Date(historyWindow.effectiveStartMs.value).toLocaleString(),
+      }),
+      dataTest: "security-overview-history-narrowed",
+    });
+  }
+  if (summary.partial.value) {
+    out.push({
+      key: "summary-partial",
+      tone: "warning",
+      text: t("siem.overview.summaryPartial"),
+      dataTest: "security-overview-summary-partial",
+    });
+  }
+  return out;
+});
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 function nav(path: string, query: Record<string, string> = {}) {
@@ -535,74 +642,12 @@ function nav(path: string, query: Record<string, string> = {}) {
     </template>
 
     <div class="flex flex-col gap-4 pb-4">
-      <OBanner
-        v-if="noDetections"
-        variant="info"
-        icon="shield"
-        inline-actions
-        data-test="security-overview-no-detections"
-      >
-        {{ t("siem.overview.noDetections") }}
-        <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="security-overview-browse-detections"
-            @click="nav('/security/detections')"
-          >
-            {{ t("siem.overview.browseDetections") }}
-          </OButton>
-        </template>
-      </OBanner>
-      <OBanner
-        v-if="historyError"
-        variant="error-soft"
-        icon="error-outline"
-        data-test="security-overview-history-error"
-      >
-        {{ historyError }}
-      </OBanner>
-      <OBanner
-        v-if="historyWindow.effectiveStartMs.value"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-overview-history-narrowed"
-      >
-        {{
-          t("siem.mitrePage.historyNarrowed", {
-            from: new Date(historyWindow.effectiveStartMs.value).toLocaleString(),
-          })
-        }}
-      </OBanner>
-      <OBanner
-        v-if="unchecked > 0"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-overview-unchecked"
-      >
-        {{ t("siem.overview.uncheckedRules", unchecked) }}
-      </OBanner>
-      <OBanner
-        v-if="historyCapped"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-overview-history-capped"
-      >
-        {{
-          t("siem.overview.historyCapped", {
-            n: formatEventCount(history.length),
-            total: formatEventCount(historyTotal),
-            from: new Date(historyFromMs).toLocaleString(),
-          })
-        }}
-      </OBanner>
+      <SecurityNotices :notices="notices" data-test="security-overview-notices" />
 
       <OStatStrip
+        compact
         :items="stats"
-        :loading="lastRunAt === null || (rulesPending && !siemRows.length)"
+        :loading="!summaryLanded"
         selectable
         :selected-key="null"
         data-test="security-overview-stats"
@@ -613,7 +658,7 @@ function nav(path: string, query: Record<string, string> = {}) {
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <SecurityPanel
           :title="t('siem.overview.activity')"
-          :hint="t('siem.overview.activityHint', firings.length)"
+          :hint="t('siem.overview.activityHint', totalFirings)"
           icon="stacked-line-chart"
           class="h-80 xl:col-span-2"
           data-test="security-overview-activity"
@@ -632,10 +677,10 @@ function nav(path: string, query: Record<string, string> = {}) {
           </template>
           <div class="min-h-0 flex-1 px-2 pb-2">
             <SecuritySeverityChart
-              v-if="firings.length || firingsLoading"
+              v-if="totalFirings || summaryLoading"
               :buckets="chartBuckets"
               :series="chartSeries"
-              :loading="firingsLoading"
+              :loading="summaryLoading"
               :min="windowStartMs"
               :max="windowEndMs"
               data-test="security-overview-activity-chart"
@@ -717,7 +762,7 @@ function nav(path: string, query: Record<string, string> = {}) {
         <SecurityPanel
           :title="t('siem.overview.triage')"
           :hint="t('siem.overview.triageHint')"
-          :count="firings.length"
+          :count="totalFirings"
           icon="inbox"
           tone="error"
           class="h-96 xl:col-span-2"
@@ -738,7 +783,7 @@ function nav(path: string, query: Record<string, string> = {}) {
             :data="triageRows"
             :columns="triageColumns"
             row-key="id"
-            :loading="firingsLoading && !firings.length"
+            :loading="triageLoading && !firings.length"
             pagination="none"
             sorting="none"
             :show-global-filter="false"
@@ -812,7 +857,7 @@ function nav(path: string, query: Record<string, string> = {}) {
           data-test="security-overview-top-detections"
         >
           <OEmptyState
-            v-if="!topDetections.length && !firingsLoading"
+            v-if="!topDetections.length && !summaryLoading"
             size="inline"
             icon="task-alt"
             :title="t('siem.overview.quiet')"

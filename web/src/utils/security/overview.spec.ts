@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { bucketMsFor, bucketize, isEvalError, isFiring, type HistoryRow } from "./history";
+import { bucketMsFor, bucketize, isFiring, type HistoryRow } from "./history";
 import { normalizeTactic, tacticCoverage, techniqueUrl } from "./mitre";
 import { SOURCE_TYPE_BY_ID } from "./sourceTypes";
 import { sourceColumnFor } from "./normalize";
@@ -15,7 +15,7 @@ import {
   toneOfSeverityId,
   toneOfSigmaLevel,
 } from "./severity";
-import { QUIET_AFTER_US, securityStreamNames, sourceHealth } from "./streams";
+import { QUIET_AFTER_US, sourceHealth } from "./streams";
 
 describe("severity tones", () => {
   it("folds OCSF ids, Sigma levels and case priorities onto one scale", () => {
@@ -73,12 +73,6 @@ describe("source health", () => {
     expect(sourceHealth({ doc_num: 5, doc_time_max: now - 1000 }, now)).toBe("live");
     expect(sourceHealth({ doc_num: 5, doc_time_max: now - QUIET_AFTER_US - 1 }, now)).toBe("quiet");
   });
-
-  it("lists detected streams first and hand-added ones after, without duplicates", () => {
-    expect(
-      securityStreamNames(["okta_logs", "nginx", "app"], ["nginx", "okta_logs", "gone"]),
-    ).toEqual(["okta_logs", "nginx"]);
-  });
 });
 
 describe("history", () => {
@@ -106,7 +100,6 @@ describe("history", () => {
     // Older rows carry no level; that is not a firing either.
     expect(isFiring(row({ status: "normal", level: undefined as unknown as string }))).toBe(false);
     expect(isFiring(row({ status: "error", error: "boom" }))).toBe(false);
-    expect(isEvalError(row({ status: "error" }))).toBe(true);
   });
 
   it("buckets across the whole window, keeping empty buckets", () => {

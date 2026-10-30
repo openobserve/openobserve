@@ -8,6 +8,7 @@ import { computed, ref, shallowRef } from "vue";
 import alertsService from "@/services/alerts";
 import streamService from "@/services/stream";
 import type { HistoryRow } from "@/utils/security/history";
+import { MAX_URL_ALERT_IDS } from "./useAlertHistorySummary";
 
 const PAGE = 1000;
 const DEFAULT_MAX_PAGES = 5;
@@ -16,6 +17,10 @@ const TRIGGERS_STREAM = "triggers";
 export interface HistoryLoadOptions {
   /** Only this alert's evaluations (the API's alert_id filter). */
   alertId?: string;
+  /** Only these alerts' evaluations; an empty list means no rows at all. */
+  alertIds?: string[];
+  /** Only these run outcomes, e.g. ["firing"]. */
+  outcomes?: string[];
   maxPages?: number;
 }
 
@@ -43,6 +48,7 @@ export async function fetchHistoryWindow(
   endMs: number,
   options: HistoryLoadOptions = {},
 ): Promise<{ rows: HistoryRow[]; total: number; complete: boolean }> {
+  if (options.alertIds && !options.alertIds.length) return { rows: [], total: 0, complete: true };
   const page = (from: number) =>
     alertsService.getHistory(orgId, {
       start_time: String(startMs * 1000),
@@ -52,6 +58,13 @@ export async function fetchHistoryWindow(
       sort_by: "timestamp",
       sort_order: "desc",
       ...(options.alertId ? { alert_id: options.alertId } : {}),
+      // Past the URL limit the server resolves the SIEM set itself instead of taking ids.
+      ...(options.alertIds && options.alertIds.length <= MAX_URL_ALERT_IDS
+        ? { alert_ids: options.alertIds.join(",") }
+        : options.alertIds
+          ? { siem: true }
+          : {}),
+      ...(options.outcomes?.length ? { outcome: options.outcomes.join(",") } : {}),
     });
   const first = await page(0);
   const total = Number(first.data?.total ?? 0);

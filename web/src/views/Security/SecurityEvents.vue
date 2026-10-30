@@ -4,7 +4,15 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- Security Events — hunt one stream at a time, normalised onto OCSF; every value is a
      pivot, and the URL carries the whole view. -->
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -21,7 +29,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -32,18 +40,26 @@ import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.v
 import SecurityEventDrawer from "./SecurityEventDrawer.vue";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import { bestMatch, isSecuritySource, type Classification } from "@/utils/security/classify";
+import config from "@/aws-exports";
+import { generateTraceContext } from "@/utils/auth";
+import {
+  bestMatch,
+  isSecuritySource,
+  readPath,
+  type Classification,
+} from "@/utils/security/classify";
 import { normalizeEvents, populatedColumns, sourceColumnFor } from "@/utils/security/normalize";
 import {
   NORMALIZED_COLUMNS,
   ocsfCategoryOf,
+  ocsfClass,
   toOcsfSeverity,
   type NormalizedEvent,
 } from "@/utils/security/ocsf";
 import { sigmaLogsourceLabel } from "@/utils/security/sourceTypes";
 import { blockedReason, caveat } from "@/utils/security/sigma";
 import { useSigmaRules } from "@/composables/security/useSigmaRules";
-import { withRecentActivity } from "@/composables/security/streamActivity";
+import { ocsfClassCounts, withRecentActivity } from "@/composables/security/streamActivity";
 import {
   addToSqlWhere,
   eventKey,
@@ -70,18 +86,17 @@ import {
   toneOfSigmaLevel,
   type SeverityTone,
 } from "@/utils/security/severity";
-import {
-  loadTaggedStreams,
-  saveTaggedStreams,
-  securityStreamNames,
-  widerPeriodFor,
-  sourceHealth,
-  type SourceHealth,
-} from "@/utils/security/streams";
+import { widerPeriodFor, sourceHealth, type SourceHealth } from "@/utils/security/streams";
+import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { FieldIndex } from "@/utils/security/fields";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
-import { b64DecodeUnicodeSafe, b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
+import {
+  b64DecodeUnicodeSafe,
+  b64EncodeUnicode,
+  formatCompactCount,
+  formatEventCount,
+} from "@/utils/formatters";
 
 const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -262,15 +277,33 @@ function toggleSidebar() {
 }
 
 // ── Streams ──────────────────────────────────────────────────────────────────
-const streamList = ref<any[]>([]);
-const streamsLoading = ref(false);
-const taggedStreams = ref<string[]>([]);
+const secSources = useSecuritySources();
+const {
+  streams: streamList,
+  loading: streamsLoading,
+  sourceNames: secStreamNames,
+  suggestions: suggestedSources,
+  classifying: classifyingSources,
+} = secSources;
 const selectedStream = ref<string | null>(null);
 
 const allStreamNames = computed(() => streamList.value.map((s) => String(s.name)));
-const secStreamNames = computed(() =>
-  securityStreamNames(allStreamNames.value, taggedStreams.value),
+const sourceByName = computed(() => new Map(secSources.sources.value.map((e) => [e.name, e])));
+const SUGGESTIONS_SHOWN = 5;
+const showAllSuggestions = ref(false);
+const visibleSuggestions = computed(() =>
+  showAllSuggestions.value
+    ? suggestedSources.value
+    : suggestedSources.value.slice(0, SUGGESTIONS_SHOWN),
 );
+function sourceHint(name: string): string {
+  const entry = sourceByName.value.get(name);
+  if (entry?.reason === "auto" && entry.verdict) {
+    const n = Math.round(entry.verdict.confidence * 100);
+    return t("siem.events.autoSource", { label: entry.verdict.label, n });
+  }
+  return entry?.reason === "name" ? t("siem.events.nameSource") : "";
+}
 const otherStreamNames = computed(() =>
   allStreamNames.value.filter((n) => !secStreamNames.value.includes(n)),
 );
@@ -304,14 +337,12 @@ const addStreamOptions = computed(() =>
 
 function addStreamToSecurity(name: unknown) {
   const n = String(name ?? "");
-  if (!n || taggedStreams.value.includes(n)) return;
-  taggedStreams.value = [...taggedStreams.value, n];
-  saveTaggedStreams(orgId.value, taggedStreams.value);
+  if (!n) return;
+  secSources.include(n);
   selectedStream.value = n;
 }
 function removeStreamFromSecurity(name: string) {
-  taggedStreams.value = taggedStreams.value.filter((s) => s !== name);
-  saveTaggedStreams(orgId.value, taggedStreams.value);
+  secSources.exclude(name);
 }
 
 const HEALTH_DOT: Record<SourceHealth, string> = {
@@ -328,15 +359,36 @@ interface StreamField {
 const schemaFields = ref<StreamField[]>([]);
 const fieldNames = computed(() => schemaFields.value.map((f) => f.name));
 
+// Groups follow OCSF objects, so a field sits where the OCSF schema puts it.
 const FIELD_GROUPS: [RegExp, string][] = [
   [
-    /^(class_uid|class_name|activity_id|activity_name|type_uid|severity_id|severity|level|status|status_code|status_id)$/,
+    /^(class_uid|class_name|category_uid|category_name|activity_id|activity_name|type_uid|type_name|severity_id|severity|level|status|status_code|status_id|status_detail|message|time|start_time|end_time|duration|count)$/,
     "event",
   ],
-  [/^actor[._]/, "actor"],
-  [/^(src_endpoint|dst_endpoint|connection_info|network_traffic|src|dst)[._]/, "network"],
+  [/^(actor|user|session)[._]/, "actor"],
+  [/^(src_endpoint|src)[._]/, "src"],
+  [/^(dst_endpoint|dst)[._]/, "dst"],
+  [/^(connection_info|traffic|network_traffic|tls|proxy)[._]/, "network"],
+  [/^(http_request|http_response|url|web_resources)[._]/, "http"],
+  [/^(process|file|module|registry_key)[._]/, "process"],
+  [/^(cloud|api|resources)[._]/, "cloud"],
+  [/^(finding_info|finding|attacks|vulnerabilities|malware|observables)[._]/, "finding"],
   [/^device[._]/, "device"],
   [/^metadata[._]/, "metadata"],
+];
+const FIELD_GROUP_ORDER = [
+  "event",
+  "actor",
+  "src",
+  "dst",
+  "network",
+  "http",
+  "process",
+  "cloud",
+  "finding",
+  "device",
+  "metadata",
+  "other",
 ];
 const fieldItems = computed<FieldItem[]>(() => {
   const groups: Record<string, StreamField[]> = {};
@@ -344,12 +396,10 @@ const fieldItems = computed<FieldItem[]>(() => {
     const group = FIELD_GROUPS.find(([re]) => re.test(f.name))?.[1] ?? "other";
     (groups[group] ??= []).push(f);
   }
-  return ["event", "actor", "network", "device", "metadata", "other"]
-    .filter((g) => groups[g]?.length)
-    .flatMap((g) => [
-      { name: `__group_${g}`, isGroup: true, groupName: t(`siem.fieldGroup.${g}`), group: g },
-      ...groups[g].map((f) => ({ name: f.name, type: f.ftype, group: g })),
-    ]);
+  return FIELD_GROUP_ORDER.filter((g) => groups[g]?.length).flatMap((g) => [
+    { name: `__group_${g}`, isGroup: true, groupName: t(`siem.fieldGroup.${g}`), group: g },
+    ...groups[g].map((f) => ({ name: f.name, type: f.ftype, group: g })),
+  ]);
 });
 
 // ── Columns (raw mode) ───────────────────────────────────────────────────────
@@ -417,6 +467,19 @@ const sqlQuery = ref(initialState.query);
 const sqlMode = ref(initialState.sqlMode);
 const severityFilter = ref<SeverityValue[]>([]);
 const fieldFilters = ref<FieldFilter[]>([...initialState.filters]);
+
+const notices = computed<SecurityNotice[]>(() =>
+  selectedStream.value && sqlMode.value
+    ? [
+        {
+          key: "sql-timeline",
+          tone: "info",
+          text: t("siem.events.sqlTimelineNote"),
+          dataTest: "security-events-sql-timeline-note",
+        },
+      ]
+    : [],
+);
 
 // Severity column: the detected source's, else a common name. Numeric fallbacks are
 // skipped — syslog counts the other way (0 is worst) and would invert the tiles.
@@ -620,13 +683,84 @@ const normalizedColumns = computed(
   () => populatedColumns(normalizedEvents.value, NORMALIZED_COLUMNS) as (keyof NormalizedEvent)[],
 );
 
+const OCSF_OBJECTS = [
+  "actor",
+  "src_endpoint",
+  "dst_endpoint",
+  "connection_info",
+  "traffic",
+  "http_request",
+  "http_response",
+  "process",
+  "file",
+  "device",
+  "cloud",
+  "api",
+  "finding_info",
+  "metadata",
+];
+
+/** Row counts per class over the last hour, for streams that carry `class_uid`. */
+const classMix = ref<{ uid: number; n: number }[]>([]);
+async function loadClassMix(streamName: string) {
+  classMix.value = [];
+  if (!fieldNames.value.includes("class_uid")) return;
+  const endUs = Date.now() * 1000;
+  try {
+    const counts = await ocsfClassCounts(
+      orgId.value,
+      streamName,
+      "class_uid",
+      endUs - 3_600_000_000,
+      endUs,
+    );
+    if (selectedStream.value === streamName) classMix.value = counts;
+  } catch {
+    // The card falls back to the classes seen in the loaded rows.
+  }
+}
+
+/** Most common `class_uid` in the loaded rows; OCSF-native types carry no fixed class. */
+const dominantClassUid = computed<number | null>(() => {
+  if (classMix.value.length) return classMix.value[0].uid;
+  const counts = new Map<number, number>();
+  for (const row of events.value) {
+    const uid = Number((row as Record<string, unknown>).class_uid);
+    if (Number.isFinite(uid) && uid > 0) counts.set(uid, (counts.get(uid) ?? 0) + 1);
+  }
+  let best: number | null = null;
+  for (const [uid, n] of counts) if (best == null || n > (counts.get(best) ?? 0)) best = uid;
+  return best;
+});
+
 const detectedSummary = computed(() => {
   const match = detected.value;
   if (!match) return null;
+  const classUid = match.source.ocsfClass || dominantClassUid.value;
+  const index = new FieldIndex(fieldNames.value);
+  const mixTotal = classMix.value.reduce((sum, c) => sum + c.n, 0);
+  const product = String(readPath(events.value[0] ?? null, "metadata.product.name") ?? "");
   return {
     label: match.source.label,
+    product: product && product !== match.source.label ? product : "",
+    classMix:
+      classMix.value.length > 1 && mixTotal
+        ? classMix.value
+            .slice(0, 4)
+            .map((c) =>
+              t("siem.events.classShare", { uid: c.uid, pct: Math.round((c.n / mixTotal) * 100) }),
+            )
+            .join(", ")
+        : "",
+    objects: OCSF_OBJECTS.filter((o) => fieldNames.value.some((f) => f.startsWith(`${o}_`))),
+    missing: (match.source.signals ?? [])
+      .filter((spec) => !spec.split("|").some((option) => index.resolve(option)))
+      .map((spec) => spec.split("|")[0])
+      .join(", "),
     confidence: Math.round(match.confidence * 100),
-    category: ocsfCategoryOf(match.source.ocsfClass)?.name ?? "",
+    category: ocsfCategoryOf(classUid)?.name ?? "",
+    classUid,
+    className: ocsfClass(classUid)?.name ?? "",
     sigma: sigmaLogsourceLabel(match.source.sigma),
     evidence: [...match.matchedRequired, ...match.matchedSignals].join(", "),
     isSecurity: isSecuritySource(match),
@@ -755,7 +889,7 @@ const histogramLoading = ref(false);
 // query can never overwrite the results of the one the analyst ran after it.
 let searchSeq = 0;
 
-async function runHistogram(seq: number) {
+async function runHistogram(seq: number, run: SearchRun) {
   const stream = selectedStream.value;
   if (!stream || sqlMode.value) {
     histogram.value = null;
@@ -783,6 +917,8 @@ async function runHistogram(seq: number) {
           },
         },
         page_type: "logs",
+        signal: run.controller.signal,
+        traceparent: run.histogramTrace.traceparent,
       },
       "ui",
     );
@@ -1064,30 +1200,22 @@ function syncUrl() {
 let streamsSeq = 0;
 async function loadStreams() {
   const seq = ++streamsSeq;
-  streamsLoading.value = true;
   // The previous load's checks describe the previous list.
   freshStats.value = new Map();
-  try {
-    const res = await streamService.nameList(orgId.value, "logs", false);
-    const list = res.data?.list ?? [];
-    streamList.value = list;
-    const wanted = initialState.stream;
-    if (wanted && allStreamNames.value.includes(wanted)) selectedStream.value = wanted;
-    else if (secStreamNames.value.length) selectedStream.value = secStreamNames.value[0];
-    else if (allStreamNames.value.length) selectedStream.value = allStreamNames.value[0];
-    // In the background: the sidebar's health dots and counts, from the data
-    // itself where the stream stats lag ingestion.
-    withRecentActivity(orgId.value, list, secStreamNames.value)
-      .then((fresh) => {
-        if (seq !== streamsSeq) return;
-        freshStats.value = new Map(fresh.map((s: any) => [String(s.name), s.stats]));
-      })
-      .catch(() => {});
-  } catch {
-    streamList.value = [];
-  } finally {
-    streamsLoading.value = false;
-  }
+  await secSources.load(orgId.value);
+  if (seq !== streamsSeq) return;
+  const wanted = initialState.stream;
+  if (wanted && allStreamNames.value.includes(wanted)) selectedStream.value = wanted;
+  else if (secStreamNames.value.length) selectedStream.value = secStreamNames.value[0];
+  else if (allStreamNames.value.length) selectedStream.value = allStreamNames.value[0];
+  // In the background: the sidebar's health dots and counts, from the data
+  // itself where the stream stats lag ingestion.
+  withRecentActivity(orgId.value, streamList.value, secStreamNames.value)
+    .then((fresh) => {
+      if (seq !== streamsSeq) return;
+      freshStats.value = new Map(fresh.map((s: any) => [String(s.name), s.stats]));
+    })
+    .catch(() => {});
 }
 
 async function loadSchema(streamName: string) {
@@ -1104,6 +1232,7 @@ async function loadSchema(streamName: string) {
     // Identify from the schema alone so the severity column is known before
     // the first search; the search re-identifies with a real row.
     detectSource(null);
+    void loadClassMix(streamName);
   } catch {
     if (selectedStream.value === streamName) schemaFields.value = [];
   }
@@ -1111,16 +1240,50 @@ async function loadSchema(streamName: string) {
 
 let mountComplete = false;
 
+interface SearchRun {
+  controller: AbortController;
+  searchTrace: { traceparent: string; traceId: string };
+  histogramTrace: { traceparent: string; traceId: string };
+}
+let activeRun: SearchRun | null = null;
+
+/** Stops the running search and its histogram, in the browser and on the server. */
+function cancelSearch({ quiet = false } = {}) {
+  const run = activeRun;
+  if (!run) return;
+  activeRun = null;
+  run.controller.abort();
+  ++searchSeq;
+  loading.value = false;
+  histogramLoading.value = false;
+  if (!quiet) errorMsg.value = t("siem.events.cancelled");
+  // Server-side cancel exists only in enterprise builds; OSS answers 403.
+  if (config.isEnterprise === "true" || config.isCloud === "true") {
+    searchService
+      .delete_running_queries(orgId.value, [run.searchTrace.traceId, run.histogramTrace.traceId])
+      .catch(() => {});
+  }
+}
+
+onBeforeUnmount(() => cancelSearch({ quiet: true }));
+
 async function runSearch() {
   if (mountComplete) syncUrl();
   if (!selectedStream.value || !orgId.value) return;
   if (dateState.value.type === "relative") timeRange.value = rangeFor(dateState.value);
+  cancelSearch({ quiet: true });
+  const run: SearchRun = {
+    controller: new AbortController(),
+    searchTrace: generateTraceContext(),
+    histogramTrace: generateTraceContext(),
+  };
+  activeRun = run;
   loading.value = true;
   errorMsg.value = "";
   const { start, end } = timeRange.value;
   const seq = ++searchSeq;
   histogramFresh.value = false;
-  const histogramDone = runHistogram(seq);
+  const histogramDone = runHistogram(seq, run);
   try {
     const res = await searchService.search(
       {
@@ -1129,6 +1292,8 @@ async function runSearch() {
           query: { sql: buildSQL(), start_time: start, end_time: end, from: 0, size: PAGE_ROWS },
         },
         page_type: "logs",
+        signal: run.controller.signal,
+        traceparent: run.searchTrace.traceparent,
       },
       "ui",
     );
@@ -1160,6 +1325,7 @@ async function runSearch() {
   }
   if (expandedField.value) void loadTopValues(expandedField.value);
   await histogramDone;
+  if (activeRun === run) activeRun = null;
 }
 
 async function restoreDrawerFromUrl() {
@@ -1290,7 +1456,6 @@ function onDateChange(dt: any) {
 }
 
 onMounted(async () => {
-  taggedStreams.value = loadTaggedStreams(orgId.value);
   await loadStreams();
   if (selectedStream.value) {
     await loadSchema(selectedStream.value);
@@ -1371,10 +1536,20 @@ function widenTo(period: string) {
           @on:date-change="onDateChange"
         />
         <OButton
+          v-if="loading || histogramLoading"
+          variant="outline-destructive"
+          size="sm"
+          icon-left="close"
+          data-test="security-events-cancel"
+          @click="cancelSearch()"
+        >
+          {{ t("siem.events.cancel") }}
+        </OButton>
+        <OButton
+          v-else
           variant="primary"
           size="sm"
           icon-left="play-arrow"
-          :loading="loading"
           data-test="security-events-run"
           @click="runSearch"
         >
@@ -1595,14 +1770,20 @@ function widenTo(period: string) {
                       ? 'text-text-heading font-semibold'
                       : 'text-text-heading'
                   "
-                  >{{ name }}</span
+                  >{{ name }}<OTooltip v-if="sourceHint(name)" :content="sourceHint(name)"
+                /></span>
+                <OTag
+                  v-if="sourceByName.get(name)?.reason === 'auto'"
+                  variant="primary-soft"
+                  size="xs"
+                  :data-test="`security-events-source-auto-${name}`"
+                  >{{ t("siem.events.autoTag") }}</OTag
                 >
                 <span class="text-text-secondary text-2xs tabular-nums">{{
-                  formatEventCount(Number(streamStats.get(name)?.doc_num ?? 0))
+                  formatCompactCount(Number(streamStats.get(name)?.doc_num ?? 0))
                 }}</span>
                 <OButton
                   :data-test="`security-events-source-remove-${name}`"
-                  v-if="taggedStreams.includes(name)"
                   variant="ghost"
                   size="icon-xs"
                   icon-left="remove"
@@ -1613,6 +1794,72 @@ function widenTo(period: string) {
                 </OButton>
               </li>
             </ul>
+            <div
+              v-if="suggestedSources.length || classifyingSources"
+              class="flex flex-col gap-0.5"
+              data-test="security-events-suggested"
+            >
+              <div
+                class="px-page-edge text-text-secondary text-2xs flex items-center gap-1.5 pt-1 font-semibold tracking-wide uppercase"
+              >
+                <span>{{ t("siem.events.suggested") }}</span>
+                <OSpinner v-if="classifyingSources" size="xs">
+                  <OTooltip :content="t('siem.events.classifying')" />
+                </OSpinner>
+              </div>
+              <div
+                v-for="entry in visibleSuggestions"
+                :key="entry.name"
+                class="px-page-edge flex items-center gap-1 py-0.5"
+                :data-test="`security-events-suggested-${entry.name}`"
+              >
+                <span class="text-text-secondary min-w-0 flex-1 truncate font-mono text-xs"
+                  >{{ entry.name
+                  }}<OTooltip
+                    v-if="entry.verdict"
+                    :content="
+                      t('siem.events.suggestedSource', {
+                        label: entry.verdict.label,
+                        n: Math.round(entry.verdict.confidence * 100),
+                      })
+                    "
+                /></span>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="add"
+                  :data-test="`security-events-suggested-add-${entry.name}`"
+                  @click="addStreamToSecurity(entry.name)"
+                >
+                  <OTooltip :content="t('siem.events.addSuggested')" />
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="close"
+                  :data-test="`security-events-suggested-dismiss-${entry.name}`"
+                  @click="secSources.dismiss(entry.name)"
+                >
+                  <OTooltip :content="t('siem.events.dismissSuggestion')" />
+                </OButton>
+              </div>
+              <div v-if="suggestedSources.length > SUGGESTIONS_SHOWN" class="px-page-edge">
+                <OButton
+                  variant="ghost"
+                  size="xs"
+                  data-test="security-events-suggested-more"
+                  @click="showAllSuggestions = !showAllSuggestions"
+                >
+                  {{
+                    showAllSuggestions
+                      ? t("siem.events.showFewer")
+                      : t("siem.events.showMore", {
+                          n: suggestedSources.length - SUGGESTIONS_SHOWN,
+                        })
+                  }}
+                </OButton>
+              </div>
+            </div>
             <div class="px-page-edge">
               <OSelect
                 :model-value="null"
@@ -1725,14 +1972,58 @@ function widenTo(period: string) {
           "
         />
         <span class="text-text-heading font-semibold">{{ detectedSummary.label }}</span>
+        <OTag
+          v-if="detectedSummary.product"
+          variant="default-soft"
+          size="xs"
+          data-test="security-events-product"
+          >{{ t("siem.events.product", { name: detectedSummary.product }) }}</OTag
+        >
         <OTag variant="primary-soft" size="xs">
           {{ t("siem.events.confidence", { n: detectedSummary.confidence }) }}
+          <OTooltip
+            v-if="detectedSummary.missing"
+            :content="t('siem.events.missingSignals', { fields: detectedSummary.missing })"
+          />
         </OTag>
-        <OTag v-if="detectedSummary.category" variant="default-soft" size="xs">{{
-          detectedSummary.category
-        }}</OTag>
-        <OTag v-if="detectedSummary.sigma" variant="purple-soft" size="xs" class="font-mono">
-          {{ detectedSummary.sigma }}
+        <OTag
+          v-if="detectedSummary.category"
+          variant="default-soft"
+          size="xs"
+          data-test="security-events-ocsf-category"
+          >{{ t("siem.events.ocsfCategory", { name: detectedSummary.category }) }}</OTag
+        >
+        <OTag
+          v-if="detectedSummary.className"
+          variant="default-soft"
+          size="xs"
+          data-test="security-events-ocsf-class"
+          >{{
+            t("siem.events.ocsfClass", {
+              name: detectedSummary.className,
+              uid: detectedSummary.classUid,
+            })
+          }}<OTooltip
+            v-if="detectedSummary.classMix"
+            :content="t('siem.events.classMix', { mix: detectedSummary.classMix })"
+        /></OTag>
+        <OTag
+          v-if="detectedSummary.objects.length"
+          variant="default-soft"
+          size="xs"
+          data-test="security-events-ocsf-objects"
+          >{{ t("siem.events.objects") }} · {{ detectedSummary.objects.length
+          }}<OTooltip :content="detectedSummary.objects.join(', ')"
+        /></OTag>
+        <OTag
+          v-if="detectedSummary.sigma"
+          variant="purple-soft"
+          size="xs"
+          class="font-mono"
+          data-test="security-events-sigma-logsource"
+        >
+          {{ t("siem.events.rulesMatch", { logsource: detectedSummary.sigma }) }}
+          <OTooltip :content="t('siem.events.rulesMatchHint')" />
         </OTag>
         <OTag v-if="!detectedSummary.isSecurity" variant="default-soft" size="xs">
           {{ t("siem.events.telemetryOnly") }}
@@ -1844,6 +2135,7 @@ function widenTo(period: string) {
       >
         <OStatStrip
           v-if="severityField"
+          compact
           data-test="security-events-severity-strip"
           :items="severityStats"
           :loading="histogramLoading && !histogram"
@@ -1865,16 +2157,12 @@ function widenTo(period: string) {
           />
         </div>
       </div>
-      <OBanner
-        v-else-if="selectedStream && sqlMode"
-        variant="default"
-        icon="info-outline"
-        dense
-        data-test="security-events-sql-timeline-note"
+      <SecurityNotices
+        v-else
+        :notices="notices"
         class="mx-page-edge my-2"
-      >
-        {{ t("siem.events.sqlTimelineNote") }}
-      </OBanner>
+        data-test="security-events-notices"
+      />
 
       <!-- ── Results ─────────────────────────────────────────────────────── -->
       <OEmptyState

@@ -413,3 +413,23 @@ export function scoreAll(
     .map((p) => scoreUser(p, baseline.get(p.user) ?? null, w, complete))
     .sort((a, b) => b.score - a.score || b.current.events - a.current.events);
 }
+
+/** Signals that claim something was never seen before; they need every baseline row. */
+export const NOVELTY_SIGNALS: UebaSignalKind[] = ["first_seen", "new_ip", "new_hours"];
+
+/** Drops the given signals from a risk as not evaluated, re-scoring what remains. */
+export function withholdSignals(risk: UserRisk, kinds: UebaSignalKind[]): UserRisk {
+  const signals = risk.signals.filter((s) => !kinds.includes(s.kind));
+  const score = Math.min(
+    100,
+    signals.reduce((sum, s) => sum + s.weight, 0),
+  );
+  return {
+    ...risk,
+    signals,
+    score,
+    tone: toneOfRisk(score),
+    hoursEligible: risk.hoursEligible && !kinds.includes("new_hours"),
+    withheld: [...new Set([...risk.withheld, ...kinds])],
+  };
+}
