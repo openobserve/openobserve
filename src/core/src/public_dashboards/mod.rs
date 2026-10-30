@@ -352,6 +352,10 @@ pub struct LinkValues {
 impl LinkValues {
     pub fn new(dash: &Dashboard, frozen: Option<&str>) -> Self {
         let values = Defaults::new(dash, parse_frozen_vars(frozen)).into_values();
+        Self::from_values(dash, values)
+    }
+
+    fn from_values(dash: &Dashboard, values: BTreeMap<String, serde_json::Value>) -> Self {
         Self {
             vars: QueryVars::new(dash, values, None),
         }
@@ -812,7 +816,7 @@ pub async fn update_link(
         &link,
         &dash,
         &cfg.frozen_variables,
-        range_changed(&link, &cfg.time_range),
+        range_changed(&link, &cfg.time_range).then_some(cfg.time_range.ranges.as_slice()),
         user_id,
     )
     .await?;
@@ -1515,11 +1519,12 @@ where
     paused
 }
 
-/// Whether an edit changes the ranges a link serves or its default range.
+/// Whether an edit changes the set of ranges a link serves or its default range.
 #[cfg(feature = "enterprise")]
 fn range_changed(link: &PublicDashboard, policy: &TimeRangePolicy) -> bool {
+    let keys = |ranges: &[TimeRange]| ranges.iter().map(TimeRange::key).collect::<BTreeSet<_>>();
     let stored = time_ranges(link);
-    stored.ranges != policy.ranges || stored.default.key() != policy.default.key()
+    keys(&stored.ranges) != keys(&policy.ranges) || stored.default.key() != policy.default.key()
 }
 
 /// Enterprise: the editor must read what a changed frozen value or range makes the link read.
@@ -1528,10 +1533,15 @@ async fn authorize_variable_edit(
     link: &PublicDashboard,
     dash: &Dashboard,
     frozen: &BTreeMap<String, serde_json::Value>,
-    range_changed: bool,
+    changed_ranges: Option<&[TimeRange]>,
     user_id: &str,
 ) -> Result<(), anyhow::Error> {
-    let sources = variable_edit_sources(link, dash, frozen, range_changed);
+    let sources = match changed_ranges {
+        Some(ranges) => {
+            range_edit_sources(&ENGINE, link, dash, frozen, ranges, user_id, now_micros()).await
+        }
+        None => variable_edit_sources(link, dash, frozen),
+    };
     if sources.is_empty() {
         return Ok(());
     }
@@ -1542,13 +1552,12 @@ async fn authorize_variable_edit(
         })
 }
 
-/// Queries a changed frozen value reaches, or every query the link runs when its range changes.
+/// The values queries a changed frozen value reaches and the queries of every panel reading one.
 #[cfg(feature = "enterprise")]
 fn variable_edit_sources(
     link: &PublicDashboard,
     dash: &Dashboard,
     frozen: &BTreeMap<String, serde_json::Value>,
-    range_changed: bool,
 ) -> Vec<crate::authz::QuerySource> {
     use crate::authz::QuerySource;
 
@@ -1560,19 +1569,10 @@ fn variable_edit_sources(
         .filter(|key| old.get(*key) != frozen.get(*key))
         .cloned()
         .collect();
-    let Some(v8) = dash
-        .v8
-        .as_ref()
-        .filter(|_| range_changed || !changed.is_empty())
-    else {
+    let Some(v8) = dash.v8.as_ref().filter(|_| !changed.is_empty()) else {
         return vec![];
     };
-    let defaults = Defaults::new(dash, frozen.clone());
-    let (reached, values_queries) = if range_changed {
-        (BTreeSet::new(), defaults.pending_queries())
-    } else {
-        defaults.reachable_queries(&changed)
-    };
+    let (reached, values_queries) = Defaults::new(dash, frozen.clone()).reachable_queries(&changed);
     let mut sources: Vec<QuerySource> = values_queries
         .into_iter()
         .map(|q| QuerySource::Sql {
@@ -1585,56 +1585,162 @@ fn variable_edit_sources(
     let values = LinkValues::new(dash, new_json.as_deref());
     for tab in &v8.tabs {
         for panel in &tab.panels {
-            let texts = template_texts(panel);
-            let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
-            let reads_changed = values
-                .vars
-                .referenced(&tab.tab_id, &panel.id, &texts)
-                .iter()
-                .any(|(_, key)| reached.contains(key));
-            if !range_changed && !reads_changed {
-                continue;
+            if panel_keys(&values, tab, panel).any(|key| reached.contains(&key)) {
+                sources.extend(panel_sources(&link.org_id, &values, tab, panel));
             }
-            let promql = panel.query_type == "promql";
-            let planned = promql
-                .then(|| values.plan_promql(&tab.tab_id, panel).ok())
-                .flatten();
-            for (qi, q) in panel.queries.iter().enumerate() {
-                let lang = if promql { "promql" } else { "sql" };
-                // A sent PromQL query is checked as the build sends it, a formula as its expansion.
-                let text = match planned.as_ref().map(|p| p[qi].clone()) {
-                    Some(Some(expr)) => expr,
-                    // A hidden or empty query is never sent; formulas carry their inputs.
-                    Some(None) => continue,
-                    None => {
-                        let Some(text) = query_text(q) else {
-                            continue;
-                        };
-                        values.substitute(&tab.tab_id, &panel.id, text, lang)
-                    }
-                };
-                sources.push(if promql {
-                    QuerySource::PromQl {
-                        org_id: link.org_id.clone(),
-                        query: text,
-                    }
-                } else {
-                    QuerySource::Sql {
-                        org_id: link.org_id.clone(),
-                        sql: text,
-                        default_type: q.fields.stream_type,
-                    }
-                });
-                let vrl = q.vrl_function_query.as_deref().map(str::trim);
-                if let Some(vrl) = vrl.filter(|f| !promql && !f.is_empty()) {
-                    sources.push(QuerySource::Vrl {
-                        org_id: link.org_id.clone(),
-                        source: vrl.to_string(),
-                    });
+        }
+    }
+    dedup(sources)
+}
+
+/// Every query the link runs in each range, its values queries run as `user_id` as a build runs
+/// them.
+#[cfg(feature = "enterprise")]
+async fn range_edit_sources(
+    search: &dyn PanelSearch,
+    link: &PublicDashboard,
+    dash: &Dashboard,
+    frozen: &BTreeMap<String, serde_json::Value>,
+    ranges: &[TimeRange],
+    user_id: &str,
+    now: i64,
+) -> Vec<crate::authz::QuerySource> {
+    use crate::authz::QuerySource;
+
+    let Some(v8) = dash.v8.as_ref() else {
+        return vec![];
+    };
+    // A denied values query runs as the editor only to be named in the refusal.
+    let editor = PublicDashboard {
+        published_by: user_id.to_string(),
+        ..link.clone()
+    };
+    let probe = AuthorizerProbe::default();
+    let family = TraceFamily::new(&link.org_id);
+    let mut sources = Vec::new();
+    // Values depend on the window only when a values query picks them.
+    let windows: Vec<&TimeRange> = if Defaults::new(dash, frozen.clone())
+        .pending_queries()
+        .is_empty()
+    {
+        ranges.iter().take(1).collect()
+    } else {
+        ranges.iter().collect()
+    };
+    for range in windows {
+        let range_key = range.key();
+        let (start, end) = materialize::window(range, now);
+        let ctx = Ctx {
+            search,
+            probe: &probe,
+            link: &editor,
+            dash,
+            identity: public_dashboard_identity(&link.org_id),
+            range_key: &range_key,
+            start,
+            end,
+            now,
+            family: &family,
+        };
+        let filled = fill_defaults(&ctx, frozen.clone()).await;
+        sources.extend(filled.deps.values().flat_map(|dep| {
+            dep.sources
+                .iter()
+                .map(|(stream_type, name)| QuerySource::Stream {
+                    org_id: link.org_id.clone(),
+                    stream_type: *stream_type,
+                    name: name.clone(),
+                })
+        }));
+        if !filled.denied.is_empty() {
+            continue;
+        }
+        let values = LinkValues::from_values(dash, filled.values);
+        for tab in &v8.tabs {
+            for panel in &tab.panels {
+                // The build fails a panel whose values query failed, so it sends nothing.
+                if !panel_keys(&values, tab, panel).any(|key| filled.failed.contains(&key)) {
+                    sources.extend(panel_sources(&link.org_id, &values, tab, panel));
                 }
             }
         }
     }
+    dedup(sources)
+}
+
+/// Keys of the scoped values the panel's queries read.
+#[cfg(feature = "enterprise")]
+fn panel_keys<'a>(
+    values: &'a LinkValues,
+    tab: &'a Tab,
+    panel: &'a Panel,
+) -> impl Iterator<Item = String> + 'a {
+    let texts = template_texts(panel);
+    let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
+    values
+        .vars
+        .referenced(&tab.tab_id, &panel.id, &texts)
+        .into_iter()
+        .map(|(_, key)| key)
+}
+
+/// The queries and VRL functions a panel's build sends; a custom chart never runs.
+#[cfg(feature = "enterprise")]
+fn panel_sources(
+    org_id: &str,
+    values: &LinkValues,
+    tab: &Tab,
+    panel: &Panel,
+) -> Vec<crate::authz::QuerySource> {
+    use crate::authz::QuerySource;
+
+    let mut sources = Vec::new();
+    if panel.typ == "custom_chart" {
+        return sources;
+    }
+    let promql = panel.query_type == "promql";
+    let planned = promql
+        .then(|| values.plan_promql(&tab.tab_id, panel).ok())
+        .flatten();
+    for (qi, q) in panel.queries.iter().enumerate() {
+        let lang = if promql { "promql" } else { "sql" };
+        // A sent PromQL query is checked as the build sends it, a formula as its expansion.
+        let text = match planned.as_ref().map(|p| p[qi].clone()) {
+            Some(Some(expr)) => expr,
+            // A hidden or empty query is never sent; formulas carry their inputs.
+            Some(None) => continue,
+            None => {
+                let Some(text) = query_text(q) else {
+                    continue;
+                };
+                values.substitute(&tab.tab_id, &panel.id, text, lang)
+            }
+        };
+        sources.push(if promql {
+            QuerySource::PromQl {
+                org_id: org_id.to_string(),
+                query: text,
+            }
+        } else {
+            QuerySource::Sql {
+                org_id: org_id.to_string(),
+                sql: text,
+                default_type: q.fields.stream_type,
+            }
+        });
+        let vrl = q.vrl_function_query.as_deref().map(str::trim);
+        if let Some(vrl) = vrl.filter(|f| !promql && !f.is_empty()) {
+            sources.push(QuerySource::Vrl {
+                org_id: org_id.to_string(),
+                source: vrl.to_string(),
+            });
+        }
+    }
+    sources
+}
+
+#[cfg(feature = "enterprise")]
+fn dedup(sources: Vec<crate::authz::QuerySource>) -> Vec<crate::authz::QuerySource> {
     let mut unique = Vec::with_capacity(sources.len());
     for source in sources {
         if !unique.contains(&source) {
@@ -4222,65 +4328,122 @@ mod tests {
                 .collect()
         };
         let same = frozen(json!({ "src.p.c": "safe", "env": "prod" }));
-        assert!(variable_edit_sources(&link, &dash, &same, false).is_empty());
+        assert!(variable_edit_sources(&link, &dash, &same).is_empty());
         let scoped = frozen(json!({ "src.p.c": "secret", "env": "prod" }));
         assert_eq!(
-            sql(variable_edit_sources(&link, &dash, &scoped, false)),
+            sql(variable_edit_sources(&link, &dash, &scoped)),
             ["SELECT * FROM secret"]
         );
         let global = frozen(json!({ "src.p.c": "safe", "env": "staging" }));
         assert_eq!(
-            sql(variable_edit_sources(&link, &dash, &global, false)),
+            sql(variable_edit_sources(&link, &dash, &global)),
             ["SELECT * FROM fixed WHERE env = 'staging'"]
         );
         // Removing a frozen value falls back to the dashboard default, which is checked too.
         let removed = frozen(json!({ "env": "prod" }));
         assert_eq!(
-            sql(variable_edit_sources(&link, &dash, &removed, false)),
+            sql(variable_edit_sources(&link, &dash, &removed)),
             ["SELECT * FROM safe"]
         );
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
-    fn a_range_edit_checks_every_panel_and_an_unchanged_range_checks_none() {
+    fn only_a_new_range_set_or_default_is_a_range_change() {
         let (mut link, ..) = ctx_parts();
-        link.frozen_variables = Some(json!({ "src.p.c": "safe", "env": "prod" }).to_string());
-        link.time_ranges = Some(json!([{ "type": "relative", "secs": 3600 }]).to_string());
-        let dash = templated_dashboard();
-        let same: BTreeMap<String, serde_json::Value> =
-            serde_json::from_value(json!({ "src.p.c": "safe", "env": "prod" })).unwrap();
-        let policy = |ranges: serde_json::Value| -> TimeRangePolicy {
+        link.time_ranges = Some(
+            json!([{ "type": "relative", "secs": 86400 }, { "type": "relative", "secs": 3600 }])
+                .to_string(),
+        );
+        link.default_range_key = Some("r86400".into());
+        let policy = |ranges: serde_json::Value, default: usize| -> TimeRangePolicy {
             let ranges: Vec<TimeRange> = serde_json::from_value(ranges).unwrap();
             TimeRangePolicy {
-                default: ranges[0],
+                default: ranges[default],
                 ranges,
             }
         };
-        assert!(!range_changed(
-            &link,
-            &policy(json!([{ "type": "relative", "secs": 3600 }]))
-        ));
+        let sorted =
+            json!([{ "type": "relative", "secs": 3600 }, { "type": "relative", "secs": 86400 }]);
+        assert!(
+            !range_changed(&link, &policy(sorted.clone(), 1)),
+            "a reorder"
+        );
+        assert!(range_changed(&link, &policy(sorted, 0)), "a new default");
         assert!(range_changed(
             &link,
-            &policy(json!([{ "type": "relative", "secs": 2592000 }]))
+            &policy(json!([{ "type": "relative", "secs": 2592000 }]), 0)
         ));
-        assert!(variable_edit_sources(&link, &dash, &same, false).is_empty());
-        let mut sql: Vec<String> = variable_edit_sources(&link, &dash, &same, true)
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_range_edit_checks_every_panel_with_the_values_its_build_picks() {
+        let (link, ..) = ctx_parts();
+        let dash = Dashboard {
+            version: 8,
+            v8: Some(
+                serde_json::from_value(json!({
+                    "tabs": [{ "tabId": "t1", "name": "", "panels": [
+                        panel("b", Some("SELECT * FROM fixed WHERE env = '$env'")),
+                        panel("d", Some("SELECT * FROM \"$pick\"")),
+                        panel("e", Some("SELECT * FROM \"$sub\"")),
+                        panel("f", Some("SELECT * FROM \"$sub\"")),
+                        typed_panel("g", "custom_chart", "sql", "SELECT * FROM never_run", None),
+                    ]}],
+                    "variables": { "list": [
+                        { "type": "custom", "name": "env", "label": "E", "value": "prod" },
+                        { "type": "query_values", "name": "pick", "label": "P",
+                          "query_data": { "stream_type": "logs", "stream": "names", "field": "n" } },
+                        { "type": "query_values", "name": "sub", "label": "U",
+                          "query_data": { "stream_type": "logs", "stream": "$pick", "field": "n" } }
+                    ]}
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let frozen: BTreeMap<String, serde_json::Value> =
+            serde_json::from_value(json!({ "env": "prod" })).unwrap();
+        let ranges: Vec<TimeRange> =
+            serde_json::from_value(json!([{ "type": "relative", "secs": 3600 }])).unwrap();
+        let search = FakeSearch {
+            hits: 1,
+            ..Default::default()
+        };
+        let sources =
+            range_edit_sources(&search, &link, &dash, &frozen, &ranges, "editor@x", 0).await;
+        let mut texts: Vec<String> = sources
             .into_iter()
             .map(|s| match s {
                 crate::authz::QuerySource::Sql { sql, .. } => sql,
+                crate::authz::QuerySource::Stream { name, .. } => format!("stream {name}"),
                 other => panic!("{other:?}"),
             })
             .collect();
-        sql.sort();
+        texts.sort();
         assert_eq!(
-            sql,
+            texts,
             [
-                "SELECT * FROM $src",
+                "SELECT * FROM \"v0\"",
                 "SELECT * FROM fixed WHERE env = 'prod'",
-                "SELECT * FROM safe"
-            ]
+                "stream names",
+                "stream v0",
+            ],
+            "the dependent values query reads the stream its parent picks"
+        );
+        let denied = FakeSearch {
+            hits: 1,
+            refuse: Some((NotAvailableReason::Unauthorized, "FROM \"names\"")),
+            ..Default::default()
+        };
+        let sources =
+            range_edit_sources(&denied, &link, &dash, &frozen, &ranges, "editor@x", 0).await;
+        assert!(
+            sources
+                .iter()
+                .all(|s| matches!(s, crate::authz::QuerySource::Stream { .. })),
+            "a denied values query is named by its stream: {sources:?}"
         );
     }
 
@@ -4302,7 +4465,7 @@ mod tests {
         let to = |value: &str| -> BTreeMap<String, serde_json::Value> {
             BTreeMap::from([("src.p.c".to_string(), json!(value))])
         };
-        let err = authorize_variable_edit(&link, &dash, &to("secret"), false, &editor)
+        let err = authorize_variable_edit(&link, &dash, &to("secret"), None, &editor)
             .await
             .unwrap_err();
         assert!(err.downcast_ref::<Forbidden>().is_some());
@@ -4311,7 +4474,7 @@ mod tests {
             "Unauthorized Access: no read permission on logs/secret"
         );
         assert!(
-            authorize_variable_edit(&link, &dash, &to("safe"), false, &editor)
+            authorize_variable_edit(&link, &dash, &to("safe"), None, &editor)
                 .await
                 .is_ok()
         );
@@ -5192,7 +5355,7 @@ mod tests {
         );
         link.frozen_variables = Some(json!({ "env": "old" }).to_string());
         let after = BTreeMap::from([("env".to_string(), json!("new"))]);
-        let sources = variable_edit_sources(&link, &dash, &after, false);
+        let sources = variable_edit_sources(&link, &dash, &after);
         assert!(
             sources.contains(&crate::authz::QuerySource::Vrl {
                 org_id: "o1".into(),
@@ -5320,7 +5483,7 @@ mod tests {
         link.frozen_variables = Some(json!({"a":"all-tenants"}).to_string());
         let after = BTreeMap::from([("a".to_string(), json!("one-tenant"))]);
         assert!(
-            !variable_edit_sources(&link, &dash, &after, false).is_empty(),
+            !variable_edit_sources(&link, &dash, &after).is_empty(),
             "upstream frozen edit influences a public panel and must reach the authorization guard"
         );
     }
@@ -5358,7 +5521,7 @@ mod tests {
         );
         link.frozen_variables = Some(json!({ "m": "old" }).to_string());
         let after = BTreeMap::from([("m".to_string(), json!("new"))]);
-        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after, false));
+        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after));
         assert!(
             texts.iter().any(|t| t == "(up) / sum(new_total)"),
             "only the formula reads m, and the build sends its expansion: {texts:?}"
@@ -5379,7 +5542,7 @@ mod tests {
         );
         link.frozen_variables = Some(json!({ "a": "old" }).to_string());
         let after = BTreeMap::from([("a".to_string(), json!("new"))]);
-        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after, false));
+        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after));
         assert!(
             texts.iter().any(|t| t.contains(r#"FROM "s_new""#)),
             "no panel reads b, but its values query reads the stream a selects: {texts:?}"
