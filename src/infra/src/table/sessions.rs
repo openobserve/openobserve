@@ -75,6 +75,25 @@ pub async fn set_with_expiry(
     }
 }
 
+/// Records explicit user activity only while the session is still valid.
+/// The conditional update prevents a stale heartbeat from reviving an expired session.
+pub async fn touch_if_active(
+    session_id: &str,
+    idle_timeout_seconds: i64,
+) -> Result<bool, errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let cutoff = now.saturating_sub(idle_timeout_seconds.saturating_mul(1_000_000));
+    let client = get_orm_client_rw().await;
+    let result = Entity::update_many()
+        .col_expr(Column::UpdatedAt, sea_orm::sea_query::Expr::value(now))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::ExpiresAt.gt(now))
+        .filter(Column::UpdatedAt.gt(cutoff))
+        .exec(client)
+        .await?;
+    Ok(result.rows_affected > 0)
+}
+
 /// Deletes a session by session_id
 pub async fn delete(session_id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
