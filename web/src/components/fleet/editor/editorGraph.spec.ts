@@ -393,14 +393,13 @@ describe("Kubernetes palette items", () => {
     return { graph, yaml: load(graphToYaml(graph)) as Record<string, any> };
   };
 
-  it("adds K8s attributes matched by pod uid first, so pod logs read from files get metadata", () => {
+  it("adds K8s attributes matched by pod uid then IP, never by the connection", () => {
     const { yaml } = added("k8sattributes");
     expect(yaml.processors.k8sattributes).toEqual({
       auth_type: "serviceAccount",
       pod_association: [
         { sources: [{ from: "resource_attribute", name: "k8s.pod.uid" }] },
         { sources: [{ from: "resource_attribute", name: "k8s.pod.ip" }] },
-        { sources: [{ from: "connection" }] },
       ],
       extract: {
         metadata: [

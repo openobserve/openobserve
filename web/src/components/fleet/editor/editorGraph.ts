@@ -176,14 +176,13 @@ export const CATALOG: CatalogItem[] = [
     limit_mib: "400",
     spike_limit_mib: "100",
   }),
-  // Without pod_association only the connection IP is matched, so file-read pod logs get nothing.
+  // Uid then IP, never the connection: on a gateway that is the sending agent, whose pod would tag node metrics.
   p("k8sattributes", "K8s attributes", "label", {
     auth_type: "serviceAccount",
     "pod_association[0].sources[0].from": "resource_attribute",
     "pod_association[0].sources[0].name": "k8s.pod.uid",
     "pod_association[1].sources[0].from": "resource_attribute",
     "pod_association[1].sources[0].name": "k8s.pod.ip",
-    "pod_association[2].sources[0].from": "connection",
     "extract.metadata[0]": "k8s.pod.name",
     "extract.metadata[1]": "k8s.namespace.name",
     "extract.metadata[2]": "k8s.deployment.name",
