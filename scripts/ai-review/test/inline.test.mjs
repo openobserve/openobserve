@@ -66,12 +66,12 @@ test("the inline block is parsed and cut out of the summary, fenced or not", () 
   assert.equal(out.text, "## 🔎 OpenObserve Code Review\n\nbody");
   assert.equal(out.error, null);
   assert.deepEqual(out.findings, [
-    { file: "src/lib.rs", line: 11, severity: "critical", category: "Code Quality", title: "Bug", body: "Fix it" },
+    { file: "src/lib.rs", line: 11, severity: "p0", category: "Code Quality", title: "Bug", body: "Fix it" },
   ]);
 });
 
 test("nested or unterminated comment openers in finding text are stripped", () => {
-  const block = (title, body) => `<!-- ai-review-inline\n${JSON.stringify([{ file: "src/lib.rs", line: 11, severity: "warning", title, body }])}\n-->`;
+  const block = (title, body) => `<!-- ai-review-inline\n${JSON.stringify([{ file: "src/lib.rs", line: 11, severity: "p2", title, body }])}\n-->`;
   const [f] = extractInlineBlock(block("A <!<!---->-- x --> B", "tail <!-- open")).findings;
   assert.equal(f.title.includes("<!--"), false);
   assert.equal(f.body.includes("<!--"), false);
@@ -86,23 +86,35 @@ test("a missing or malformed inline block leaves the summary intact and yields n
   assert.match(bad.error, /not valid JSON/);
 });
 
-test("only critical/warning findings on valid anchors are selected, critical first, capped", () => {
+test("only p0, p1 and p2 findings on valid anchors are selected, most severe first, capped", () => {
   const lines = rightSideLines(DIFF);
   const f = (severity, file, line, title) => ({ severity, file, line, title, body: "" });
   const { selected, dropped } = selectInlineComments([
-    f("warning", "src/lib.rs", 12, "warn"),
-    f("critical", "src/lib.rs", 11, "crit"),
-    f("suggestion", "src/lib.rs", 11, "nit"),
-    f("critical", "src/lib.rs", 20, "outside the hunk"),
-    f("critical", "other.rs", 1, "file not in diff"),
-    f("warning", "src/lib.rs", 0, "no line"),
-    f("warning", "src/lib.rs", 13, "Crit!"),
-    f("warning", "src/lib.rs", 13, "crit"),
-    f("warning", "new.ts", 1, "over the cap"),
+    f("p2", "src/lib.rs", 12, "warn"),
+    f("p0", "src/lib.rs", 11, "crit"),
+    f("p3", "src/lib.rs", 11, "nit"),
+    f("p0", "src/lib.rs", 20, "outside the hunk"),
+    f("p0", "other.rs", 1, "file not in diff"),
+    f("p2", "src/lib.rs", 0, "no line"),
+    f("p2", "src/lib.rs", 13, "Crit!"),
+    f("p2", "src/lib.rs", 13, "crit"),
+    f("p2", "new.ts", 1, "over the cap"),
   ], lines, new Set(), 2);
   assert.deepEqual(selected.map(s => s.title), ["crit", "warn"]);
   assert.equal(selected[0].fingerprint, fingerprint("src/lib.rs", "crit"));
   assert.deepEqual(dropped, { severity: 1, anchor: 3, duplicate: 2, cap: 1 });
+});
+
+test("p1 sorts between p0 and p2 and parsed legacy severities reach the right threads", () => {
+  const block = `<!-- ai-review-inline\n${JSON.stringify([
+    { file: "src/lib.rs", line: 11, severity: "warning", title: "two" },
+    { file: "src/lib.rs", line: 12, severity: "P1", title: "one" },
+    { file: "src/lib.rs", line: 13, severity: "suggestion", title: "three" },
+    { file: "src/lib.rs", line: 14, severity: "critical", title: "zero" },
+  ])}\n-->`;
+  const { selected, dropped } = selectInlineComments(extractInlineBlock(block).findings, rightSideLines(DIFF));
+  assert.deepEqual(selected.map(s => [s.title, s.severity]), [["zero", "p0"], ["one", "p1"], ["two", "p2"]]);
+  assert.equal(dropped.severity, 1);
 });
 
 test("fingerprints already posted by the bot are skipped; other authors are ignored", () => {
@@ -115,20 +127,20 @@ test("fingerprints already posted by the bot are skipped; other authors are igno
   assert.deepEqual([...posted], [fp]);
   assert.equal(existingFingerprints(comments, "").size, 0);
   const { selected, dropped } = selectInlineComments([
-    { severity: "critical", file: "src/lib.rs", line: 11, title: "  CRIT. ", body: "" },
-    { severity: "warning", file: "src/lib.rs", line: 12, title: "warn", body: "" },
+    { severity: "p0", file: "src/lib.rs", line: 11, title: "  CRIT. ", body: "" },
+    { severity: "p2", file: "src/lib.rs", line: 12, title: "warn", body: "" },
   ], rightSideLines(DIFF), posted);
   assert.deepEqual(selected.map(s => s.title), ["warn"]);
   assert.equal(dropped.duplicate, 1);
 });
 
 test("the review payload comments only, on the RIGHT side, with the fingerprint after the scrubbed text", () => {
-  const selected = [{ severity: "critical", category: "Security", file: "src/lib.rs", line: 11, title: "t", body: "b", fingerprint: "a".repeat(40) }];
+  const selected = [{ severity: "p0", category: "Security", file: "src/lib.rs", line: 11, title: "t", body: "b", fingerprint: "a".repeat(40) }];
   const payload = buildReviewPayload(selected, "abc123", "summary", text => text.toUpperCase());
   assert.equal(payload.event, "COMMENT");
   assert.equal(payload.commit_id, "abc123");
   assert.deepEqual(Object.keys(payload.comments[0]), ["path", "line", "side", "body"]);
   assert.equal(payload.comments[0].side, "RIGHT");
-  assert.equal(payload.comments[0].body, `**🔴 BLOCKER · SECURITY:** T\n\nB\n\n<!-- ai-review-fp:${"a".repeat(40)} -->`);
+  assert.equal(payload.comments[0].body, `**🔴 P0 · SECURITY:** T\n\nB\n\n<!-- ai-review-fp:${"a".repeat(40)} -->`);
   assert.equal("commit_id" in buildReviewPayload(selected, "", "s"), false);
 });

@@ -5,10 +5,16 @@ These rules apply to ALL reviewers. Violating any of these will cause your findi
 ### Rules
 
 1. **Only report problems this PR introduces or leaves incomplete.** Unchanged code is in scope when the change relies on it or leaves it wrong: a caller or consumer that still uses the old semantics, a sibling code path that should enforce the same rule, a match arm or key the new code depends on that never fires, the other half of a parity pair. Name the changed line that creates the dependency. Unrelated pre-existing bugs stay out.
-2. **Be concrete.** Report a problem only when you can name the input or sequence that triggers it in code you have read. Do not invent hypothetical problems. If one step of the trace is unverified, say which and use suggestion severity. A claim about how a library, framework, browser or test runtime behaves ("jsdom does not keep X", "this selector matches nothing", "the crate panics on Y") needs evidence you read: its source, its docs, or a test in this repo that shows it. Without that, it is a suggestion at most, never a blocker.
+2. **Be concrete.** Report a problem only when you can name the input or sequence that triggers it in code you have read. Do not invent hypothetical problems. If one step of the trace is unverified, say which and use `p3`, never `p0` or `p1`. A claim about how a library, framework, browser or test runtime behaves ("jsdom does not keep X", "this selector matches nothing", "the crate panics on Y") needs evidence you read: its source, its docs, or a test in this repo that shows it. Without that, it is `p3` at most, never `p0` or `p1`.
 3. **No style nitpicks.** Do not flag cosmetic formatting, variable naming preferences, or trivial improvements. Only flag style if it violates established project conventions (e.g., clippy lints in Rust, ESLint rules in TypeScript).
 4. **No flattery.** Do not include "Great job", "Thanks for", "Nice work", or any non-actionable commentary.
-5. **Severity must be justified.** Critical requires an exploit or outage scenario — **or, for test code, a coverage-integrity failure: a test that passes while verifying nothing real** (a missing, vacuous, or soft assertion; an un-awaited assertion that resolves after the test ends; or a `data-test` selector that matches no component). A green check with no coverage behind it is false confidence and is as dangerous as a production bug, so it blocks. Warning requires measurable regression risk or a broken project rule. Suggestion is for a likely bug with one unverified step (rule 2).
+5. **Severity must be justified, and is graded by who can reach the failure.** Use one of four levels:
+   - `p0` (blocker): an outage, data loss or corruption, an exploitable security hole, or a default path broken for all users.
+   - `p1` (blocker): a real bug that normal use or normal config reaches: wrong results, a crash, a failed request, a regression. Also, for test code, **a coverage-integrity failure: a test that passes while verifying nothing real** (a missing, vacuous, or soft assertion; an un-awaited assertion that resolves after the test ends; or a `data-test` selector that matches no component). A green check with no coverage behind it is false confidence, so it blocks.
+   - `p2` (not blocking): a real bug that needs unusual input, rare timing or non-default config; a measurable regression off the hot path; a broken project rule with no runtime effect.
+   - `p3` (not blocking): a likely bug with one unverified step (rule 2).
+
+   If a normal user reaches it without unusual setup, it is `p1`, not `p2`. A finding with neither a concrete failure nor a named project rule it breaks is not a finding: drop it.
 6. **Real bugs only.** Report a finding only when it breaks something: wrong output, a crash, data loss, a security hole, or a measurable regression. Breaking a project rule (AGENTS.md, the house rules) counts. Hardening ideas, extra defensive checks, "consider" items and best-practice notes are not findings. If you cannot name what breaks, leave it out.
 7. **One finding per issue.** Do not combine multiple unrelated issues into one finding.
 8. **Be specific.** Include exact file paths and line numbers. Reference the relevant code snippet in your description.
@@ -42,7 +48,7 @@ You MUST output your findings as a single block of structured XML. Do not includ
 <findings>
   <finding>
     <category>YOUR_CATEGORY</category>
-    <severity>critical|warning|suggestion</severity>
+    <severity>p0|p1|p2|p3</severity>
     <file>path/to/file.rs</file>
     <line>NUMBER</line>
     <summary>One-line summary of the issue</summary>
