@@ -114,6 +114,7 @@ import {
 import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
+import type { AlertSectionId } from "@/components/alerts/alertFormSections";
 import {
   anomalyBandWidthPrefill,
   anomalyBudgetPerDay,
@@ -409,7 +410,17 @@ export type AlertFormValues = PayloadFormData & {
   _meta: Record<string, unknown>;
 } & Record<string, unknown>;
 
-export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
+/** What the host editor does on the form's behalf. */
+export interface AlertFormHooks {
+  /** Bring a section into view when a save gate stops on a field inside it. */
+  showSection?: (id: AlertSectionId) => void;
+}
+
+export function useAlertForm(
+  props: AlertFormProps,
+  emit: AlertFormEmit,
+  hooks: AlertFormHooks = {},
+) {
   const store: any = useStore();
   const { t } = useI18nTyped();
   const router = useRouter();
@@ -1453,43 +1464,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return false;
   };
 
+  // Every section is always rendered, so the first visible message is the one to focus.
   const focusOnFirstError = () => {
-    nextTick(async () => {
+    nextTick(() => {
       const form = document.querySelector("form");
-      if (!form) return;
-
-      // The offending field is on the tab the user is already looking at.
-      if (focusVisibleError(form)) return;
-
-      // Nothing VISIBLE is erroring, but the form is still invalid — so the
-      // offending field lives on a tab the user isn't looking at. That pane is
-      // v-show'd off, so every message inside it has a null offsetParent and the
-      // scan above skips it: the toast fires, points at nothing, and the user is
-      // told to fix a field they cannot see. Bring the owning tab forward first,
-      // then focus for real (this is what the pre-migration save gate did by
-      // hardcoding `activeTab = "condition"` before focusing).
-      // Only hop to a tab that is REACHABLE in the current mode. Every pane stays
-      // in the DOM in both modes (v-show, not v-if) while `alertTabs` swaps the
-      // headers wholesale between anomaly and alert — so a stale message on a
-      // pane whose header isn't rendered would strand the user on a tab the
-      // toggle group cannot show or leave.
-      const stranded = Array.from(form.querySelectorAll<HTMLElement>('[role="alert"]')).find(
-        (el) => {
-          if (!el.textContent?.trim()) return false;
-          const key = el.closest<HTMLElement>("[data-tab-pane]")?.dataset.tabPane;
-          return !!key && !!form.querySelector(`[data-test="add-alert-tab-${key}"]`);
-        },
-      );
-      const pane = stranded?.closest<HTMLElement>("[data-tab-pane]");
-      const tab = pane?.dataset.tabPane;
-      if (!tab || tab === activeTab.value) return;
-
-      activeTab.value = tab;
-      await nextTick();
-      // Re-scan with the visibility filter intact: now that the pane is shown,
-      // its messages have an offsetParent. Anything still hidden (a collapsed
-      // section) is correctly skipped rather than focused into the void.
-      focusVisibleError(form);
+      if (form) focusVisibleError(form);
     });
   };
 
@@ -2252,6 +2231,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // inline "Cron expression and timezone are required". Parity: no toast.
       if (!tc.cron || !tc.timezone) {
         activeTab.value = "condition";
+        hooks.showSection?.("schedule");
         return false;
       }
       try {
@@ -2262,6 +2242,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         ) {
           const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
           activeTab.value = "condition";
+          hooks.showSection?.("schedule");
           toast({
             variant: "error",
             message: t("alerts.queryConfig.frequencyGreaterThanSeconds", {
@@ -2272,6 +2253,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         }
       } catch {
         activeTab.value = "condition";
+        hooks.showSection?.("schedule");
         toast({
           variant: "error",
           message: t("alerts.queryConfig.invalidCronExpression"),
@@ -2285,6 +2267,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (tab === "sql") {
       if (!qc.sql || String(qc.sql).trim() === "") {
         activeTab.value = "condition";
+        hooks.showSection?.("watch");
         toast({
           variant: "error",
           message: t("alerts.messages.sqlQueryEmpty"),
@@ -2293,6 +2276,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
       if (sqlQueryErrorMsg.value && sqlQueryErrorMsg.value.trim() !== "") {
         activeTab.value = "condition";
+        hooks.showSection?.("watch");
         toast({
           variant: "error",
           message: t("alerts.messages.fixSqlErrorBeforeSaving"),
@@ -2302,6 +2286,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     } else if (tab === "promql") {
       if (!qc.promql || String(qc.promql).trim() === "") {
         activeTab.value = "condition";
+        hooks.showSection?.("watch");
         toast({
           variant: "error",
           message: t("alerts.messages.promqlQueryEmpty"),
@@ -2346,6 +2331,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       !getParser(formData.value.query_condition.sql)
     ) {
       activeTab.value = "condition";
+      hooks.showSection?.("watch");
       toast({
         variant: "error",
         message: t("alerts.messages.selectAllColumnsNotAllowed"),
@@ -2418,6 +2404,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
 
       activeTab.value = "condition";
+      hooks.showSection?.("watch");
       return false;
     }
 

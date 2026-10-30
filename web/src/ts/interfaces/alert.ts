@@ -484,3 +484,15 @@ export interface CompositeTimelineResponse {
   children: CompositeTimelineLane[];
   result: CompositeTimelineLane;
 }
+
+/** `EnableAlertResponseBody` in src/api/management/src/models/alerts/responses.rs. */
+export interface EnableAlertResponseBody {
+  enabled: boolean;
+}
+
+/** Reply of `PATCH /api/v2/{org}/alerts/{id}/trigger`; the flags come only from an anomaly run. */
+export interface TriggerAlertResponseBody {
+  message?: string;
+  claim_lost?: boolean;
+  ineligible?: boolean;
+}

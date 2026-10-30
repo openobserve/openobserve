@@ -21,9 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
+      :templates="templates"
       @update:list="handleUpdateList"
       @cancel:hideform="handleCancel"
       @refresh:destinations="refreshDestinations"
+      @refresh:templates="refreshTemplates"
     />
   </div>
 </template>
@@ -33,6 +35,7 @@ import { alertDetailQuery } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
@@ -58,6 +61,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const destinations = ref([]);
+    const templates = ref<unknown[]>([]);
     const isUpdated = ref(false);
 
     /**
@@ -145,6 +149,28 @@ export default defineComponent({
       await getDestinations();
     };
 
+    // The mount read stays cache-first; only the form's refresh button forces a server read.
+    const getTemplates = async (force = false) => {
+      const options = templatesQuery(store.state.selectedOrganization.identifier);
+      try {
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        templates.value = await queryClient.fetchQuery(options);
+      } catch {
+        toast({
+          variant: "error",
+          message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
+        });
+      }
+    };
+
+    const refreshTemplates = () => getTemplates(true);
+
     const handleUpdateList = (folderId?: string, options?: AlertSavedOptions) => {
       const resolvedFolder = folderId || (route.query.folder as string) || "default";
 
@@ -189,7 +215,7 @@ export default defineComponent({
       // In parallel: the form needs destinations either way, and edit mode
       // needs the alert. Sequencing them would make editing feel slower than
       // the list-hosted editor it replaces.
-      void Promise.all([getDestinations(), loadAlertForEdit()]);
+      void Promise.all([getDestinations(), getTemplates(), loadAlertForEdit()]);
     });
 
     // Leaving without saving retires the prefill too — otherwise re-opening the
@@ -201,12 +227,14 @@ export default defineComponent({
 
     return {
       destinations,
+      templates,
       isUpdated,
       editedAlert,
       isLoadingAlert,
       loadFailed,
       getDestinations,
       refreshDestinations,
+      refreshTemplates,
       handleUpdateList,
       handleCancel,
     };

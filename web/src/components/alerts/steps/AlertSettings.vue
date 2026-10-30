@@ -16,10 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions rounded-default bg-surface-overlay border-border-default mx-auto w-full border"
+    :class="[
+      'step-alert-conditions mx-auto w-full',
+      sectionTargets ? '' : 'rounded-default bg-surface-overlay border-border-default border',
+    ]"
   >
     <!-- Section header -->
-    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+    <div
+      v-if="!sectionTargets"
+      class="border-border-default flex items-center border-b px-3 py-2.5"
+    >
       <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
       <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
         t("alerts.alertSettings.sectionTitle")
@@ -30,382 +36,440 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          FORM_CONTEXT_KEY. The OForm* fields below inject that form and bind by
          nested `name=` (trigger_condition.*, destinations, creates_incident); the
          composed schema in AddAlert.schema.ts validates them on save. -->
-    <div class="px-3 py-2">
+    <div :class="sectionTargets ? '' : 'px-3 py-2'">
       <div>
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true' || isRealTime === 'composite'">
-          <!-- Silence Notification (Cooldown) -->
-          <div class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.silenceNotification')"
-                    name="trigger_condition.silence"
-                    type="number"
-                    min="0"
-                    data-test="alert-settings-silence-duration-input"
+          <Teleport
+            :to="sectionTargets?.settingsSchedule"
+            :disabled="!sectionTargets?.settingsSchedule"
+          >
+            <!-- Silence Notification (Cooldown) -->
+            <div class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1">
+              <div
+                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
+              >
+                {{ t("alerts.plain.cooldown") }}
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
+              </div>
+              <div class="me-2 flex w-fit flex-col gap-1">
+                <div class="flex items-center">
+                  <div class="w-21.75">
+                    <OFormInput
+                      :aria-label="t('alerts.silenceNotification')"
+                      name="trigger_condition.silence"
+                      type="number"
+                      min="0"
+                      data-test="alert-settings-silence-duration-input"
+                    >
+                      <!-- Message rendered below at pair width — see silenceError. -->
+                      <template #error />
+                    </OFormInput>
+                  </div>
+                  <div
+                    class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                   >
-                    <!-- Message rendered below at pair width — see silenceError. -->
-                    <template #error />
-                  </OFormInput>
+                    {{ t("alerts.minutes") }}
+                  </div>
                 </div>
                 <div
-                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                  v-if="silenceError"
+                  class="text-input-error-text text-xs whitespace-nowrap"
+                  data-test="alert-settings-silence-error"
+                  role="alert"
                 >
-                  {{ t("alerts.minutes") }}
+                  {{ silenceError }}
                 </div>
               </div>
-              <div
-                v-if="silenceError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-silence-error"
-                role="alert"
-              >
-                {{ silenceError }}
-              </div>
             </div>
-          </div>
 
-          <!-- Pending period. Composite only — no per-alert frequency to warn
+            <!-- Pending period. Composite only — no per-alert frequency to warn
                against (§2b), so no not-a-multiple hint here, unlike the
                scheduled block below. Same field, label, and tooltip as the
                scheduled version, intentionally no visual distinction — the
                backend stores and evaluates it for composite alerts too
                (handle_composite_alert_trigger). -->
-          <div
-            v-if="isRealTime === 'composite'"
-            class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1"
-          >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.queryConfig.pendingPeriod") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center gap-2">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.summary.pendingPeriod')"
-                    name="_ui.pendingPeriod"
-                    type="number"
-                    min="0"
-                    data-test="alert-settings-pending-period-input"
-                    @update:model-value="onPendingPeriodChange"
-                  >
-                    <template #error />
-                  </OFormInput>
-                </div>
-                <OSelect
-                  :aria-label="t('common.timeUnit')"
-                  class="max-w-25 min-w-20"
-                  :model-value="pendingPeriodUnit"
-                  :options="pendingPeriodUnitOptions"
-                  labelKey="label"
-                  valueKey="value"
-                  :searchable="false"
-                  data-test="alert-settings-pending-period-unit"
-                  @update:model-value="onPendingPeriodUnitChange"
-                />
-              </div>
+            <div
+              v-if="isRealTime === 'composite'"
+              class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1"
+            >
               <div
-                v-if="pendingPeriodError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-pending-period-error"
-                role="alert"
+                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
               >
-                {{ pendingPeriodError }}
+                {{ t("alerts.queryConfig.pendingPeriod") }}
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
+              </div>
+              <div class="me-2 flex w-fit flex-col gap-1">
+                <div class="flex items-center gap-2">
+                  <div class="w-21.75">
+                    <OFormInput
+                      :aria-label="t('alerts.summary.pendingPeriod')"
+                      name="_ui.pendingPeriod"
+                      type="number"
+                      min="0"
+                      data-test="alert-settings-pending-period-input"
+                      @update:model-value="onPendingPeriodChange"
+                    >
+                      <template #error />
+                    </OFormInput>
+                  </div>
+                  <OSelect
+                    :aria-label="t('common.timeUnit')"
+                    class="max-w-25 min-w-20"
+                    :model-value="pendingPeriodUnit"
+                    :options="pendingPeriodUnitOptions"
+                    labelKey="label"
+                    valueKey="value"
+                    :searchable="false"
+                    data-test="alert-settings-pending-period-unit"
+                    @update:model-value="onPendingPeriodUnitChange"
+                  />
+                </div>
+                <div
+                  v-if="pendingPeriodError"
+                  class="text-input-error-text text-xs whitespace-nowrap"
+                  data-test="alert-settings-pending-period-error"
+                  role="alert"
+                >
+                  {{ pendingPeriodError }}
+                </div>
               </div>
             </div>
-          </div>
+          </Teleport>
 
-          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
+          <Teleport
+            :to="sectionTargets?.settingsNotify"
+            :disabled="!sectionTargets?.settingsNotify"
+          >
+            <!-- Destinations. Deliberately NOT name=-bound: one control writes two
                form fields, so both go up through the parent's setFieldValue via
                the events below. -->
-          <AlertDestinationsField
-            class="mb-4 pb-4"
-            :destinations="destinations"
-            :workflows="workflows"
-            :destination-options="formattedDestinations"
-            :error="destinationsError"
-            :notifies-nobody="notifiesNobody"
-            show-status
-            :placeholder="t('alerts.summary.noDestination')"
-            @update:destinations="$emit('update:destinations', $event)"
-            @update:workflows="$emit('update:workflows', $event)"
-            @refresh="$emit('refresh:destinations')"
-          />
+            <AlertDestinationsField
+              :wrap="!!sectionTargets"
+              class="mb-4 pb-4"
+              :destinations="destinations"
+              :workflows="workflows"
+              :destination-options="formattedDestinations"
+              :error="destinationsError"
+              :notifies-nobody="notifiesNobody"
+              show-status
+              :placeholder="t('alerts.summary.noDestination')"
+              @update:destinations="$emit('update:destinations', $event)"
+              @update:workflows="$emit('update:workflows', $event)"
+              @refresh="$emit('refresh:destinations')"
+            />
+          </Teleport>
         </template>
 
         <!-- For Scheduled Alerts -->
         <template v-else>
-          <!-- Period -->
-          <div
-            v-if="!isForecastMode"
-            ref="periodFieldRef"
-            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          <Teleport
+            :to="sectionTargets?.settingsSchedule"
+            :disabled="!sectionTargets?.settingsSchedule"
           >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.period')"
-                    name="trigger_condition.period"
-                    type="number"
-                    min="1"
-                    :debounce="300"
-                    data-test="alert-settings-period-input"
-                    @update:model-value="handlePeriodChange"
+            <!-- Period -->
+            <div
+              v-if="!isForecastMode"
+              ref="periodFieldRef"
+              class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+            >
+              <div
+                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
+              >
+                {{ t("alerts.plain.lookBack") }}
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
+              </div>
+              <div class="me-2 flex w-fit flex-col gap-1">
+                <div class="flex items-center">
+                  <div class="w-21.75">
+                    <OFormInput
+                      :aria-label="t('alerts.period')"
+                      name="trigger_condition.period"
+                      type="number"
+                      min="1"
+                      :debounce="300"
+                      data-test="alert-settings-period-input"
+                      @update:model-value="handlePeriodChange"
+                    >
+                      <!-- Message rendered below at pair width — see periodError. -->
+                      <template #error />
+                    </OFormInput>
+                  </div>
+                  <div
+                    class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                   >
-                    <!-- Message rendered below at pair width — see periodError. -->
-                    <template #error />
-                  </OFormInput>
+                    {{ t("alerts.minutes") }}
+                  </div>
                 </div>
                 <div
-                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                  v-if="periodError"
+                  class="text-input-error-text text-xs whitespace-nowrap"
+                  data-test="alert-settings-period-error"
+                  role="alert"
                 >
-                  {{ t("alerts.minutes") }}
+                  {{ periodError }}
                 </div>
               </div>
-              <div
-                v-if="periodError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-period-error"
-                role="alert"
-              >
-                {{ periodError }}
-              </div>
             </div>
-          </div>
 
-          <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div
-            ref="silenceFieldRef"
-            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
-          >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.silenceNotification')"
-                    name="trigger_condition.silence"
-                    type="number"
-                    min="0"
-                    :debounce="300"
-                    data-test="alert-settings-silence-duration-input"
+            <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
+            <div
+              ref="silenceFieldRef"
+              class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+            >
+              <div
+                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
+              >
+                {{ t("alerts.plain.cooldown") }}
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
+              </div>
+              <div class="me-2 flex w-fit flex-col gap-1">
+                <div class="flex items-center">
+                  <div class="w-21.75">
+                    <OFormInput
+                      :aria-label="t('alerts.silenceNotification')"
+                      name="trigger_condition.silence"
+                      type="number"
+                      min="0"
+                      :debounce="300"
+                      data-test="alert-settings-silence-duration-input"
+                    >
+                      <!-- Message rendered below at pair width — see silenceError. -->
+                      <template #error />
+                    </OFormInput>
+                  </div>
+                  <div
+                    class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                   >
-                    <!-- Message rendered below at pair width — see silenceError. -->
-                    <template #error />
-                  </OFormInput>
+                    {{ t("alerts.minutes") }}
+                  </div>
                 </div>
                 <div
-                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                  v-if="silenceError"
+                  class="text-input-error-text text-xs whitespace-nowrap"
+                  data-test="alert-settings-silence-error"
+                  role="alert"
                 >
-                  {{ t("alerts.minutes") }}
+                  {{ silenceError }}
                 </div>
               </div>
-              <div
-                v-if="silenceError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-silence-error"
-                role="alert"
-              >
-                {{ silenceError }}
-              </div>
             </div>
-          </div>
+          </Teleport>
 
-          <!-- Pending period for Scheduled Alerts. Moved here from
+          <Teleport :to="sectionTargets?.settingsHold" :disabled="!sectionTargets?.settingsHold">
+            <!-- Pending period for Scheduled Alerts. Moved here from
                QueryConfig.vue's condition section — same field, label, and
                tooltip as the composite version above, plus the
                not-a-multiple-of-Check-every warning (composite has no
                frequency to compare against, so it skips that row). -->
-          <div
-            ref="pendingPeriodFieldRef"
-            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
-          >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.queryConfig.pendingPeriod") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center gap-2">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.summary.pendingPeriod')"
-                    name="_ui.pendingPeriod"
-                    type="number"
-                    min="0"
-                    data-test="alert-settings-pending-period-input"
-                    @update:model-value="onPendingPeriodChange"
-                  >
-                    <template #error />
-                  </OFormInput>
+            <div
+              v-if="tierShows('holdFor')"
+              ref="pendingPeriodFieldRef"
+              class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+            >
+              <div
+                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
+              >
+                {{ t("alerts.plain.forAtLeast") }}
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
+              </div>
+              <div class="me-2 flex w-fit flex-col gap-1">
+                <div class="flex items-center gap-2">
+                  <div class="w-21.75">
+                    <OFormInput
+                      :aria-label="t('alerts.summary.pendingPeriod')"
+                      name="_ui.pendingPeriod"
+                      type="number"
+                      min="0"
+                      data-test="alert-settings-pending-period-input"
+                      @update:model-value="onPendingPeriodChange"
+                    >
+                      <template #error />
+                    </OFormInput>
+                  </div>
+                  <OSelect
+                    :aria-label="t('common.timeUnit')"
+                    class="max-w-25 min-w-20"
+                    :model-value="pendingPeriodUnit"
+                    :options="pendingPeriodUnitOptions"
+                    labelKey="label"
+                    valueKey="value"
+                    :searchable="false"
+                    data-test="alert-settings-pending-period-unit"
+                    @update:model-value="onPendingPeriodUnitChange"
+                  />
                 </div>
-                <OSelect
-                  :aria-label="t('common.timeUnit')"
-                  class="max-w-25 min-w-20"
-                  :model-value="pendingPeriodUnit"
-                  :options="pendingPeriodUnitOptions"
-                  labelKey="label"
-                  valueKey="value"
-                  :searchable="false"
-                  data-test="alert-settings-pending-period-unit"
-                  @update:model-value="onPendingPeriodUnitChange"
-                />
-              </div>
-              <div
-                v-if="pendingPeriodError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-pending-period-error"
-                role="alert"
-              >
-                {{ pendingPeriodError }}
-              </div>
-              <div
-                v-if="!pendingPeriodError && pendingPeriodWarning"
-                class="text-status-warning-text text-xs whitespace-nowrap"
-                data-test="alert-settings-pending-period-warning"
-                role="alert"
-              >
-                {{ pendingPeriodWarning }}
+                <div
+                  v-if="pendingPeriodError"
+                  class="text-input-error-text text-xs whitespace-nowrap"
+                  data-test="alert-settings-pending-period-error"
+                  role="alert"
+                >
+                  {{ pendingPeriodError }}
+                </div>
+                <div
+                  v-if="!pendingPeriodError && pendingPeriodWarning"
+                  class="text-status-warning-text text-xs whitespace-nowrap"
+                  data-test="alert-settings-pending-period-warning"
+                  role="alert"
+                >
+                  {{ pendingPeriodWarning }}
+                </div>
               </div>
             </div>
-          </div>
+          </Teleport>
 
-          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
+          <Teleport
+            :to="sectionTargets?.settingsNotify"
+            :disabled="!sectionTargets?.settingsNotify"
+          >
+            <!-- Destinations. Deliberately NOT name=-bound: one control writes two
                form fields, so both go up through the parent's setFieldValue via
                the events below. The focus manager resolves a component ref via
                $el, so the ref moves onto the field unchanged. -->
-          <AlertDestinationsField
-            ref="destinationsFieldRef"
-            class="me-2 mb-4!"
-            :destinations="destinations"
-            :workflows="workflows"
-            :destination-options="formattedDestinations"
-            :error="destinationsError"
-            :notifies-nobody="notifiesNobody"
-            show-status
-            :placeholder="t('alerts.summary.noDestination')"
-            @update:destinations="$emit('update:destinations', $event)"
-            @update:workflows="$emit('update:workflows', $event)"
-            @refresh="$emit('refresh:destinations')"
-          />
+            <AlertDestinationsField
+              :wrap="!!sectionTargets"
+              ref="destinationsFieldRef"
+              class="me-2 mb-4!"
+              :destinations="destinations"
+              :workflows="workflows"
+              :destination-options="formattedDestinations"
+              :error="destinationsError"
+              :notifies-nobody="notifiesNobody"
+              show-status
+              :placeholder="t('alerts.summary.noDestination')"
+              @update:destinations="$emit('update:destinations', $event)"
+              @update:workflows="$emit('update:workflows', $event)"
+              @refresh="$emit('refresh:destinations')"
+            />
+          </Teleport>
         </template>
 
-        <!-- Creates Incident toggle — all alert types, enterprise/cloud with Incidents on -->
-        <div v-if="incidentsEnabled" class="mb-4! flex items-start max-md:gap-3">
-          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-            {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-            <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
-          </div>
-          <OFormSwitch
-            name="creates_incident"
-            :aria-label="t('alerts.alertSettings.createsIncident')"
-            data-test="alert-creates-incident-toggle"
-          />
-        </div>
-
-        <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
-        <template v-if="isRealTime === 'false'">
-          <div class="mb-4! flex items-start max-md:gap-3">
+        <Teleport
+          :to="sectionTargets?.settingsNotifyMore"
+          :disabled="!sectionTargets?.settingsNotifyMore"
+        >
+          <!-- Creates Incident toggle — all alert types, enterprise/cloud with Incidents on -->
+          <div
+            v-if="incidentsEnabled && tierShows('createsIncident')"
+            class="mb-4! flex items-start max-md:gap-3"
+          >
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.alertSettings.notifyOnRecovery") }}
+              {{ t("alerts.plain.openIncident") }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip
-                :content="
-                  notifiesNobody
-                    ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
-                    : t('alerts.alertSettings.notifyOnRecoveryTooltip')
-                "
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
             </div>
-            <div class="flex flex-col gap-1">
-              <!-- A recovery closes what a firing delivered; with no target nothing is
-                   delivered, so it cannot be turned on. It can still be turned off. -->
-              <OFormSwitch
-                name="notify_on_recovery"
-                :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
-                :disabled="notifiesNobody && !formData?.notify_on_recovery"
-                data-test="alert-notify-on-recovery-toggle"
-              />
-              <template v-if="formData?.notify_on_recovery && !notifiesNobody">
-                <div
-                  v-for="row in recoveryPlan"
-                  :key="row.name"
-                  class="text-text-secondary text-xs"
-                  :data-test="`alert-notify-on-recovery-plan-${row.name}`"
-                >
-                  {{ row.name }} — {{ row.action }}
-                </div>
-                <div
-                  v-if="hasChatRecovery"
-                  class="text-text-secondary text-xs"
-                  data-test="alert-notify-on-recovery-hint"
-                >
-                  {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
-                </div>
-              </template>
-            </div>
+            <OFormSwitch
+              name="creates_incident"
+              :aria-label="t('alerts.alertSettings.createsIncident')"
+              data-test="alert-creates-incident-toggle"
+            />
           </div>
 
-          <AlertDestinationsField
-            v-if="formData?.notify_on_recovery && !notifiesNobody"
-            class="me-2 mb-4!"
-            :destinations="recoveryDestinations"
-            :workflows="[]"
-            :destination-options="formattedDestinations"
-            :label="t('alerts.alertSettings.recoveryDestinations')"
-            :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
-            :supports-workflows="false"
-            @update:destinations="$emit('update:recoveryDestinations', $event)"
-            @refresh="$emit('refresh:destinations')"
-          />
-
-          <!-- The hold delays on-call and incident closure too, not only the message. -->
-          <div class="mb-4! flex items-start max-md:flex-col max-md:gap-1">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.alertSettings.keepFiringFor") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
-            </div>
-            <div class="flex items-center">
-              <div class="w-21.75">
-                <OFormInput
-                  :aria-label="t('alerts.alertSettings.keepFiringFor')"
-                  name="keep_firing_for"
-                  type="number"
-                  min="0"
-                  :debounce="300"
-                  data-test="alert-settings-keep-firing-for-input"
+          <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
+          <template v-if="isRealTime === 'false'">
+            <div v-if="tierShows('recovery')" class="mb-4! flex items-start max-md:gap-3">
+              <div
+                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
+              >
+                {{ t("alerts.plain.notifyOnRecovery") }}
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                <OTooltip
+                  :content="
+                    notifiesNobody
+                      ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
+                      : t('alerts.alertSettings.notifyOnRecoveryTooltip')
+                  "
+                  side="right"
                 />
               </div>
-              <div
-                class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
-              >
-                {{ t("alerts.seconds") }}
+              <div class="flex flex-col gap-1">
+                <!-- A recovery closes what a firing delivered; with no target nothing is
+                   delivered, so it cannot be turned on. It can still be turned off. -->
+                <OFormSwitch
+                  name="notify_on_recovery"
+                  :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
+                  :disabled="notifiesNobody && !formData?.notify_on_recovery"
+                  data-test="alert-notify-on-recovery-toggle"
+                />
+                <span
+                  v-if="notifiesNobody && !formData?.notify_on_recovery"
+                  class="text-text-secondary text-xs"
+                  data-test="alert-notify-on-recovery-disabled-reason"
+                >
+                  {{ t("alerts.alertSettings.notifyOnRecoveryNeedsDestination") }}
+                </span>
+                <template v-if="formData?.notify_on_recovery && !notifiesNobody">
+                  <div
+                    v-for="row in recoveryPlan"
+                    :key="row.name"
+                    class="text-text-secondary text-xs"
+                    :data-test="`alert-notify-on-recovery-plan-${row.name}`"
+                  >
+                    {{ row.name }} — {{ row.action }}
+                  </div>
+                  <div
+                    v-if="hasChatRecovery"
+                    class="text-text-secondary text-xs"
+                    data-test="alert-notify-on-recovery-hint"
+                  >
+                    {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
+                  </div>
+                </template>
               </div>
             </div>
-          </div>
-        </template>
+
+            <AlertDestinationsField
+              :wrap="!!sectionTargets"
+              v-if="formData?.notify_on_recovery && !notifiesNobody && tierShows('recovery')"
+              class="me-2 mb-4!"
+              :destinations="recoveryDestinations"
+              :workflows="[]"
+              :destination-options="formattedDestinations"
+              :label="t('alerts.alertSettings.recoveryDestinations')"
+              :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
+              :supports-workflows="false"
+              @update:destinations="$emit('update:recoveryDestinations', $event)"
+              @refresh="$emit('refresh:destinations')"
+            />
+
+            <!-- The hold delays on-call and incident closure too, not only the message. -->
+            <div
+              v-if="tierShows('keepFiring')"
+              class="mb-4! flex items-start max-md:flex-col max-md:gap-1"
+            >
+              <div
+                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
+              >
+                {{ t("alerts.plain.keepFiringFor") }}
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
+              </div>
+              <div class="flex items-center">
+                <div class="w-21.75">
+                  <OFormInput
+                    :aria-label="t('alerts.alertSettings.keepFiringFor')"
+                    name="keep_firing_for"
+                    type="number"
+                    min="0"
+                    :debounce="300"
+                    data-test="alert-settings-keep-firing-for-input"
+                  />
+                </div>
+                <div
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                >
+                  {{ t("alerts.seconds") }}
+                </div>
+              </div>
+            </div>
+          </template>
+        </Teleport>
       </div>
     </div>
   </div>
@@ -423,7 +487,9 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
+import { useTierVisibility } from "@/composables/alerts/useAlertSettingTiers";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
@@ -440,6 +506,11 @@ export default defineComponent({
     AlertDestinationsField,
   },
   props: {
+    // Opt-in: the sectioned alert editor renders each slice of these settings in its own section.
+    sectionTargets: {
+      type: Object as PropType<AlertSectionTargets | null>,
+      default: null,
+    },
     formData: {
       type: Object as PropType<any>,
       required: true,
@@ -730,7 +801,10 @@ export default defineComponent({
     });
     const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
 
+    const tierShows = useTierVisibility();
+
     return {
+      tierShows,
       recoveryPlan,
       hasChatRecovery,
       t,
