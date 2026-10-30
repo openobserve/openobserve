@@ -143,6 +143,48 @@ describe("HomeView", () => {
     });
   });
 
+  describe("the AI Assistant tab", () => {
+    beforeEach(() => setFlag(false));
+
+    it("should stay visible with a lock and show the denied state when ai_assistant is locked", async () => {
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: false,
+        features: { ai_assistant: "locked" },
+      });
+      openTab("ai");
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("home-tab-ai")).toBe(true);
+      expect(has("home-tab-lock-ai")).toBe(true);
+      expect(has("home-ai-locked")).toBe(true);
+      expect(has("ai-chat-stub")).toBe(false);
+    });
+
+    it("should be absent when ai_assistant is not offered", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false, features: {} });
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("home-tab-ai")).toBe(false);
+    });
+
+    it("should mount the chat with no lock when ai_assistant is enabled", async () => {
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: true,
+        features: { ai_assistant: "enabled" },
+      });
+      openTab("ai");
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("home-tab-lock-ai")).toBe(false);
+      expect(has("ai-chat-stub")).toBe(true);
+    });
+  });
+
   describe("with the empty-data flag off", () => {
     beforeEach(() => setFlag(false));
 

@@ -2648,6 +2648,8 @@ describe("useRoutes (router.ts)", () => {
       ["infraKubernetes", "kubernetes_monitoring"],
       ["infraKubernetes2", "kubernetes_monitoring"],
       ["infraHosts", "host_monitoring"],
+      ["alertDestinations", "alerts"],
+      ["alertTemplates", "alerts"],
     ])("tags %s with meta.licenseFeature %s", (name, feature) => {
       expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe(feature);
     });
@@ -2656,18 +2658,12 @@ describe("useRoutes (router.ts)", () => {
       expect(shell("infra/databases").meta.licenseFeature).toBe("db_monitoring");
     });
 
-    it.each([
-      "alertDestinations",
-      "alertTemplates",
-      "pipeline",
-      "functionList",
-      "importFunction",
-      "enrichmentTables",
-      "logs",
-      "traces",
-    ])("leaves %s untagged", (name) => {
-      expect(findRoute(useRoutes().homeChildRoutes, name).meta?.licenseFeature).toBeUndefined();
-    });
+    it.each(["pipeline", "functionList", "importFunction", "enrichmentTables", "logs", "traces"])(
+      "leaves %s untagged",
+      (name) => {
+        expect(findRoute(useRoutes().homeChildRoutes, name).meta?.licenseFeature).toBeUndefined();
+      },
+    );
 
     it("leaves the logged-out public dashboard untagged", () => {
       const route = useRoutes().parentRoutes.find((r: any) => r.name === "publicDashboard");

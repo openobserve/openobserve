@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OTooltip v-if="locked" :content="lockedReason">
         <span class="inline-flex" :data-test="`downtime-target-${module}-locked`">
-          <OIcon name="lock" size="sm" class="text-text-secondary" />
+          <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
         </span>
       </OTooltip>
       <span

@@ -161,6 +161,13 @@ describe("EmptyStateActionCard", () => {
     expect(wrapper.classes()).toContain("gap-2");
   });
 
+  it("drops the chevron hover motion while unavailable", () => {
+    const chevron = (props: Record<string, unknown>) =>
+      mountCard(props).findAll("[data-icon-name]")[1].classes().join(" ");
+    expect(chevron({})).toContain("group-hover:translate-x-0.5");
+    expect(chevron({ unavailable: true })).not.toContain("group-hover");
+  });
+
   it("keeps an unavailable card focusable without emitting its action", async () => {
     const wrapper = mountCard({ unavailable: true });
     expect(wrapper.attributes("disabled")).toBeUndefined();

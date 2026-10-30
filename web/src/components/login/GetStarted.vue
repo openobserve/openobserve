@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             name="lock"
                             size="sm"
-                            class="shrink-0"
+                            class="text-icon-locked shrink-0"
                             :data-test="`onboarding-get-started-source-${option.id}-lock`"
                           />
                           <span>{{ t(option.labelKey) }}</span>

@@ -1096,7 +1096,7 @@ describe("Ingestion", () => {
       w.unmount();
     });
 
-    it("renders the RUM token button disabled with a lock when rum is locked", async () => {
+    it("leaves the lock to the page on the RUM token button when rum is locked", async () => {
       store.state.zoConfig.features = { rum: "locked" };
       if (!router.hasRoute("frontendMonitoring")) {
         router.addRoute({
@@ -1112,8 +1112,8 @@ describe("Ingestion", () => {
       const btn = w
         .findAllComponents({ name: "OButton" })
         .find((b: any) => b.attributes("data-test") === "ingestion-reset-token-btn");
-      expect(btn?.props("disabled")).toBe(true);
-      expect(btn?.props("iconLeft")).toBe("lock");
+      expect(btn?.exists()).toBe(true);
+      expect(btn?.props("iconLeft")).not.toBe("lock");
       w.unmount();
       await router.push(before);
     });

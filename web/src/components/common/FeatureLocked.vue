@@ -16,14 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout :title="label" :icon="meta?.icon ?? 'lock'" data-test="feature-locked-page">
-    <OEmptyState
-      size="hero"
-      illustration="lock"
-      :title="t('featureLock.title', { feature: label })"
-      :description="t('featureLock.description')"
-      :action-label="t('featureLock.contactSales')"
-      @action="openContactSales"
-    />
+    <LicenseDeniedState :features="[key]">
+      <template #actions>
+        <OButton
+          variant="primary"
+          data-test="feature-locked-contact-sales"
+          @click="openContactSales"
+        >
+          {{ t("featureLock.contactSales") }}
+        </OButton>
+      </template>
+    </LicenseDeniedState>
   </OPageLayout>
 </template>
 
@@ -32,7 +35,8 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { useFeatureLockActions, useFeatureNames } from "@/composables/useFeatureLock";
 import { LOCKED_FEATURES } from "@/utils/featureGate";
 

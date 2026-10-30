@@ -335,6 +335,18 @@ describe("LibraryCard", () => {
       expect(scheduled.find('[data-test="alert-library-card-anomaly"]').exists()).toBe(false);
     });
 
+    it("disables the card, its checkbox and its title button when the license locks it", async () => {
+      const wrapper = mountCard({ entry: anomaly, locked: true, licenseLockedReason: "Locked" });
+      const card = wrapper.find(`[data-test="alert-library-card-${anomaly.id}"]`);
+      expect(card.attributes("aria-disabled")).toBe("true");
+      expect(card.classes()).toContain("cursor-not-allowed");
+      expect(
+        wrapper.find(`[data-test="alert-library-card-title-${anomaly.id}"]`).attributes("disabled"),
+      ).toBeDefined();
+      await card.trigger("click");
+      expect(wrapper.emitted("open")).toBeUndefined();
+    });
+
     it("shows the Enterprise badge only when locked", () => {
       const locked = mountCard({ entry: anomaly, locked: true });
       expect(locked.find('[data-test="alert-library-card-enterprise"]').text()).toBe("Enterprise");

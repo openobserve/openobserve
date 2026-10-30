@@ -24,39 +24,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop
       data-test="alert-context-menu"
     >
-      <div
-        v-if="seriesRole === 'forecast'"
-        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
-        @click="handleMenuItemClick('forecast')"
-        data-test="alert-context-menu-forecast"
-      >
-        <OIcon name="trending-up" size="sm" class="me-2" />
-        <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
-          t("dashboard.alertContextMenu.forecastReaches", { value: forecastText })
-        }}</span>
-      </div>
-      <div
-        v-if="seriesRole !== 'forecast'"
-        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
-        @click="handleMenuItemClick('above')"
-        data-test="alert-context-menu-above"
-      >
-        <OIcon name="arrow-upward" size="sm" class="me-2" />
-        <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
-          t("dashboard.alertContextMenu.thresholdAbove", { value: valueText })
-        }}</span>
-      </div>
-      <div
-        v-if="seriesRole !== 'forecast'"
-        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
-        @click="handleMenuItemClick('below')"
-        data-test="alert-context-menu-below"
-      >
-        <OIcon name="arrow-downward" size="sm" class="me-2" />
-        <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
-          t("dashboard.alertContextMenu.thresholdBelow", { value: valueText })
-        }}</span>
-      </div>
+      <template v-if="locked">
+        <div
+          v-for="item in lockedItems"
+          :key="item.condition"
+          class="text-dropdown-item-disabled focus-visible:ring-focus-ring-accent flex cursor-not-allowed items-center px-4 py-2 text-sm focus-visible:ring-2 focus-visible:ring-inset"
+          role="menuitem"
+          aria-disabled="true"
+          tabindex="0"
+          :data-test="`alert-context-menu-${item.condition}`"
+        >
+          <OIcon
+            name="lock"
+            size="sm"
+            class="text-icon-locked me-2"
+            :data-test="`alert-context-menu-${item.condition}-lock`"
+          />
+          <span class="flex min-w-0 flex-col">
+            <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
+              item.label
+            }}</span>
+            <span
+              class="text-text-secondary text-xs select-none"
+              :data-test="`alert-context-menu-${item.condition}-reason`"
+              >{{ lockedReason }}</span
+            >
+          </span>
+        </div>
+      </template>
+      <template v-else>
+        <div
+          v-if="seriesRole === 'forecast'"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          @click="handleMenuItemClick('forecast')"
+          data-test="alert-context-menu-forecast"
+        >
+          <OIcon name="trending-up" size="sm" class="me-2" />
+          <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
+            t("dashboard.alertContextMenu.forecastReaches", { value: forecastText })
+          }}</span>
+        </div>
+        <div
+          v-if="seriesRole !== 'forecast'"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          @click="handleMenuItemClick('above')"
+          data-test="alert-context-menu-above"
+        >
+          <OIcon name="arrow-upward" size="sm" class="me-2" />
+          <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
+            t("dashboard.alertContextMenu.thresholdAbove", { value: valueText })
+          }}</span>
+        </div>
+        <div
+          v-if="seriesRole !== 'forecast'"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          @click="handleMenuItemClick('below')"
+          data-test="alert-context-menu-below"
+        >
+          <OIcon name="arrow-downward" size="sm" class="me-2" />
+          <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
+            t("dashboard.alertContextMenu.thresholdBelow", { value: valueText })
+          }}</span>
+        </div>
+      </template>
     </div>
   </teleport>
 </template>
@@ -101,6 +131,8 @@ export default defineComponent({
     },
     unit: { type: String, default: null },
     unitCustom: { type: String, default: null },
+    locked: { type: Boolean, default: false },
+    lockedReason: { type: String, default: "" },
   },
   emits: ["select", "close"],
   setup(props, { emit }) {
@@ -152,6 +184,26 @@ export default defineComponent({
         String(value),
       );
     });
+
+    const lockedItems = computed(() =>
+      props.seriesRole === "forecast"
+        ? [
+            {
+              condition: "forecast",
+              label: t("dashboard.alertContextMenu.forecastReaches", { value: forecastText.value }),
+            },
+          ]
+        : [
+            {
+              condition: "above",
+              label: t("dashboard.alertContextMenu.thresholdAbove", { value: valueText.value }),
+            },
+            {
+              condition: "below",
+              label: t("dashboard.alertContextMenu.thresholdBelow", { value: valueText.value }),
+            },
+          ],
+    );
 
     const handleMenuItemClick = (condition: "above" | "below" | "forecast") => {
       emit("select", {
@@ -216,6 +268,7 @@ export default defineComponent({
       valueText,
       forecastText,
       menuStyle,
+      lockedItems,
       handleMenuItemClick,
     };
   },

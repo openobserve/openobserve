@@ -244,8 +244,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("traces.servicesCatalog.insights.viewTraces") }}
         </OButton>
+        <OTooltip v-if="entry.folder && alertsLocked" :content="alertsLockedReason">
+          <span class="inline-flex">
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              disabled
+              icon-left="lock"
+              :data-test="`services-catalog-insight-charts-${i}`"
+            >
+              {{ t("traces.servicesCatalog.insights.viewCharts") }}
+            </OButton>
+          </span>
+        </OTooltip>
         <OButton
-          v-if="entry.folder"
+          v-else-if="entry.folder"
           variant="ghost-primary"
           size="xs"
           :data-test="`services-catalog-insight-charts-${i}`"
@@ -697,6 +710,7 @@ let insightsRequest = 0;
 let catalogLoad = 0;
 // The RED insights job is enterprise-only, so OSS never fetches the _anomalies schema for it.
 const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
+const { locked: alertsLocked, lockedReason: alertsLockedReason } = useLicenseLock("alerts");
 const redInsightsEnabled = computed(
   () =>
     config.isEnterprise == "true" &&

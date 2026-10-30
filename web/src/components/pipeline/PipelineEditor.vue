@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-hidden="true"
           class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
         >
-          <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
+          <OIcon name="lock" size="xs" class="text-icon-locked size-2.5!" />
         </span>
       </OButton>
     </template>

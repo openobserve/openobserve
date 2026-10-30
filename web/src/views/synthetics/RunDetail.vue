@@ -174,19 +174,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Steps and Evidence are siblings, not stacked. Stacking them pushed
              a 158-row event list above the step table and broke the drawer's
              scroll: OTabPanels owns the scroll container (`grow scroll="y"`). -->
-        <OTabs
-          v-if="!loading"
-          v-model="detailTab"
-          class="border-border-default mt-2 shrink-0 border-b px-2"
-        >
-          <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
-            {{ t("synthetics.runs.tabSteps") }}
-            <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
-          </OTab>
-          <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
-            {{ t("synthetics.runDetail.evidenceSection") }}
-          </OTab>
-        </OTabs>
+        <FeatureLockExempt class="contents">
+          <OTabs
+            v-if="!loading"
+            v-model="detailTab"
+            class="border-border-default mt-2 shrink-0 border-b px-2"
+          >
+            <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
+              {{ t("synthetics.runs.tabSteps") }}
+              <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
+            </OTab>
+            <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
+              {{ t("synthetics.runDetail.evidenceSection") }}
+            </OTab>
+          </OTabs>
+        </FeatureLockExempt>
 
         <div class="min-h-0 flex-1">
           <OTabPanels v-model="detailTab" grow scroll="y" class="h-full min-h-0">
@@ -631,6 +633,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import { buildAttemptViews, stepOwnDetail } from "@/composables/synthetics/syntheticResultsSchema";
 import type {
   AttemptView,

@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -35,6 +36,10 @@ const props = defineProps<{
   alerts: FiringAlert[];
   alertsVisible: boolean;
   alertsLoading: boolean;
+  incidentsLocked: boolean;
+  incidentsLockedReason: I18nText;
+  alertsLocked: boolean;
+  alertsLockedReason: I18nText;
   // µs
   endUs: number;
 }>();
@@ -55,6 +60,18 @@ const ageOf = (us: number | null | undefined) =>
 </script>
 
 <template>
+  <section
+    v-if="incidentsLocked"
+    class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-2 border p-3"
+    data-test="k8s2-overview-incident-locked"
+  >
+    <OText variant="card-title">{{ t("infra.k8s2.overviewIncidentTitle") }}</OText>
+    <div class="text-text-secondary flex items-center gap-2 text-sm">
+      <OIcon name="lock" size="sm" class="text-icon-locked shrink-0" />
+      <span>{{ incidentsLockedReason }}</span>
+    </div>
+  </section>
+
   <section
     v-if="incidentsVisible && (incidentsLoading || incident)"
     class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-2 border p-3"
@@ -102,6 +119,18 @@ const ageOf = (us: number | null | undefined) =>
         </OButton>
       </div>
     </template>
+  </section>
+
+  <section
+    v-if="alertsLocked"
+    class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-2 border p-3"
+    data-test="k8s2-overview-alerts-locked"
+  >
+    <OText variant="card-title">{{ t("infra.k8s2.overviewAlertsTitle") }}</OText>
+    <div class="text-text-secondary flex items-center gap-2 text-sm">
+      <OIcon name="lock" size="sm" class="text-icon-locked shrink-0" />
+      <span>{{ alertsLockedReason }}</span>
+    </div>
   </section>
 
   <section

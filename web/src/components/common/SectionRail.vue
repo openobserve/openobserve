@@ -109,11 +109,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :tooltip="collapsed ? item.label : undefined"
               :icon="item.icon"
               :suffix-icon="(item.locked || item.licenseLocked) && !collapsed ? 'lock' : undefined"
+              :suffix-label="item.lockedLabel"
               :data-test="item.locked ? `${item.dataTest}-locked` : item.dataTest"
               class="w-full"
               :class="collapsed ? 'justify-center!' : undefined"
               @click="navigate(item.locked ? { name: 'enterpriseFeatures' } : item.to)"
-            />
+            >
+              <template v-if="collapsed && (item.locked || item.licenseLocked)" #icon>
+                <span class="relative inline-flex shrink-0">
+                  <OIcon :name="item.icon as IconName" size="sm" class="o-tab__icon" />
+                  <OLockBadge :label="item.lockedLabel" />
+                </span>
+              </template>
+            </OTab>
           </template>
         </template>
       </OTabs>
@@ -127,6 +135,7 @@ import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

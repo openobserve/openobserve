@@ -33,6 +33,7 @@ defineProps<{
   tab: FirstSourcePickTab;
   /** Heading over the rest of the rail. */
   restLabel: I18nText;
+  locked?: boolean;
 }>();
 
 const { t } = useI18nTyped();
@@ -51,6 +52,7 @@ const { t } = useI18nTyped();
     :to="tab.to"
     :icon="tab.icon"
     :label="tab.label"
+    :suffix-icon="locked ? 'lock' : undefined"
     :data-test="`ingestion-${rail}-pick-tab-${tab.name}`"
   />
   <div

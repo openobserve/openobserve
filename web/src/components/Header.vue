@@ -229,15 +229,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group.
            Shown locked (not hidden) in builds that don't unlock it. -->
-          <template v-if="aiButtonVisible">
+          <template v-if="aiButtonVisible || aiLicenseLocked">
             <OButton
               variant="ghost"
               size="icon-toolbar"
-              @click="toggleAIChat"
-              data-test="menu-link-ai-item"
-              :aria-label="t('menu.aiAssistant')"
+              @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
+              :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
+              :aria-label="
+                aiLicenseLocked
+                  ? t('featureLock.headerLocked', {
+                      feature: featureName('ai_assistant') ?? t('featureLock.thisFeature'),
+                    })
+                  : t('menu.aiAssistant')
+              "
               class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-              :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+              :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
               @mouseenter="handleMouseEnter"
               @mouseleave="handleMouseLeave"
             >
@@ -246,40 +252,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
-              <span
-                v-if="!aiAccess.allowed"
-                aria-hidden="true"
-                class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
-              >
-                <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
-              </span>
+              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" />
               <OTooltip
                 v-if="aiAccess.allowed"
                 side="bottom"
                 align="center"
-                :content="t('menu.aiAssistant')"
-                shortcut-id="aiChatToggle"
+                :content="
+                  aiLicenseLocked
+                    ? t('featureLock.headerLocked', {
+                        feature: featureName('ai_assistant') ?? t('featureLock.thisFeature'),
+                      })
+                    : t('menu.aiAssistant')
+                "
+                :shortcut-id="aiLicenseLocked ? undefined : 'aiChatToggle'"
               />
             </OButton>
           </template>
-          <OButton
-            v-else-if="aiAssistantState === 'locked'"
-            variant="ghost"
-            size="icon-toolbar"
-            icon-left="lock"
-            data-test="menu-link-ai-locked"
-            @click="openLockedAiAssistant"
-          >
-            <OTooltip
-              side="bottom"
-              align="center"
-              :content="
-                t('featureLock.title', {
-                  feature: featureName('ai_assistant') ?? t('featureLock.thisFeature'),
-                })
-              "
-            />
-          </OButton>
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -394,6 +382,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon size="xs" name="person" class="padding-none" />
                   </template>
                   {{ t("oncall.mineTitle") }}
+                  <template v-if="oncallLocked" #icon-right>
+                    <OIcon
+                      name="lock"
+                      size="xs"
+                      class="text-icon-locked"
+                      data-test="header-my-oncall-license-lock"
+                    />
+                    <span class="sr-only">{{
+                      t("featureLock.headerLocked", {
+                        feature: featureName("oncall") ?? t("featureLock.thisFeature"),
+                      })
+                    }}</span>
+                  </template>
                 </ODropdownItem>
                 <ODropdownSeparator />
               </template>
@@ -525,6 +526,7 @@ import OrganizationSelector from "./OrganizationSelector.vue";
 import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
@@ -535,7 +537,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 
 import { getImageURL } from "@/utils/zincutils";
-import { featureLockedPath, menuState } from "@/utils/featureGate";
+import { featureLockedPath, featureState, menuState } from "@/utils/featureGate";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 
@@ -548,6 +550,7 @@ export default defineComponent({
     LinkedAccountsDialog,
     OButton,
     OIcon,
+    OLockBadge,
     OTooltip,
     ODropdown,
     ODropdownItem,
@@ -754,6 +757,9 @@ export default defineComponent({
     const aiButtonVisible = computed(
       () => !aiAccess.value.allowed || aiAssistantState.value === "enabled",
     );
+    const aiLicenseLocked = computed(
+      () => aiAccess.value.allowed && aiAssistantState.value === "locked",
+    );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
     const linkedAccountsVisible = computed(
@@ -869,6 +875,10 @@ export default defineComponent({
       () => isGateOpen(navGateContext.value, "oncall") && props.router.hasRoute("onCallMine"),
     );
 
+    const oncallLocked = computed(
+      () => featureState(props.store.state.zoConfig?.features, "oncall") === "locked",
+    );
+
     const goToMyOncall = () => {
       // eslint-disable-next-line vue/no-mutating-props -- vue-router's push navigates; the rule mistakes it for Array#push.
       props.router.push({
@@ -901,6 +911,8 @@ export default defineComponent({
       openLockedAiAssistant,
       aiAccess,
       aiButtonVisible,
+      aiLicenseLocked,
+      oncallLocked,
       linkedAccountsVisible,
       showLinkedAccounts,
       openSlack,

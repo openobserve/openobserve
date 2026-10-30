@@ -41,16 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
-      <OEmptyState
+      <LicenseDeniedState
         v-if="Array.isArray(forbidden)"
-        size="hero"
-        preset="no-access"
-        :title="t('featureLock.toastTitle')"
-        :description="
-          forbidden.length
-            ? t('featureLock.toastMessage', { features: raw(featureNames(forbidden)) })
-            : t('featureLock.toastMessageGeneric')
-        "
+        :features="forbidden"
         data-test="discovered-services-license-denied"
       />
       <OEmptyState
@@ -519,6 +512,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -530,14 +524,12 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
-import { useFeatureNames } from "@/composables/useFeatureLock";
 
 defineEmits<{
   (e: "navigate-to-configuration"): void;
 }>();
 
 const { t } = useI18nTyped();
-const { featureNames } = useFeatureNames();
 
 interface ServiceRecord {
   id: string;

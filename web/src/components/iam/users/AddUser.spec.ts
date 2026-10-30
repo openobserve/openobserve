@@ -773,6 +773,20 @@ describe("AddUser", () => {
       expect(wrapper.find('[data-test="user-custom-role-field"]').exists()).toBe(true);
     });
 
+    it("keeps the custom_role field visible but disabled under a locked rbac license", async () => {
+      const saved = store.state.zoConfig;
+      store.state.zoConfig = { ...saved, features: { rbac: "locked" } };
+      wrapper = mountComp({
+        modelValue: { email: "other@example.com", first_name: "Other", org_member_id: "2" },
+      });
+      await flushPromises();
+
+      const field = wrapper.find('[data-test="user-custom-role-field"]');
+      expect(field.exists()).toBe(true);
+      expect(field.find("button[role=combobox]").attributes("disabled")).toBeDefined();
+      store.state.zoConfig = saved;
+    });
+
     it("stages an unlock and sends it on save, after confirming", async () => {
       vi.mocked(userServiece.get).mockResolvedValue({
         data: { lockout: { locked: true, retry_after_secs: 240 } },

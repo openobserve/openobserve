@@ -401,6 +401,24 @@ describe("MenuLink", async () => {
     });
   });
 
+  describe("license-locked tile screen-reader text", () => {
+    it("names the lock with the supplied label and paints it gold", () => {
+      const w = mount(MenuLink, {
+        props: {
+          title: "Workflows",
+          link: "/workflows",
+          licenseLocked: true,
+          licenseLockedLabel: "Locked: needs Workflows",
+        },
+        global: { plugins: [i18n, mockRouter], provide: { store } },
+      });
+      const badge = w.get('[data-test="menu-link-/workflows-license-lock"]');
+      expect(badge.get(".sr-only").text()).toBe("Locked: needs Workflows");
+      expect(badge.find(".text-icon-locked").exists()).toBe(true);
+      w.unmount();
+    });
+  });
+
   describe("trial-paywalled tile (AC-14)", () => {
     function mountTile(props: Record<string, unknown> = {}) {
       return mount(MenuLink, {

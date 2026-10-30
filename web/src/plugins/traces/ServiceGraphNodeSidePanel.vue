@@ -202,7 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isAgentBehaviorContext"
               name="behavior"
               :label="t('aiObservability.behavior.node.tabLabel')"
-              :suffix-icon="!agentBehaviorAccess.allowed ? 'lock' : undefined"
+              :suffix-icon="behaviorLocked ? 'lock' : undefined"
+              :tooltip="aiObsLocked ? aiObsLockedReason : undefined"
               class="capitalize"
               data-test="service-graph-node-panel-tab-behavior"
             />
@@ -219,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="metrics"
               :label="t('traces.serviceGraphNodeSidePanel.metrics')"
               :suffix-icon="correlationLocked ? 'lock' : undefined"
+              :tooltip="correlationLocked ? correlationLockedReason : undefined"
               class="capitalize"
               data-test="service-graph-node-panel-tab-metrics"
             />
@@ -387,7 +389,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="panel-section mb-0! p-0!"
             data-test="service-graph-side-panel-behavior"
           >
+            <LicenseDeniedState
+              v-if="aiObsLocked"
+              :features="['ai_observability']"
+              data-test="service-graph-side-panel-behavior-license-denied"
+            />
             <AgentNodeBehaviorTab
+              v-else
               :agent-name="behaviorAgentName"
               :source-stream="streamFilter"
               :start-time="timeRange.startTime"
@@ -1624,8 +1632,12 @@ export default defineComponent({
     // The AgentNodeBehaviorTab itself degrades gracefully to a "feature off"
     // hint if the rollup is disabled, so the panel only needs to mount once
     // both the context is right AND the edition allows it.
+    const { locked: aiObsLocked, lockedReason: aiObsLockedReason } =
+      useLicenseLock("ai_observability");
+    const behaviorLocked = computed(() => aiObsLocked.value || !agentBehaviorAccess.value.allowed);
     const showBehaviorTab = computed(
-      () => isAgentBehaviorContext.value && agentBehaviorAccess.value.allowed,
+      () =>
+        isAgentBehaviorContext.value && (aiObsLocked.value || agentBehaviorAccess.value.allowed),
     );
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
@@ -1633,7 +1645,7 @@ export default defineComponent({
     // here is what keeps the locked Behavior tab from becoming active —
     // clicking it opens the upgrade dialog instead of switching.
     function onTabChange(name: string | number) {
-      if (name === "behavior" && !agentBehaviorAccess.value.allowed) {
+      if (name === "behavior" && !aiObsLocked.value && !agentBehaviorAccess.value.allowed) {
         openUpgradeDialog();
         return;
       }
@@ -2594,7 +2606,9 @@ export default defineComponent({
       isAllStreamsSelected,
       isInferred,
       isAgentBehaviorContext,
-      agentBehaviorAccess,
+      behaviorLocked,
+      aiObsLocked,
+      aiObsLockedReason,
       onTabChange,
       showBehaviorTab,
       behaviorAgentName,

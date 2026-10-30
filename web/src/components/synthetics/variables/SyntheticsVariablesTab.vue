@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="listRef"
           :variables="scope.variables"
           :loading="loading"
+          :forbidden="forbidden"
           :environment="scope.isGlobal ? null : (scope.environment?.name ?? null)"
           :environments="overridingEnvironments"
           :globals="globals"
@@ -108,6 +109,7 @@ import SyntheticsEnvironmentForm from "./SyntheticsEnvironmentForm.vue";
 import SyntheticsDuplicateEnvironmentDialog from "./SyntheticsDuplicateEnvironmentDialog.vue";
 import { namedEnvironments, resolveScope } from "./scope";
 import { environmentDeleteBlock } from "./usage";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { serverMessage } from "./serverMessage";
 
 const { t } = useI18nTyped();
@@ -119,6 +121,7 @@ const deleteShown = ref({ name: "", variables: 0 });
 const environments = ref<SyntheticsEnvironment[]>([]);
 const globals = ref<SyntheticsVariable[]>([]);
 const loading = ref(false);
+const forbidden = ref<ForbiddenState>(false);
 const selectedScope = ref<string>("");
 const environmentDrawer = ref({
   show: false,
@@ -144,6 +147,7 @@ const scopeSummary = computed(() => {
 
 async function refresh() {
   loading.value = true;
+  forbidden.value = false;
   try {
     const org = store.state.selectedOrganization.identifier;
     const [envRes, globalRes] = await Promise.all([
@@ -153,6 +157,7 @@ async function refresh() {
     environments.value = envRes.data ?? [];
     globals.value = globalRes.data ?? [];
   } catch (error) {
+    forbidden.value = forbiddenState(error);
     toast({
       variant: "error",
       message: serverMessage(error) ?? t("synthetics.variables.loadFailed"),

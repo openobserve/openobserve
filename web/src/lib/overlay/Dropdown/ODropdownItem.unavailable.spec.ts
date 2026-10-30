@@ -66,6 +66,23 @@ describe("ODropdownItem focusable unavailable opt-in", () => {
     );
   });
 
+  it("paints a lock icon-left with the locked-icon token", async () => {
+    wrapper = mount(ODropdown, {
+      attachTo: document.body,
+      props: { open: true },
+      slots: {
+        trigger: () => h("button", "Menu"),
+        default: () => [
+          h(ODropdownItem, { iconLeft: "lock", "data-test": "locked" }, () => "Locked"),
+          h(ODropdownItem, { iconLeft: "add", "data-test": "plain" }, () => "Plain"),
+        ],
+      },
+    });
+    await flushPromises();
+    expect(document.querySelector('[data-test="locked"] .text-icon-locked')).not.toBeNull();
+    expect(document.querySelector('[data-test="plain"] .text-icon-locked')).toBeNull();
+  });
+
   it("emits enabled selections without changing existing behavior", async () => {
     const select = vi.fn();
     wrapper = mount(ODropdown, {

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tabs-below="tabOrder.length > 1"
       bleed
     >
-      <template v-if="isMobile && activeHomeTab === 'ai'" #actions>
+      <template v-if="isMobile && activeHomeTab === 'ai' && !aiLocked" #actions>
         <OButton
           variant="outline"
           size="sm"
@@ -60,15 +60,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tab.id"
             :name="tab.id"
             :data-test="`home-tab-${tab.id}`"
+            :tooltip="tab.id === 'ai' ? tabLockReason(tab.id) : undefined"
           >
-            <OIcon
-              v-if="dashboardsLocked && tab.id.startsWith('dash:')"
-              name="lock"
-              size="sm"
-              class="me-1"
-              :data-test="`home-tab-lock-${tab.id}`"
-            />
             <span class="o-tab__label truncate">{{ tab.label }}</span>
+            <template v-if="tabLockReason(tab.id)">
+              <OIcon
+                name="lock"
+                size="xs"
+                class="text-icon-locked ms-1 shrink-0"
+                :data-test="`home-tab-lock-${tab.id}`"
+              />
+              <span class="sr-only">{{ tabLockReason(tab.id) }}</span>
+            </template>
             <template v-if="tab.id.startsWith('dash:')" #trailing>
               <button
                 type="button"
@@ -112,9 +115,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @dismiss="arrived = undefined"
           @open="openArrived"
         />
+        <LicenseDeniedState
+          v-if="activeHomeTab === 'ai' && aiLocked"
+          :features="['ai_assistant']"
+          data-test="home-ai-locked"
+        />
         <!-- O2 AI Assistant tab -->
         <div
-          v-if="activeHomeTab === 'ai'"
+          v-else-if="activeHomeTab === 'ai'"
           class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
         >
           <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
@@ -230,6 +238,8 @@ import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
 import UsageTab from "@/views/UsageTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+import { menuState } from "@/utils/featureGate";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -267,11 +277,26 @@ export default defineComponent({
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
     const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard(t);
-    const { locked: dashboardsLocked } = useLicenseLock("dashboards");
+    const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+      useLicenseLock("dashboards");
+    const { lockedReason: aiLockedReason } = useLicenseLock("ai_assistant");
+    const aiState = computed(() =>
+      menuState(
+        store.state.zoConfig?.features,
+        "ai_assistant",
+        Boolean(store.state.zoConfig?.ai_enabled),
+      ),
+    );
+    const aiLocked = computed(() => aiState.value === "locked");
+    const tabLockReason = (id: string) => {
+      if (id === "ai" && aiLocked.value) return aiLockedReason.value;
+      if (id.startsWith("dash:") && dashboardsLocked.value) return dashboardsLockedReason.value;
+      return undefined;
+    };
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
-      if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
+      if (isEnterpriseOrCloud && aiState.value !== "hidden") {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
       // Always reachable — Incidents/Services inside render locked (not
@@ -477,13 +502,15 @@ export default defineComponent({
       isDataTab,
       arrived,
       openArrived,
-      dashboardsLocked,
+      aiLocked,
+      tabLockReason,
     };
   },
   components: {
     OverviewTab,
     UsageTab,
     O2AIChat,
+    LicenseDeniedState,
     HomeChatHistory,
     OTabs,
     OTab,

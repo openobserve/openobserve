@@ -119,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="privateLocationsEnabled && activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
+        :forbidden="locationsForbidden"
         @refresh="loadPrivateLocations"
         @copy-setup="openSetupDrawer"
         @delete="confirmDeleteLocation"
@@ -293,6 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="activeSection === 'status-pages'"
         :pages="statusPages"
         :loading="statusPagesLoading"
+        :forbidden="statusPagesForbidden"
         :timezone="store.state.timezone"
         @refresh="loadStatusPages"
         @new-page="showCreateStatusPage = true"
@@ -565,7 +567,7 @@ import {
   statusPageEditRoute,
 } from "@/utils/synthetics/routes";
 import { getFoldersListByType } from "@/utils/commons";
-import { forbiddenState } from "@/utils/featureGate";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -1108,13 +1110,17 @@ const setupData = ref<AgentSetup | null>(null);
 const showDeleteLocation = ref(false);
 const locationToDelete = ref<SyntheticLocation | null>(null);
 
+const locationsForbidden = ref<ForbiddenState>(false);
+
 async function loadPrivateLocations() {
   locationsLoading.value = true;
+  locationsForbidden.value = false;
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
     const all: SyntheticLocation[] = (res.data as any).locations ?? [];
     privateLocations.value = all.filter((l) => l.kind === "private");
   } catch (err) {
+    locationsForbidden.value = forbiddenState(err);
     console.error("[synthetics] failed to load private locations", err);
   } finally {
     locationsLoading.value = false;
@@ -1166,15 +1172,18 @@ async function deleteLocation() {
 // ── Status pages tab ───────────────────────────────────────────────────
 const statusPages = ref<StatusPageListItem[]>([]);
 const statusPagesLoading = ref(false);
+const statusPagesForbidden = ref<ForbiddenState>(false);
 const showCreateStatusPage = ref(false);
 
 async function loadStatusPages() {
   if (!orgIdentifier.value) return;
   statusPagesLoading.value = true;
+  statusPagesForbidden.value = false;
   try {
     const res = await statusPagesService.list(orgIdentifier.value);
     statusPages.value = (res.data as any).pages ?? [];
   } catch (err) {
+    statusPagesForbidden.value = forbiddenState(err);
     console.error("[status-pages] failed to load", err);
   } finally {
     statusPagesLoading.value = false;

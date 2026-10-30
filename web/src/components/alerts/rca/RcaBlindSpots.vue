@@ -62,7 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               disabled
             >
               <template #icon-left>
-                <OIcon name="lock" size="sm" data-test="rca-blind-spot-action-lock" />
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="rca-blind-spot-action-lock"
+                />
               </template>
               {{ actions[spot.id]!.label }}
             </OButton>

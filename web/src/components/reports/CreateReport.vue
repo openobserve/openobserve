@@ -109,6 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      change, wiping each field's TanStack error meta. -->
                 <template v-for="(dashboard, index) in dashboardRows" :key="index">
                   <div :data-test="`add-report-dashboard-${index}`" class="my-2 flex flex-col px-2">
+                    <div
+                      v-if="dashboardsLocked"
+                      class="text-text-secondary mb-2 flex items-center gap-1 text-xs"
+                      data-test="add-report-dashboards-locked"
+                    >
+                      <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+                      {{ dashboardsLockedReason }}
+                    </div>
                     <!-- items-start (not items-center): keeps all selects
                          top-aligned when a validation error appears under one and
                          grows its cell taller. -->
@@ -120,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-folder-select"
+                          :disabled="dashboardsLocked"
                           :name="`dashboards[${index}].folder`"
                           :options="folderOptions"
                           :label="t('reports.dashboardFolder')"
@@ -137,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-name-select"
+                          :disabled="dashboardsLocked"
                           :name="`dashboards[${index}].dashboard`"
                           :options="dashboardOptions"
                           :label="t('reports.dashboard')"
@@ -154,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-tab-select"
+                          :disabled="dashboardsLocked"
                           :name="`dashboards[${index}].tabs`"
                           :options="dashboardTabOptions"
                           :label="t('reports.dashboardTab')"
@@ -665,6 +676,7 @@ import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
 import { getFoldersListByType } from "@/utils/commons";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeCreateReportSchema,
@@ -794,6 +806,8 @@ const dashboardRows = form.useStore((s: any): any[] => s.values?.dashboards ?? [
 // `variables` are now form-owned (VariablesInput renders in form mode,
 // name-prefix="variables"); read from the form value at save.
 
+const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+  useLicenseLock("dashboards");
 const folderOptions: Ref<{ label: I18nText; value: string }[]> = ref([]);
 
 const dashboardOptions: Ref<{ label: I18nText; value: string; tabs: any[]; version: number }[]> =
@@ -1075,6 +1089,7 @@ const onFolderSelection = async (id: string, index = 0) => {
 };
 
 const setDashboardOptions = (id: string) => {
+  if (dashboardsLocked.value) return Promise.resolve(true);
   dashboardOptions.value.length = 0;
   isFetchingDashboard.value = true;
   return new Promise((resolve, reject) => {
@@ -1226,6 +1241,7 @@ const { timezoneOptions: timezoneSelectOptions } = useTimezoneOptions({
 });
 
 const getDashboaordFolders = () => {
+  if (dashboardsLocked.value) return Promise.resolve(true);
   return new Promise((resolve, reject) => {
     isFetchingFolders.value = true;
     dashboardService
@@ -1517,14 +1533,20 @@ const setupEditingReport = async (report: any) => {
   // Resolve folder/dashboard/tab against the loaded options (drop + warn if the
   // saved selection has since been deleted).
   let folder = "";
-  if (folderOptions.value.some((f) => f.value === report.dashboards[0].folder)) {
+  if (
+    dashboardsLocked.value ||
+    folderOptions.value.some((f) => f.value === report.dashboards[0].folder)
+  ) {
     folder = report.dashboards[0].folder;
   } else {
     toast({ variant: "error", message: t("toastMessages.reports.selectedFolderHasBeenDeleted") });
   }
 
   let dashboard = "";
-  if (dashboardOptions.value.some((d) => d.value === report.dashboards[0].dashboard)) {
+  if (
+    dashboardsLocked.value ||
+    dashboardOptions.value.some((d) => d.value === report.dashboards[0].dashboard)
+  ) {
     dashboard = report.dashboards[0].dashboard;
   } else {
     toast({
@@ -1537,7 +1559,9 @@ const setupEditingReport = async (report: any) => {
 
   let tabs = "";
   const tab = dashboardTabOptions.value.find((t) => t.value === report.dashboards[0].tabs[0]);
-  if (tab) {
+  if (dashboardsLocked.value) {
+    tabs = report.dashboards[0].tabs[0] ?? "";
+  } else if (tab) {
     tabs = tab.value;
   } else {
     toast({

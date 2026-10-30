@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         :frame="false"
         :error="error"
+        :forbidden="forbidden"
         sorting="server"
         :sort-by="sortBy"
         :sort-order="sortOrder"
@@ -524,6 +525,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,

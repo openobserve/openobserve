@@ -25,10 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <component
-    :is="href ? 'a' : 'button'"
-    :class="[CHIP_BASE, variant === 'ai' ? CHIP_AI : CHIP_DEFAULT]"
-    v-bind="href ? { href, target: '_blank', rel: 'noopener noreferrer' } : { type: 'button' }"
-    @click="!href && emit('click')"
+    :is="href && !unavailable ? 'a' : 'button'"
+    :class="chipClass"
+    :aria-disabled="unavailable || undefined"
+    v-bind="
+      href && !unavailable
+        ? { href, target: '_blank', rel: 'noopener noreferrer' }
+        : { type: 'button' }
+    "
+    @click="onClick"
   >
     <OIcon v-if="icon" :name="icon" size="xs" class="shrink-0" />
     <slot />
@@ -36,31 +41,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 // Shape, spacing and focus ring — identical in both variants.
 const CHIP_BASE =
-  "es-ing-chip text-compact border-border-default hover:border-accent inline-flex cursor-pointer items-center gap-1.25 rounded-full border px-3 py-1 font-medium no-underline! outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+  "es-ing-chip text-compact border-border-default inline-flex items-center gap-1.25 rounded-full border px-3 py-1 font-medium no-underline! outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
 // The two colour sets are mutually exclusive so no two `!` utilities ever
 // compete for the same property — which class wins would otherwise depend on
 // Tailwind's emit order rather than on intent.
 const CHIP_DEFAULT =
-  "bg-surface-panel text-text-secondary! hover:text-accent! transition-[border-color,color,background-color] duration-150 hover:bg-accent/6";
+  "hover:border-accent bg-surface-panel text-text-secondary! hover:text-accent! cursor-pointer transition-[border-color,color,background-color] duration-150 hover:bg-accent/6";
 
 // `ai-hover-btn` survives only as the hook for the two rules the utility layer
 // cannot express: the color-mix() glow and the filter on the slotted <img>.
 const CHIP_AI =
-  "ai-hover-btn bg-gradient-ai-subtle! text-ai-accent! hover:bg-gradient-ai! hover:text-white! dark:text-white! transition-[background,box-shadow,color] duration-300";
+  "hover:border-accent ai-hover-btn bg-gradient-ai-subtle! text-ai-accent! hover:bg-gradient-ai! hover:text-white! dark:text-white! cursor-pointer transition-[background,box-shadow,color] duration-300";
 
-defineProps<{
+// No hover utilities and no `ai-hover-btn` hook, whose scoped rules would otherwise still glow.
+const CHIP_UNAVAILABLE_DEFAULT = "bg-surface-panel text-text-secondary!";
+const CHIP_UNAVAILABLE_AI = "bg-gradient-ai-subtle! text-ai-accent! dark:text-white!";
+
+const props = defineProps<{
   icon?: IconName;
   href?: string;
   variant?: "default" | "ai";
+  /** Dims the chip and blocks the action while keeping it focusable for its reason. */
+  unavailable?: boolean;
 }>();
 
 const emit = defineEmits<{ click: [] }>();
+
+const chipClass = computed(() => {
+  const ai = props.variant === "ai";
+  if (props.unavailable) {
+    return [
+      CHIP_BASE,
+      "cursor-not-allowed opacity-60",
+      ai ? CHIP_UNAVAILABLE_AI : CHIP_UNAVAILABLE_DEFAULT,
+    ];
+  }
+  return [CHIP_BASE, ai ? CHIP_AI : CHIP_DEFAULT];
+});
+
+function onClick(event: MouseEvent) {
+  if (props.unavailable) {
+    event.preventDefault();
+    return;
+  }
+  if (!props.href) emit("click");
+}
 </script>
 
 <style scoped>

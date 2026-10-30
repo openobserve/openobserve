@@ -26,23 +26,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="px-page-edge border-border-default flex shrink-0 items-center gap-2 border-b py-2 max-md:flex-wrap"
       data-test="rum-performance-toolbar"
     >
-      <OToggleGroup
-        v-model="activePerformanceTab"
-        mobile-dropdown
-        class="shrink-0"
-        data-test="rum-performance-tabs"
-      >
-        <OToggleGroupItem
-          v-for="tab in tabs"
-          :key="tab.value"
-          :value="tab.value"
-          :icon-left="tab.icon"
-          size="sm"
-          :data-test="`rum-performance-tab-${tab.value}`"
+      <FeatureLockExempt class="contents">
+        <OToggleGroup
+          v-model="activePerformanceTab"
+          mobile-dropdown
+          class="shrink-0"
+          data-test="rum-performance-tabs"
         >
-          {{ tab.label }}
-        </OToggleGroupItem>
-      </OToggleGroup>
+          <OToggleGroupItem
+            v-for="tab in tabs"
+            :key="tab.value"
+            :value="tab.value"
+            :icon-left="tab.icon"
+            size="sm"
+            :data-test="`rum-performance-tab-${tab.value}`"
+          >
+            {{ tab.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </FeatureLockExempt>
       <div
         class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end max-md:[&_.date-time-label]:hidden"
       >
@@ -171,6 +173,7 @@ import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
@@ -195,6 +198,7 @@ export default defineComponent({
   name: "AppPerformance",
   components: {
     AutoRefreshInterval,
+    FeatureLockExempt,
     OToggleGroup,
     OToggleGroupItem,
     DateTimePickerDashboard,

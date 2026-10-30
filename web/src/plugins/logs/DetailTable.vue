@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="tabItem.name"
               :label="tabItem.label"
               :suffix-icon="tabItem.locked ? 'lock' : undefined"
+              :tooltip="tabItem.locked ? correlationLockedReason : undefined"
             />
           </template>
         </OTabs>
@@ -856,7 +857,8 @@ export default defineComponent({
       checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
     );
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-    const { locked: correlationLicenseLocked } = useLicenseLock("correlation");
+    const { locked: correlationLicenseLocked, lockedReason: correlationLockedReason } =
+      useLicenseLock("correlation");
 
     const selectedRelativeValue = ref<number>(10);
     const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
@@ -1459,6 +1461,7 @@ export default defineComponent({
       serviceStreamsEnabled,
       correlationAccess,
       correlationLicenseLocked,
+      correlationLockedReason,
       onTabChange,
       tabOrder,
       onTabReorder,

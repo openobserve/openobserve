@@ -33,6 +33,31 @@ describe("AlertContextMenu Component", () => {
     vi.clearAllMocks();
   });
 
+  describe("locked", () => {
+    it("shows disabled, focusable items with a gold lock and the reason, and emits nothing", async () => {
+      wrapper = createWrapper({ locked: true, lockedReason: "Locked: needs Alerts" });
+      for (const id of ["above", "below"]) {
+        const item = wrapper.find(`[data-test="alert-context-menu-${id}"]`);
+        expect(item.attributes("aria-disabled")).toBe("true");
+        expect(item.attributes("tabindex")).toBe("0");
+        expect(wrapper.find(`[data-test="alert-context-menu-${id}-lock"]`).classes()).toContain(
+          "text-icon-locked",
+        );
+        expect(wrapper.find(`[data-test="alert-context-menu-${id}-reason"]`).text()).toBe(
+          "Locked: needs Alerts",
+        );
+        await item.trigger("click");
+      }
+      expect(wrapper.emitted("select")).toBeUndefined();
+    });
+
+    it("locks the single forecast item", () => {
+      wrapper = createWrapper({ locked: true, lockedReason: "x", seriesRole: "forecast" });
+      expect(wrapper.find('[data-test="alert-context-menu-forecast-lock"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-context-menu-above"]').exists()).toBe(false);
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should mount successfully", () => {
       wrapper = createWrapper();

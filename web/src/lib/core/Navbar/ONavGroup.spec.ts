@@ -492,7 +492,9 @@ describe("ONavGroup", () => {
       expect(tileLink()).toBe("/infra/databases");
       await hoverOpenInfra();
       const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
-      expect(fly.find('[data-test="nav-group-item-dbmDatabases-locked"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-dbmDatabases-license-lock"]').exists()).toBe(
+        true,
+      );
     });
 
     const licensedInfra = (): SubnavChild[] => [
@@ -1421,11 +1423,14 @@ describe("ONavGroup", () => {
       return router;
     }
 
-    it("shows a locked child with a lock and opens its own page, which renders locked", async () => {
+    it("shows a locked child as a real link with a gold lock and screen-reader text", async () => {
       const router = await mountWithFeature("locked");
-      const item = flyout().get('[data-test="nav-group-item-workflows-locked"]');
-      expect(item.element.tagName).toBe("DIV");
-      expect(flyout().find('[data-test="nav-group-item-workflows-lock"]').exists()).toBe(true);
+      const item = flyout().get('[data-test="nav-group-item-workflows-license-lock"]');
+      expect(item.element.tagName).toBe("A");
+      expect(item.attributes("href")).toContain("/workflows");
+      const lock = flyout().get('[data-test="nav-group-item-workflows-lock"]');
+      expect(lock.classes()).toContain("text-icon-locked");
+      expect(item.find(".sr-only").text()).toContain("Locked");
       await item.trigger("click");
       await flushPromises();
       expect(router.currentRoute.value.fullPath).toBe("/workflows?org_identifier=default");
@@ -1434,13 +1439,17 @@ describe("ONavGroup", () => {
     it("drops a hidden child", async () => {
       await mountWithFeature("hidden");
       expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(false);
-      expect(flyout().find('[data-test="nav-group-item-workflows-locked"]').exists()).toBe(false);
+      expect(flyout().find('[data-test="nav-group-item-workflows-license-lock"]').exists()).toBe(
+        false,
+      );
     });
 
     it("renders an enabled or unsent feature as a normal link", async () => {
       await mountWithFeature();
       expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(true);
-      expect(flyout().find('[data-test="nav-group-item-workflows-locked"]').exists()).toBe(false);
+      expect(flyout().find('[data-test="nav-group-item-workflows-license-lock"]').exists()).toBe(
+        false,
+      );
     });
   });
 

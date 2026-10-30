@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="section.licenseLocked"
           name="lock"
           size="xs"
-          class="text-warning-600 shrink-0"
+          class="text-icon-locked shrink-0"
           :data-test="`alert-section-tab-${section.key}-lock`"
           aria-hidden="true"
         />
@@ -90,7 +90,6 @@ const sections = computed<Section[]>(() => {
   const hideLibrary = (store.state.zoConfig?.custom_hide_menus ?? "")
     .split(",")
     .includes("alertLibrary");
-  // Destinations and templates stay free; only the alert pages themselves follow the license.
   const alerts = featureState(store.state.zoConfig?.features, "alerts");
   const alertsHidden = alerts === "hidden";
   const licenseLocked = alerts === "locked";
@@ -114,12 +113,14 @@ const sections = computed<Section[]>(() => {
       label: t("alert_destinations.header"),
       icon: "location-on",
       to: { name: "alertDestinations", query },
+      licenseLocked,
     },
     {
       key: "alertTemplates",
       label: t("alert_templates.header"),
       icon: "description",
       to: { name: "alertTemplates", query },
+      licenseLocked,
     },
     // Last: the catalog is where you go once to fetch an alert, not where you
     // work. The rail's Reliability flyout lists these four in this same order.

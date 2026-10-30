@@ -146,12 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :content="profilesLockedReason"
         >
           <span class="inline-flex">
-            <EmptyStateIngestionChip
-              icon="lock"
-              disabled
-              class="cursor-not-allowed opacity-60"
-              data-test="home-no-data-profiles-btn"
-            >
+            <EmptyStateIngestionChip unavailable data-test="home-no-data-profiles-btn">
+              <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
               {{ t("home.noDataState.profiles") }}
             </EmptyStateIngestionChip>
           </span>
@@ -185,6 +181,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
