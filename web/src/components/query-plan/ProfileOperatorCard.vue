@@ -78,12 +78,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </div>
+    <div v-if="refold" class="absolute end-2 top-0 -translate-y-1/2">
+      <OButton
+        variant="outline"
+        size="xs"
+        icon-left="compress"
+        :aria-label="t('search.queryProfile.foldBackLabel', { op: label })"
+        :data-test="`query-profile-card-${op.id}-refold`"
+        @click.stop="emit('fold', 'refold')"
+        >{{ t("search.queryProfile.foldBack") }}</OButton
+      >
+    </div>
+    <div v-if="branch" class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
+      <OButton
+        variant="outline"
+        size="icon-xs-circle"
+        :icon-left="branch === 'open' ? 'remove' : 'add'"
+        :aria-label="
+          branch === 'open'
+            ? t('search.queryProfile.collapseBranch', { op: label })
+            : t('search.queryProfile.expandBranch', { op: label })
+        "
+        :aria-expanded="branch === 'open'"
+        :data-test="`query-profile-card-${op.id}-branch`"
+        @click.stop="emit('fold', 'branch')"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -114,9 +141,11 @@ const props = defineProps<{
   selected: boolean;
   x: number;
   y: number;
+  branch?: "open" | "collapsed" | null;
+  refold?: boolean;
 }>();
 
-const emit = defineEmits<{ select: [opId: string] }>();
+const emit = defineEmits<{ select: [opId: string]; fold: [kind: "branch" | "refold"] }>();
 
 const { t } = useI18nTyped();
 

@@ -24,6 +24,8 @@ export const VARIANT_GAP = 32;
 export const STAGE_PAD_X = 20;
 export const STAGE_PAD_TOP = 64;
 export const STAGE_PAD_BOTTOM = 20;
+export const FOLD_H = 56;
+const EDGE_LABEL_RISE = 13;
 export const STRAGGLER_FACTOR = 1.8;
 
 const NODE_SCOPE_PREFIX = "node:";
@@ -286,14 +288,54 @@ export interface LayoutCard {
   opId: string;
   x: number;
   y: number;
+  /** Whether the branch under this card can be collapsed, and its current state. */
+  branch: "open" | "collapsed" | null;
+  /** A plumbing operator the user opened from its edge, which can fold back. */
+  refold: boolean;
 }
 
 export interface LayoutEdge {
-  childId: string;
+  key: string;
+  /** The operator whose output the parent reads; null when the child is a fold card. */
+  childId: string | null;
+  /** The card the edge starts at; null when the child is a fold card. */
+  fromId: string | null;
   parentId: string;
+  /** Plumbing operators folded onto this edge, top first. */
+  folded: string[];
   path: string;
   labelX: number;
   labelY: number;
+}
+
+export type FoldKind = "branch" | "group" | "stage";
+
+/** One card standing in for operators the canvas does not draw. */
+export interface LayoutFold {
+  key: string;
+  kind: FoldKind;
+  /** branch: the owner's children; group: the hidden siblings; stage: the stage's variant roots. */
+  opIds: string[];
+  /** The visible card this fold hangs under. */
+  ownerId: string;
+  /** Hidden by focus rather than by the user collapsing it. */
+  focus: boolean;
+  x: number;
+  y: number;
+}
+
+export interface FoldState {
+  /** Fold single-child plumbing operators onto the edge they sit on. */
+  plumbing: boolean;
+  /** Plumbing operators the user opened back into cards. */
+  shown: ReadonlySet<string>;
+  /** Operators whose branch below is hidden behind one card. */
+  collapsed: ReadonlySet<string>;
+  /** Operators hidden whole; hidden siblings share one card. */
+  grouped: ReadonlySet<string>;
+  /** Stages drawn as a single summary card. */
+  stages: ReadonlySet<string>;
+  focusId: string | null;
 }
 
 export interface LayoutStage {
@@ -318,6 +360,7 @@ export interface ProfileLayout {
   edges: LayoutEdge[];
   stages: LayoutStage[];
   variantLabels: LayoutVariantLabel[];
+  folds: LayoutFold[];
 }
 
 export interface PlanDetailEntry {
@@ -1228,150 +1271,316 @@ export function clusterNodes(
   }));
 }
 
-function blocksOf(model: ProfileModel, op: ProfileOperator): string[] {
-  if (op.remoteStageId) {
-    const stage = model.stageById[op.remoteStageId];
-    return stage && stage.variants.length ? [`stage:${stage.id}`] : [];
-  }
-  return op.childIds;
+type FoldSpec = Omit<LayoutFold, "x" | "y">;
+
+type VisNode =
+  | { kind: "op"; opId: string; folded: string[]; blocks: VisNode[] }
+  | { kind: "stage"; stageId: string; variants: { variantId: string; node: VisNode }[] }
+  | { kind: "fold"; fold: FoldSpec; folded: string[] };
+
+interface FoldContext {
+  model: ProfileModel;
+  fold: FoldState;
+  hot: Set<string>;
+  related: Set<string> | null;
 }
 
-function measureBlock(model: ProfileModel, block: string, memo: Map<string, Box>): Box {
-  return block.startsWith("stage:")
-    ? measureStage(model, block.slice(6), memo)
-    : measureOp(model, block, memo);
-}
-
-function measureOp(model: ProfileModel, opId: string, memo: Map<string, Box>): Box {
-  const cached = memo.get(opId);
-  if (cached) return cached;
-  const blocks = blocksOf(model, model.operators[opId]).map((b) => measureBlock(model, b, memo));
-  const childrenW =
-    blocks.reduce((a, b) => a + b.w, 0) + SIBLING_GAP * Math.max(0, blocks.length - 1);
-  const box = {
-    w: Math.max(CARD_W, childrenW),
-    h: CARD_H + (blocks.length ? LEVEL_GAP + Math.max(...blocks.map((b) => b.h)) : 0),
-  };
-  memo.set(opId, box);
-  return box;
-}
-
-function measureStage(model: ProfileModel, stageId: string, memo: Map<string, Box>): Box {
-  const key = `stage:${stageId}`;
-  const cached = memo.get(key);
-  if (cached) return cached;
-  const variants = model.stageById[stageId].variants.map((v) => measureOp(model, v.rootOpId, memo));
-  const box = {
-    w:
-      variants.reduce((a, b) => a + b.w, 0) +
-      VARIANT_GAP * Math.max(0, variants.length - 1) +
-      2 * STAGE_PAD_X,
-    h: STAGE_PAD_TOP + Math.max(0, ...variants.map((b) => b.h)) + STAGE_PAD_BOTTOM,
-  };
-  memo.set(key, box);
-  return box;
+interface Link {
+  x: number;
+  y: number;
+  stageTop: number | null;
+  child: VisNode;
 }
 
 interface PlaceContext {
   model: ProfileModel;
-  memo: Map<string, Box>;
+  fold: FoldState;
+  memo: WeakMap<VisNode, Box>;
   out: ProfileLayout;
-  cardPos: Map<string, { x: number; y: number }>;
-  stageTop: Map<string, number>;
 }
 
-function placeOp(ctx: PlaceContext, opId: string, left: number, top: number): number {
-  const box = ctx.memo.get(opId)!;
-  const blocks = blocksOf(ctx.model, ctx.model.operators[opId]);
-  const widths = blocks.map((b) => measureBlock(ctx.model, b, ctx.memo).w);
-  const childrenW =
-    widths.reduce((a, w) => a + w, 0) + SIBLING_GAP * Math.max(0, blocks.length - 1);
-  let cursor = left + (box.w - childrenW) / 2;
-  const anchors: number[] = [];
-  blocks.forEach((block, i) => {
-    const childTop = top + CARD_H + LEVEL_GAP;
-    anchors.push(
-      block.startsWith("stage:")
-        ? placeStage(ctx, block.slice(6), cursor, childTop)
-        : placeOp(ctx, block, cursor, childTop),
-    );
-    cursor += widths[i] + SIBLING_GAP;
-  });
-  const center = anchors.length ? (anchors[0] + anchors[anchors.length - 1]) / 2 : left + box.w / 2;
-  const x = center - CARD_W / 2;
-  ctx.cardPos.set(opId, { x, y: top });
-  ctx.out.cards.push({ opId, x, y: top });
-  return center;
+const NO_FOLD: FoldState = {
+  plumbing: false,
+  shown: new Set(),
+  collapsed: new Set(),
+  grouped: new Set(),
+  stages: new Set(),
+  focusId: null,
+};
+
+const PLUMBING_RE = /^(Repartition|CoalescePartitions|CoalesceBatches|Projection|Cooperative)Exec/;
+const PLUMBING_SHARE = 0.01;
+
+export function subtreeIds(model: ProfileModel, opId: string): string[] {
+  const out: string[] = [];
+  const walk = (id: string) => {
+    out.push(id);
+    model.operators[id].childIds.forEach(walk);
+  };
+  walk(opId);
+  return out;
 }
 
-function placeStage(ctx: PlaceContext, stageId: string, left: number, top: number): number {
-  const box = ctx.memo.get(`stage:${stageId}`)!;
-  ctx.out.stages.push({ stageId, x: left, y: top, w: box.w, h: box.h });
-  ctx.stageTop.set(stageId, top);
+export function ancestorIds(model: ProfileModel, opId: string): string[] {
+  const out: string[] = [];
+  for (let id = model.operators[opId]?.parentId; id; id = model.operators[id].parentId)
+    out.push(id);
+  return out;
+}
+
+/** A single-child exchange or projection too cheap to deserve its own card. */
+export function isPlumbing(model: ProfileModel, op: ProfileOperator, hot: Set<string>): boolean {
+  return (
+    PLUMBING_RE.test(op.name) &&
+    op.childIds.length === 1 &&
+    !op.remoteStageId &&
+    !hot.has(op.id) &&
+    (model.planOnly || shareOfTotal(model, op) < PLUMBING_SHARE)
+  );
+}
+
+export function hotspotSet(model: ProfileModel): Set<string> {
+  return new Set(hotspotIds(model));
+}
+
+function foldsAway(ctx: FoldContext, op: ProfileOperator): boolean {
+  return ctx.fold.plumbing && !ctx.fold.shown.has(op.id) && isPlumbing(ctx.model, op, ctx.hot);
+}
+
+function hiddenWhole(ctx: FoldContext, opId: string): boolean {
+  return ctx.fold.grouped.has(opId) || (!!ctx.related && !ctx.related.has(opId));
+}
+
+function chainNode(ctx: FoldContext, opId: string): VisNode {
+  const folded: string[] = [];
+  let id = opId;
+  while (foldsAway(ctx, ctx.model.operators[id])) {
+    folded.push(id);
+    id = ctx.model.operators[id].childIds[0];
+  }
+  const node = buildNode(ctx, id);
+  return node.kind === "op" ? { ...node, folded } : node;
+}
+
+function groupFold(ctx: FoldContext, ownerId: string, opIds: string[]): VisNode {
+  const focus = !!ctx.related && opIds.some((id) => !ctx.related!.has(id));
+  const fold: FoldSpec = { key: `group-${opIds[0]}`, kind: "group", opIds, ownerId, focus };
+  return { kind: "fold", fold, folded: [] };
+}
+
+function childNodes(ctx: FoldContext, op: ProfileOperator): VisNode[] {
+  const hidden = op.childIds.filter((id) => hiddenWhole(ctx, id));
+  const nodes: VisNode[] = [];
+  for (const id of op.childIds) {
+    if (!hidden.includes(id)) nodes.push(chainNode(ctx, id));
+    else if (id === hidden[0]) nodes.push(groupFold(ctx, op.id, hidden));
+  }
+  return nodes;
+}
+
+function stageNode(ctx: FoldContext, op: ProfileOperator, stage: ProfileStage): VisNode {
+  if (ctx.fold.stages.has(stage.id)) {
+    const opIds = stage.variants.map((v) => v.rootOpId);
+    const fold: FoldSpec = {
+      key: `stage-${stage.id}`,
+      kind: "stage",
+      opIds,
+      ownerId: op.id,
+      focus: false,
+    };
+    return { kind: "fold", fold, folded: [] };
+  }
+  const variants = stage.variants.map((v) => ({
+    variantId: v.id,
+    node: hiddenWhole(ctx, v.rootOpId)
+      ? groupFold(ctx, op.id, [v.rootOpId])
+      : chainNode(ctx, v.rootOpId),
+  }));
+  return { kind: "stage", stageId: stage.id, variants };
+}
+
+function buildNode(ctx: FoldContext, opId: string): VisNode {
+  const op = ctx.model.operators[opId];
+  const node: VisNode = { kind: "op", opId, folded: [], blocks: [] };
+  if (op.remoteStageId) {
+    const stage = ctx.model.stageById[op.remoteStageId];
+    if (stage?.variants.length) node.blocks = [stageNode(ctx, op, stage)];
+  } else if (ctx.fold.collapsed.has(opId) && op.childIds.length) {
+    const fold: FoldSpec = {
+      key: `branch-${opId}`,
+      kind: "branch",
+      opIds: op.childIds,
+      ownerId: opId,
+      focus: false,
+    };
+    node.blocks = [{ kind: "fold", fold, folded: [] }];
+  } else {
+    node.blocks = childNodes(ctx, op);
+  }
+  return node;
+}
+
+function measure(memo: WeakMap<VisNode, Box>, node: VisNode): Box {
+  const cached = memo.get(node);
+  if (cached) return cached;
+  let box: Box;
+  if (node.kind === "fold") {
+    box = { w: CARD_W, h: FOLD_H };
+  } else if (node.kind === "stage") {
+    const variants = node.variants.map((v) => measure(memo, v.node));
+    box = {
+      w:
+        variants.reduce((a, b) => a + b.w, 0) +
+        VARIANT_GAP * Math.max(0, variants.length - 1) +
+        2 * STAGE_PAD_X,
+      h: STAGE_PAD_TOP + Math.max(0, ...variants.map((b) => b.h)) + STAGE_PAD_BOTTOM,
+    };
+  } else {
+    const blocks = node.blocks.map((b) => measure(memo, b));
+    const childrenW =
+      blocks.reduce((a, b) => a + b.w, 0) + SIBLING_GAP * Math.max(0, blocks.length - 1);
+    box = {
+      w: Math.max(CARD_W, childrenW),
+      h: CARD_H + (blocks.length ? LEVEL_GAP + Math.max(...blocks.map((b) => b.h)) : 0),
+    };
+  }
+  memo.set(node, box);
+  return box;
+}
+
+function placeChild(p: PlaceContext, node: VisNode, left: number, top: number): number {
+  if (node.kind === "op") return placeOp(p, node, left, top);
+  if (node.kind === "fold") {
+    p.out.folds.push({ ...node.fold, x: left, y: top });
+    return left + CARD_W / 2;
+  }
+  return left + measure(p.memo, node).w / 2;
+}
+
+function placeStage(
+  p: PlaceContext,
+  node: Extract<VisNode, { kind: "stage" }>,
+  left: number,
+  top: number,
+): Link[] {
+  const box = measure(p.memo, node);
+  p.out.stages.push({ stageId: node.stageId, x: left, y: top, w: box.w, h: box.h });
+  const links: Link[] = [];
   let cursor = left + STAGE_PAD_X;
-  for (const v of ctx.model.stageById[stageId].variants) {
-    const vBox = ctx.memo.get(v.rootOpId)!;
-    ctx.out.variantLabels.push({
-      variantId: v.id,
+  for (const v of node.variants) {
+    const vBox = measure(p.memo, v.node);
+    p.out.variantLabels.push({
+      variantId: v.variantId,
       x: cursor,
       y: top + STAGE_PAD_TOP - 20,
       w: vBox.w,
     });
-    placeOp(ctx, v.rootOpId, cursor, top + STAGE_PAD_TOP);
+    const x = placeChild(p, v.node, cursor, top + STAGE_PAD_TOP);
+    links.push({ x, y: top + STAGE_PAD_TOP, stageTop: top, child: v.node });
     cursor += vBox.w + VARIANT_GAP;
   }
-  return left + box.w / 2;
+  return links;
 }
 
-function edgeFor(ctx: PlaceContext, child: ProfileOperator): LayoutEdge {
-  const c = ctx.cardPos.get(child.id)!;
-  const p = ctx.cardPos.get(child.parentId!)!;
-  const x1 = c.x + CARD_W / 2;
-  const y1 = c.y;
-  const x2 = p.x + CARD_W / 2;
-  const y2 = p.y + CARD_H;
-  const stageTop =
-    child.variantId && ctx.model.variantById[child.variantId]?.rootOpId === child.id
-      ? ctx.stageTop.get(child.stageId!)
-      : undefined;
-  if (stageTop === undefined) {
+function placeOp(
+  p: PlaceContext,
+  node: Extract<VisNode, { kind: "op" }>,
+  left: number,
+  top: number,
+): number {
+  const box = measure(p.memo, node);
+  const widths = node.blocks.map((b) => measure(p.memo, b).w);
+  const childrenW =
+    widths.reduce((a, w) => a + w, 0) + SIBLING_GAP * Math.max(0, node.blocks.length - 1);
+  let cursor = left + (box.w - childrenW) / 2;
+  const childTop = top + CARD_H + LEVEL_GAP;
+  const centers: number[] = [];
+  const links: Link[] = [];
+  node.blocks.forEach((block, i) => {
+    if (block.kind === "stage") {
+      links.push(...placeStage(p, block, cursor, childTop));
+      centers.push(cursor + widths[i] / 2);
+    } else {
+      const x = placeChild(p, block, cursor, childTop);
+      links.push({ x, y: childTop, stageTop: null, child: block });
+      centers.push(x);
+    }
+    cursor += widths[i] + SIBLING_GAP;
+  });
+  const center = centers.length ? (centers[0] + centers[centers.length - 1]) / 2 : left + box.w / 2;
+  const op = p.model.operators[node.opId];
+  const canCollapse = op.childIds.length > 0 && !op.remoteStageId;
+  p.out.cards.push({
+    opId: node.opId,
+    x: center - CARD_W / 2,
+    y: top,
+    branch: canCollapse ? (p.fold.collapsed.has(op.id) ? "collapsed" : "open") : null,
+    refold: p.fold.plumbing && p.fold.shown.has(op.id),
+  });
+  for (const link of links) p.out.edges.push(edgeFor(link, center, top + CARD_H, node.opId));
+  return center;
+}
+
+function edgeFor(link: Link, x2: number, y2: number, parentId: string): LayoutEdge {
+  const { x: x1, y: y1, stageTop, child } = link;
+  const fromId = child.kind === "op" ? child.opId : null;
+  const folded = child.kind === "stage" ? [] : child.folded;
+  const childId = folded[0] ?? fromId;
+  const key = childId ?? (child.kind === "fold" ? child.fold.key : parentId);
+  if (stageTop === null) {
     const my = (y1 + y2) / 2;
     return {
-      childId: child.id,
-      parentId: child.parentId!,
+      key,
+      childId,
+      fromId,
+      parentId,
+      folded,
       path: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`,
-      labelX: (x1 + x2) / 2,
-      labelY: my,
+      // on the child's own column, where sibling edges cannot crowd it the way they do near the parent
+      labelX: x1,
+      labelY: y1 - EDGE_LABEL_RISE,
     };
   }
   const my = (stageTop + y2) / 2;
   return {
-    childId: child.id,
-    parentId: child.parentId!,
+    key,
+    childId,
+    fromId,
+    parentId,
+    folded,
     path: `M${x1},${y1} L${x1},${stageTop} C${x1},${my} ${x2},${my} ${x2},${y2}`,
     labelX: x1,
     labelY: stageTop + 28,
   };
 }
 
+function relatedTo(model: ProfileModel, focusId: string | null): Set<string> | null {
+  if (!focusId || !model.operators[focusId]) return null;
+  return new Set([...subtreeIds(model, focusId), ...ancestorIds(model, focusId)]);
+}
+
 /** Tidy top-down layout: each subtree owns a disjoint x-range, stages box their variants side by side. */
-export function layoutProfile(model: ProfileModel): ProfileLayout {
-  const memo = new Map<string, Box>();
-  const root = measureOp(model, model.rootId, memo);
+export function layoutProfile(model: ProfileModel, fold: FoldState = NO_FOLD): ProfileLayout {
+  const ctx: FoldContext = {
+    model,
+    fold,
+    hot: hotspotSet(model),
+    related: relatedTo(model, fold.focusId),
+  };
+  // the root has no edge above it to carry folded operators, so it is never folded away
+  const root = buildNode(ctx, model.rootId);
+  const memo = new WeakMap<VisNode, Box>();
+  const box = measure(memo, root);
   const out: ProfileLayout = {
-    width: root.w,
-    height: root.h,
+    width: box.w,
+    height: box.h,
     cards: [],
     edges: [],
     stages: [],
     variantLabels: [],
+    folds: [],
   };
-  const ctx: PlaceContext = { model, memo, out, cardPos: new Map(), stageTop: new Map() };
-  placeOp(ctx, model.rootId, 0, 0);
-  for (const id of model.order) {
-    const op = model.operators[id];
-    if (op.parentId && ctx.cardPos.has(id)) out.edges.push(edgeFor(ctx, op));
-  }
+  placeChild({ model, fold, memo, out }, root, 0, 0);
   return out;
 }
 

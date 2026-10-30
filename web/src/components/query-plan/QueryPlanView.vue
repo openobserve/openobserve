@@ -21,27 +21,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #canvas="{ leftInset }">
       <ProfileCanvas
+        ref="canvasRef"
         :model="model"
         :layout="layout"
         scope="sum"
         :selected-id="selectedId"
         :left-inset="leftInset"
+        :plumbing="fold.plumbing"
+        :notice="notice"
         @select="pick"
+        @fold="act"
+        @notice-action="onNoticeAction"
       />
     </template>
     <template #detail>
-      <PlanDetailPanel :model="model" :op-id="selectedId" @select="pick" />
+      <PlanDetailPanel
+        :model="model"
+        :op-id="selectedId"
+        :can-focus="focusable"
+        :focused="!!fold.focusId && fold.focusId === selectedId"
+        @select="pick"
+        @focus="focusOn"
+      />
     </template>
   </QueryPlanLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { layoutProfile, summarizePlan, type ProfileModel } from "@/utils/queryProfile";
+import { useI18nTyped } from "@/types/i18n";
+import { summarizePlan, type ProfileModel } from "@/utils/queryProfile";
 import PlanDetailPanel from "./PlanDetailPanel.vue";
 import PlanSummaryPanel from "./PlanSummaryPanel.vue";
 import ProfileCanvas from "./ProfileCanvas.vue";
 import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
+import { useProfileFold } from "./useProfileFold";
 
 const props = defineProps<{
   model: ProfileModel;
@@ -49,14 +63,27 @@ const props = defineProps<{
 
 const emit = defineEmits<{ analyze: [] }>();
 
-const selectedId = ref<string | null>(null);
+const { t } = useI18nTyped();
 
-const layout = computed(() => layoutProfile(props.model));
+const selectedId = ref<string | null>(null);
+const canvasRef = ref<InstanceType<typeof ProfileCanvas> | null>(null);
+
 const summary = computed(() => summarizePlan(props.model));
+const { fold, layout, notice, focusable, act, reveal, onNoticeAction } = useProfileFold(
+  t,
+  () => props.model,
+  selectedId,
+);
 
 function pick(id: string) {
+  reveal(id);
   selectedId.value = id;
   revealDetail();
+}
+
+function focusOn(opId: string | null) {
+  canvasRef.value?.fitNext();
+  act({ type: "focus", opId });
 }
 
 watch(

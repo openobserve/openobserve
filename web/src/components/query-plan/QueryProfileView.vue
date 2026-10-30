@@ -28,12 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #canvas="{ leftInset }">
       <ProfileCanvas
+        ref="canvasRef"
         :model="model"
         :layout="layout"
         :scope="scope"
         :selected-id="selectedId"
         :left-inset="leftInset"
+        :plumbing="fold.plumbing"
+        :notice="notice"
         @select="pick"
+        @fold="act"
+        @notice-action="onNoticeAction"
       >
         <template v-if="model.stages.length" #toolbar>
           <div
@@ -77,8 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model="model"
         :op-id="selectedId"
         :scope="scope"
+        :can-focus="focusable"
+        :focused="!!fold.focusId && fold.focusId === selectedId"
         @select="pick"
         @scope="scope = $event"
+        @focus="focusOn"
       />
     </template>
   </QueryPlanLayout>
@@ -93,7 +101,6 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   clusterNodes,
-  layoutProfile,
   nodeScope,
   scopeNodeKey,
   summarizeProfile,
@@ -106,6 +113,7 @@ import ProfileDetailPanel from "./ProfileDetailPanel.vue";
 import ProfileSummaryPanel from "./ProfileSummaryPanel.vue";
 import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
 import { roleLabel } from "./profileText";
+import { useProfileFold } from "./useProfileFold";
 
 const props = defineProps<{
   model: ProfileModel;
@@ -116,9 +124,14 @@ const { t } = useI18nTyped();
 
 const scope = ref<StageScope>("sum");
 const selectedId = ref<string | null>(null);
+const canvasRef = ref<InstanceType<typeof ProfileCanvas> | null>(null);
 
-const layout = computed(() => layoutProfile(props.model));
 const summary = computed(() => summarizeProfile(props.model, props.stream ?? {}));
+const { fold, layout, notice, focusable, act, reveal, onNoticeAction } = useProfileFold(
+  t,
+  () => props.model,
+  selectedId,
+);
 
 const nodeOptions = computed(() =>
   clusterNodes(props.model).map((n) => {
@@ -131,8 +144,14 @@ const selectedNode = computed(() => scopeNodeKey(scope.value));
 const toggleValue = computed(() => (selectedNode.value ? "" : scope.value));
 
 function pick(id: string) {
+  reveal(id);
   selectedId.value = id;
   revealDetail();
+}
+
+function focusOn(opId: string | null) {
+  canvasRef.value?.fitNext();
+  act({ type: "focus", opId });
 }
 
 function onToggle(value: unknown) {

@@ -16,7 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="op" class="flex flex-col pb-6" data-test="query-plan-detail">
-    <ProfileDetailHeader :model="model" :op="op" @select="emit('select', $event)" />
+    <ProfileDetailHeader
+      :model="model"
+      :op="op"
+      :can-focus="canFocus"
+      :focused="focused"
+      @select="emit('select', $event)"
+      @focus="emit('focus', $event)"
+    />
 
     <div class="flex flex-col gap-4 px-4 pt-3">
       <section v-if="entries.length">
@@ -60,9 +67,11 @@ import ProfileDetailHeader from "./ProfileDetailHeader.vue";
 const props = defineProps<{
   model: ProfileModel;
   opId: string | null;
+  canFocus?: boolean;
+  focused?: boolean;
 }>();
 
-const emit = defineEmits<{ select: [opId: string] }>();
+const emit = defineEmits<{ select: [opId: string]; focus: [opId: string | null] }>();
 
 const { t } = useI18nTyped();
 

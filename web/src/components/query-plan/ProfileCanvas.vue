@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <path
           v-for="e in edges"
-          :key="e.childId"
+          :key="e.key"
           :d="e.path"
           fill="none"
           stroke-linecap="round"
@@ -69,21 +69,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </svg>
       <span
         v-for="e in labelledEdges"
-        :key="`label-${e.childId}`"
+        :key="`label-${e.key}`"
         class="bg-surface-base text-2xs absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-1.5 font-mono whitespace-nowrap"
         :class="e.hot ? 'border-accent text-accent' : 'border-border-default text-text-secondary'"
         :style="{ left: `${e.labelX}px`, top: `${e.labelY}px` }"
         >{{ e.label }}</span
       >
       <div
+        v-for="e in chipEdges"
+        :key="`chip-${e.key}`"
+        class="absolute -translate-x-1/2 -translate-y-1/2"
+        :style="{ left: `${e.labelX}px`, top: `${e.labelY}px` }"
+        data-profile-card
+      >
+        <OButton
+          variant="outline"
+          size="xs"
+          icon-left="swap-horiz"
+          :aria-label="t('search.queryProfile.showFolded', { op: e.chipTitle })"
+          :data-test="`query-profile-chip-${e.key}`"
+          @click.stop="showFolded(e)"
+          >{{ e.chipText }}</OButton
+        >
+      </div>
+      <div
         v-for="s in stageBoxes"
         :key="`pill-${s.stageId}`"
-        class="bg-surface-panel border-border-strong text-text-secondary absolute -translate-y-1/2 rounded-full border px-2 py-px text-xs whitespace-nowrap"
+        class="bg-surface-panel border-border-strong text-text-secondary absolute flex -translate-y-1/2 items-center gap-1 rounded-full border py-px ps-2 pe-0.5 text-xs whitespace-nowrap"
         :style="{ left: `${s.x + 12}px`, top: `${s.y}px` }"
+        data-profile-card
       >
         <span class="text-text-heading font-semibold">{{ s.title }}</span>
         <span>{{ s.meta }}</span>
+        <OButton
+          variant="ghost"
+          size="icon-xs"
+          icon-left="unfold-less"
+          :aria-label="t('search.queryProfile.collapseStage', { index: s.index })"
+          :data-test="`query-profile-collapse-stage-${s.stageId}`"
+          @click.stop="collapseStage(s.stageId)"
+        />
       </div>
+      <ProfileFoldCard
+        v-for="f in layout.folds"
+        :key="f.key"
+        :model="model"
+        :fold="f"
+        @open="emitFold({ type: 'open', fold: f }, [f.ownerId])"
+      />
       <ProfileOperatorCard
         v-for="c in layout.cards"
         :key="c.opId"
@@ -93,12 +126,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected="c.opId === selectedId"
         :x="c.x"
         :y="c.y"
+        :branch="c.branch"
+        :refold="c.refold"
         @select="emit('select', $event)"
+        @fold="onCardFold(c.opId, $event)"
       />
     </div>
 
     <div class="absolute top-3 z-10 w-max" :style="{ left: `${toolbarX}px` }" data-canvas-overlay>
       <slot name="toolbar" />
+    </div>
+
+    <div
+      v-if="notice"
+      class="bg-surface-base border-border-default rounded-default absolute bottom-3 z-10 flex items-center gap-2 border py-1 ps-2.5 pe-1 text-xs shadow-sm"
+      :style="{ left: `${toolbarX}px`, maxWidth: `calc(100% - ${toolbarX + noticeRightGap}px)` }"
+      data-canvas-overlay
+      data-test="query-profile-fold-notice"
+    >
+      <span class="text-text-body min-w-0">{{ notice.text }}</span>
+      <OButton
+        variant="ghost"
+        size="xs"
+        data-test="query-profile-fold-notice-action"
+        @click="onNotice"
+        >{{ notice.action }}</OButton
+      >
     </div>
 
     <div
@@ -142,6 +195,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="query-profile-minimap-toggle"
           @click="showMini = !showMini"
         />
+        <div class="border-border-default mx-1 border-t" />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="compress"
+          :aria-label="t('search.queryProfile.foldPlumbing')"
+          :aria-pressed="plumbing"
+          :class="plumbing ? 'text-accent' : ''"
+          data-test="query-profile-fold-plumbing"
+          @click="emitFold({ type: 'plumbing' }, selectedAnchor())"
+        />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="unfold-more"
+          :aria-label="t('search.queryProfile.expandAll')"
+          data-test="query-profile-expand-all"
+          @click="emitFold({ type: 'expandAll' })"
+        />
+        <OButton
+          v-if="!model.planOnly"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="local-fire-department"
+          :aria-label="t('search.queryProfile.collapseToHotPath')"
+          data-test="query-profile-hot-path"
+          @click="emitFold({ type: 'hotPath' })"
+        />
       </div>
       <svg
         v-if="showMini"
@@ -161,6 +242,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :y="s.y"
           :width="s.w"
           :height="s.h"
+          fill="none"
+          stroke="var(--color-border-strong)"
+          stroke-dasharray="4 4"
+          vector-effect="non-scaling-stroke"
+        />
+        <rect
+          v-for="f in layout.folds"
+          :key="f.key"
+          :x="f.x"
+          :y="f.y"
+          :width="CARD_W"
+          :height="FOLD_H"
           fill="none"
           stroke="var(--color-border-strong)"
           stroke-dasharray="4 4"
@@ -200,16 +293,20 @@ import { useI18nTyped } from "@/types/i18n";
 import {
   CARD_H,
   CARD_W,
+  FOLD_H,
   formatBytes,
   formatRows,
   scopedValue,
+  type LayoutEdge,
   type ProfileLayout,
   type ProfileModel,
   type StageScope,
 } from "@/utils/queryProfile";
+import type { FoldAction } from "@/utils/queryProfileFold";
+import ProfileFoldCard from "./ProfileFoldCard.vue";
 import ProfileOperatorCard from "./ProfileOperatorCard.vue";
-import { CATEGORY_STYLE } from "./profileStyles";
-import { variantLabel } from "./profileText";
+import { CATEGORY_STYLE, type FoldNotice } from "./profileStyles";
+import { operatorTitle, variantLabel } from "./profileText";
 
 // World coordinates are screen pixels at zoom 1, so pointer pan and zoom map one to one.
 const ZOOM_STEP = 1.2;
@@ -231,9 +328,15 @@ const props = defineProps<{
   scope: StageScope;
   selectedId: string | null;
   leftInset: number;
+  plumbing?: boolean;
+  notice?: FoldNotice | null;
 }>();
 
-const emit = defineEmits<{ select: [opId: string] }>();
+const emit = defineEmits<{
+  select: [opId: string];
+  fold: [action: FoldAction];
+  "notice-action": [];
+}>();
 
 const { t } = useI18nTyped();
 const { isDesktop } = useBreakpoint();
@@ -245,8 +348,12 @@ const size = reactive({ w: 0, h: 0 });
 const showMini = ref(false);
 const drag = ref<{ x: number; y: number; vx: number; vy: number; id: number } | null>(null);
 let observer: ResizeObserver | null = null;
+let lastModel = props.model;
+// what the next layout change should do to the view: keep a card where it was, or refit
+let pending: { ids: string[]; sx: number; sy: number } | "fit" | null = null;
 
 const toolbarX = computed(() => props.leftInset);
+const noticeRightGap = computed(() => (isDesktop.value ? FIT_OVERLAY_W + 12 : 12));
 
 const stageBoxes = computed(() =>
   props.layout.stages.map((box) => {
@@ -263,6 +370,7 @@ const stageBoxes = computed(() =>
     );
     return {
       ...box,
+      index: stage.index,
       title: t("search.queryProfile.stage", { index: stage.index }),
       meta: props.model.planOnly
         ? ` · ${t("search.queryProfile.stageRunsEverywhere")}`
@@ -280,8 +388,8 @@ const variantLabels = computed(() =>
 
 const edges = computed(() =>
   props.layout.edges.map((e) => {
-    const hot = e.childId === props.selectedId || e.parentId === props.selectedId;
-    if (props.model.planOnly) return { ...e, on: true, hot, width: 1.5, label: "" };
+    const hot = (!!e.fromId && e.fromId === props.selectedId) || e.parentId === props.selectedId;
+    if (props.model.planOnly || !e.childId) return { ...e, on: true, hot, width: 1.5, label: "" };
     const child = props.model.operators[e.childId];
     const value = scopedValue(child, props.scope);
     const rows = child.remoteStageId ? child.totalRows : value.rows;
@@ -305,7 +413,86 @@ const edges = computed(() =>
   }),
 );
 
-const labelledEdges = computed(() => edges.value.filter((e) => e.label));
+const labelledEdges = computed(() => edges.value.filter((e) => e.label && !e.folded.length));
+
+const chipEdges = computed(() =>
+  edges.value
+    .filter((e) => e.folded.length)
+    .map((e) => {
+      const chipTitle = operatorTitle(t, props.model.operators[e.folded[0]]);
+      const more = e.folded.length > 1 ? ` +${e.folded.length - 1}` : "";
+      const rows = e.label ? ` · ${e.label}` : "";
+      return { ...e, chipTitle, chipText: `${chipTitle}${more}${rows}` };
+    }),
+);
+
+function cardAt(opId: string) {
+  return props.layout.cards.find((c) => c.opId === opId);
+}
+
+function selectedAnchor(): string[] {
+  return props.selectedId ? [props.selectedId] : [];
+}
+
+/** Keeps the first of `anchorIds` still on screen where it was once the fold re-lays the plan. */
+function emitFold(action: FoldAction, anchorIds: string[] = []) {
+  const anchor = anchorIds.map(cardAt).find(Boolean);
+  pending = anchor
+    ? { ids: anchorIds, sx: anchor.x * view.k + view.x, sy: anchor.y * view.k + view.y }
+    : "fit";
+  emit("fold", action);
+}
+
+function onCardFold(opId: string, kind: "branch" | "refold") {
+  if (kind === "branch") return emitFold({ type: "branch", opId }, [opId]);
+  const below: string[] = [];
+  for (
+    let id = props.model.operators[opId].childIds[0];
+    id;
+    id = props.model.operators[id].childIds[0]
+  ) {
+    below.push(id);
+  }
+  const parent = props.model.operators[opId].parentId;
+  emitFold({ type: "refold", opId }, [...below, ...(parent ? [parent] : [])]);
+}
+
+function showFolded(e: LayoutEdge) {
+  emitFold({ type: "show", opIds: e.folded }, e.fromId ? [e.fromId] : [e.parentId]);
+}
+
+function collapseStage(stageId: string) {
+  emitFold({ type: "stage", stageId }, [props.model.stageById[stageId].remoteOpId]);
+}
+
+function onNotice() {
+  pending = "fit";
+  emit("notice-action");
+}
+
+function restoreAnchor(anchor: { ids: string[]; sx: number; sy: number }) {
+  const card = anchor.ids.map(cardAt).find(Boolean);
+  if (!card) return fit();
+  view.x = anchor.sx - card.x * view.k;
+  view.y = anchor.sy - card.y * view.k;
+}
+
+function onLayout() {
+  const next = pending;
+  pending = null;
+  if (props.model !== lastModel) {
+    lastModel = props.model;
+    return fit();
+  }
+  if (next === "fit") return fit();
+  if (next) return restoreAnchor(next);
+  ensureVisible(props.selectedId);
+}
+
+/** Refits once the next layout lands, for fold changes made outside the canvas. */
+function fitNext() {
+  pending = "fit";
+}
 
 function clampZoom(k: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k));
@@ -421,14 +608,19 @@ onMounted(() => {
 onBeforeUnmount(() => observer?.disconnect());
 
 watch(
-  () => [props.layout, props.leftInset, isDesktop.value],
+  () => props.layout,
+  () => nextTick(onLayout),
+);
+
+watch(
+  () => [props.leftInset, isDesktop.value],
   () => nextTick(fit),
 );
 
 watch(
   () => props.selectedId,
-  (id) => ensureVisible(id),
+  (id) => nextTick(() => ensureVisible(id)),
 );
 
-defineExpose({ fit, zoomBy, view });
+defineExpose({ fit, fitNext, zoomBy, view });
 </script>
