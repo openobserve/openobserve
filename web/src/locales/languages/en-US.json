@@ -1396,6 +1396,7 @@
       "ingesters": "Ingesters",
       "roleQuerier": "Querier",
       "roleIngester": "Ingester",
+      "nodeOnCluster": "{cluster} · {role}",
       "nodesCount": "{count} node | {count} nodes",
       "planShapes": "{count} plan shape | {count} plan shapes",
       "opSubline": "{time} · {rows} rows",
