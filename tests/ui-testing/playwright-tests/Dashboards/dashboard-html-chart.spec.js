@@ -13,6 +13,13 @@ import {
   setupTestDashboard,
   cleanupTestDashboard,
 } from "./utils/dashCreation.js";
+import {
+  BLANK_TARGET_HTML_SNIPPET,
+  DROPPED_TARGET_HTML_SNIPPET,
+  HTML_LINK_SELECTORS,
+  POPUP_HTML_SNIPPET,
+  SHADOWED_FORM_HTML_SNIPPET,
+} from "./utils/htmlPanelFixtures.js";
 // Each test runs in parallel (mode: "parallel" below), so the name must be
 // generated fresh per test — a single shared name caused cross-test races
 // where one test's create/delete collided with another's mid-flight.
@@ -58,35 +65,6 @@ const UNDEFINED_VARIABLE_HTML_SNIPPET = `<!DOCTYPE html>
     <p>$undefinedvar Not replaced</p>
   </body>
 </html>`;
-
-const BLANK_TARGET_HTML_SNIPPET = `<h1>Blank Target Test</h1>
-<a id="o2-blank-link" href="https://example.com/a" target="_blank" rel="opener">Blank link</a>
-<a id="o2-blank-mixed-case-link" href="https://example.com/b" target="  _BLANK ">Mixed case link</a>
-<form id="o2-blank-form" action="https://example.com/submit" target="_blank"><button type="submit">Go</button></form>
-<map name="o2-map"><area id="o2-blank-area" shape="rect" coords="0,0,10,10" href="https://example.com/c" target="_blank" alt="area"></map>
-<svg width="20" height="20"><a id="o2-blank-svg-link" href="https://example.com/d" target="_blank"><rect width="10" height="10"></rect></a></svg>`;
-
-const DROPPED_TARGET_HTML_SNIPPET = `<h1>Dropped Target Test</h1>
-<a id="o2-named-link" href="https://example.com/a" target="o2frame">Named link</a>
-<a id="o2-top-link" href="https://example.com/b" target="_top">Top link</a>
-<a id="o2-self-link" href="https://example.com/c" target="_self">Self link</a>
-<a id="o2-parent-link" href="https://example.com/d" target="_parent">Parent link</a>
-<form id="o2-named-form" action="https://example.com/submit" target="o2frame"><button type="submit">Go</button></form>
-<a id="o2-plain-link" href="https://example.com/e" rel="nofollow">Plain link</a>`;
-
-// a shadowed getAttribute must not blank the panel; a shadowed nodeName form is dropped as clobbered
-const SHADOWED_FORM_HTML_SNIPPET = `<h1>Shadowed Form Test</h1>
-<form id="o2-shadowed-form" action="https://example.com/submit" target="_blank">
-  <input name="getAttribute" value="a">
-  <button type="submit">Send</button>
-</form>
-<form id="o2-clobbered-form" action="https://example.com/submit" target="_blank">
-  <input name="nodeName" value="b">
-</form>
-<a id="o2-after-forms-link" href="https://example.com/a" target="_blank">After forms</a>`;
-
-const POPUP_HTML_SNIPPET = `<h1>Popup Link Test</h1>
-<a id="o2-popup-link" href="/healthz" target="_blank">Open in new tab</a>`;
 
 test.describe.configure({ mode: "parallel" });
 
@@ -315,11 +293,11 @@ test.describe("HTML chart link targets", () => {
     ).toBeVisible();
 
     for (const selector of [
-      "#o2-blank-link",
-      "#o2-blank-mixed-case-link",
-      "#o2-blank-form",
-      "#o2-blank-area",
-      "#o2-blank-svg-link",
+      HTML_LINK_SELECTORS.blankLink,
+      HTML_LINK_SELECTORS.blankMixedCaseLink,
+      HTML_LINK_SELECTORS.blankForm,
+      HTML_LINK_SELECTORS.blankArea,
+      HTML_LINK_SELECTORS.blankSvgLink,
     ]) {
       await pm.chartTypeSelector.expectHtmlLinkTarget(selector, "_blank");
     }
@@ -345,18 +323,18 @@ test.describe("HTML chart link targets", () => {
     ).toBeVisible();
 
     for (const selector of [
-      "#o2-named-link",
-      "#o2-top-link",
-      "#o2-self-link",
-      "#o2-parent-link",
-      "#o2-named-form",
+      HTML_LINK_SELECTORS.namedLink,
+      HTML_LINK_SELECTORS.topLink,
+      HTML_LINK_SELECTORS.selfLink,
+      HTML_LINK_SELECTORS.parentLink,
+      HTML_LINK_SELECTORS.namedForm,
     ]) {
       await pm.chartTypeSelector.expectHtmlLinkTarget(selector, null);
     }
 
     // an element without a target keeps the author's rel
     await expect(
-      pm.chartTypeSelector.getHtmlRendererElement("#o2-plain-link")
+      pm.chartTypeSelector.getHtmlRendererElement(HTML_LINK_SELECTORS.plainLink)
     ).toHaveAttribute("rel", "nofollow");
 
     await pm.dashboardPanelActions.addPanelName(
@@ -380,13 +358,13 @@ test.describe("HTML chart link targets", () => {
       pm.chartTypeSelector.getHtmlHeading("Shadowed Form Test")
     ).toBeVisible();
     await expect(
-      pm.chartTypeSelector.getHtmlRendererElement("#o2-shadowed-form button")
+      pm.chartTypeSelector.getHtmlRendererElement(HTML_LINK_SELECTORS.shadowedFormButton)
     ).toBeVisible();
-    await pm.chartTypeSelector.expectHtmlLinkTarget("#o2-shadowed-form", "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.shadowedForm, "_blank");
     await expect(
-      pm.chartTypeSelector.getHtmlRendererElement("#o2-clobbered-form")
+      pm.chartTypeSelector.getHtmlRendererElement(HTML_LINK_SELECTORS.clobberedForm)
     ).toHaveCount(0);
-    await pm.chartTypeSelector.expectHtmlLinkTarget("#o2-after-forms-link", "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.afterFormsLink, "_blank");
 
     await pm.dashboardPanelActions.addPanelName(
       pm.dashboardPanelActions.generateUniquePanelName("panel-test")
@@ -405,10 +383,10 @@ test.describe("HTML chart link targets", () => {
     await setupTestDashboard(page, pm, dashboardName);
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.addHtmlPanelContent(POPUP_HTML_SNIPPET);
-    await pm.chartTypeSelector.expectHtmlLinkTarget("#o2-popup-link", "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.popupLink, "_blank");
 
     const popup = await pm.chartTypeSelector.clickHtmlRendererElementForPopup(
-      "#o2-popup-link"
+      HTML_LINK_SELECTORS.popupLink
     );
     expect(popup.url()).toBe(popupUrl);
     expect(await pm.chartTypeSelector.isPopupOpenerNull(popup)).toBe(true);
@@ -447,16 +425,16 @@ test.describe("HTML chart link targets", () => {
     await expect(
       pm.chartTypeSelector.getHtmlHeading("Blank Target Test")
     ).toBeVisible();
-    await pm.chartTypeSelector.expectHtmlLinkTarget("#o2-blank-link", "_blank");
-    await pm.chartTypeSelector.expectHtmlLinkTarget("#o2-blank-form", "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankLink, "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankForm, "_blank");
 
     await page.reload();
     await expect(
       pm.chartTypeSelector.getHtmlHeading("Blank Target Test")
     ).toBeVisible();
-    await pm.chartTypeSelector.expectHtmlLinkTarget("#o2-blank-link", "_blank");
-    await pm.chartTypeSelector.expectHtmlLinkTarget("#o2-blank-mixed-case-link", "_blank");
-    await pm.chartTypeSelector.expectHtmlLinkTarget("#o2-blank-svg-link", "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankLink, "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankMixedCaseLink, "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankSvgLink, "_blank");
 
     await cleanupTestDashboard(page, pm, dashboardName);
   });
