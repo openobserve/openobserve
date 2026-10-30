@@ -149,7 +149,9 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
       browser_devices: browserDevices ?? [{ browser: "chromium", device: "desktop" }],
       // Defaults apply on create only; on edit the stored values win.
       timeout_ms: extras?.timeout_ms ?? 30000,
-      ...(extras?.journey_budget_ms !== undefined && { journey_budget_ms: extras.journey_budget_ms }),
+      ...(extras?.journey_budget_ms !== undefined && {
+        journey_budget_ms: extras.journey_budget_ms,
+      }),
       ...(extras?.test_id_attr !== undefined && { test_id_attr: extras.test_id_attr }),
       ...(extras?.runtime !== undefined && { runtime: extras.runtime }),
       capture: {
@@ -356,7 +358,8 @@ function mapFrequencyToSchedule(freq: any, start?: number): BrowserCheck["schedu
 function pickBrowserConfigExtras(config: any): BrowserCheck["browserConfigExtras"] {
   if (!config) return undefined;
   const out: NonNullable<BrowserCheck["browserConfigExtras"]> = {};
-  if (typeof config.journey_budget_ms === "number") out.journey_budget_ms = config.journey_budget_ms;
+  if (typeof config.journey_budget_ms === "number")
+    out.journey_budget_ms = config.journey_budget_ms;
   if (typeof config.test_id_attr === "string") out.test_id_attr = config.test_id_attr;
   if (typeof config.runtime === "string") out.runtime = config.runtime;
   if (typeof config.timeout_ms === "number") out.timeout_ms = config.timeout_ms;
