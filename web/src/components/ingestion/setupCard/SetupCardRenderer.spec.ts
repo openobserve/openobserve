@@ -121,6 +121,16 @@ describe("SetupCardRenderer — advanced section", () => {
     if (wrapper) wrapper.unmount();
   });
 
+  it("hides token-bearing commands until the ingest passcode is known", () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: CONTENT, subs: SUBS, commandsReady: false },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(wrapper.find('[data-test="ingestion-setup-code-block-copy-btn"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Install");
+  });
+
   it("renders the advanced accordion collapsed, as its own panel", () => {
     wrapper = mountCard();
     const acc = wrapper.find('[data-test="ai-advanced-accordion"]');

@@ -20,8 +20,27 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { ref } from "vue";
-import DataSourceSetupCard from "./DataSourceSetupCard.vue";
 import i18n from "@/locales";
+import { b64EncodeStandard } from "@/utils/formatters";
+import DataSourceSetupCard from "./DataSourceSetupCard.vue";
+
+const credentialMock = vi.hoisted(() => ({
+  ready: true,
+  load: vi.fn((): Promise<{ kind: string } | undefined> => Promise.resolve(undefined)),
+}));
+
+vi.mock("@/composables/useOrgCredential", async () => {
+  const { computed } = await import("vue");
+  return {
+    useOrgCredential: () => ({
+      ready: computed(() => credentialMock.ready),
+      pickedName: computed(() => ""),
+      load: () => credentialMock.load(),
+      pickToken: () => undefined,
+      setUserPasscode: () => undefined,
+    }),
+  };
+});
 
 const { importHostMetricsDashboard, importSetupDashboard, toastMock } = vi.hoisted(() => ({
   importHostMetricsDashboard: vi.fn(),
@@ -57,7 +76,7 @@ vi.mock("@/composables/useIngestion", () => ({
 // The renderer is presentational — stub it and drive its emits directly.
 const rendererStub = {
   name: "SetupCardRenderer",
-  props: ["content", "subs"],
+  props: ["content", "subs", "commandsReady"],
   emits: ["detected", "step-action"],
   template: '<div data-test="renderer-stub" />',
 };
@@ -70,12 +89,12 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   let store: any;
   let router: any;
 
-  const mountCard = (slug: string) => {
+  const mountCard = async (slug: string, passcode = "pc", path = "/") => {
     store = createStore({
       state: {
         selectedOrganization: { identifier: "test-org" },
         userInfo: { email: "t@e.com" },
-        organizationData: { organizationPasscode: "pc" },
+        organizationData: { organizationPasscode: passcode },
         theme: "light",
       },
     });
@@ -84,10 +103,17 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
       routes: [
         { path: "/", component: { template: "<div />" } },
         { path: "/infra/hosts", name: "infraHosts", component: { template: "<div />" } },
+        {
+          path: "/ingestion",
+          name: "ingestion",
+          component: { template: "<router-view />" },
+          children: [{ path: "linux", name: "linuxIngest", component: { template: "<div />" } }],
+        },
         { path: "/dashboards/view", name: "viewDashboard", component: { template: "<div />" } },
       ],
     });
     vi.spyOn(router, "push");
+    if (path !== "/") await router.push(path);
     return mount(DataSourceSetupCard, {
       props: { slug },
       global: {
@@ -101,6 +127,9 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    credentialMock.ready = true;
+    credentialMock.load.mockReset();
+    credentialMock.load.mockResolvedValue(undefined);
     importHostMetricsDashboard.mockResolvedValue({
       status: "created",
       dashboardId: "dash-1",
@@ -112,10 +141,41 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
     if (wrapper) wrapper.unmount();
   });
 
+  it("withholds the install command until a passcode exists", async () => {
+    credentialMock.ready = false;
+    wrapper = await mountCard("macos", "");
+    expect(renderer().props("subs").token).toBe("");
+    expect(renderer().props("commandsReady")).toBe(false);
+  });
+
+  it("encodes the org passcode once the credential has loaded", async () => {
+    wrapper = await mountCard("macos", "pc");
+    expect(renderer().props("subs").token).toBe(b64EncodeStandard("t@e.com:pc"));
+    expect(renderer().props("commandsReady")).toBe(true);
+  });
+
+  it("tells Hosts and Kubernetes when the passcode is empty", async () => {
+    credentialMock.load.mockResolvedValue({ kind: "empty" });
+    wrapper = await mountCard("macos", "");
+    await flushPromises();
+    expect(toastMock).toHaveBeenCalledWith({
+      variant: "error",
+      message: t("toastMessages.views.passcodeNotFound"),
+      timeout: 5000,
+    });
+  });
+
+  it("leaves the empty-passcode toast to Ingestion on Data sources", async () => {
+    credentialMock.load.mockResolvedValue({ kind: "empty" });
+    wrapper = await mountCard("linux", "", "/ingestion/linux");
+    await flushPromises();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
   it.each(["linux", "windows", "macos"])(
     "imports the host dashboard when detection connects on the %s card",
     async (slug) => {
-      wrapper = mountCard(slug);
+      wrapper = await mountCard(slug);
       renderer().vm.$emit("detected", 4);
       await flushPromises();
       expect(importHostMetricsDashboard).toHaveBeenCalledWith("test-org");
@@ -123,7 +183,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   );
 
   it("is a no-op for every non-host slug (the AWS EC2 embed guarantee)", async () => {
-    wrapper = mountCard("sqlServer");
+    wrapper = await mountCard("sqlServer");
     renderer().vm.$emit("detected", 4);
     renderer().vm.$emit("step-action", "view-host-dashboard");
     await flushPromises();
@@ -134,7 +194,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   it.each(["linux", "sqlServer"])(
     "forwards the renderer's detected emit for the %s slug (embedding pages react to it)",
     async (slug) => {
-      wrapper = mountCard(slug);
+      wrapper = await mountCard(slug);
       renderer().vm.$emit("detected", 4);
       await flushPromises();
       // The Hosts empty state flips live off this emit — the card's state never reaches it otherwise.
@@ -143,7 +203,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   );
 
   it("toasts hostDashboardImported with the View Hosts action on created", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("detected", 4);
     await flushPromises();
     expect(toastMock).toHaveBeenCalledTimes(1);
@@ -155,7 +215,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   });
 
   it("the toast action opens Infra → Hosts with the captured org", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("detected", 4);
     await flushPromises();
     // Org switches between detect and toast click — the captured org must win.
@@ -176,7 +236,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
       dashboardId: "dash-old",
       folderId: "default",
     });
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("detected", 4);
     await flushPromises();
     const opts = toastMock.mock.calls[0][0];
@@ -190,14 +250,14 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
       kind: "forbidden",
       message: "403",
     });
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("detected", 4);
     await flushPromises();
     expect(toastMock).not.toHaveBeenCalled();
   });
 
   it("navigates the view-host-dashboard step button to the known dashboard id", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("detected", 4);
     await flushPromises();
     renderer().vm.$emit("step-action", "view-host-dashboard");
@@ -217,7 +277,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   });
 
   it("keeps the silent detect-time import — the setup flow's own framing is the user's consent", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("detected", 4);
     await flushPromises();
     expect(importHostMetricsDashboard).toHaveBeenCalledWith("test-org");
@@ -225,7 +285,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   });
 
   it("imports first, then navigates, when the step button is clicked before any import", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("step-action", "view-host-dashboard");
     await flushPromises();
     expect(importHostMetricsDashboard).toHaveBeenCalledWith("test-org");
@@ -238,7 +298,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   });
 
   it("does not track dashboard_created for the automatic detect-time import", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("detected", 4);
     await flushPromises();
     expect(importHostMetricsDashboard).toHaveBeenCalled();
@@ -246,7 +306,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   });
 
   it("tracks dashboard_created when the step button creates the dashboard", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("step-action", "view-host-dashboard");
     await flushPromises();
     expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
@@ -258,14 +318,14 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
       dashboardId: "dash-old",
       folderId: "default",
     });
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("step-action", "view-host-dashboard");
     await flushPromises();
     expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("re-resolves the host dashboard after an org switch instead of opening the old org's id", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("detected", 4);
     await flushPromises();
     store.state.selectedOrganization = { identifier: "org-b" };
@@ -289,7 +349,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
       kind: "forbidden",
       message: "403",
     });
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("step-action", "view-host-dashboard");
     await flushPromises();
     const opts = toastMock.mock.calls[0][0];
@@ -303,7 +363,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
       kind: "generic",
       message: "boom",
     });
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("step-action", "view-host-dashboard");
     await flushPromises();
     const opts = toastMock.mock.calls[0][0];
@@ -343,6 +403,8 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
 
   beforeEach(() => {
     vi.clearAllMocks();
+    credentialMock.load.mockReset();
+    credentialMock.load.mockResolvedValue(undefined);
     importSetupDashboard.mockResolvedValue({
       status: "created",
       dashboardId: "gpu-1",
@@ -355,7 +417,7 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
   });
 
   it("imports the GPU dashboard on detect and toasts with an Open dashboard action", async () => {
-    wrapper = mountCard("nvidiaDcgm");
+    wrapper = await mountCard("nvidiaDcgm");
     renderer().vm.$emit("detected", 3);
     await flushPromises();
     expect(importSetupDashboard).toHaveBeenCalledWith(
@@ -375,14 +437,14 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
 
   it("stays silent when the detect-time import fails", async () => {
     importSetupDashboard.mockResolvedValue({ status: "error", kind: "generic", message: "x" });
-    wrapper = mountCard("nvidiaDcgm");
+    wrapper = await mountCard("nvidiaDcgm");
     renderer().vm.$emit("detected", 3);
     await flushPromises();
     expect(toastMock).not.toHaveBeenCalled();
   });
 
   it("imports then opens the dashboard from the step button, reusing the id afterwards", async () => {
-    wrapper = mountCard("nvidiaDcgm");
+    wrapper = await mountCard("nvidiaDcgm");
     renderer().vm.$emit("step-action", "open-setup-dashboard");
     await flushPromises();
     renderer().vm.$emit("step-action", "open-setup-dashboard");
@@ -396,7 +458,7 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
   });
 
   it("re-resolves the dashboard after an org switch instead of opening the old org's id", async () => {
-    wrapper = mountCard("nvidiaDcgm");
+    wrapper = await mountCard("nvidiaDcgm");
     renderer().vm.$emit("step-action", "open-setup-dashboard");
     await flushPromises();
     (wrapper.vm.$store as any).state.selectedOrganization = { identifier: "org-b" };
@@ -416,7 +478,7 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
 
   it("names the RBAC cause when the step button hits a 403", async () => {
     importSetupDashboard.mockResolvedValue({ status: "error", kind: "forbidden", message: "" });
-    wrapper = mountCard("nvidiaDcgm");
+    wrapper = await mountCard("nvidiaDcgm");
     renderer().vm.$emit("step-action", "open-setup-dashboard");
     await flushPromises();
     expect(toastMock).toHaveBeenCalledWith(
@@ -431,7 +493,7 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
   });
 
   it("ignores the dashboard action on a card without a companion dashboard", async () => {
-    wrapper = mountCard("linux");
+    wrapper = await mountCard("linux");
     renderer().vm.$emit("step-action", "open-setup-dashboard");
     await flushPromises();
     expect(importSetupDashboard).not.toHaveBeenCalled();

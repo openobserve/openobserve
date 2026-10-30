@@ -25,12 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { b64EncodeStandard } from "@/utils/zincutils";
 import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
 import useIngestion from "@/composables/useIngestion";
+import { useOrgCredential, type PasscodeRead } from "@/composables/useOrgCredential";
+import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
 import analytics from "@/services/product_analytics";
 import {
@@ -63,19 +64,44 @@ const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
 const { endpoint } = useIngestion();
+const credential = useOrgCredential();
 
-// Per-org url/org/token — the same Basic-auth token every Data Sources card
-// uses: base64(email:<org ingestion passcode>) WITHOUT the "Basic " prefix.
+// Ingestion.vue already toasts an empty passcode. Infra pages that embed this card do not.
+const reportEmptyPasscode = (read: PasscodeRead | undefined) => {
+  if (read?.kind !== "empty") return;
+  if (router.currentRoute.value.matched.some((record) => record.name === "ingestion")) return;
+  toast({
+    variant: "error",
+    message: t("toastMessages.views.passcodeNotFound"),
+    timeout: 5000,
+  });
+};
+
+watch(
+  () => store.state.selectedOrganization?.identifier,
+  (orgId) => {
+    if (!orgId) return;
+    void credential.load().then(reportEmptyPasscode);
+  },
+  { immediate: true },
+);
+
+// Hosts embeds this card and never visits Ingestion, so the passcode load lives here.
 const subs = computed<CardSubstitutions>(() => {
   const email = store.state.userInfo?.email ?? "";
   const passcode = store.state.organizationData?.organizationPasscode ?? "";
   return {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    token: basicIngestToken(email, passcode),
     isPrimaryCloud: isPrimaryCloudWebUrl(store.state.zoConfig?.web_url),
   };
 });
+
+// Copy writes the raw command. Hide it until a passcode exists, or the block is a 401 token.
+const commandsReady = computed(
+  () => credential.ready.value && !!store.state.organizationData?.organizationPasscode,
+);
 
 const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
 
@@ -221,6 +247,7 @@ const onStepAction = async (actionId: string) => {
       v-else-if="content"
       :content="content"
       :subs="subs"
+      :commands-ready="commandsReady"
       data-test="data-source-setup-card"
       @detected="onDetected"
       @step-action="onStepAction"

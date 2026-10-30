@@ -67,18 +67,23 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 /** The data-test prefix of a step's code block when the content names none. */
 const SETUP_CODE_BLOCK = "ingestion-setup-code-block";
 
-const props = defineProps<{
-  /** The integration's rich content (already token-substituted). */
-  content: RichCardContent;
-  /** Per-org url/org/token — used for the .env download + detection org. */
-  subs: CardSubstitutions;
-  /** Optional logo URL (e.g. from the manifest) — overrides the content logo. */
-  logoUrl?: string;
-  /** Optional dark-mode logo URL (manifest) — overrides the content dark logo. */
-  logoUrlDark?: string;
-  /** Drop the hero — for a host page whose own header already names the card. */
-  hideHero?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** The integration's rich content (already token-substituted). */
+    content: RichCardContent;
+    /** Per-org url/org/token — used for the .env download + detection org. */
+    subs: CardSubstitutions;
+    /** Optional logo URL (e.g. from the manifest) — overrides the content logo. */
+    logoUrl?: string;
+    /** Optional dark-mode logo URL (manifest) — overrides the content dark logo. */
+    logoUrlDark?: string;
+    /** Drop the hero — for a host page whose own header already names the card. */
+    hideHero?: boolean;
+    /** False while the ingest passcode is still unknown. Token-bearing blocks stay hidden so copy cannot ship a blank credential. */
+    commandsReady?: boolean;
+  }>(),
+  { commandsReady: true },
+);
 
 const emit = defineEmits<{
   /** A step's action button was clicked; carries RichCardStepAction.id. */
@@ -94,6 +99,7 @@ const { isDark } = useTheme();
 const openTokenPicker = inject(OPEN_TOKEN_PICKER, null);
 
 const streamKind = computed(() => props.content.detect?.streamType);
+const showCommands = computed(() => props.commandsReady !== false);
 
 // Logo precedence per theme: manifest override → content (frontmatter) → none.
 // In dark mode the dark variant is preferred, falling back to the light logo.
@@ -783,7 +789,7 @@ function fireConfetti() {
             </div>
 
             <OCodeBlock
-              v-if="displayCode(step) && !missingRequired(activeVariant(step))"
+              v-if="showCommands && displayCode(step) && !missingRequired(activeVariant(step))"
               :lang="displayCode(step)?.lang"
               :chrome="codeChrome(step)"
               :filename="displayCode(step)?.filename"
@@ -933,6 +939,7 @@ function fireConfetti() {
               v-html="inlineMd(sectionDescription(extras.advanced))"
             ></p>
             <OCodeBlock
+              v-if="showCommands"
               :lang="extras.advanced.code.lang"
               :chrome="extras.advanced.code.filename ? 'editor' : 'terminal'"
               :filename="extras.advanced.code.filename"
