@@ -1133,14 +1133,14 @@ impl PublicAiChat {
     }
 }
 
-/// Background self CPU/memory profile ingest into `_meta.self_profiles`.
-/// Gated at runtime by `enabled`; sampling code is compile-gated on `profiling`.
+/// Background self CPU/memory profile ingest into the `default` profiles stream.
+/// Gated at runtime by `enabled`; CPU needs `cpu-profiling`, memory needs `profiling`.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct SelfProfiles {
     #[env_config(
         name = "ZO_SELF_PROFILES_ENABLED",
         default = false,
-        help = "Enable background self CPU/memory profile sampling into _meta.self_profiles"
+        help = "Enable background self CPU/memory profile sampling into the default profiles stream"
     )]
     pub enabled: bool,
     #[env_config(
