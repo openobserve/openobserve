@@ -39,6 +39,7 @@ import {
   ALERT_LIST_STATES,
 } from "@/utils/dashboard/alertListPanel";
 import { BOXPLOT_WHISKERS } from "@/utils/dashboard/convertBoxplotData";
+import { LOGS_ORDERS } from "@/utils/dashboard/convertLogsPanelData";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { STATE_TIMELINE_DISPLAYS } from "@/utils/dashboard/convertStateTimelineData";
 import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/convertTreemapData";
@@ -891,6 +892,7 @@ const validatePanelContentByType = (t: TranslateFn, panel: any, errors: string[]
       );
       break;
     case "flame-graph":
+    case "logs":
       validateQueriesNotEmpty(t, [panel?.queries?.[0]], errors);
       break;
   }
@@ -1060,6 +1062,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "markdown",
     "alert-list",
     "flame-graph",
+    "logs",
   ];
 
   if (!allowedTypes.includes(panel?.type)) {
@@ -1240,6 +1243,7 @@ const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[
   ["state_timeline_display", ["state-timeline"], STATE_TIMELINE_DISPLAYS],
   ["sort_order", ["pie", "donut"], SORT_ORDERS],
   ["boxplot_whisker", ["boxplot"], BOXPLOT_WHISKERS],
+  ["logs_order", ["logs"], LOGS_ORDERS],
   ["funnel_sort", ["funnel"], FUNNEL_SORTS],
   ["funnel_orient", ["funnel"], FUNNEL_ORIENTS],
   ["node_graph_layout", ["node-graph"], NODE_GRAPH_LAYOUTS],

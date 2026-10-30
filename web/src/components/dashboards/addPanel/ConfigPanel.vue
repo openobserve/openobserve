@@ -3484,6 +3484,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </OCollapsible>
+
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelData.data.type == 'logs'"
+      v-show="isSectionVisible('logs')"
+      :model-value="isExpanded('logs')"
+      :icon="SECTION_ICONS.logs"
+      @update:modelValue="
+        (v) => {
+          expandedSections.logs = v;
+        }
+      "
+      :label="t('dashboard.chartSelection.logs')"
+      class="border-card-glass-border border-t border-solid"
+    >
+      <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <LogsPanelConfig :is-option-visible="(id: string) => isConfigOptionVisible('logs', id)" />
+      </div>
+    </OCollapsible>
   </div>
 </template>
 
@@ -3694,6 +3713,7 @@ import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 
 const AlertListPanelConfig = defineAsyncComponent(() => import("./AlertListPanelConfig.vue"));
 const FlameGraphPanelConfig = defineAsyncComponent(() => import("./FlameGraphPanelConfig.vue"));
+const LogsPanelConfig = defineAsyncComponent(() => import("./LogsPanelConfig.vue"));
 
 export default defineComponent({
   components: {
@@ -3721,6 +3741,7 @@ export default defineComponent({
     SparklineConfig,
     AlertListPanelConfig,
     FlameGraphPanelConfig,
+    LogsPanelConfig,
     PromQLChartConfig,
     OButton,
     OTooltip,

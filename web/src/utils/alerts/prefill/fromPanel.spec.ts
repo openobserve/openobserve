@@ -783,4 +783,9 @@ describe("buildPrefillFromPanel — a formula query", () => {
     expect(p.streamName).toBe("http_requests_total");
     expect(p.streamCandidates).toBeUndefined();
   });
+
+  it("alerts on a logs panel's rows", () => {
+    const logs = buildPrefillFromPanel(sqlPanel({ panelType: "logs" }), makeId);
+    expect(logs.warnings.map((w) => w.key)).not.toContain("unsupportedPanelType");
+  });
 });

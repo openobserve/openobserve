@@ -149,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'alert-list',
               'flame-graph',
               'boxplot',
+              'logs',
             ].includes(props.data.type)
           "
           variant="ghost"
