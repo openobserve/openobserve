@@ -20,22 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="isEdit ? t('oncall.editTeam') : t('oncall.addTeam')"
     :form-id="FORM_ID"
-    :primary-button-label="t('oncall.save')"
+    :primary-button-label="primaryLabel"
     :secondary-button-label="t('oncall.cancel')"
     data-test="oncall-team-form-drawer"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:secondary="close"
   >
-    <!-- `formKey` remounts OForm on open so defaults re-read the edit target. -->
-    <OForm
-      :id="FORM_ID"
-      ref="formRef"
-      :key="formKey"
-      :schema="schema"
-      :default-values="defaultValues"
-      class="flex flex-col gap-5"
-      @submit="onSubmit"
-    >
+    <!-- Remounted on open so no field keeps state from the last visit; the values themselves come from `form.reset`. -->
+    <OForm :id="FORM_ID" :key="formKey" :form="form" class="flex flex-col gap-5">
       <OFormInput
         name="name"
         :label="t('oncall.teamName')"
@@ -43,13 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         required
         data-test="oncall-team-form-name"
       />
-      <!-- In create mode this same field sits inline with First Handover
-           instead — a team's zone and its first handover are decided
-           together, so asking for the zone twice on one screen would be the
-           genuinely redundant thing. Edit mode has no handover row, so it
-           stays here. -->
       <OFormSelect
-        v-if="isEdit"
         name="timezone"
         :label="t('oncall.timezone')"
         :options="timezoneOptions"
@@ -106,53 +92,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OFormSelect
-          name="shift_micros"
-          :label="t('oncall.shiftLength')"
-          :options="shiftOptions"
-          data-test="oncall-team-form-shift"
-        />
-
-        <!-- Without an explicit first handover the anchor is "now", so a team
-             created at 14:32 hands over at 14:32 for ever. The zone travels
-             with it on the same row — a date and time mean nothing on their
-             own, and this is the one place in create mode that asks for the
-             zone at all. -->
-        <div class="flex gap-2 max-md:flex-wrap" data-test="oncall-team-form-handover">
-          <OFormDate
-            class="min-w-0 flex-1"
-            name="first_handover_date"
-            :label="t('oncall.firstHandover')"
-            data-test="oncall-team-form-handover-date"
-          />
-          <!-- Blank label, not none: it reserves the same header row the date and timezone fields have, so all three boxes align. -->
-          <OFormTime
-            class="min-w-0 flex-1"
-            name="first_handover_time"
-            :label="raw('\u00A0')"
-            data-test="oncall-team-form-handover-time"
-          />
+        <template v-if="memberCount">
           <OFormSelect
-            class="min-w-0 flex-1 max-md:basis-full"
-            name="timezone"
-            :label="t('oncall.timezone')"
-            :options="timezoneOptions"
-            required
-            data-test="oncall-team-form-timezone"
+            name="shift_micros"
+            :label="t('oncall.shiftLength')"
+            :options="shiftOptions"
+            data-test="oncall-team-form-shift"
           />
-        </div>
 
-        <!-- The default that replaced the derived secondary. Ticked, because
+          <!-- Without an explicit first handover the anchor is "now", so a team created at 14:32 hands over at 14:32 for ever. -->
+          <div class="flex gap-2 max-md:flex-wrap" data-test="oncall-team-form-handover">
+            <OFormDate
+              class="min-w-0 flex-1"
+              name="first_handover_date"
+              :label="t('oncall.firstHandover')"
+              data-test="oncall-team-form-handover-date"
+            />
+            <!-- Blank label, not none: it reserves the header row the date field has, so the two boxes align. -->
+            <OFormTime
+              class="min-w-0 flex-1"
+              name="first_handover_time"
+              :label="raw('\u00A0')"
+              data-test="oncall-team-form-handover-time"
+            />
+          </div>
+
+          <!-- The default that replaced the derived secondary. Ticked, because
              a team with one position and no backup is the state almost nobody
              wants and nobody notices until a page goes unanswered. -->
-        <OFormCheckbox
-          name="create_secondary"
-          :label="t('oncall.teamCreateSecondary')"
-          :help-text="t('oncall.teamCreateSecondaryHint')"
-          data-test="oncall-team-form-secondary"
-        />
+          <OFormCheckbox
+            name="create_secondary"
+            :label="t('oncall.teamCreateSecondary')"
+            :help-text="t('oncall.teamCreateSecondaryHint')"
+            data-test="oncall-team-form-secondary"
+          />
 
-        <OnCallRotationPreview />
+          <OnCallRotationPreview />
+        </template>
       </template>
     </OForm>
   </ODrawer>
@@ -166,6 +142,7 @@ import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -201,7 +178,7 @@ const FORM_ID = "oncall-team-form";
 const props = defineProps<{ open: boolean; team: OnCallTeam | null }>();
 const emit = defineEmits<{
   "update:open": [value: boolean];
-  saved: [];
+  saved: [teamId: string];
 }>();
 
 const { t } = useI18nTyped();
@@ -210,7 +187,6 @@ const router = useRouter();
 const { noteConfigurationDenied } = useOnCallPermissions();
 
 const formKey = ref(0);
-const formRef = ref<{ form: any } | null>(null);
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
 const loadingUsers = ref(false);
 const isEdit = computed(() => !!props.team);
@@ -280,8 +256,21 @@ const defaultValues = computed<OnCallTeamFormValues>(() => {
   };
 });
 
+// Owned here rather than by OForm, so the rotation block and the primary button can follow the picked members.
+const form = useOForm<OnCallTeamFormValues>({
+  defaultValues: defaultValues.value,
+  schema: schema.value,
+  onSubmit,
+});
+const memberCount = form.useStore((s: any) => (s.values?.members ?? []).length as number);
+
+const primaryLabel = computed(() => {
+  if (isEdit.value) return t("oncall.save");
+  return memberCount.value ? t("oncall.createTeamAndRotation") : t("oncall.createTeam");
+});
+
 function addEveryone() {
-  formRef.value?.form?.setFieldValue(
+  form.setFieldValue(
     "members",
     userOptions.value.map((option) => option.value),
   );
@@ -307,6 +296,7 @@ watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) return;
+    form.reset(defaultValues.value);
     formKey.value += 1;
     if (!isEdit.value) void fetchOrgUsers();
   },
@@ -336,17 +326,19 @@ async function onSubmit(values: OnCallTeamFormValues) {
     description: values.description?.trim() ? values.description.trim() : null,
   };
   try {
+    let teamId = props.team?.id ?? "";
     if (props.team) {
       await updateTeamWrite.mutateAsync(data);
     } else {
       const created = await createTeamWrite.mutateAsync(data);
-      await staffNewTeam(created.data.id, values);
+      teamId = created.data.id;
+      await staffNewTeam(teamId, values);
     }
     toast({
       variant: "success",
       message: props.team ? t("oncall.teamUpdated") : t("oncall.teamCreated"),
     });
-    emit("saved");
+    emit("saved", teamId);
   } catch (err: any) {
     noteConfigurationDenied(err);
     toast({

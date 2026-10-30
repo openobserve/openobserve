@@ -43,7 +43,8 @@ export const HOSTS_LIVENESS_QUERY = `count by (host_name, os_type, k8s_node_name
 // k8s_node_name is grouped too because liveness carries it only for ACTIVE hosts, leaving dead ones pod-named.
 export const HOSTS_LAST_SEEN_SQL = `SELECT host_name, k8s_node_name, max(_timestamp) AS last_seen FROM "system_cpu_load_average_15m" WHERE ${HOSTS_PRODUCER_GUARD_SQL} GROUP BY host_name, k8s_node_name`;
 
-export const HOSTS_CPU_QUERY = `100 * (1 - avg by (host_name)(irate(system_cpu_time{state="idle",${HOSTS_PRODUCER_GUARD}}[5m])))`;
+// A ratio, not 1 - avg(idle): collectors >= 0.157 drop the cpu label and sum idle across cores.
+export const HOSTS_CPU_QUERY = `100 * (1 - sum by (host_name)(irate(system_cpu_time{state="idle",${HOSTS_PRODUCER_GUARD}}[5m])) / sum by (host_name)(irate(system_cpu_time{${HOSTS_PRODUCER_GUARD}}[5m])))`;
 
 // The six states the collector ratios against ONE MemTotal; each is a redundant MemTotal estimate.
 export const HOSTS_MEMORY_STATES = [
@@ -65,5 +66,5 @@ export const HOSTS_DISK_QUERY = `100 * max by (host_name)(sum by (host_name, mou
 
 export const HOSTS_LOAD_QUERY = `avg by (host_name)(system_cpu_load_average_15m{${HOSTS_PRODUCER_GUARD}})`;
 
-// system_cpu_logical_count is opt-in and unemitted here; system_cpu_time is default-on and carries one series per cpu.
-export const HOSTS_CORES_QUERY = `count by (host_name)(count by (host_name, cpu)(system_cpu_time{state="idle",${HOSTS_PRODUCER_GUARD}}))`;
+// system_cpu_logical_count is opt-in; without the opt-in cpu label, all states together accrue one second per second per core.
+export const HOSTS_CORES_QUERY = `count by (host_name)(count by (host_name, cpu)(system_cpu_time{state="idle",cpu!="",${HOSTS_PRODUCER_GUARD}})) or round(sum by (host_name)(rate(system_cpu_time{${HOSTS_PRODUCER_GUARD}}[5m])))`;

@@ -32,15 +32,19 @@ export function maskSecret(secret: string): string {
   return secret.slice(0, VISIBLE_EDGE) + MASK + secret.slice(-VISIBLE_EDGE);
 }
 
+/** Basic token for install snippets. An empty passcode stays blank: base64(email:) still looks like a credential and ingest answers 401. */
+export function basicIngestToken(email: string, passcode: string): string {
+  if (!email || !passcode) return "";
+  return b64EncodeStandard(`${email}:${passcode}`) ?? "";
+}
+
 /** Builds the real and the masked snippet from one template, so OCodeBlock can map a masked selection back to the real token. */
 export function useCredentialSnippet(content: Ref<string>) {
   const store = useStore();
 
   const email = computed<string>(() => store.state.userInfo?.email ?? "");
   const passcode = computed<string>(() => store.state.organizationData?.organizationPasscode ?? "");
-  const basicPasscode = computed(() =>
-    passcode.value ? (b64EncodeStandard(`${email.value}:${passcode.value}`) ?? "") : "",
-  );
+  const basicPasscode = computed(() => basicIngestToken(email.value, passcode.value));
 
   const fill = (template: string, token: string, basic: string) =>
     template
