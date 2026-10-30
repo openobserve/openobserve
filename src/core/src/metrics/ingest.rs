@@ -96,7 +96,7 @@ impl StreamKeyChecks {
             let violation =
                 schema::check_stream_key_len(org_id, StreamType::Metrics, stream_name).err();
             if let Some(e) = &violation {
-                log::debug!("[METRICS] rejecting stream {org_id}/{stream_name}: {e}");
+                log::warn!("[METRICS] rejecting stream {org_id}/{stream_name}: {e}");
             }
             self.0
                 .insert(stream_name.to_string(), violation.map(|e| e.to_string()));
