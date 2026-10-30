@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem value="plan" size="sm" data-test="query-plan-mode-plan">{{
           t("search.queryProfile.modePlan")
         }}</OToggleGroupItem>
-        <OToggleGroupItem value="profile" size="sm" data-test="query-plan-mode-profile">{{
-          t("search.queryProfile.modeProfile")
+        <OToggleGroupItem value="analyze" size="sm" data-test="query-plan-mode-analyze">{{
+          t("search.queryProfile.modeAnalyze")
         }}</OToggleGroupItem>
         <OToggleGroupItem value="text" size="sm" data-test="query-plan-mode-text">{{
           t("search.queryProfile.modeText")
@@ -61,10 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon-left="hasAnalyze ? 'refresh' : 'play-arrow'"
         :loading="profileLoading"
         data-test="query-plan-run-btn"
-        @click="runProfile"
+        @click="runAnalyze"
       >
-        {{ hasAnalyze ? t("search.queryProfile.rerun") : t("search.queryProfile.runProfile") }}
-        <OTooltip :content="t('search.queryProfile.runProfileTooltip')" />
+        {{ hasAnalyze ? t("search.queryProfile.rerun") : t("search.queryProfile.runAnalyze") }}
+        <OTooltip :content="t('search.queryProfile.runAnalyzeTooltip')" />
       </OButton>
     </template>
 
@@ -97,17 +97,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="mode === 'plan' && planProfile"
           :profile="planProfile"
           :running="profileLoading"
-          @run="runProfile"
+          @run="runAnalyze"
         />
 
         <QueryProfileView
-          v-else-if="mode === 'profile' && profile"
+          v-else-if="mode === 'analyze' && profile"
           :profile="profile"
           :stream="streamResult"
         />
 
         <div
-          v-else-if="mode === 'profile' && analyzePlan"
+          v-else-if="mode === 'analyze' && analyzePlan"
           class="flex h-full flex-col gap-3 overflow-y-auto p-4"
           data-test="query-plan-analyze-fallback"
         >
@@ -182,9 +182,9 @@ import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import QueryPlanView from "@/components/query-plan/QueryPlanView.vue";
 import QueryProfileView from "@/components/query-plan/QueryProfileView.vue";
 
-type PlanMode = "plan" | "profile" | "text";
+type PlanMode = "plan" | "analyze" | "text";
 
-const MODES: PlanMode[] = ["plan", "profile", "text"];
+const MODES: PlanMode[] = ["plan", "analyze", "text"];
 
 defineOptions({ name: "QueryPlanDialog" });
 
@@ -244,13 +244,13 @@ const analyzeText = computed<string | null>(() => {
 });
 
 const loadingText = computed<I18nText | null>(() => {
-  if (mode.value === "profile")
-    return profileLoading.value ? t("search.queryProfile.runningProfile") : null;
+  if (mode.value === "analyze")
+    return profileLoading.value ? t("search.queryProfile.runningAnalyze") : null;
   return planLoading.value ? t("search.loadingPlan") : null;
 });
 
 const errorText = computed(() => {
-  if (mode.value === "profile") return profileError.value;
+  if (mode.value === "analyze") return profileError.value;
   return mode.value === "plan" ? planError.value : "";
 });
 
@@ -349,10 +349,10 @@ async function fetchExplainPlan() {
   }
 }
 
-async function runProfile() {
+async function runAnalyze() {
   if (profileLoading.value) return;
   const epoch = requestEpoch;
-  mode.value = "profile";
+  mode.value = "analyze";
   profileLoading.value = true;
   profileError.value = "";
   try {
@@ -383,7 +383,7 @@ async function runProfile() {
 function onMode(value: unknown) {
   if (!MODES.includes(value as PlanMode)) return;
   mode.value = value as PlanMode;
-  if (mode.value === "profile" && !hasAnalyze.value && !profileLoading.value) runProfile();
+  if (mode.value === "analyze" && !hasAnalyze.value && !profileLoading.value) runAnalyze();
 }
 
 watch(

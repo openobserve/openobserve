@@ -212,7 +212,7 @@ describe("QueryPlanDialog", () => {
       const view = wrapper.findComponent({ name: "QueryPlanView" });
       expect(view.exists()).toBe(true);
       expect(view.props("profile").plan.name).toBe("SortPreservingMergeExec");
-      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Run profile");
+      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Analyze");
     });
 
     it("shows an error when the query has no SQL", async () => {
@@ -237,15 +237,15 @@ describe("QueryPlanDialog", () => {
     });
   });
 
-  describe("profile mode", () => {
-    it("runs EXPLAIN ANALYZE from Run profile and shows the profile view", async () => {
+  describe("analyze mode", () => {
+    it("runs EXPLAIN ANALYZE from the Analyze button and shows the profile view", async () => {
       wrapper = await openDialog();
       mockStreamingSearch.mockResolvedValue({ data: PROFILE_SSE });
       await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
       await flushPromises();
       expect(sentSql(1)).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
       expect(wrapper.find('[data-test="query-plan-mode"]').attributes("data-value")).toBe(
-        "profile",
+        "analyze",
       );
       expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(false);
@@ -261,11 +261,11 @@ describe("QueryPlanDialog", () => {
       expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
     });
 
-    it("runs the profile when the Profile tab is picked, keeping Plan usable meanwhile", async () => {
+    it("runs EXPLAIN ANALYZE when the Analyze mode is picked, keeping Plan usable meanwhile", async () => {
       wrapper = await openDialog();
       let resolve!: (v: unknown) => void;
       mockStreamingSearch.mockReturnValue(new Promise((r) => (resolve = r)));
-      await selectMode(wrapper, "profile");
+      await selectMode(wrapper, "analyze");
       expect(mockStreamingSearch).toHaveBeenCalledTimes(2);
       expect(wrapper.find('[data-test="query-plan-loading"]').exists()).toBe(true);
 
@@ -274,7 +274,7 @@ describe("QueryPlanDialog", () => {
 
       resolve({ data: PROFILE_SSE });
       await flushPromises();
-      await selectMode(wrapper, "profile");
+      await selectMode(wrapper, "analyze");
       expect(mockStreamingSearch).toHaveBeenCalledTimes(2);
       expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
     });
@@ -332,7 +332,7 @@ describe("QueryPlanDialog", () => {
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       expect(wrapper.find('[data-test="query-plan-mode"]').attributes("data-value")).toBe("plan");
-      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Run profile");
+      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Analyze");
     });
 
     it("ignores a run that finishes after the dialog was reopened", async () => {
@@ -346,7 +346,7 @@ describe("QueryPlanDialog", () => {
       await flushPromises();
       resolve({ data: PROFILE_SSE });
       await flushPromises();
-      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Run profile");
+      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Analyze");
       expect(wrapper.findComponent({ name: "QueryPlanView" }).exists()).toBe(true);
     });
   });
