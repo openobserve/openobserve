@@ -15,74 +15,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_22rem] max-lg:flex max-lg:flex-col max-lg:overflow-y-auto xl:grid-cols-[minmax(0,1fr)_27.5rem]"
-    data-test="query-profile-view"
-  >
-    <div class="relative flex min-h-0 min-w-0 flex-col max-lg:shrink-0">
-      <aside
-        ref="panelEl"
-        class="bg-surface-base border-border-default rounded-surface absolute start-3 top-3 z-20 max-h-[calc(100%-1.5rem)] w-75 overflow-y-auto border p-3 shadow-md max-lg:static max-lg:max-h-none max-lg:w-auto max-lg:rounded-none max-lg:border-0 max-lg:border-b max-lg:px-4 max-lg:shadow-none"
+  <QueryPlanLayout :selected-id="selectedId" data-test="query-profile-view">
+    <template #summary>
+      <ProfileSummaryPanel
+        :model="model"
+        :summary="summary"
+        :scope="scope"
+        :selected-id="selectedId"
+        @select="selectedId = $event"
+        @scope="scope = $event"
+      />
+    </template>
+    <template #canvas="{ leftInset }">
+      <ProfileCanvas
+        :model="model"
+        :layout="layout"
+        :scope="scope"
+        :selected-id="selectedId"
+        :left-inset="leftInset"
+        @select="selectedId = $event"
       >
-        <ProfileSummaryPanel
-          :model="model"
-          :summary="summary"
-          :scope="scope"
-          :selected-id="selectedId"
-          @select="selectedId = $event"
-          @scope="scope = $event"
-        />
-      </aside>
-      <div class="min-h-0 flex-1 max-lg:h-[78vh] max-lg:flex-none">
-        <ProfileCanvas
-          :model="model"
-          :layout="layout"
-          :scope="scope"
-          :selected-id="selectedId"
-          :left-inset="leftInset"
-          @select="selectedId = $event"
-        >
-          <template v-if="model.stages.length" #toolbar>
-            <div
-              class="bg-surface-base border-border-default rounded-default flex items-center gap-1.5 border p-1 whitespace-nowrap shadow-sm"
-              data-test="query-profile-scope-toolbar"
+        <template v-if="model.stages.length" #toolbar>
+          <div
+            class="bg-surface-base border-border-default rounded-default flex items-center gap-1.5 border p-1 whitespace-nowrap shadow-sm"
+            data-test="query-profile-scope-toolbar"
+          >
+            <span class="text-text-secondary ps-1.5 text-xs max-xl:hidden">{{
+              t("search.queryProfile.stageMetrics")
+            }}</span>
+            <OToggleGroup
+              type="single"
+              :model-value="toggleValue"
+              :aria-label="t('search.queryProfile.stageMetrics')"
+              @update:model-value="onToggle"
             >
-              <span class="text-text-secondary ps-1.5 text-xs max-xl:hidden">{{
-                t("search.queryProfile.stageMetrics")
-              }}</span>
-              <OToggleGroup
-                type="single"
-                :model-value="toggleValue"
-                :aria-label="t('search.queryProfile.stageMetrics')"
-                @update:model-value="onToggle"
-              >
-                <OToggleGroupItem value="sum" size="sm" data-test="query-profile-scope-sum">{{
-                  t("search.queryProfile.scopeSum")
-                }}</OToggleGroupItem>
-                <OToggleGroupItem value="max" size="sm" data-test="query-profile-scope-max">{{
-                  t("search.queryProfile.scopeMax")
-                }}</OToggleGroupItem>
-              </OToggleGroup>
-              <div class="w-40">
-                <OSelect
-                  :model-value="selectedNode"
-                  :options="nodeOptions"
-                  size="sm"
-                  searchable
-                  clearable
-                  :placeholder="t('search.queryProfile.scopeNode')"
-                  data-test="query-profile-scope-node"
-                  @update:model-value="onNodeSelect"
-                />
-              </div>
+              <OToggleGroupItem value="sum" size="sm" data-test="query-profile-scope-sum">{{
+                t("search.queryProfile.scopeSum")
+              }}</OToggleGroupItem>
+              <OToggleGroupItem value="max" size="sm" data-test="query-profile-scope-max">{{
+                t("search.queryProfile.scopeMax")
+              }}</OToggleGroupItem>
+            </OToggleGroup>
+            <div class="w-40">
+              <OSelect
+                :model-value="selectedNode"
+                :options="nodeOptions"
+                size="sm"
+                searchable
+                clearable
+                :placeholder="t('search.queryProfile.scopeNode')"
+                data-test="query-profile-scope-node"
+                @update:model-value="onNodeSelect"
+              />
             </div>
-          </template>
-        </ProfileCanvas>
-      </div>
-    </div>
-    <aside
-      class="bg-surface-base border-border-default min-h-0 overflow-y-auto border-s max-lg:shrink-0 max-lg:overflow-visible max-lg:border-s-0 max-lg:border-t"
-    >
+          </div>
+        </template>
+      </ProfileCanvas>
+    </template>
+    <template #detail>
       <ProfileDetailPanel
         :model="model"
         :op-id="selectedId"
@@ -90,17 +80,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="selectedId = $event"
         @scope="scope = $event"
       />
-    </aside>
-  </div>
+    </template>
+  </QueryPlanLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import useBreakpoint from "@/composables/useBreakpoint";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   buildProfileModel,
@@ -116,10 +105,8 @@ import {
 import ProfileCanvas from "./ProfileCanvas.vue";
 import ProfileDetailPanel from "./ProfileDetailPanel.vue";
 import ProfileSummaryPanel from "./ProfileSummaryPanel.vue";
+import QueryPlanLayout from "./QueryPlanLayout.vue";
 import { roleLabel } from "./profileText";
-
-const MOBILE_INSET = 16;
-const PANEL_GAP = 24;
 
 const props = defineProps<{
   profile: QueryProfile;
@@ -127,10 +114,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const { isDesktop } = useBreakpoint();
 
-const panelEl = ref<HTMLElement | null>(null);
-const panelWidth = ref(0);
 const scope = ref<StageScope>("sum");
 const selectedId = ref<string | null>(null);
 
@@ -147,7 +131,6 @@ const nodeOptions = computed(() =>
 
 const selectedNode = computed(() => scopeNodeKey(scope.value));
 const toggleValue = computed(() => (selectedNode.value ? "" : scope.value));
-const leftInset = computed(() => (!isDesktop.value ? MOBILE_INSET : panelWidth.value + PANEL_GAP));
 
 function onToggle(value: unknown) {
   if (value === "sum" || value === "max") scope.value = value;
@@ -165,8 +148,4 @@ watch(
   },
   { immediate: true },
 );
-
-onMounted(() => {
-  panelWidth.value = panelEl.value?.offsetWidth ?? 0;
-});
 </script>
