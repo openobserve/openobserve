@@ -21,6 +21,17 @@ use infra::db::{delete_from_db_coordinator, put_into_db_coordinator};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
+/// Returns whether a session has exceeded the configured idle period.
+/// Timestamps are Unix epoch microseconds; a zero timeout disables idle expiration.
+/// A session exactly at the timeout boundary is considered expired.
+fn is_idle_expired(last_activity_micros: i64, now_micros: i64, timeout_seconds: i64) -> bool {
+    if timeout_seconds <= 0 {
+        return false;
+    }
+    let timeout_micros = timeout_seconds.saturating_mul(1_000_000);
+    now_micros.saturating_sub(last_activity_micros) >= timeout_micros
+}
+
 // Key prefix for session events in coordinator
 pub const USER_SESSION_KEY: &str = "/user_sessions/";
 
@@ -302,6 +313,25 @@ pub async fn cleanup_expired() -> Result<u64, anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_idle_expiration_boundary() {
+        let now = 1_800_000_000_i64;
+        assert!(!is_idle_expired(now - 1_799_000_000, now, 1800));
+        assert!(is_idle_expired(now - 1_800_000_000, now, 1800));
+        assert!(is_idle_expired(now - 1_801_000_000, now, 1800));
+    }
+
+    #[test]
+    fn test_idle_expiration_disabled() {
+        assert!(!is_idle_expired(0, 3_600_000_000, 0));
+        assert!(!is_idle_expired(0, 3_600_000_000, -1));
+    }
+
+    #[test]
+    fn test_idle_expiration_future_activity() {
+        assert!(!is_idle_expired(2_000_000_000, 1_000_000_000, 1800));
+    }
 
     #[test]
     fn test_user_session_key_format() {
