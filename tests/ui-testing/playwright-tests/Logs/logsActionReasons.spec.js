@@ -74,6 +74,7 @@ test.describe('G1 visible action reasons C2', () => {
         const trigger = page.locator(`[data-test="${menu === 'saved' ? 'logs-search-bar-saved-views-pinned-list-btn' : `logs-search-bar-${menu === 'more' ? 'more-options' : 'utilities-menu'}-btn`}"]`);
         await trigger.click();
         await settleMenu(page);
+        if (menu === 'utilities') await page.locator('[data-test="logs-search-bar-menu-list-saved-views-btn"]').click();
         const scheduled = page.locator('[data-test="search-scheduler-create-new-btn"]');
         const scheduleLocked = menu === 'more' && await page.locator('[data-test="search-scheduler-locked-icon"]').count() > 0;
         // A locked item opens the upgrade dialog, not the query, so it carries no edited-query note.

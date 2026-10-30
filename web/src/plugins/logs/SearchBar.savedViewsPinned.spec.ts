@@ -149,11 +149,11 @@ describe("SearchBar — pinned saved views", () => {
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-update-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-update-named"]',
     )!;
     expect(button).not.toBeNull();
     expect(button.getAttribute("aria-label")).toBe(
-      i18n.global.t("search.updateSavedViewWithCurrent"),
+      i18n.global.t("search.overwriteSavedViewNamed", { name: "Named view" }),
     );
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.getAttribute("title")).toBeNull();
@@ -172,11 +172,11 @@ describe("SearchBar — pinned saved views", () => {
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-update-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-update-named"]',
     )!;
     expect(button).not.toBeNull();
     expect(button.getAttribute("aria-label")).toBe(
-      i18n.global.t("search.updateSavedViewWithCurrent"),
+      i18n.global.t("search.overwriteSavedViewNamed", { name: "Named view" }),
     );
     expect(button.getAttribute("aria-disabled")).toBeNull();
     expect(button.getAttribute("disabled")).toBeNull();
@@ -196,7 +196,7 @@ describe("SearchBar — pinned saved views", () => {
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-update-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-update-named"]',
     )!;
     const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
     button.dispatchEvent(event);
@@ -218,7 +218,7 @@ describe("SearchBar — pinned saved views", () => {
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-update-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-update-named"]',
     )!;
     expect(button.getAttribute("aria-disabled")).toBeNull();
     button.dispatchEvent(
@@ -228,7 +228,7 @@ describe("SearchBar — pinned saved views", () => {
     expect(update).toHaveBeenCalledExactlyOnceWith(view);
     expect(apply).not.toHaveBeenCalled();
     const row = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-apply-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-apply-named"]',
     )!;
     row.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
