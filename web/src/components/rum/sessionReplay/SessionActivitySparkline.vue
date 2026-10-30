@@ -85,7 +85,7 @@ import useSessionActivity, { type SessionActivity } from "@/composables/useSessi
 
 const props = defineProps<{
   sessionId: string;
-  /** Session start/end, epoch milliseconds (from the replay row). */
+  /** Session start/end, epoch milliseconds: the replay row's, else the session's _rumdata bounds. */
   startTime?: number;
   endTime?: number;
   isBounce?: boolean;
@@ -158,8 +158,12 @@ const observe = () => {
 onMounted(observe);
 // A row gets _rumdata bounds first and the replay's later, and each window needs its own query.
 watch(
-  () => [props.startTime, props.endTime, props.isBounce],
-  () => (started.value ? load() : observe()),
+  () => [props.sessionId, props.startTime, props.endTime, props.isBounce] as const,
+  ([sessionId], [previousSessionId]) => {
+    // The table recycles rows by index, so another session's chart must not stay up while this one loads.
+    if (sessionId !== previousSessionId) activity.value = null;
+    return started.value ? load() : observe();
+  },
 );
 
 onBeforeUnmount(() => {

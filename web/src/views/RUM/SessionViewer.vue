@@ -527,6 +527,7 @@ let livePolling = false;
 let lastNewIdAtMs = 0;
 let lastEventsTs = 0;
 let lastLogsTs = 0;
+let rumLogLookup: Promise<StreamLookup> | null = null;
 let rumLogListRefreshed = false;
 // Formatted events by stream key, so a poll overlapping the last one adds nothing twice.
 const rumEvents = new Map<string, any>();
@@ -1930,13 +1931,21 @@ const refreshServerStatuses = (): Promise<void> => {
   return serverLookupRunning;
 };
 
-// The stream list is cached and can predate the app's first browser log, so a miss is checked against the server once.
-const rumLogStreamMissing = async () => {
-  if ((await readStreamSchema("_rumlog")) !== "missing") return false;
-  if (rumLogListRefreshed) return true;
+// The stream list is cached and can predate the app's first browser log, so the first miss is checked against the server.
+const lookUpRumLogStream = async (): Promise<StreamLookup> => {
+  const lookup = await readStreamSchema("_rumlog");
+  if (lookup !== "missing" || rumLogListRefreshed) return lookup;
   rumLogListRefreshed = true;
   await getStreams("logs", false, false, true).catch(() => undefined);
-  return (await readStreamSchema("_rumlog")) === "missing";
+  return readStreamSchema("_rumlog");
+};
+
+// Only a found stream is kept, so its schema is read once while a missing one is re-checked in the self-refreshing cached list.
+const rumLogStreamMissing = async () => {
+  const pending = (rumLogLookup ??= lookUpRumLogStream());
+  const lookup = await pending;
+  if (lookup !== "present" && rumLogLookup === pending) rumLogLookup = null;
+  return lookup === "missing";
 };
 
 // Apps that send no browser logs have no _rumlog stream, and searching it answers 400.

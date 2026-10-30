@@ -39,6 +39,12 @@ export class RumSessionsPage {
         await this.page.goto(url);
     }
 
+    /** Opens the sessions list narrowed by a SQL `filter` in `org` and waits for its table. */
+    async openFilteredSessionsList({ org, filter, period = '1h', timeoutMs = 30000 }) {
+        await this.gotoSessionsList({ org, filter, period });
+        await this.expectSessionsTableVisible(timeoutMs);
+    }
+
     /** Session aggregation can lag ingestion, so the list is polled until it settles on exactly `count` rows. */
     async expectSessionRowCount(count, timeoutMs = 60000) {
         await expect

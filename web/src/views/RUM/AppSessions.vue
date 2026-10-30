@@ -610,8 +610,11 @@ const dateTime = ref({
 });
 const rumSessionStreamName = "_rumdata";
 
+// SDK telemetry rows carry no session_id and must not group into a phantom session.
+const SESSION_ROWS_FILTER = "session_id IS NOT NULL AND session_id <> ''";
+
 // Mirrors getSessions()'s WHERE clause minus the editor value, so the sidebar's checkbox state reflects the query, not what the user is still typing (health/type/device segments are excluded too — they filter client-side, see tableRows).
-const fieldListBaseFilter = "1 = 1";
+const fieldListBaseFilter = SESSION_ROWS_FILTER;
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -1037,8 +1040,7 @@ const getSessions = () => {
       "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS has_replay";
   }
 
-  // SDK telemetry rows carry no session_id and must not group into a phantom session.
-  let whereClause = "session_id IS NOT NULL AND session_id <> ''";
+  let whereClause = SESSION_ROWS_FILTER;
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
@@ -1509,7 +1511,7 @@ const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
-    is_active: isSessionLive(row.end_time, Date.now()),
+    is_active: isSessionLive(row.end_time ?? row.rum_end_time, Date.now()),
     device_type: classifyDevice(row.device_family, row.os),
     platform: classifySource(row.source),
   })),

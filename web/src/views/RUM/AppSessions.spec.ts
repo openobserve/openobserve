@@ -625,12 +625,31 @@ describe("AppSessions.vue", () => {
       expect(mockSessionState.data.editorValue).toBe("env='staging'");
     });
 
-    // Sessions are listed regardless of replay availability — the base filter no longer
-    // depends on session_has_replay, which only drives the per-row play icon now.
-    it("should pass an unconditional base filter to the sidebar", () => {
+    // Sessions are listed regardless of replay availability, so the filter never names session_has_replay.
+    it("filters the sidebar's field values to the rows the list itself groups into sessions", () => {
       const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
-      expect(fieldList.props("baseFilter")).toBe("1 = 1");
+      expect(fieldList.props("baseFilter")).toBe("session_id IS NOT NULL AND session_id <> ''");
     });
+
+    it.each([
+      ["a minute", true, 60_000],
+      ["ten minutes", false, 10 * 60_000],
+    ])(
+      "marks a session without replay whose last event was %s ago as active: %s",
+      async (_label, active, ageMs) => {
+        wrapper.vm.rows = [
+          {
+            session_id: "no-replay-1",
+            events: 5,
+            time_spent: 60_000,
+            rum_end_time: Date.now() - ageMs,
+          },
+        ];
+        await nextTick();
+
+        expect(wrapper.vm.enrichedRows[0].is_active).toBe(active);
+      },
+    );
 
     // The base filter used to be concatenated into `query`, which made the
     // sidebar read it back as an active exclude filter and show session_id /
