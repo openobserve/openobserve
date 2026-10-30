@@ -1,4 +1,4 @@
-import type { TranslateFn } from "@/types/i18n";
+import type { I18nKey, TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
@@ -1231,17 +1231,31 @@ const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]
   ["alert_list_state", ["alert-list"], ALERT_LIST_STATES],
 ];
 
-// [key, chart types, lowest allowed, highest allowed, lowest is exclusive]
-const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, string[], number, number, boolean]> = [
-  ["value_font_size", ["metric"], 0, Infinity, true],
-  ["gauge_segments", ["gauge"], 2, 100, false],
-  ["pie_other_threshold", ["pie", "donut"], 0, 100, false],
-  ["donut_inner_radius", ["donut"], 0, 95, false],
-  ["heatmap_cell_gap", ["heatmap"], 0, Infinity, false],
-  ["map_cluster_radius", ["geomap"], 0, Infinity, true],
-  ["distribution_bucket_count", ["distribution"], 1, DISTRIBUTION_MAX_BUCKETS, false],
-  ["distribution_bucket_size", ["distribution"], 0, Infinity, true],
-  ["alert_list_max", ["alert-list"], 1, ALERT_LIST_MAX_LIMIT, false],
+// [key, label, chart types, lowest allowed, highest allowed, lowest is exclusive]
+const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, I18nKey, string[], number, number, boolean]> = [
+  ["value_font_size", "dashboard.valueFontSize", ["metric"], 0, Infinity, true],
+  ["gauge_segments", "dashboard.gaugeSegments", ["gauge"], 2, 100, false],
+  ["pie_other_threshold", "dashboard.pieOtherThreshold", ["pie", "donut"], 0, 100, false],
+  ["donut_inner_radius", "dashboard.donutInnerRadius", ["donut"], 0, 95, false],
+  ["heatmap_cell_gap", "dashboard.heatmapCellGap", ["heatmap"], 0, Infinity, false],
+  ["map_cluster_radius", "dashboard.mapClusterRadius", ["geomap"], 0, Infinity, true],
+  [
+    "distribution_bucket_count",
+    "dashboard.distributionBucketCount",
+    ["distribution"],
+    1,
+    DISTRIBUTION_MAX_BUCKETS,
+    false,
+  ],
+  [
+    "distribution_bucket_size",
+    "dashboard.distributionBucketSize",
+    ["distribution"],
+    0,
+    Infinity,
+    true,
+  ],
+  ["alert_list_max", "dashboard.alertListMax", ["alert-list"], 1, ALERT_LIST_MAX_LIMIT, false],
 ];
 
 const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {
@@ -1266,14 +1280,14 @@ const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) 
 
 const validatePanelTypeRanges = (t: TranslateFn, panel: any, errors: string[]) => {
   const config = panel.config;
-  for (const [key, types, min, max, exclusive] of PANEL_TYPE_RANGE_KEYS) {
+  for (const [key, label, types, min, max, exclusive] of PANEL_TYPE_RANGE_KEYS) {
     if (!types.includes(panel.type) || !isSetValue(config[key])) continue;
     const value = asFiniteNumber(config[key]);
     const tooLow = value === null || (exclusive ? value <= min : value < min);
     if (tooLow || (value as number) > max) {
       errors.push(
         t("dashboard.utils.configValueOutOfRange", {
-          setting: key,
+          setting: t(label),
           min: exclusive ? `> ${min}` : String(min),
           max: Number.isFinite(max) ? String(max) : "∞",
         }),
