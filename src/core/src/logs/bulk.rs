@@ -606,7 +606,7 @@ mod tests {
         } else {
             assert!(rejected.is_empty());
         }
-        // the top-level flag is left alone, see reject_stream_rows
+        // not set: Fluent Bit retries a whole chunk on it, duplicating the other streams' rows
         assert!(!resp.errors);
         assert!(
             infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_key_len_ok").await

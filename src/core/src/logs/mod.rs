@@ -395,7 +395,6 @@ fn reject_stream_rows(
                 .iter()
                 .map(|(_, record)| record.get("_id").and_then(Value::as_str).map(String::from))
                 .chain(columnar.into_iter().flat_map(|mut c| c.take_bulk_ids()));
-            // `errors` stays as is: Fluent Bit retries a whole chunk on it and duplicates its rows
             for doc_id in doc_ids {
                 bulk::add_record_status(
                     stream_name.to_string(),
