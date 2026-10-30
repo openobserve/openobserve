@@ -807,4 +807,20 @@ describe("DateTime Component", () => {
       expect(prev(wrapper).props("disabled")).toBe(true);
     });
   });
+
+  describe("hideSeconds", () => {
+    const units = (list: Array<{ value: string }>) => list.map((period) => period.value);
+
+    it("offers Seconds by default, as every existing picker has it", () => {
+      wrapper = createWrapper();
+      expect(units(wrapper.vm.relativePeriods)).toEqual(["s", "m", "h", "d", "w", "M"]);
+      expect(units(wrapper.vm.relativePeriodsSelect)).toEqual(["s", "m", "h", "d", "w", "M"]);
+    });
+
+    it("drops Seconds from the rows and the custom unit when the parent asks", () => {
+      wrapper = createWrapper({ hideSeconds: true });
+      expect(units(wrapper.vm.relativePeriods)).toEqual(["m", "h", "d", "w", "M"]);
+      expect(units(wrapper.vm.relativePeriodsSelect)).toEqual(["m", "h", "d", "w", "M"]);
+    });
+  });
 });

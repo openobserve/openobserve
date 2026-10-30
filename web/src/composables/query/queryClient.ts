@@ -51,6 +51,8 @@ declare module "@tanstack/query-core" {
     mutationMeta: {
       /** Scopes to refetch. Prefer a domain's `all` key over a precise one. */
       invalidates?: readonly (readonly unknown[])[];
+      /** Scopes marked stale without a refetch: each refetches the next time a reader mounts it. */
+      stales?: readonly (readonly unknown[])[];
       /**
        * Scopes whose *inactive* entries are dropped outright. Use after a
        * delete: invalidation alone leaves the deleted entity's detail query
@@ -89,6 +91,9 @@ export const queryClient = new QueryClient({
       }
       for (const key of meta.invalidates ?? []) {
         void queryClient.invalidateQueries({ queryKey: key });
+      }
+      for (const key of meta.stales ?? []) {
+        void queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
       }
       if (meta.successMessage) {
         notifyMutation("success", meta.successMessage);
