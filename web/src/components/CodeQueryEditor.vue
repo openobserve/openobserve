@@ -102,6 +102,7 @@ const loadMonaco = (): Promise<any> => {
 };
 
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+import { recentCompletionItems } from "@/utils/queryHistory/recentCompletions";
 
 /**
  * Per-editor configuration, keyed by model URI.
@@ -130,6 +131,8 @@ interface EditorConfig {
   showHint: (text: string | null) => void;
   /** Set when the value lookup searches a caller's own time range instead of the default lookback. */
   valuesTimeRange: () => { startTime: number; endTime: number } | null;
+  /** The user's recent queries, offered as clock rows that replace the editor text. */
+  recents: () => string[];
 }
 
 interface ChainState {
@@ -267,6 +270,15 @@ const editorConfigs = new Map<string, EditorConfig>();
 const registeredLanguages = new Set<string>();
 const modelKey = (model: any): string => model?.uri?.toString?.() ?? "";
 
+// Stops at the first non-blank line, so an edit never copies the whole document.
+const modelIsBlank = (model: any): boolean => {
+  const lines: number = model?.getLineCount?.() ?? 0;
+  for (let line = 1; line <= lines; line++) {
+    if (model.getLineContent(line).trim()) return false;
+  }
+  return true;
+};
+
 // Global commands report here; the model says which editor accepted.
 const onSuggestAccepted = (editor: any, lane: SuggestLane | "", chained: boolean) => {
   const config = editorConfigs.get(modelKey(editor?.getModel?.()));
@@ -391,6 +403,10 @@ export default defineComponent({
     suggestions: {
       type: Array,
       default: null,
+    },
+    recentQueries: {
+      type: Array as PropType<string[]>,
+      default: () => [],
     },
     debounceTime: {
       type: Number,
@@ -805,6 +821,7 @@ export default defineComponent({
         announce: announceMenu,
         showHint,
         valuesTimeRange: () => props.valuesTimeRange ?? null,
+        recents: () => props.recentQueries,
       });
     };
 
@@ -1010,7 +1027,11 @@ export default defineComponent({
         hintDecorations?.clear();
         syncValueQuoteKey();
       });
+      // Programmatic writes update it too, so a restore followed by a clear reads as non-empty → empty.
+      let isBlank = modelIsBlank(editorObj.getModel());
       editorObj.onDidChangeModelContent((e: any) => {
+        const wasBlank = isBlank;
+        isBlank = modelIsBlank(editorObj.getModel());
         const [change] = e?.changes ?? [];
         const chainSpace =
           chainState.typingSpace && e?.changes?.length === 1 && change.text === " ";
@@ -1020,7 +1041,7 @@ export default defineComponent({
           : null;
         if (!e?.isFlush && !programmatic) {
           pendingUserEdit = true;
-          emit("user-edit");
+          emit("user-edit", isBlank, wasBlank);
         } else {
           // The debounce emits the latest value, so a write landing on a typed one owns the origin.
           pendingUserEdit = false;
@@ -1909,7 +1930,19 @@ export default defineComponent({
           if (language === "promql" && context?.triggerCharacter === "=")
             return { suggestions: [] };
 
-          return reply(catalogEntries(config, model, position, textUntilPosition, word.word));
+          const catalog = reply(
+            catalogEntries(config, model, position, textUntilPosition, word.word),
+          );
+          const recents = recentCompletionItems(
+            config.recents(),
+            model,
+            position,
+            kinds().Reference,
+            t("recentSearches.recentRow"),
+          );
+          return recents.length
+            ? { ...catalog, suggestions: [...recents, ...catalog.suggestions] }
+            : catalog;
         },
       });
 
