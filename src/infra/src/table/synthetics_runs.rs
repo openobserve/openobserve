@@ -28,7 +28,7 @@ use crate::errors;
 /// Status page streaks stop growing here, so a steady check stops writing its row.
 pub const STREAK_CAP: i32 = 10;
 /// How far back the stuck-run sweep looks, in microseconds.
-const STUCK_LOOKBACK_US: i64 = 3_600_000_000;
+const STUCK_LOOKBACK_US: i64 = 86_400_000_000;
 const SWAP_ATTEMPTS: usize = 3;
 const STATUS_ERROR: i32 = 4;
 // `synthetics_jobs.status` values; a different scale from SyntheticStatus.
@@ -505,8 +505,10 @@ async fn write_check_row<C: ConnectionTrait>(
             return Ok(changed.then_some(next));
         }
     }
-    log::warn!("[synthetics] check {synthetics_id}: status streak swap lost {SWAP_ATTEMPTS} times");
-    Ok(None)
+    // Rolls the finalization back, so the stuck-run sweep retries it instead of losing the run.
+    Err(errors::Error::Message(format!(
+        "check {synthetics_id}: status streak swap lost {SWAP_ATTEMPTS} times"
+    )))
 }
 
 /// Maps a `synthetics_jobs.status` to the SyntheticStatus DB scale; non-terminal jobs map to 0.

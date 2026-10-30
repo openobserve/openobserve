@@ -25,7 +25,8 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // SQLite ignores `IF NOT EXISTS` on `ADD COLUMN`, so `has_column` keeps this idempotent.
+        // Plain `ADD COLUMN`: MySQL rejects `IF NOT EXISTS`, and `has_column` keeps this
+        // idempotent.
         for (name, column, big) in columns() {
             if manager.has_column(TABLE, name).await? {
                 continue;
@@ -40,7 +41,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(Synthetics::Table)
-                        .add_column_if_not_exists(def.not_null().default(0))
+                        .add_column(def.not_null().default(0))
                         .to_owned(),
                 )
                 .await?;

@@ -637,14 +637,20 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
 
     // Step 2: claim each row individually. Only rows this call actually
     // transitioned are returned, so only one node ever accounts for a job.
-    let update_sql = "UPDATE synthetics_jobs SET status = 2 WHERE id = $1 AND status = $2";
+    // `completed_at` lets the stuck-run sweep see a dead job as terminal.
+    let update_sql =
+        "UPDATE synthetics_jobs SET status = 2, completed_at = $3 WHERE id = $1 AND status = $2";
     let mut dead = Vec::with_capacity(candidates.len());
     for (row, prev_status) in candidates {
         let res = conn
             .execute(Statement::from_sql_and_values(
                 conn.get_database_backend(),
                 update_sql,
-                [Value::from(row.id.clone()), Value::from(prev_status)],
+                [
+                    Value::from(row.id.clone()),
+                    Value::from(prev_status),
+                    Value::from(now_us),
+                ],
             ))
             .await?;
         if res.rows_affected() == 1 {
