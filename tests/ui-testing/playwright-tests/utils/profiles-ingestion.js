@@ -1,4 +1,4 @@
-// Profiles OTLP/JSON ingestion, readiness gates and the hand-computable reference dataset (profiles-feature.md §7).
+// Profiles OTLP/JSON ingestion, readiness gates and a reference dataset whose totals are computed by hand.
 
 const crypto = require('crypto');
 const { expect } = require('@playwright/test');
@@ -129,7 +129,7 @@ function buildProfilesRequest(resources) {
 const cpu = (samples) => ({ type: 'cpu', unit: 'nanoseconds', samples });
 const s = (frames, value, link) => ({ stack: frames.split('<-'), value, ...(link ? { link } : {}) });
 
-/** The reference dataset of feature §7; `link` is the trace/span C2's process_payment sample carries. */
+/** Reference dataset: checkout totals 12 s (v1.4.0 4 s, v1.5.0 8 s), payments 3.5 s cpu, catalog 5.515 s; `link` tags checkout's process_payment. */
 function referenceResources(t0Ms, link) {
   const at = (minutes) => t0Ms + minutes * MINUTE_MS;
   const wide = Array.from({ length: 300 }, (_, i) =>
@@ -349,8 +349,8 @@ async function deleteProfilesStream(request, stream) {
   }
 }
 
-/** Ingests one trace whose single span carries `traceId`/`spanId`, into its own traces stream. */
-async function ingestLinkedTrace(request, stream, { traceId, spanId, startMs, durationMs = 1_000, service = 'checkout' }) {
+/** Ingests one trace with a sibling span per id in `spanIds` (all same start/duration), into its own traces stream. */
+async function ingestTraceSpans(request, stream, { traceId, spanIds, startMs, durationMs = 1_000, service = 'checkout' }) {
   const org = getOrgIdentifier();
   const start = BigInt(startMs) * 1_000_000n;
   const end = start + BigInt(durationMs) * 1_000_000n;
@@ -361,18 +361,16 @@ async function ingestLinkedTrace(request, stream, { traceId, spanId, startMs, du
         scopeSpans: [
           {
             scope: { name: 'e2e-profiles', version: '1.0.0' },
-            spans: [
-              {
-                traceId,
-                spanId,
-                name: 'process_payment',
-                kind: 2,
-                startTimeUnixNano: String(start),
-                endTimeUnixNano: String(end),
-                attributes: [],
-                status: { code: 1 },
-              },
-            ],
+            spans: spanIds.map((spanId) => ({
+              traceId,
+              spanId,
+              name: `op_${spanId}`,
+              kind: 2,
+              startTimeUnixNano: String(start),
+              endTimeUnixNano: String(end),
+              attributes: [],
+              status: { code: 1 },
+            })),
           },
         ],
       },
@@ -443,6 +441,6 @@ module.exports = {
   waitForProfilesTotal,
   waitForProfilesService,
   deleteProfilesStream,
-  ingestLinkedTrace,
+  ingestTraceSpans,
   deleteTracesStream,
 };

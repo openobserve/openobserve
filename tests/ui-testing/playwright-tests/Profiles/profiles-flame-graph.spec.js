@@ -157,6 +157,7 @@ test.describe('Profiles flame graph', () => {
       await pm.profilesPage.dragOnFlame(point, 200);
       const panned = await pm.profilesPage.flameCanvasPng();
       expect(panned.equals(zoomed)).toBe(false);
+      await pm.profilesPage.expectNotZoomedVia(FULL_WIDTH(0), 'Total: 12 s');
       await pm.profilesPage.expectUrlParamAbsent('focus');
     });
 
@@ -178,11 +179,13 @@ test.describe('Profiles flame graph', () => {
       await pm.profilesPage.hoverFrame(C.truncated, '[truncated]');
       await pm.profilesPage.expectFlameTooltipContains('[truncated]', ['Callers beyond 1000 frames, cut from this stack.']);
       await pm.profilesPage.clickFrame(C.truncated, '[truncated]');
+      await pm.profilesPage.expectNotZoomedVia(C.catalog_main, 'catalog_main');
       await pm.profilesPage.rightClickFrame(C.truncated, '[truncated]');
-      await pm.profilesPage.expectFlameMenuHidden();
+      await pm.profilesPage.expectNoFrameMenuVia(C.catalog_main, 'catalog_main');
       await pm.profilesPage.hoverFrame(C.smallFrames, '55 small frames');
       await pm.profilesPage.expectFlameTooltipContains('55 small frames', ['Too thin to draw one by one.']);
       await pm.profilesPage.clickFrame(C.smallFrames, '55 small frames');
+      await pm.profilesPage.expectNotZoomedVia(C.catalog_main, 'catalog_main');
       await pm.profilesPage.expectUrlParamAbsent('focus');
       await pm.profilesPage.hoverFrame(FULL_WIDTH(0), 'Total: 5.52 s');
       await pm.profilesPage.expectFlameTooltipLacks('Total: 5.52 s', 'Click to zoom out');

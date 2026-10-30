@@ -231,6 +231,7 @@ test.describe('Profiles query controls', () => {
   });
 
   test('Changing stream clears the filters and the service', { tag: ['@all', '@profiles', '@P2'] }, async () => {
+    await pm.profilesPage.mockStreamList([ref.stream, bare.stream].sort());
     await pm.profilesPage.gotoRef(ref, { filters: 'service_version=v1.4.0' });
     await pm.profilesPage.expectFilterChipCount(1);
     await pm.profilesPage.selectStream(bare.stream);

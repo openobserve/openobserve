@@ -3,6 +3,8 @@
 import { expect } from '@playwright/test';
 import { PNG } from 'pngjs';
 
+const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+
 const FLAME_ROW_PX = 26;
 const FLAME_PLOT_INSET_PX = 10;
 const FLAME_TOOLTIP_Z = 'z-index: 9999999';
@@ -131,6 +133,7 @@ export class ProfilesPage {
 
     this.successToast = '[data-test-variant="success"]';
     this.menuProfiles = '[data-test="menu-link-/profiles-item"]';
+    this.menuTraces = '[data-test="menu-link-/traces-item"]';
     this.menuLinks = '[data-test^="menu-link-"]';
     this.navRail = '[data-test="navbar-main-nav"]';
 
@@ -147,7 +150,7 @@ export class ProfilesPage {
 
 
   orgName() {
-    return process.env['ORGNAME'] || 'default';
+    return getOrgIdentifier();
   }
 
   baseUrl() {
@@ -236,6 +239,9 @@ export class ProfilesPage {
   async waitForRunIdle() {
     await expect(this.page.locator(this.cancelBtn)).toHaveCount(0, { timeout: 30000 });
     await expect(this.page.locator(this.runBtn)).toBeVisible({ timeout: 30000 });
+    // Before the org is known nothing has started yet; a picked stream (or the no-stream state) proves init ran.
+    const initStarted = this.page.locator(`[data-test="${this.streamSelect}-trigger"]:not([data-test-selected-value=""])`);
+    await expect(initStarted.or(this.page.locator(this.noStreamState)).first()).toBeVisible({ timeout: 30000 });
     await expect(this.page.locator(this.loadingIndicators)).toHaveCount(0, { timeout: 30000 });
   }
 
@@ -359,6 +365,9 @@ export class ProfilesPage {
 
   async pickOption(name, label, scope) {
     await this.openSelect(name, scope);
+    const search = this.page.locator(`[data-test="${name}-popover"] [data-test="${name}-search"]`);
+    // Lists over 50 entries are virtualised, so an option off screen only renders once the search narrows to it.
+    if (await search.count()) await search.fill(label);
     const option = this.page.locator(`[data-test="${name}-popover"] [data-test="${name}-option"][data-test-label="${label}"]`);
     await expect(option).toBeVisible();
     await option.click();
@@ -746,6 +755,21 @@ export class ProfilesPage {
     for (const item of absent) await expect(menu.locator(`[data-test="flame-graph-${item}"]`)).toHaveCount(0);
   }
 
+  /** Hovering a wide frame shows its ⋮ button only while no frame menu is open, so this proves the menu is closed. */
+  async expectNoFrameMenuVia(frame, name, options = {}) {
+    await this.hoverFrame(frame, name, options);
+    await expect(this.page.locator(this.flameFrameMore)).toBeVisible();
+    await expect(this.page.locator(this.flameMenu)).toHaveCount(0);
+  }
+
+  /** Opens a frame's menu, which offers Reset zoom only while a frame is focused, then closes it again. */
+  async expectNotZoomedVia(frame, name, options = {}) {
+    await this.rightClickFrame(frame, name, options);
+    await this.expectFlameMenu(['copy-name'], ['zoom-reset', 'zoom-out', 'zoom-out-here']);
+    await this.pressEscape();
+    await expect(this.page.locator(this.flameMenu)).toHaveCount(0);
+  }
+
   async expectFlameMenuHidden() {
     await expect(this.page.locator(this.flameMenu)).toHaveCount(0);
   }
@@ -972,9 +996,15 @@ export class ProfilesPage {
     await expect(this.page.locator(map[name])).toHaveCount(0, { timeout: 15000 });
   }
 
+  /** OEmptyState renders its action buttons without a data-test hook, so the button is found by its label inside the state. */
   async clickStateAction(name) {
-    const map = { error: this.errorState, noStream: this.noStreamState, cancelled: this.searchCancelledState };
-    await this.page.locator(map[name]).getByRole('button').first().click();
+    const map = {
+      error: [this.errorState, 'Retry'],
+      noStream: [this.noStreamState, 'Set up profiles ingestion'],
+      cancelled: [this.searchCancelledState, 'Run query'],
+    };
+    const [state, label] = map[name];
+    await this.page.locator(state).getByRole('button', { name: label }).click();
   }
 
   async expectTopTableLoading() {
@@ -1128,6 +1158,7 @@ export class ProfilesPage {
 
   async expectMenuProfilesVisible(visible) {
     await expect(this.page.locator(this.navRail)).toBeVisible();
+    await expect(this.page.locator(this.menuTraces)).toBeVisible();
     await expect(this.page.locator(this.menuProfiles)).toHaveCount(visible ? 1 : 0);
   }
 
@@ -1150,8 +1181,10 @@ export class ProfilesPage {
     await this.page.goto(`${this.baseUrl()}/web/streams?org_identifier=${this.orgName()}`);
     const filter = this.page.locator(this.streamTypeFilter);
     await expect(filter).toBeVisible({ timeout: 30000 });
-    await filter.getByRole('button', { name: 'Profiles' }).click();
-    await expect(filter.getByRole('button', { name: 'Profiles' })).toHaveAttribute('data-state', 'on');
+    // The stream-type toggle items carry no data-test of their own (OToggleGroupItem only tags its mobile menu rows).
+    const profilesToggle = filter.getByRole('button', { name: 'Profiles' });
+    await profilesToggle.click();
+    await expect(profilesToggle).toHaveAttribute('data-state', 'on');
     await expect(this.page.locator('[data-test^="log-stream-name-cell-"]').first()).toBeVisible({ timeout: 30000 });
     await expect(async () => {
       await this.page.locator(this.streamSearchInput).fill(stream);
@@ -1162,7 +1195,9 @@ export class ProfilesPage {
 
   /** Clicks the row's explore button until the app leaves the Data page (the filtered list re-renders under the pointer). */
   async clickDataPageExplore(stream) {
-    const row = this.page.locator(`[data-test="log-stream-name-cell-${stream}"]`).locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]');
+    const row = this.page
+      .locator('[data-test^="o2-table-row-"]')
+      .filter({ has: this.page.locator(`[data-test="log-stream-name-cell-${stream}"]`) });
     await expect(async () => {
       if (new URL(this.page.url()).pathname === '/web/streams') await row.locator(this.streamExploreBtn).click({ timeout: 2000 });
       await expect.poll(() => new URL(this.page.url()).pathname, { timeout: 3000 }).toBe('/web/logs');
@@ -1210,6 +1245,16 @@ export class ProfilesPage {
       },
       { timeout: 30000 },
     );
+  }
+
+  async expectTraceSidebarSpan(spanId) {
+    await expect(this.page.locator('[data-test="trace-details-sidebar-header-operation-name"]').first()).toHaveText(`op_${spanId}`);
+  }
+
+  async clickTraceSpanAndAwaitProbe(stream, spanId) {
+    const probe = this.waitForSpanProfileProbe(stream, spanId);
+    await this.openTraceSpan(spanId);
+    await (await probe).finished();
   }
 
   async gotoTraceDetails({ traceId, stream, fromUs, toUs }) {

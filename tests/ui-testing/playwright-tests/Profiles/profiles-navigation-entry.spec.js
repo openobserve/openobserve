@@ -6,7 +6,7 @@ const PageManager = require('../../pages/page-manager.js');
 const {
   seedReferenceStream,
   deleteProfilesStream,
-  ingestLinkedTrace,
+  ingestTraceSpans,
   deleteTracesStream,
   randomHex,
   MINUTE_MS,
@@ -26,11 +26,15 @@ test.describe('Profiles navigation and entry points', () => {
     trace = {
       stream: `e2e_prof_trace_${randomHex(4)}`,
       startMs,
-      linked: { traceId: ref.link.traceId, spanId: ref.link.spanId },
-      unlinked: { traceId: randomHex(16), spanId: randomHex(8) },
+      traceId: ref.link.traceId,
+      linkedSpanId: ref.link.spanId,
+      unlinkedSpanId: randomHex(8),
     };
-    await ingestLinkedTrace(api, trace.stream, { ...trace.linked, startMs });
-    await ingestLinkedTrace(api, trace.stream, { ...trace.unlinked, startMs });
+    await ingestTraceSpans(api, trace.stream, {
+      traceId: trace.traceId,
+      spanIds: [trace.linkedSpanId, trace.unlinkedSpanId],
+      startMs,
+    });
   });
 
   test.afterAll(async () => {
@@ -112,14 +116,15 @@ test.describe('Profiles navigation and entry points', () => {
   });
 
   test('A linked trace span opens its profile', { tag: ['@all', '@profiles', '@P1'] }, async ({ page }) => {
+    await pm.profilesPage.mockStreamList([ref.stream]);
     await navigateToBase(page);
     await pm.profilesPage.gotoTraceDetails({
-      traceId: trace.linked.traceId,
+      traceId: trace.traceId,
       stream: trace.stream,
       fromUs: (trace.startMs - 5 * MINUTE_MS) * 1000,
       toUs: (trace.startMs + 5 * MINUTE_MS) * 1000,
     });
-    await pm.profilesPage.openTraceSpan(trace.linked.spanId);
+    await pm.profilesPage.clickTraceSpanAndAwaitProbe(ref.stream, trace.linkedSpanId);
     await pm.profilesPage.expectViewProfileButton(true);
     await pm.profilesPage.clickViewProfile();
     const query = pm.profilesPage.currentQuery();
@@ -129,22 +134,26 @@ test.describe('Profiles navigation and entry points', () => {
     expect(query.profile_type).toBe('cpu');
     expect(Math.abs(Number(query.from) - (trace.startMs * 1000 - 60_000_000))).toBeLessThan(1_000_000);
     expect(Math.abs(Number(query.to) - ((trace.startMs + 1000) * 1000 + 60_000_000))).toBeLessThan(1_000_000);
-    await pm.profilesPage.expectFilterChip('trace_id', trace.linked.traceId);
-    await pm.profilesPage.expectFilterChip('span_id', trace.linked.spanId);
+    await pm.profilesPage.expectFilterChip('trace_id', trace.traceId);
+    await pm.profilesPage.expectFilterChip('span_id', trace.linkedSpanId);
     await pm.profilesPage.expectFlameRootSummary('Total: 250 ms (CPU duration)');
   });
 
   test('A span without a linked profile has no View Profile', { tag: ['@all', '@profiles', '@P2'] }, async ({ page }) => {
+    await pm.profilesPage.mockStreamList([ref.stream]);
     await navigateToBase(page);
-    const probe = pm.profilesPage.waitForSpanProfileProbe(ref.stream, trace.unlinked.spanId);
     await pm.profilesPage.gotoTraceDetails({
-      traceId: trace.unlinked.traceId,
+      traceId: trace.traceId,
       stream: trace.stream,
       fromUs: (trace.startMs - 5 * MINUTE_MS) * 1000,
       toUs: (trace.startMs + 5 * MINUTE_MS) * 1000,
     });
-    await pm.profilesPage.openTraceSpan(trace.unlinked.spanId);
-    await probe;
+    await pm.profilesPage.clickTraceSpanAndAwaitProbe(ref.stream, trace.unlinkedSpanId);
+    await pm.profilesPage.clickTraceSpanAndAwaitProbe(ref.stream, trace.linkedSpanId);
+    await pm.profilesPage.expectViewProfileButton(true);
+    // The unlinked span's probe finished before the linked one started, so its cached miss now renders synchronously.
+    await pm.profilesPage.openTraceSpan(trace.unlinkedSpanId);
+    await pm.profilesPage.expectTraceSidebarSpan(trace.unlinkedSpanId);
     await pm.profilesPage.expectViewProfileButton(false);
   });
 });
