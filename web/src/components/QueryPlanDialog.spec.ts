@@ -15,11 +15,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-// ── Module mocks (hoisted) ───────────────────────────────────────────────────
+import { AGG_LOGICAL_PLAN, AGG_PHYSICAL_PLAN } from "@/utils/__fixtures__/queryProfile.fixture";
 
 const mockGetSearchQueryPayload = vi.fn();
 
@@ -31,100 +29,87 @@ vi.mock("@/composables/useLogs/useSearchStream", () => ({
 
 vi.mock("@/composables/useLogs/searchState", () => ({
   searchState: () => ({
-    searchObj: {
-      data: {
-        stream: { streamType: "logs" },
-        query: "SELECT * FROM logs",
-      },
-    },
+    searchObj: { data: { stream: { streamType: "logs" }, query: "SELECT * FROM logs" } },
   }),
 }));
 
 const mockStreamingSearch = vi.fn();
 vi.mock("@/services/streaming_search", () => ({
-  default: {
-    search: (...args: any[]) => mockStreamingSearch(...args),
-  },
+  default: { search: (...args: unknown[]) => mockStreamingSearch(...args) },
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    generateTraceContext: vi.fn(() => ({ traceId: "mock-trace" })),
-  };
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, generateTraceContext: vi.fn(() => ({ traceId: "mock-trace" })) };
 });
 
-vi.mock("@/utils/queryPlanParser", () => ({
-  parseQueryPlanTree: vi.fn((text: string) => ({
-    name: "RootNode",
-    label: text || "empty",
-    metrics: {},
-    children: [],
-  })),
-  calculateSummaryMetrics: vi.fn(() => ({
-    totalRows: 100,
-    totalTime: "1.2s",
-  })),
-  findRemoteExecNode: vi.fn(() => null),
-}));
-
-// Component import must come after all vi.mock() declarations.
 import QueryPlanDialog from "./QueryPlanDialog.vue";
 
-// ── Stubs ────────────────────────────────────────────────────────────────────
+const SQL = "SELECT k8s_namespace_name,\n  count(*) AS cnt\nFROM app_logs";
 
 const oDialogStub = {
   inheritAttrs: false,
-  template: '<div data-test="o-dialog" v-if="open"><slot /></div>',
+  template: `<div data-test="o-dialog" v-if="open">
+    <div data-test="o-dialog-title">{{ title }}</div>
+    <slot name="header-left" /><slot name="header-right" /><slot />
+  </div>`,
   props: ["open", "size", "title"],
   emits: ["update:open"],
 };
 
-const queryPlanTreeStub = {
-  template: '<div data-test="query-plan-tree" />',
-  props: ["tree", "isAnalyze"],
-};
-
-const metricsSummaryCardStub = {
-  template: '<div data-test="metrics-summary-card" />',
-  props: ["metrics"],
-};
-
-const queryProfileViewStub = {
-  template: '<div data-test="query-profile-view" />',
-  props: ["profile", "stream", "sql"],
-};
-
 const oButtonStub = {
-  template:
-    '<button data-test="o-button" :disabled="loading" @click="$emit(\'click\')"><slot /></button>',
-  props: ["variant", "size", "loading"],
+  template: '<button :disabled="loading" @click="$emit(\'click\')"><slot /></button>',
+  props: ["variant", "size", "loading", "iconLeft", "iconRight"],
   emits: ["click"],
 };
 
-const oTabsStub = {
-  template: '<div data-test="o-tabs"><slot /></div>',
-  props: ["modelValue", "dense", "align"],
+const oToggleGroupStub = {
+  name: "OToggleGroup",
+  template: '<div data-test="query-plan-mode" :data-value="modelValue"><slot /></div>',
+  props: ["modelValue", "type"],
   emits: ["update:modelValue"],
 };
 
-const oTabStub = {
-  template: '<div data-test="o-tab">{{ label }}</div>',
-  props: ["name", "label"],
+const stub = (name: string, dataTest: string, props: string[]) => ({
+  name,
+  template: `<div data-test="${dataTest}" />`,
+  props,
+});
+
+function sse(payload: unknown) {
+  return `event: search_response_hits\ndata: ${JSON.stringify(payload)}\n\n`;
+}
+
+const EXPLAIN_SSE = sse({
+  hits: [
+    { plan_type: "logical_plan", plan: AGG_LOGICAL_PLAN },
+    { plan_type: "physical_plan", plan: AGG_PHYSICAL_PLAN },
+  ],
+});
+
+const OLD_ANALYZE_SSE = sse({
+  hits: [
+    { phase: 1, plan: "DataSourceExec: metrics=[output_rows=5]\n" },
+    { phase: 0, plan: "RemoteScanExec: metrics=[output_rows=5]\n" },
+  ],
+});
+
+const PROFILE = {
+  version: 1,
+  node_name: "q-0",
+  node_address: "10.0.0.1:5081",
+  start_us: 1,
+  end_us: 2,
+  output_rows: 1,
+  plan: { name: "ProjectionExec", detail: "ProjectionExec", partitions: 1 },
 };
 
-const oTabPanelsStub = {
-  template: '<div data-test="o-tab-panels"><slot /></div>',
-  props: ["modelValue", "animated"],
-};
-
-const oTabPanelStub = {
-  template: '<div data-test="o-tab-panel"><slot /></div>',
-  props: ["name"],
-};
-
-// ── Mount factory ────────────────────────────────────────────────────────────
+const PROFILE_SSE = sse({
+  hits: [
+    { phase: 0, plan: "ProjectionExec\n", profile: JSON.stringify(PROFILE) },
+    { phase: 1, plan: "DataSourceExec\n", profile: null },
+  ],
+});
 
 function mountDialog(props: Record<string, unknown> = {}) {
   return mount(QueryPlanDialog, {
@@ -133,30 +118,52 @@ function mountDialog(props: Record<string, unknown> = {}) {
       stubs: {
         ODialog: oDialogStub,
         OButton: oButtonStub,
-        OTabs: oTabsStub,
-        OTab: oTabStub,
-        OTabPanels: oTabPanelsStub,
-        OTabPanel: oTabPanelStub,
-        QueryPlanTree: queryPlanTreeStub,
-        MetricsSummaryCard: metricsSummaryCardStub,
-        QueryProfileView: queryProfileViewStub,
-        OIcon: true,
+        OToggleGroup: oToggleGroupStub,
+        OToggleGroupItem: { template: "<span><slot /></span>", props: ["value", "size"] },
+        OTooltip: true,
+        QueryPlanView: {
+          name: "QueryPlanView",
+          template: '<div data-test="query-plan-view-stub" @click="$emit(\'run\')" />',
+          props: ["profile", "running"],
+          emits: ["run"],
+        },
+        QueryProfileView: stub("QueryProfileView", "query-profile-view", [
+          "profile",
+          "stream",
+          "sql",
+        ]),
+        QueryPlanText: stub("QueryPlanText", "query-plan-text", [
+          "physicalPlan",
+          "logicalPlan",
+          "analyzePlan",
+        ]),
+        QueryPlanTree: stub("QueryPlanTree", "query-plan-tree", ["tree", "isAnalyze"]),
+        MetricsSummaryCard: stub("MetricsSummaryCard", "metrics-summary-card", ["metrics"]),
       },
     },
     props: {
-      modelValue: true,
-      searchObj: {
-        data: {
-          query: "SELECT * FROM logs",
-          stream: { streamType: "logs" },
-        },
-      },
+      modelValue: false,
+      searchObj: { data: { query: SQL, stream: { streamType: "logs" } } },
       ...props,
     },
   });
 }
 
-// ── Tests ────────────────────────────────────────────────────────────────────
+async function openDialog(props: Record<string, unknown> = {}) {
+  const wrapper = mountDialog(props);
+  await wrapper.setProps({ modelValue: true });
+  await flushPromises();
+  return wrapper;
+}
+
+async function selectMode(wrapper: VueWrapper, mode: string) {
+  wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", mode);
+  await flushPromises();
+}
+
+function sentSql(call: number) {
+  return mockStreamingSearch.mock.calls[call][0].query.query.sql;
+}
 
 describe("QueryPlanDialog", () => {
   let wrapper: VueWrapper;
@@ -164,10 +171,8 @@ describe("QueryPlanDialog", () => {
   beforeEach(() => {
     mockGetSearchQueryPayload.mockReset();
     mockStreamingSearch.mockReset();
-    mockGetSearchQueryPayload.mockReturnValue({
-      query: { sql: "SELECT * FROM logs" },
-    });
-    mockStreamingSearch.mockResolvedValue({ data: "" });
+    mockGetSearchQueryPayload.mockReturnValue({ query: { sql: "SELECT * FROM logs" } });
+    mockStreamingSearch.mockResolvedValue({ data: EXPLAIN_SSE });
   });
 
   afterEach(() => {
@@ -175,313 +180,174 @@ describe("QueryPlanDialog", () => {
     vi.clearAllMocks();
   });
 
-  describe("mounting", () => {
-    it("should render the dialog when modelValue is true", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      await flushPromises();
-      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(true);
-    });
-
-    it("should not render dialog body when modelValue is false", async () => {
-      wrapper = mountDialog({ modelValue: false });
-      await flushPromises();
+  describe("header", () => {
+    it("renders nothing while closed", () => {
+      wrapper = mountDialog();
       expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
     });
 
-    it("should have correct component name", () => {
-      wrapper = mountDialog();
-      expect(wrapper.vm.$options.name).toBe("QueryPlanDialog");
+    it("shows the title and the SQL on one line that expands on click", async () => {
+      wrapper = await openDialog();
+      expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe("Query plan");
+      const toggle = wrapper.find('[data-test="query-plan-sql-toggle"]');
+      expect(toggle.text()).toBe("SELECT k8s_namespace_name, count(*) AS cnt FROM app_logs");
+      expect(wrapper.find('[data-test="query-plan-sql-full"]').exists()).toBe(false);
+      await toggle.trigger("click");
+      expect(wrapper.find('[data-test="query-plan-sql-full"]').text()).toBe(SQL);
     });
 
-    it("should expose key refs and methods on instance", () => {
-      wrapper = mountDialog();
-      const vm: any = wrapper.vm;
-      expect(typeof vm.runAnalyze).toBe("function");
-      expect(typeof vm.onClose).toBe("function");
-      expect(vm.activeTab).toBe("logical");
-      expect(vm.isAnalyzing).toBe(false);
-      expect(vm.showAnalyzeResults).toBe(false);
-    });
-  });
-
-  describe("sqlQuery computed", () => {
-    it("should return the searchObj query string", () => {
-      wrapper = mountDialog({
-        searchObj: {
-          data: { query: "SELECT a FROM b", stream: { streamType: "logs" } },
-        },
-      });
-      expect((wrapper.vm as any).sqlQuery).toBe("SELECT a FROM b");
-    });
-
-    it("should return empty string when searchObj has no query", () => {
-      wrapper = mountDialog({
-        searchObj: { data: { stream: { streamType: "logs" } } },
-      });
-      expect((wrapper.vm as any).sqlQuery).toBe("");
-    });
-
-    it("should return empty string when searchObj.data is undefined", () => {
-      wrapper = mountDialog({ searchObj: {} });
-      expect((wrapper.vm as any).sqlQuery).toBe("");
+    it("emits update:modelValue when the dialog closes", async () => {
+      wrapper = await openDialog();
+      wrapper.findComponent(oDialogStub).vm.$emit("update:open", false);
+      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([false]);
     });
   });
 
-  describe("onClose", () => {
-    it("should emit update:modelValue false when onClose is called", () => {
-      wrapper = mountDialog({ modelValue: true });
-      (wrapper.vm as any).onClose();
-      const emitted = wrapper.emitted("update:modelValue");
-      expect(emitted).toBeTruthy();
-      expect(emitted![emitted!.length - 1]).toEqual([false]);
-    });
-  });
-
-  describe("showDialog v-model", () => {
-    it("should emit update:modelValue when showDialog is set", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      (wrapper.vm as any).showDialog = false;
-      await nextTick();
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-    });
-  });
-
-  describe("fetchExplainPlan (auto-triggered on open)", () => {
-    it("should call streamingSearch.search when modelValue toggles to true", async () => {
-      wrapper = mountDialog({ modelValue: false });
-      await nextTick();
-      mockStreamingSearch.mockResolvedValue({ data: "" });
-
-      await wrapper.setProps({ modelValue: true });
-      await flushPromises();
-
+  describe("plan mode", () => {
+    it("opens on the plan, built from the plain EXPLAIN physical plan", async () => {
+      wrapper = await openDialog();
       expect(mockStreamingSearch).toHaveBeenCalledTimes(1);
-      const callArg = mockStreamingSearch.mock.calls[0][0];
-      expect(callArg.query.query.sql).toBe("EXPLAIN SELECT * FROM logs");
-      expect(callArg.search_type).toBe("ui");
+      expect(sentSql(0)).toBe("EXPLAIN SELECT * FROM logs");
+      expect(wrapper.find('[data-test="query-plan-mode"]').attributes("data-value")).toBe("plan");
+      const view = wrapper.findComponent({ name: "QueryPlanView" });
+      expect(view.exists()).toBe(true);
+      expect(view.props("profile").plan.name).toBe("SortPreservingMergeExec");
+      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Run profile");
     });
 
-    it("should set error when query payload has no sql", async () => {
+    it("shows an error when the query has no SQL", async () => {
       mockGetSearchQueryPayload.mockReturnValue({ query: { sql: "" } });
-      wrapper = mountDialog({ modelValue: false });
-      await nextTick();
-      await wrapper.setProps({ modelValue: true });
-      await flushPromises();
-
-      expect((wrapper.vm as any).error).toBeTruthy();
-      expect((wrapper.vm as any).loading).toBe(false);
-    });
-
-    it("should set error when SSE response has no parseable data", async () => {
-      mockStreamingSearch.mockResolvedValue({ data: "event: progress\n\n" });
-      wrapper = mountDialog({ modelValue: false });
-      await nextTick();
-      await wrapper.setProps({ modelValue: true });
-      await flushPromises();
-
-      expect((wrapper.vm as any).error).toBeTruthy();
-    });
-
-    it("should populate plans on a valid SSE response containing logical_plan", async () => {
-      const sse =
-        "event: search_result\ndata: " +
-        JSON.stringify({
-          hits: [
-            { plan_type: "logical_plan", plan: "Scan\n  Filter\n" },
-            { plan_type: "physical_plan", plan: "RemoteScanExec\n" },
-          ],
-        }) +
-        "\n\n";
-      mockStreamingSearch.mockResolvedValue({ data: sse });
-
-      wrapper = mountDialog({ modelValue: false });
-      await nextTick();
-      await wrapper.setProps({ modelValue: true });
-      await flushPromises();
-
-      expect((wrapper.vm as any).error).toBe("");
-      expect((wrapper.vm as any).logicalPlanTree).not.toBeNull();
-      expect((wrapper.vm as any).physicalPlanTree).not.toBeNull();
-    });
-
-    it("should set error when fetch throws", async () => {
-      mockStreamingSearch.mockRejectedValue(new Error("network down"));
-      wrapper = mountDialog({ modelValue: false });
-      await nextTick();
-      await wrapper.setProps({ modelValue: true });
-      await flushPromises();
-
-      expect((wrapper.vm as any).error).toBe("network down");
-      expect((wrapper.vm as any).loading).toBe(false);
-    });
-
-    it("should reset activeTab to logical when opening", async () => {
-      wrapper = mountDialog({ modelValue: false });
-      (wrapper.vm as any).activeTab = "physical";
-      await nextTick();
-      await wrapper.setProps({ modelValue: true });
-      await flushPromises();
-      expect((wrapper.vm as any).activeTab).toBe("logical");
-    });
-  });
-
-  describe("runAnalyze", () => {
-    it("should send EXPLAIN ANALYZE query to streamingSearch.search", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      await flushPromises();
-      mockStreamingSearch.mockClear();
-      mockStreamingSearch.mockResolvedValue({ data: "" });
-
-      await (wrapper.vm as any).runAnalyze();
-      await flushPromises();
-
-      expect(mockStreamingSearch).toHaveBeenCalledTimes(1);
-      const callArg = mockStreamingSearch.mock.calls[0][0];
-      expect(callArg.query.query.sql).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
-    });
-
-    it("should set showAnalyzeResults true when analyze response is valid", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      await flushPromises();
-
-      const sse =
-        "event: search_result\ndata: " +
-        JSON.stringify({
-          hits: [
-            { phase: 0, plan: "RemoteScanExec\n" },
-            { phase: 1, plan: "ParquetScan\n" },
-          ],
-        }) +
-        "\n\n";
-      mockStreamingSearch.mockResolvedValue({ data: sse });
-
-      await (wrapper.vm as any).runAnalyze();
-      await flushPromises();
-
-      expect((wrapper.vm as any).showAnalyzeResults).toBe(true);
-      expect((wrapper.vm as any).error).toBe("");
-      expect((wrapper.vm as any).isAnalyzing).toBe(false);
-    });
-
-    it("should set error when analyze response has no parseable data", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      await flushPromises();
-      mockStreamingSearch.mockResolvedValue({ data: "" });
-
-      await (wrapper.vm as any).runAnalyze();
-      await flushPromises();
-
-      expect((wrapper.vm as any).error).toBeTruthy();
-      expect((wrapper.vm as any).showAnalyzeResults).toBe(false);
-    });
-
-    it("should set error and reset isAnalyzing when search rejects", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      await flushPromises();
-      mockStreamingSearch.mockRejectedValue(new Error("boom"));
-
-      await (wrapper.vm as any).runAnalyze();
-      await flushPromises();
-
-      expect((wrapper.vm as any).error).toBe("boom");
-      expect((wrapper.vm as any).isAnalyzing).toBe(false);
-      expect((wrapper.vm as any).loading).toBe(false);
-    });
-
-    it("should short-circuit when query payload has no sql", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      await flushPromises();
-      mockStreamingSearch.mockClear();
-      mockGetSearchQueryPayload.mockReturnValue({ query: { sql: "" } });
-
-      await (wrapper.vm as any).runAnalyze();
-      await flushPromises();
-
+      wrapper = await openDialog();
       expect(mockStreamingSearch).not.toHaveBeenCalled();
-      expect((wrapper.vm as any).error).toBeTruthy();
-      expect((wrapper.vm as any).isAnalyzing).toBe(false);
+      expect(wrapper.find('[data-test="query-plan-error"]').exists()).toBe(true);
+    });
+
+    it("shows the request error", async () => {
+      mockStreamingSearch.mockRejectedValue(new Error("network down"));
+      wrapper = await openDialog();
+      expect(wrapper.find('[data-test="query-plan-error"]').text()).toContain("network down");
+    });
+
+    it("reports a missing plan when the response has none", async () => {
+      mockStreamingSearch.mockResolvedValue({ data: "event: progress\n\n" });
+      wrapper = await openDialog();
+      expect(wrapper.find('[data-test="query-plan-error"]').text()).toContain(
+        "No query plan found",
+      );
     });
   });
 
-  describe("watch showAnalyzeResults", () => {
-    it("should reset activeTab to logical when switching back from analyze", async () => {
-      wrapper = mountDialog({ modelValue: true });
+  describe("profile mode", () => {
+    it("runs EXPLAIN ANALYZE from Run profile and shows the profile view", async () => {
+      wrapper = await openDialog();
+      mockStreamingSearch.mockResolvedValue({ data: PROFILE_SSE });
+      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
       await flushPromises();
-      (wrapper.vm as any).showAnalyzeResults = true;
-      (wrapper.vm as any).activeTab = "physical";
-      await nextTick();
-
-      (wrapper.vm as any).showAnalyzeResults = false;
-      await nextTick();
-
-      expect((wrapper.vm as any).activeTab).toBe("logical");
-    });
-  });
-
-  describe("conditional rendering", () => {
-    it("should render MetricsSummaryCard when showAnalyzeResults and summaryMetrics", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      await flushPromises();
-
-      const sse =
-        "event: search_result\ndata: " +
-        JSON.stringify({
-          hits: [
-            { phase: 0, plan: "RemoteScanExec\n" },
-            { phase: 1, plan: "ParquetScan\n" },
-          ],
-        }) +
-        "\n\n";
-      mockStreamingSearch.mockResolvedValue({ data: sse });
-
-      await (wrapper.vm as any).runAnalyze();
-      await flushPromises();
-      await nextTick();
-
-      expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(true);
-    });
-
-    it("should render the profile view when the analyze response carries a profile", async () => {
-      wrapper = mountDialog({ modelValue: true });
-      await flushPromises();
-
-      const profile = {
-        version: 1,
-        node_name: "q-0",
-        node_address: "10.0.0.1:5081",
-        start_us: 1,
-        end_us: 2,
-        output_rows: 1,
-        plan: { name: "ProjectionExec", detail: "ProjectionExec", partitions: 1 },
-      };
-      const meta = { results: { took_detail: { total: 9 }, hits: [], total: 1 } };
-      const sse =
-        "event: search_response_metadata\ndata: " +
-        JSON.stringify(meta) +
-        "\n\nevent: search_response_hits\ndata: " +
-        JSON.stringify({
-          hits: [
-            { phase: 0, plan: "ProjectionExec\n", profile: JSON.stringify(profile) },
-            { phase: 1, plan: "DataSourceExec\n", profile: null },
-          ],
-        }) +
-        "\n\n";
-      mockStreamingSearch.mockResolvedValue({ data: sse });
-
-      await (wrapper.vm as any).runAnalyze();
-      await flushPromises();
-
-      expect((wrapper.vm as any).showProfile).toBe(true);
-      expect((wrapper.vm as any).streamResult.took_detail.total).toBe(9);
+      expect(sentSql(1)).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
+      expect(wrapper.find('[data-test="query-plan-mode"]').attributes("data-value")).toBe(
+        "profile",
+      );
       expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Re-run");
     });
 
-    it("should render OTabs for logical/physical when not in analyze mode", async () => {
-      wrapper = mountDialog({ modelValue: true });
+    it("starts a run from the plan view's call to action", async () => {
+      wrapper = await openDialog();
+      mockStreamingSearch.mockResolvedValue({ data: PROFILE_SSE });
+      await wrapper.find('[data-test="query-plan-view-stub"]').trigger("click");
       await flushPromises();
-      expect((wrapper.vm as any).showAnalyzeResults).toBe(false);
-      expect(wrapper.find('[data-test="o-tabs"]').exists()).toBe(true);
+      expect(sentSql(1)).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
+      expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
+    });
+
+    it("runs the profile when the Profile tab is picked, keeping Plan usable meanwhile", async () => {
+      wrapper = await openDialog();
+      let resolve!: (v: unknown) => void;
+      mockStreamingSearch.mockReturnValue(new Promise((r) => (resolve = r)));
+      await selectMode(wrapper, "profile");
+      expect(mockStreamingSearch).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="query-plan-loading"]').exists()).toBe(true);
+
+      await selectMode(wrapper, "plan");
+      expect(wrapper.find('[data-test="query-plan-view-stub"]').exists()).toBe(true);
+
+      resolve({ data: PROFILE_SSE });
+      await flushPromises();
+      await selectMode(wrapper, "profile");
+      expect(mockStreamingSearch).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
+    });
+
+    it("falls back to the metrics card and tree when the server sends no profile", async () => {
+      wrapper = await openDialog();
+      mockStreamingSearch.mockResolvedValue({ data: OLD_ANALYZE_SSE });
+      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-plan-analyze-fallback"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="query-plan-tree"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(false);
+    });
+
+    it("shows the analyze error in the profile body only", async () => {
+      wrapper = await openDialog();
+      mockStreamingSearch.mockRejectedValue(new Error("boom"));
+      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-plan-error"]').text()).toContain("boom");
+      await selectMode(wrapper, "plan");
+      expect(wrapper.find('[data-test="query-plan-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="query-plan-view-stub"]').exists()).toBe(true);
+    });
+  });
+
+  describe("text mode", () => {
+    it("passes both plans and, after a run, the analyze output in phase order", async () => {
+      wrapper = await openDialog();
+      await selectMode(wrapper, "text");
+      const text = () => wrapper.findComponent({ name: "QueryPlanText" });
+      expect(text().props("physicalPlan")).toBe(AGG_PHYSICAL_PLAN);
+      expect(text().props("logicalPlan")).toBe(AGG_LOGICAL_PLAN);
+      expect(text().props("analyzePlan")).toBeNull();
+
+      mockStreamingSearch.mockResolvedValue({ data: OLD_ANALYZE_SSE });
+      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
+      await flushPromises();
+      await selectMode(wrapper, "text");
+      expect(text().props("analyzePlan")).toBe(
+        "RemoteScanExec: metrics=[output_rows=5]\nDataSourceExec: metrics=[output_rows=5]",
+      );
+    });
+  });
+
+  describe("reopening", () => {
+    it("returns to plan mode and drops the previous run", async () => {
+      wrapper = await openDialog();
+      mockStreamingSearch.mockResolvedValue({ data: PROFILE_SSE });
+      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
+      await flushPromises();
+      await wrapper.setProps({ modelValue: false });
+      mockStreamingSearch.mockResolvedValue({ data: EXPLAIN_SSE });
+      await wrapper.setProps({ modelValue: true });
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-plan-mode"]').attributes("data-value")).toBe("plan");
+      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Run profile");
+    });
+
+    it("ignores a run that finishes after the dialog was reopened", async () => {
+      wrapper = await openDialog();
+      let resolve!: (v: unknown) => void;
+      mockStreamingSearch.mockReturnValue(new Promise((r) => (resolve = r)));
+      await wrapper.find('[data-test="query-plan-run-btn"]').trigger("click");
+      await wrapper.setProps({ modelValue: false });
+      mockStreamingSearch.mockResolvedValue({ data: EXPLAIN_SSE });
+      await wrapper.setProps({ modelValue: true });
+      await flushPromises();
+      resolve({ data: PROFILE_SSE });
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-plan-run-btn"]').text()).toBe("Run profile");
+      expect(wrapper.findComponent({ name: "QueryPlanView" }).exists()).toBe(true);
     });
   });
 });

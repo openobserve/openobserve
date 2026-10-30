@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </svg>
       <span
-        v-for="e in edges"
+        v-for="e in labelledEdges"
         :key="`label-${e.childId}`"
         class="bg-surface-base text-2xs absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-1.5 font-mono whitespace-nowrap"
         :class="e.hot ? 'border-accent text-accent' : 'border-border-default text-text-secondary'"
@@ -214,7 +214,7 @@ const FIT_MARGIN = 24;
 const FIT_OVERLAY_W = 232;
 const MD_BREAKPOINT = 768;
 // Below this a fitted card is unreadable; the graph is top-aligned instead and the rest is panned to.
-const MIN_FIT_ZOOM = 0.6;
+const MIN_FIT_ZOOM = 0.85;
 
 const props = defineProps<{
   model: ProfileModel;
@@ -253,13 +253,15 @@ const stageBoxes = computed(() =>
     return {
       ...box,
       title: t("search.queryProfile.stage", { index: stage.index }),
-      meta: ` · ${nodes} · ${shapes}`,
+      meta: props.model.planOnly
+        ? ` · ${t("search.queryProfile.stageRunsEverywhere")}`
+        : ` · ${nodes} · ${shapes}`,
     };
   }),
 );
 
 const variantLabels = computed(() =>
-  props.layout.variantLabels.map((v) => {
+  (props.model.planOnly ? [] : props.layout.variantLabels).map((v) => {
     const variant = props.model.variantById[v.variantId];
     return { ...v, text: `${variantLabel(t, variant)} · ${variant.nodeKeys.length}` };
   }),
@@ -267,6 +269,8 @@ const variantLabels = computed(() =>
 
 const edges = computed(() =>
   props.layout.edges.map((e) => {
+    const hot = e.childId === props.selectedId || e.parentId === props.selectedId;
+    if (props.model.planOnly) return { ...e, on: true, hot, width: 1.5, label: "" };
     const child = props.model.operators[e.childId];
     const value = scopedValue(child, props.scope);
     const rows = child.remoteStageId ? child.totalRows : value.rows;
@@ -279,7 +283,7 @@ const edges = computed(() =>
     return {
       ...e,
       on: value.on,
-      hot: e.childId === props.selectedId || e.parentId === props.selectedId,
+      hot,
       width: Math.max(1.5, Math.min(8, Math.log10(Math.max(10, rows)) * 1.1)),
       label: !value.on
         ? "—"
@@ -289,6 +293,8 @@ const edges = computed(() =>
     };
   }),
 );
+
+const labelledEdges = computed(() => edges.value.filter((e) => e.label));
 
 function clampZoom(k: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k));

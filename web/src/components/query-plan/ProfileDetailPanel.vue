@@ -16,31 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="op" class="flex flex-col pb-6" data-test="query-profile-detail">
-    <div class="bg-surface-base border-border-default sticky top-0 z-1 border-b px-4 py-3">
-      <div class="text-text-secondary text-2xs font-semibold">{{ where }}</div>
-      <div class="mt-0.5 flex min-w-0 items-center gap-2">
-        <span class="rounded-default grid size-6 shrink-0 place-items-center" :class="style.chip">
-          <OIcon :name="style.icon" size="sm" />
-        </span>
-        <OTruncatedText class="text-text-heading text-lg font-semibold">{{ label }}</OTruncatedText>
-      </div>
-      <div v-if="relatives.length" class="mt-2 flex flex-wrap gap-1.5">
-        <OBadge
-          v-for="r in relatives"
-          :key="r.id"
-          clickable
-          size="sm"
-          shape="rounded"
-          variant="default-outline"
-          :data-test="`query-profile-detail-link-${r.id}`"
-          @click="emit('select', r.id)"
-        >
-          <OIcon :name="r.up ? 'arrow-upward' : 'arrow-downward'" size="xs" />
-          <span class="size-1.5 shrink-0 rounded-full" :class="r.swatch" />
-          {{ r.label }}
-        </OBadge>
-      </div>
-    </div>
+    <ProfileDetailHeader :model="model" :op="op" @select="emit('select', $event)" />
 
     <div class="flex flex-col gap-4 px-4 pt-3">
       <template v-if="stage">
@@ -188,6 +164,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.straggler ? 'danger' : 'default'"
               />
             </template>
+            <template #cell-cache="{ row }">
+              <span
+                class="tabular-nums"
+                :class="row.straggler ? 'text-status-error-text font-semibold' : ''"
+                >{{ row.cache === null ? "—" : formatPercent(row.cache) }}</span
+              >
+            </template>
           </OTable>
           <div class="mt-2 flex justify-between text-xs">
             <span class="text-text-secondary">{{ t("search.queryProfile.skew") }}</span>
@@ -223,12 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -241,22 +221,23 @@ import {
   metricSections,
   metricsForScope,
   nodeScope,
-  operatorLabel,
   operatorNodeRows,
   scopeNodeKey,
   scopedValue,
   shareOfTotal,
   shareTone,
   skew,
+  stageNodeFor,
   type ProfileModel,
   type ProfileMetric,
   type StageScope,
 } from "@/utils/queryProfile";
+import ProfileDetailHeader from "./ProfileDetailHeader.vue";
 import ProfileMetricList from "./ProfileMetricList.vue";
 import ProfileNodeName from "./ProfileNodeName.vue";
 import ProfileStatTile from "./ProfileStatTile.vue";
-import { CATEGORY_STYLE, SHARE_BAR, type NodeNameRow } from "./profileStyles";
-import { operatorWhere, scopeTag } from "./profileText";
+import { SHARE_BAR, type NodeNameRow } from "./profileStyles";
+import { scopeTag } from "./profileText";
 
 const props = defineProps<{
   model: ProfileModel;
@@ -272,9 +253,6 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const op = computed(() => (props.opId ? props.model.operators[props.opId] : null));
-const style = computed(() => CATEGORY_STYLE[op.value?.category ?? "other"]);
-const label = computed(() => raw(op.value ? operatorLabel(op.value) : ""));
-const where = computed(() => (op.value ? operatorWhere(t, props.model, op.value) : raw("")));
 const stage = computed(() =>
   op.value?.remoteStageId ? props.model.stageById[op.value.remoteStageId] : null,
 );
@@ -282,16 +260,6 @@ const share = computed(() => (op.value ? shareOfTotal(props.model, op.value) : 0
 const value = computed(() =>
   op.value ? scopedValue(op.value, props.scope) : { computeNs: 0, rows: 0, on: false },
 );
-
-const relatives = computed(() => {
-  if (!op.value) return [];
-  const toLink = (id: string, up: boolean) => {
-    const rel = props.model.operators[id];
-    return { id, up, label: raw(operatorLabel(rel)), swatch: CATEGORY_STYLE[rel.category].swatch };
-  };
-  const parent = op.value.parentId ? [toLink(op.value.parentId, true)] : [];
-  return [...parent, ...op.value.childIds.map((id) => toLink(id, false))];
-});
 
 const computeLabel = computed<I18nText>(() =>
   op.value?.stageId && op.value.samples.length > 1
@@ -330,23 +298,35 @@ const metricBlocks = computed(() => {
 
 const activeNode = computed(() => scopeNodeKey(props.scope));
 
-const nodeRows = computed<(NodeNameRow & { computeNs: number; rows: number; share: number })[]>(
-  () =>
-    op.value
-      ? operatorNodeRows(props.model, op.value).map((r) => ({
-          id: r.nodeKey,
-          name: r.name,
-          role: "",
-          straggler: r.straggler,
-          active: activeNode.value === r.nodeKey,
-          error: "",
-          skipped: false,
-          computeNs: r.computeNs,
-          rows: r.rows,
-          share: r.share,
-        }))
-      : [],
-);
+interface OpNodeRow extends NodeNameRow {
+  computeNs: number;
+  rows: number;
+  share: number;
+  files: number | null;
+  cache: number | null;
+}
+
+const nodeRows = computed<OpNodeRow[]>(() => {
+  const current = op.value;
+  if (!current) return [];
+  return operatorNodeRows(props.model, current).map((r) => {
+    const st = stageNodeFor(props.model, current, r.nodeKey)?.remote.scan_stats;
+    return {
+      id: r.nodeKey,
+      name: r.name,
+      role: "",
+      straggler: r.straggler,
+      active: activeNode.value === r.nodeKey,
+      error: "",
+      skipped: false,
+      computeNs: r.computeNs,
+      rows: r.rows,
+      share: r.share,
+      files: st ? st.files || 0 : null,
+      cache: st?.querier_files ? st.querier_disk_cached_files / st.querier_files : null,
+    };
+  });
+});
 
 const maxNodeCompute = computed(() => Math.max(0, ...nodeRows.value.map((r) => r.computeNs)));
 const opSkewValue = computed(() => skew(nodeRows.value.map((r) => r.computeNs)));
@@ -407,7 +387,7 @@ const nameColumn: OTableColumnDef = {
   size: 120,
 };
 
-const opColumns: OTableColumnDef[] = [
+const opBaseColumns: OTableColumnDef[] = [
   nameColumn,
   {
     id: "compute",
@@ -431,6 +411,28 @@ const opColumns: OTableColumnDef[] = [
     meta: right,
   },
 ];
+
+const filesColumn: OTableColumnDef = {
+  id: "files",
+  header: t("search.queryProfile.files"),
+  accessorFn: (r) => (r.files === null ? "—" : formatRows(r.files)),
+  size: 56,
+  meta: right,
+};
+
+const cacheColumn: OTableColumnDef = {
+  id: "cache",
+  header: t("search.queryProfile.cache"),
+  accessorKey: "cache",
+  size: 60,
+  meta: { ...right, headerTooltip: t("search.queryProfile.cacheTooltip") },
+};
+
+const opColumns = computed<OTableColumnDef[]>(() => [
+  ...opBaseColumns,
+  ...(nodeRows.value.some((r) => r.files !== null) ? [filesColumn] : []),
+  ...(nodeRows.value.some((r) => r.cache !== null) ? [cacheColumn] : []),
+]);
 
 const remoteColumns: OTableColumnDef[] = [
   nameColumn,

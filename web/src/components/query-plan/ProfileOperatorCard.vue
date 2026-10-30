@@ -32,8 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       role="button"
       tabindex="0"
-      class="bg-surface-base border-border-default rounded-default focus-visible:ring-accent/40 relative flex h-full cursor-pointer flex-col justify-between overflow-hidden border border-s-3 px-2.5 py-2 shadow-sm transition-shadow outline-none hover:shadow-md focus-visible:ring-2"
-      :class="[style.border, selected ? 'ring-accent ring-2' : '']"
+      class="bg-surface-base border-border-default rounded-default focus-visible:ring-accent/40 relative flex h-full cursor-pointer flex-col overflow-hidden border border-s-3 px-2.5 py-2 shadow-sm transition-shadow outline-none hover:shadow-md focus-visible:ring-2"
+      :class="[
+        style.border,
+        selected ? 'ring-accent ring-2' : '',
+        model.planOnly ? 'justify-center gap-1.5' : 'justify-between',
+      ]"
       :aria-pressed="selected"
       :data-test="`query-profile-card-${op.id}`"
       @click.stop="emit('select', op.id)"
@@ -48,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label
         }}</OTruncatedText>
         <OBadge
+          v-if="badge"
           size="xs"
           shape="rounded"
           :variant="badge.variant"
@@ -56,20 +61,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
       <div class="text-text-secondary flex min-w-0 items-center gap-1.5 text-xs tabular-nums">
-        <OTruncatedText>{{ subline }}</OTruncatedText>
+        <OTruncatedText :class="model.planOnly ? 'font-mono' : ''">{{ subline }}</OTruncatedText>
         <span
           v-if="tag"
           class="bg-surface-subtle rounded-default text-2xs shrink-0 px-1 font-mono whitespace-nowrap"
           >{{ tag }}</span
         >
       </div>
-      <ProfileNodeBars v-if="bars" :bars="bars" />
-      <OProgressBar
-        v-else
-        size="xs"
-        :value="Math.max(0.015, share)"
-        :variant="SHARE_BAR[shareTone(share)]"
-      />
+      <template v-if="!model.planOnly">
+        <ProfileNodeBars v-if="bars" :bars="bars" />
+        <OProgressBar
+          v-else
+          size="xs"
+          :value="Math.max(0.015, share)"
+          :variant="SHARE_BAR[shareTone(share)]"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -87,7 +94,6 @@ import {
   formatNs,
   formatPercent,
   formatRows,
-  operatorLabel,
   scopeNodeKey,
   scopedValue,
   shareOfTotal,
@@ -98,7 +104,7 @@ import {
 } from "@/utils/queryProfile";
 import ProfileNodeBars from "./ProfileNodeBars.vue";
 import { CATEGORY_STYLE, SHARE_BADGE, SHARE_BAR, type NodeBar } from "./profileStyles";
-import { nodeName, scopeTag } from "./profileText";
+import { nodeName, operatorTitle, planCardDetail, scopeTag } from "./profileText";
 
 const props = defineProps<{
   model: ProfileModel;
@@ -114,7 +120,7 @@ const emit = defineEmits<{ select: [opId: string] }>();
 const { t } = useI18nTyped();
 
 const style = computed(() => CATEGORY_STYLE[props.op.category]);
-const label = computed(() => raw(operatorLabel(props.op)));
+const label = computed(() => operatorTitle(t, props.op));
 const share = computed(() => shareOfTotal(props.model, props.op));
 const value = computed(() => scopedValue(props.op, props.scope));
 const stage = computed(() =>
@@ -129,6 +135,7 @@ const badge = computed(() => {
       text: t("search.queryProfile.stage", { index: stage.value.index }),
     };
   }
+  if (props.model.planOnly) return null;
   return {
     variant: SHARE_BADGE[shareTone(share.value)],
     text: raw(formatPercent(share.value)),
@@ -136,6 +143,7 @@ const badge = computed(() => {
 });
 
 const subline = computed<I18nText>(() => {
+  if (props.model.planOnly) return planCardDetail(t, props.model, props.op);
   if (stage.value) {
     return t("search.queryProfile.remoteSubline", {
       wall: formatNs(stage.value.maxWallUs * 1000),
@@ -154,6 +162,7 @@ const subline = computed<I18nText>(() => {
 });
 
 const tag = computed<I18nText | null>(() => {
+  if (props.model.planOnly) return null;
   if (stage.value) {
     const count = stage.value.nodes.length;
     return t("search.queryProfile.nodesCount", { count }, count);
