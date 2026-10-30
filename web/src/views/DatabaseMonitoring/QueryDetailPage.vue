@@ -1071,6 +1071,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon
                           name="lock"
+                          class="text-icon-locked"
                           size="sm"
                           :data-test="`dbm-detail-endpoint-traces-lock-${endpoint.rowKey}`"
                         />
@@ -1114,7 +1115,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <div v-if="samples.length" class="h-50 w-full px-3">
-              <ChartRenderer :data="scatterData" @click="onSampleClick" />
+              <ChartRenderer
+                :data="scatterData"
+                v-on="tracesLock.locked.value ? {} : { click: onSampleClick }"
+              />
             </div>
 
             <OTable
@@ -1128,7 +1132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :page-size="10"
               table-id="dbm-query-samples"
               data-test="dbm-detail-samples-table"
-              @row-click="openSampleTrace"
+              v-on="tracesLock.locked.value ? {} : { rowClick: openSampleTrace }"
             >
               <template #cell-timestamp="{ row: sample }">
                 <span class="tabular-nums">{{ formatClock(sample.timestamp) }}</span>
@@ -1162,6 +1166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon
                           name="lock"
+                          class="text-icon-locked"
                           size="sm"
                           :data-test="`dbm-detail-sample-trace-lock-${sample.rowKey}`"
                         />

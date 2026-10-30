@@ -329,7 +329,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="h-5! px-1.5"
                           disabled
                         >
-                          <OIcon name="lock" size="xs" data-test="view-trace-btn-lock" />
+                          <OIcon
+                            name="lock"
+                            class="text-icon-locked"
+                            size="xs"
+                            data-test="view-trace-btn-lock"
+                          />
                           <span>{{ t("common.viewTrace") }}</span>
                         </OButton>
                       </span>

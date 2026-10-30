@@ -208,35 +208,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
-              <router-link
+              <OTooltip
                 v-if="canView('dashboards')"
-                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
-                :to="{
-                  name: 'dashboards',
-                  query: { org_identifier: store.state.selectedOrganization?.identifier },
-                }"
-                data-test="home-usage-tab-dashboards-card"
+                :content="lockedReason('dashboards')"
+                :disabled="!isLocked('dashboards')"
               >
-                <span
-                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                  aria-hidden="true"
+                <router-link
+                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                  :to="{
+                    name: 'dashboards',
+                    query: { org_identifier: store.state.selectedOrganization?.identifier },
+                  }"
+                  data-test="home-usage-tab-dashboards-card"
                 >
-                  <OIcon name="dashboard" size="sm" />
-                </span>
-                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                  t("home.dashboardTitle")
-                }}</OTruncatedText>
-                <span
-                  class="text-text-heading text-sm font-semibold tabular-nums"
-                  data-test="home-usage-tab-dashboards-count"
-                  >{{ animatedDashboardCount || summary.dashboard_count }}</span
-                >
-                <OIcon
-                  name="chevron-right"
-                  size="sm"
-                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                />
-              </router-link>
+                  <span
+                    class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    <OIcon name="dashboard" size="sm" />
+                  </span>
+                  <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
+                    t("home.dashboardTitle")
+                  }}</OTruncatedText>
+                  <span
+                    class="text-text-heading text-sm font-semibold tabular-nums"
+                    data-test="home-usage-tab-dashboards-count"
+                    >{{ animatedDashboardCount || summary.dashboard_count }}</span
+                  >
+                  <template v-if="isLocked('dashboards')">
+                    <OIcon
+                      name="lock"
+                      size="xs"
+                      class="text-icon-locked shrink-0"
+                      data-test="home-usage-tab-dashboards-card-lock"
+                    />
+                    <span class="sr-only">{{ lockedReason("dashboards") }}</span>
+                  </template>
+                  <OIcon
+                    v-else
+                    name="chevron-right"
+                    size="sm"
+                    class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                  />
+                </router-link>
+              </OTooltip>
             </nav>
           </template>
 
@@ -253,158 +268,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <nav class="flex flex-col">
               <OTooltip
-                v-if="canView('logs')"
-                :content="lockedReason('logs')"
-                :disabled="!isLocked('logs')"
+                v-for="row in exploreRows"
+                :key="row.name"
+                :content="lockedReason(row.feature)"
+                :disabled="!isLocked(row.feature)"
               >
-                <component
-                  :is="isLocked('logs') ? 'div' : 'router-link'"
-                  v-bind="exploreLinkAttrs('logs')"
-                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors aria-disabled:cursor-not-allowed"
-                  data-test="home-usage-tab-explore-logs"
+                <router-link
+                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                  :to="{
+                    name: row.name,
+                    query: { org_identifier: store.state.selectedOrganization?.identifier },
+                  }"
+                  :data-test="`home-usage-tab-explore-${row.test}`"
                 >
                   <span
-                    class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                    class="rounded-default inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                    :class="row.chip"
                     aria-hidden="true"
                   >
-                    <OIcon name="search" size="sm" />
+                    <OIcon :name="row.icon" size="sm" />
                   </span>
                   <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                    t("menu.search")
+                    row.label
                   }}</OTruncatedText>
+                  <template v-if="isLocked(row.feature)">
+                    <OIcon
+                      name="lock"
+                      size="xs"
+                      class="text-icon-locked shrink-0"
+                      :data-test="`home-usage-tab-explore-${row.test}-lock`"
+                    />
+                    <span class="sr-only">{{ lockedReason(row.feature) }}</span>
+                  </template>
                   <OIcon
-                    :name="isLocked('logs') ? 'lock' : 'chevron-right'"
+                    v-else
+                    name="chevron-right"
                     size="sm"
                     class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                   />
-                </component>
+                </router-link>
               </OTooltip>
-              <OTooltip
-                v-if="canView('traces')"
-                :content="lockedReason('traces')"
-                :disabled="!isLocked('traces')"
-              >
-                <component
-                  :is="isLocked('traces') ? 'div' : 'router-link'"
-                  v-bind="exploreLinkAttrs('traces')"
-                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors aria-disabled:cursor-not-allowed"
-                  data-test="home-usage-tab-explore-traces"
-                >
-                  <span
-                    class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                    aria-hidden="true"
-                  >
-                    <OIcon name="account-tree" size="sm" />
-                  </span>
-                  <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                    t("menu.traces")
-                  }}</OTruncatedText>
-                  <OIcon
-                    :name="isLocked('traces') ? 'lock' : 'chevron-right'"
-                    size="sm"
-                    class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                  />
-                </component>
-              </OTooltip>
-              <OTooltip
-                v-if="canView('metrics')"
-                :content="lockedReason('metrics')"
-                :disabled="!isLocked('metrics')"
-              >
-                <component
-                  :is="isLocked('metrics') ? 'div' : 'router-link'"
-                  v-bind="exploreLinkAttrs('metrics')"
-                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors aria-disabled:cursor-not-allowed"
-                  data-test="home-usage-tab-explore-metrics"
-                >
-                  <span
-                    class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                    aria-hidden="true"
-                  >
-                    <OIcon name="bar-chart" size="sm" />
-                  </span>
-                  <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                    t("menu.metrics")
-                  }}</OTruncatedText>
-                  <OIcon
-                    :name="isLocked('metrics') ? 'lock' : 'chevron-right'"
-                    size="sm"
-                    class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                  />
-                </component>
-              </OTooltip>
-              <router-link
-                v-if="canView('RUM')"
-                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
-                :to="{
-                  name: 'RUM',
-                  query: { org_identifier: store.state.selectedOrganization?.identifier },
-                }"
-                data-test="home-usage-tab-explore-rum"
-              >
-                <span
-                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                  aria-hidden="true"
-                >
-                  <OIcon name="devices" size="sm" />
-                </span>
-                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                  raw("RUM")
-                }}</OTruncatedText>
-                <OIcon
-                  name="chevron-right"
-                  size="sm"
-                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                />
-              </router-link>
-              <router-link
-                v-if="canView('incidentList')"
-                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
-                :to="{
-                  name: 'incidentList',
-                  query: { org_identifier: store.state.selectedOrganization?.identifier },
-                }"
-                data-test="home-usage-tab-explore-incidents"
-              >
-                <span
-                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                  aria-hidden="true"
-                >
-                  <OIcon name="notifications-active" size="sm" />
-                </span>
-                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                  t("menu.incidents")
-                }}</OTruncatedText>
-                <OIcon
-                  name="chevron-right"
-                  size="sm"
-                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                />
-              </router-link>
-              <router-link
-                v-if="canView('reports')"
-                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
-                :to="{
-                  name: 'reports',
-                  query: { org_identifier: store.state.selectedOrganization?.identifier },
-                }"
-                data-test="home-usage-tab-explore-reports"
-              >
-                <span
-                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                  aria-hidden="true"
-                >
-                  <OIcon name="description" size="sm" />
-                </span>
-                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                  t("menu.report")
-                }}</OTruncatedText>
-                <OIcon
-                  name="chevron-right"
-                  size="sm"
-                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                />
-              </router-link>
             </nav>
           </template>
         </aside>
@@ -429,11 +332,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-circle"
               class="relative"
-              :aria-label="t('home.viewButton')"
-              :title="t('home.viewButton')"
+              :aria-label="viewLabel('alerts')"
+              :title="viewLabel('alerts')"
               data-test="home-usage-tab-view-alerts-btn"
             >
-              <OIcon name="arrow-forward" size="sm" />
+              <OIcon
+                :name="isLocked('alerts') ? 'lock' : 'arrow-forward'"
+                size="sm"
+                :class="{ 'text-icon-locked': isLocked('alerts') }"
+              />
               <router-link
                 exact
                 :to="{
@@ -441,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
                 }"
                 class="absolute inset-0"
-                :aria-label="t('home.viewButton')"
+                :aria-label="viewLabel('alerts')"
               ></router-link>
             </OButton>
           </div>
@@ -495,11 +402,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-circle"
               class="relative"
-              :aria-label="t('home.viewButton')"
-              :title="t('home.viewButton')"
+              :aria-label="viewLabel('pipelines')"
+              :title="viewLabel('pipelines')"
               data-test="home-usage-tab-view-pipelines-btn"
             >
-              <OIcon name="arrow-forward" size="sm" />
+              <OIcon
+                :name="isLocked('pipelines') ? 'lock' : 'arrow-forward'"
+                size="sm"
+                :class="{ 'text-icon-locked': isLocked('pipelines') }"
+              />
               <router-link
                 exact
                 :to="{
@@ -507,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
                 }"
                 class="absolute inset-0"
-                :aria-label="t('home.viewButton')"
+                :aria-label="viewLabel('pipelines')"
               ></router-link>
             </OButton>
           </div>
@@ -579,7 +490,8 @@ import { configFullQuery } from "@/services/config.queries";
 import { orgSummaryQuery } from "@/services/organizations.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -609,10 +521,72 @@ const store = useStore();
 const router = useRouter();
 const { isLocked, lockedReason } = useLicenseLocks();
 
-const exploreLinkAttrs = (name: string) =>
-  isLocked(name)
-    ? { role: "link", "aria-disabled": "true" }
-    : { to: { name, query: { org_identifier: store.state.selectedOrganization?.identifier } } };
+const viewLabel = (feature: string) =>
+  isLocked(feature) ? lockedReason(feature) : t("home.viewButton");
+
+interface ExploreRow {
+  name: string;
+  test: string;
+  feature: string;
+  icon: IconName;
+  chip: string;
+  label: I18nText;
+}
+
+const exploreRows = computed(() =>
+  (
+    [
+      {
+        name: "logs",
+        test: "logs",
+        feature: "logs",
+        icon: "search",
+        chip: "bg-icon-chip-success-bg text-icon-chip-success-text",
+        label: t("menu.search"),
+      },
+      {
+        name: "traces",
+        test: "traces",
+        feature: "traces",
+        icon: "account-tree",
+        chip: "bg-icon-chip-primary-bg text-icon-chip-primary-text",
+        label: t("menu.traces"),
+      },
+      {
+        name: "metrics",
+        test: "metrics",
+        feature: "metrics",
+        icon: "bar-chart",
+        chip: "bg-icon-chip-success-bg text-icon-chip-success-text",
+        label: t("menu.metrics"),
+      },
+      {
+        name: "RUM",
+        test: "rum",
+        feature: "rum",
+        icon: "devices",
+        chip: "bg-icon-chip-primary-bg text-icon-chip-primary-text",
+        label: raw("RUM"),
+      },
+      {
+        name: "incidentList",
+        test: "incidents",
+        feature: "incidents",
+        icon: "notifications-active",
+        chip: "bg-icon-chip-warning-bg text-icon-chip-warning-text",
+        label: t("menu.incidents"),
+      },
+      {
+        name: "reports",
+        test: "reports",
+        feature: "reports",
+        icon: "description",
+        chip: "bg-icon-chip-warning-bg text-icon-chip-warning-text",
+        label: t("menu.report"),
+      },
+    ] as ExploreRow[]
+  ).filter((row) => canView(row.name)),
+);
 
 const summary = ref<any>([]);
 const no_data_ingest = ref(false);

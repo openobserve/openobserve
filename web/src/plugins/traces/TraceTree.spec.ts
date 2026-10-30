@@ -378,6 +378,7 @@ describe("TraceTree", () => {
     const btn = locked.find('[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]');
     expect(btn.attributes("disabled")).toBeDefined();
     expect(btn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+    expect(btn.attributes("aria-label")).toBeTruthy();
     await btn.trigger("click");
     expect(locked.emitted("view-correlated-logs")).toBeUndefined();
     locked.unmount();

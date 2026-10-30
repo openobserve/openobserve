@@ -96,7 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="inline-flex">
           <OButton data-test="rca-evidence-open" variant="ghost-primary" size="sm" disabled>
             <template #icon-left>
-              <OIcon name="lock" size="sm" data-test="rca-evidence-open-lock" />
+              <OIcon
+                name="lock"
+                class="text-icon-locked"
+                size="sm"
+                data-test="rca-evidence-open-lock"
+              />
             </template>
             {{ openLabel }}
           </OButton>

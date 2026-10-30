@@ -135,7 +135,12 @@
                       data-test="ai-experiment-row-trace"
                     >
                       <template #icon-left>
-                        <OIcon name="lock" size="sm" data-test="ai-experiment-row-trace-lock" />
+                        <OIcon
+                          name="lock"
+                          class="text-icon-locked"
+                          size="sm"
+                          data-test="ai-experiment-row-trace-lock"
+                        />
                       </template>
                       {{ t("aiObservability.experiments.rowDetail.viewTrace") }}
                     </OButton>
@@ -283,6 +288,7 @@
                         <template #icon-left>
                           <OIcon
                             name="lock"
+                            class="text-icon-locked"
                             size="sm"
                             :data-test="`ai-experiment-row-score-trace-lock-${score.key}`"
                           />

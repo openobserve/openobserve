@@ -59,13 +59,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="metricsLock.lockedReason.value"
       >
         <span
-          class="text-text-muted ms-auto inline-flex shrink-0"
+          class="ms-auto inline-flex shrink-0"
           role="link"
           aria-disabled="true"
           :aria-label="t('dbm.metrics.explore')"
           :data-test="`dbm-metric-panel-explore-${panelKey}`"
         >
-          <OIcon name="lock" size="sm" :data-test="`dbm-metric-panel-explore-lock-${panelKey}`" />
+          <OIcon
+            name="lock"
+            size="xs"
+            class="text-icon-locked"
+            :data-test="`dbm-metric-panel-explore-lock-${panelKey}`"
+          />
         </span>
       </OTooltip>
       <a
