@@ -145,7 +145,6 @@ pub async fn remote_write(
     let mut skipped_records: u32 = 0;
     // remote write has no partial success: a 4xx drops the whole batch, a 5xx retries it forever
     let mut stream_key_checks = ingest::StreamKeyChecks::default();
-    let mut too_long_samples: usize = 0;
 
     // parse metadata
     for item in request.metadata {
@@ -388,7 +387,6 @@ pub async fn remote_write(
         }
 
         if stream_key_checks.violation(org_id, &metric_name).is_some() {
-            too_long_samples += event.samples.len() + event.histograms.len();
             continue;
         }
 
@@ -529,14 +527,6 @@ pub async fn remote_write(
         );
     }
 
-    // a native histogram's bucket streams and an exemplar stream are longer than the metric's
-    for (_, _, records) in stream_key_checks.drop_unstorable(org_id, &mut stream_pipeline_inputs) {
-        too_long_samples += records;
-    }
-    for (_, _, records) in stream_key_checks.drop_unstorable(org_id, &mut json_data_by_stream) {
-        too_long_samples += records;
-    }
-
     let parse_timeseries_ms = step_start.elapsed().as_millis();
 
     // Detailed performance logging
@@ -557,7 +547,7 @@ pub async fn remote_write(
         );
     }
 
-    let (mut pipeline_outputs, _) = ingest::run_pipelines(
+    let (pipeline_outputs, _) = ingest::run_pipelines(
         org_id,
         &stream_executable_pipelines,
         stream_pipeline_inputs,
@@ -565,14 +555,6 @@ pub async fn remote_write(
         &mut stream_partitioning_map,
     )
     .await;
-    for (_, _, records) in stream_key_checks.drop_unstorable(org_id, &mut pipeline_outputs) {
-        too_long_samples += records;
-    }
-    if too_long_samples > 0 {
-        log::warn!(
-            "[METRICS:PROM] dropped {too_long_samples} samples of streams whose stream key is too long, org_id: {org_id}"
-        );
-    }
     for (stream_name, records) in pipeline_outputs {
         // a pipeline rewrote the labels, so the series hash is recomputed from its output
         json_data_by_stream.entry(stream_name).or_default().extend(
@@ -581,6 +563,8 @@ pub async fn remote_write(
                 .map(|(record, timestamp)| (record, timestamp, None)),
         );
     }
+    // histogram bucket, exemplar and pipeline output streams can be too long when the metric fits
+    stream_key_checks.drop_unstorable(org_id, &mut json_data_by_stream);
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
@@ -2341,10 +2325,13 @@ mod tests {
     // cloud builds reject the unknown test org at the trial check
     #[cfg(not(feature = "cloud"))]
     #[tokio::test]
-    async fn remote_write_drops_only_the_series_whose_stream_key_is_too_long() {
+    async fn remote_write_drops_only_the_streams_whose_key_is_too_long() {
+        use infra::file_list::STREAM_KEY_MAX_LEN;
         use prost::Message;
         use proto::prometheus_rpc;
 
+        let org_id = "test_org_id";
+        let now = Utc::now().timestamp_millis();
         let series = |name: &str| prometheus_rpc::TimeSeries {
             labels: vec![prometheus_rpc::Label {
                 name: NAME_LABEL.to_string(),
@@ -2352,13 +2339,36 @@ mod tests {
             }],
             samples: vec![prometheus_rpc::Sample {
                 value: 1.0,
-                timestamp: Utc::now().timestamp_millis(),
+                timestamp: now,
             }],
             ..Default::default()
         };
-        let long_name = "m".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let long_name = "m".repeat(STREAM_KEY_MAX_LEN);
+        // `_sum` fills the key exactly; `_count`, `_bucket` and `_exemplars` overflow it
+        let histogram_name =
+            "h".repeat(STREAM_KEY_MAX_LEN - format!("{org_id}/metrics/_sum").len());
+        let histogram = prometheus_rpc::TimeSeries {
+            samples: vec![],
+            exemplars: vec![prometheus_rpc::Exemplar {
+                labels: vec![],
+                value: 1.0,
+                timestamp: now,
+            }],
+            histograms: vec![prometheus_rpc::Histogram {
+                sum: 1.0,
+                count: Some(prometheus_rpc::histogram::Count::CountInt(1)),
+                zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(1)),
+                timestamp: now,
+                ..Default::default()
+            }],
+            ..series(&histogram_name)
+        };
         let request = prometheus_rpc::WriteRequest {
-            timeseries: vec![series("test_prom_key_len_ok"), series(&long_name)],
+            timeseries: vec![
+                series("test_prom_key_len_ok"),
+                series(&long_name),
+                histogram,
+            ],
             metadata: vec![prometheus_rpc::MetricMetadata {
                 r#type: prometheus_rpc::metric_metadata::MetricType::Gauge as i32,
                 metric_family_name: long_name.clone(),
@@ -2369,7 +2379,7 @@ mod tests {
             .compress_vec(&request.encode_to_vec())
             .unwrap();
         remote_write(
-            "test_org_id",
+            org_id,
             Bytes::from(body),
             IngestUser::User("root@example.com".to_string()),
         )
@@ -2377,15 +2387,20 @@ mod tests {
         .unwrap();
 
         let bounded =
-            infra::file_list::stream_key_violation("test_org_id", StreamType::Metrics, &long_name)
+            infra::file_list::stream_key_violation(org_id, StreamType::Metrics, &long_name)
                 .is_some();
-        assert!(
-            infra::schema::exists("test_org_id", StreamType::Metrics, "test_prom_key_len_ok").await
-        );
-        assert_eq!(
-            infra::schema::exists("test_org_id", StreamType::Metrics, &long_name).await,
-            !bounded
-        );
+        let expected = [
+            ("test_prom_key_len_ok".to_string(), true),
+            (format!("{histogram_name}_sum"), true),
+            (long_name, !bounded),
+            (format!("{histogram_name}_count"), !bounded),
+            (format!("{histogram_name}_bucket"), !bounded),
+            (exemplars_stream_name(&histogram_name), !bounded),
+        ];
+        for (name, created) in expected {
+            let exists = infra::schema::exists(org_id, StreamType::Metrics, &name).await;
+            assert_eq!(exists, created, "{name}");
+        }
     }
 
     #[tokio::test]
