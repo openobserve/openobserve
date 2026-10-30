@@ -347,7 +347,11 @@ fn restore_canonical_agent_fields(
 }
 
 #[cfg(feature = "enterprise")]
-async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObservationBuffer) {
+async fn queue_gen_ai_agent_observations(org_id: &str, mut observations: AgentObservationBuffer) {
+    // spans of a destination skipped for its key length were never written
+    observations.retain(|_, o| {
+        infra::file_list::stream_key_violation(org_id, StreamType::Traces, &o.stream_name).is_none()
+    });
     o2_enterprise::enterprise::llm_evaluations::agent_registry::queue_observations(
         org_id.to_string(),
         observations,
@@ -763,6 +767,14 @@ pub async fn handle_otlp_request(
         Some(name) => format_stream_name(name.to_string()),
         None => "default".to_owned(),
     };
+    // before anything that writes for the stream, so one that cannot be stored is never created
+    if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name) {
+        return Ok(otlp_rejection_response(
+            req_type,
+            http::StatusCode::BAD_REQUEST,
+            e.to_string(),
+        ));
+    }
     // Refused before the pipelines run: a remote-stream destination writes inside them.
     #[cfg(feature = "vectorscan")]
     if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
@@ -1315,6 +1327,7 @@ pub async fn handle_otlp_request(
         (started_at, &start),
         json_data_by_stream,
         &user.to_email(),
+        &mut partial_success,
     )
     .await
     {
@@ -1446,6 +1459,11 @@ pub async fn ingest_json(
             )
                 .into_response());
         }
+    }
+
+    // before anything that writes for the stream, so one that cannot be stored is never created
+    if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Traces, traces_stream_name) {
+        return Ok(MetaHttpResponse::bad_request(e));
     }
 
     let start = std::time::Instant::now();
@@ -1662,6 +1680,7 @@ pub async fn ingest_json(
         (started_at, &start),
         json_data_by_stream,
         &user.to_email(),
+        &mut partial_success,
     )
     .await
     {
@@ -1757,8 +1776,17 @@ async fn write_traces_by_stream(
     time_stats: (i64, &Instant),
     json_data_by_stream: HashMap<String, IngestJsonData>,
     user_email: &str,
+    partial_success: &mut ExportTracePartialSuccess,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
+        // only a pipeline destination can fail here; the request's own stream is checked on entry
+        if let Err(e) =
+            schema::check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name)
+        {
+            partial_success.rejected_spans += json_data.len() as i64;
+            partial_success.error_message = e.to_string();
+            continue;
+        }
         if crate::ingestion::checks_for_new_stream(org_id)
             && !infra::schema::exists(org_id, StreamType::Traces, &traces_stream_name).await
         {
@@ -3658,6 +3686,105 @@ mod tests {
             })
             .collect();
         ExportTraceServiceRequest { resource_spans }
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_too_long_stream_key_is_rejected_on_entry() {
+        use config::meta::stream::StreamType;
+        use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+
+        let org_id = "test_org_id";
+        let long_name = "t".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation(org_id, StreamType::Traces, &long_name)
+                .is_some();
+        let expected = if bounded {
+            axum::http::StatusCode::BAD_REQUEST
+        } else {
+            axum::http::StatusCode::OK
+        };
+
+        let resp = super::handle_otlp_request(
+            org_id,
+            ExportTraceServiceRequest::default(),
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some(&long_name),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), expected);
+
+        let resp = super::ingest_json(
+            org_id,
+            bytes::Bytes::from_static(b"[]"),
+            config::meta::otlp::OtlpRequestType::HttpJson,
+            &long_name,
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), expected);
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_write_skips_only_a_destination_whose_stream_key_is_too_long() {
+        use std::collections::HashMap;
+
+        use config::meta::stream::StreamType;
+        use opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess;
+
+        let org_id = "test_org_id";
+        let long_name = "t".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation(org_id, StreamType::Traces, &long_name)
+                .is_some();
+        let now = config::utils::time::now_micros();
+        let span = json!({
+            "_timestamp": now,
+            "trace_id": "0af7651916cd43dd8448eb211c80319c",
+            "span_id": "b7ad6b7169203331",
+            "start_time": now * 1000,
+            "end_time": now * 1000 + 1000,
+        });
+        let rows = |n: usize| {
+            let row = (now, span.as_object().unwrap().clone());
+            (vec![row; n], None)
+        };
+        let json_data_by_stream = HashMap::from([
+            ("test_traces_key_len_ok".to_string(), rows(1)),
+            (long_name.clone(), rows(2)),
+        ]);
+        let mut partial_success = ExportTracePartialSuccess::default();
+        super::write_traces_by_stream(
+            org_id,
+            (now, &std::time::Instant::now()),
+            json_data_by_stream,
+            "a@a.com",
+            &mut partial_success,
+        )
+        .await
+        .unwrap();
+
+        if bounded {
+            assert_eq!(partial_success.rejected_spans, 2);
+            assert!(
+                partial_success
+                    .error_message
+                    .starts_with("Stream name too long")
+            );
+        } else {
+            assert_eq!(partial_success.rejected_spans, 0);
+        }
+        assert!(infra::schema::exists(org_id, StreamType::Traces, "test_traces_key_len_ok").await);
+        assert_eq!(
+            infra::schema::exists(org_id, StreamType::Traces, &long_name).await,
+            !bounded
+        );
     }
 
     async fn ingest_and_read_service_names(
