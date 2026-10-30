@@ -227,6 +227,84 @@ describe("ShortcutManager", () => {
       expect(handler).toHaveBeenCalledOnce();
     });
   });
+
+  describe("skipInOverlay", () => {
+    const inside = (role: string | null, attr?: string): HTMLButtonElement => {
+      const overlay = document.createElement("div");
+      if (role) overlay.setAttribute("role", role);
+      if (attr) overlay.setAttribute(attr, "");
+      const button = document.createElement("button");
+      overlay.appendChild(button);
+      document.body.appendChild(overlay);
+      return button;
+    };
+
+    afterEach(() => {
+      document.body.innerHTML = "";
+    });
+
+    it.each([
+      ["dialog", undefined],
+      ["alertdialog", undefined],
+      ["listbox", undefined],
+      ["menu", undefined],
+      [null, "data-o-popover-content"],
+    ])("leaves Space to a button inside a %s %s", (role, attr) => {
+      const handler = vi.fn();
+      manager.register({ key: "space", handler, skipInOverlay: true });
+      const event = fakeEvent({ key: " ", target: inside(role, attr) });
+
+      manager.handleKeyDown(event);
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("leaves a modifier combo to an editable element", () => {
+      const handler = vi.fn();
+      manager.register({ key: "alt+down", handler, skipInOverlay: true });
+      const event = fakeEvent({
+        key: "ArrowDown",
+        altKey: true,
+        target: document.createElement("textarea"),
+      });
+
+      manager.handleKeyDown(event);
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("leaves a key a widget already handled", () => {
+      const handler = vi.fn();
+      manager.register({ key: "pagedown", handler, skipInOverlay: true });
+      const event = fakeEvent({ key: "PageDown", target: document.body, defaultPrevented: true });
+
+      manager.handleKeyDown(event);
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("still fires on the page itself", () => {
+      const handler = vi.fn();
+      manager.register({ key: "pagedown", handler, skipInOverlay: true });
+      const event = fakeEvent({ key: "PageDown", target: inside(null) });
+
+      manager.handleKeyDown(event);
+
+      expect(handler).toHaveBeenCalledOnce();
+      expect(event.preventDefault).toHaveBeenCalledOnce();
+    });
+
+    it("does not change shortcuts without the flag", () => {
+      const handler = vi.fn();
+      manager.register({ key: "pagedown", handler });
+
+      manager.handleKeyDown(fakeEvent({ key: "PageDown", target: inside("dialog") }));
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
+  });
 });
 
 describe("useShortcut composable", () => {
