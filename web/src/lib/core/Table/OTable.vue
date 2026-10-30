@@ -1595,10 +1595,8 @@ defineExpose({
           />
 
           <!-- ── Body ─────────────────────────────────────────── -->
-          <!-- The fade plays on insertion only, i.e. when rows replace the skeleton, never on sort or page changes. -->
           <OTableBody
             v-else-if="!showEmpty && !showError"
-            class="motion-safe:animate-in motion-safe:fade-in-40 motion-safe:duration-200 motion-safe:ease-out"
             :rows="bodyRows"
             :sections="sectionsEnabled ? rowSections : undefined"
             :table="table"

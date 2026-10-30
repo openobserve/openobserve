@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <keep-alive :include="KEPT_ALIVE_VIEWS">
                   <component
                     :is="Component"
-                    class="motion-safe:animate-in motion-safe:fade-in-40 h-full motion-safe:duration-200 motion-safe:ease-out"
+                    :class="[ENTER_FADE, 'h-full']"
                     @sendToAiChat="sendToAiChat"
                   />
                 </keep-alive>
@@ -261,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
+import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
@@ -1734,6 +1735,7 @@ export default defineComponent({
       zoBackendUrl,
       isLoading,
       KEPT_ALIVE_VIEWS,
+      ENTER_FADE,
       getImageURL,
       updateOrganization,
       setSelectedOrganization,

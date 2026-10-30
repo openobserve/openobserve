@@ -205,6 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { ref, computed, watch, useSlots, provide } from "vue";
 import { useRouter } from "vue-router";
+// The route view already fades the whole page in, so the body takes only the slide and the header stays still.
+import { ENTER_SLIDE as BODY_ENTER } from "@/lib/styles/motion";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -310,10 +312,6 @@ const hasHeader = computed(
     !!slots.actions ||
     !!slots["header-tabs"],
 );
-
-// The route view already fades the whole page in, so the body adds only the slide and the header stays still.
-const BODY_ENTER =
-  "motion-safe:animate-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 motion-safe:ease-out";
 
 const internalWidth = ref(props.sidebarWidth);
 
