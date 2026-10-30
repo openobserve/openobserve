@@ -38,7 +38,7 @@ use config::{
 use dashmap::DashMap;
 use db::alerts::destinations::DestinationError;
 use reqwest::{Method, StatusCode};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::{NotificationContext, STATUS_RESOLVED};
 
@@ -784,9 +784,7 @@ fn description(ctx: &NotificationContext) -> String {
         DESCRIPTION_MAX_CHARS.saturating_sub(head.chars().count() + reserved.chars().count());
     let mut rows = Vec::new();
     for row in ctx.rows.iter().take(MAX_ROWS) {
-        let row = serde_json::to_string(row)
-            .unwrap_or_default()
-            .replace("{noformat}", "");
+        let row = row_text(row);
         let cost = row.chars().count() + 1;
         if cost > budget {
             break;
@@ -802,6 +800,27 @@ fn description(ctx: &NotificationContext) -> String {
         rows.len(),
         rows.join("\n")
     )
+}
+
+/// Drops braces inside keys and values, so no row can close the `{noformat}` block or open a macro.
+struct NoBraces;
+
+impl serde_json::ser::Formatter for NoBraces {
+    fn write_string_fragment<W: ?Sized + std::io::Write>(
+        &mut self,
+        writer: &mut W,
+        fragment: &str,
+    ) -> std::io::Result<()> {
+        writer.write_all(fragment.replace(['{', '}'], "").as_bytes())
+    }
+}
+
+fn row_text(row: &Map<String, Value>) -> String {
+    let mut out = Vec::new();
+    let _ = row.serialize(&mut serde_json::Serializer::with_formatter(
+        &mut out, NoBraces,
+    ));
+    String::from_utf8(out).unwrap_or_default()
 }
 
 fn comment(ctx: &NotificationContext) -> String {
@@ -928,11 +947,19 @@ mod tests {
     #[test]
     fn rows_cannot_close_the_noformat_block() {
         let mut ctx = alert_ctx();
-        ctx.rows = vec![row(json!({"msg": "{noformat}[~accountid:5b10a2]"}))];
-        let text = description(&ctx);
-        assert_eq!(text.matches("{noformat}").count(), 2, "{text}");
-        assert!(text.contains(r#"{"msg":"[~accountid:5b10a2]"}"#), "{text}");
-        assert!(text.ends_with("See all rows in OpenObserve: https://o2.example.com/s/abc"));
+        for msg in [
+            "{noformat}[~accountid:5b10a2]",
+            "{noformat{noformat}}[~accountid:5b10a2] !http://evil.example/x.png! [click|http://evil.example]",
+            "{NOFORMAT}{noformat:title=x}",
+        ] {
+            ctx.rows = vec![row(json!({"msg": msg, msg: 1}))];
+            let text = description(&ctx);
+            let inert = msg.replace(['{', '}'], "");
+            let kept = format!(r#"{{"msg":"{inert}","{inert}":1}}"#);
+            assert_eq!(text.matches("{noformat}").count(), 2, "{text}");
+            assert!(text.contains(&format!("\n{kept}\n")), "{text}");
+            assert!(text.ends_with("See all rows in OpenObserve: https://o2.example.com/s/abc"));
+        }
     }
 
     #[test]
