@@ -29,9 +29,7 @@ pub enum RotationMode {
     /// round-trips unchanged.
     #[default]
     OnCall,
-    /// Everyone on the rotation's winning shift rule, on shift or not — the
-    /// broadcast before the whole team. The away are left out: an absence is not
-    /// being there at all, and `WholeTeam` below ignores that on purpose.
+    /// Everyone on the rotation's winning shift rule, on shift or not, minus the away.
     All,
 }
 
@@ -64,8 +62,7 @@ pub enum EscalationTarget {
         #[serde(default, skip_serializing_if = "RotationMode::is_default")]
         mode: RotationMode,
     },
-    /// One named person, by email — email is the login, so it is the one
-    /// identifier every user is guaranteed to have.
+    /// One named person, by email; a ladder step skips them while away, a handoff does not.
     User { email: String },
     /// Every member of the team — the last resort at the bottom of a ladder.
     ///

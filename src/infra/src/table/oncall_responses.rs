@@ -560,23 +560,31 @@ pub async fn list_by_team(
         .collect())
 }
 
-/// Every open record in the org that `user_email` holds the acknowledgement of, on any team.
+/// Open records `user_email` holds the acknowledgement of, on `team_id` or on any team.
 pub async fn list_open_acknowledged_by(
     org_id: &str,
+    team_id: Option<&str>,
     user_email: &str,
 ) -> Result<Vec<Response>, errors::Error> {
-    list_open_acknowledged_by_in(get_orm_client_rw().await, org_id, user_email).await
+    list_open_acknowledged_by_in(get_orm_client_rw().await, org_id, team_id, user_email).await
 }
 
 async fn list_open_acknowledged_by_in<C: ConnectionTrait>(
     db: &C,
     org_id: &str,
+    team_id: Option<&str>,
     user_email: &str,
 ) -> Result<Vec<Response>, errors::Error> {
     use oncall_responses::Column;
 
-    Ok(oncall_responses::Entity::find()
-        .filter(Column::OrgId.eq(org_id))
+    let mut query = oncall_responses::Entity::find().filter(Column::OrgId.eq(org_id));
+    if let Some(team_id) = team_id {
+        query = query.filter(Column::TeamId.eq(team_id));
+    }
+    // An open record carries `acked_by` only while acknowledged; the state lets the scan use the
+    // index.
+    Ok(query
+        .filter(Column::State.eq(ResponseState::Acknowledged.to_i32()))
         .filter(Column::ClosedAt.is_null())
         .filter(
             Expr::expr(sea_orm::sea_query::Func::lower(Expr::col(Column::AckedBy)))
@@ -2313,9 +2321,10 @@ mod tests {
         }
     }
 
-    /// A leaver's open acknowledged pages are found on every team, whatever the stored case.
+    /// A leaver's open acknowledged pages are found org-wide or on one team, whatever the stored
+    /// case.
     #[tokio::test]
-    async fn test_open_pages_acknowledged_by_a_person_span_every_team() {
+    async fn test_open_pages_acknowledged_by_a_person_on_every_or_one_team() {
         let held = |id: &str, team: &str, holder: &str| oncall_responses::Model {
             id: id.into(),
             team_id: Some(team.into()),
@@ -2345,14 +2354,22 @@ mod tests {
                 .unwrap();
         }
 
-        let mut ids: Vec<String> = list_open_acknowledged_by_in(&db, "default", "ANA@o2.ai")
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|r| r.id)
-            .collect();
-        ids.sort();
-        assert_eq!(ids, ["resp_1", "resp_2"]);
+        for (team, expected) in [
+            (None, vec!["resp_1", "resp_2"]),
+            (Some("team_1"), vec!["resp_1"]),
+            (Some("team_2"), vec!["resp_2"]),
+            (Some("team_3"), vec![]),
+        ] {
+            let mut ids: Vec<String> =
+                list_open_acknowledged_by_in(&db, "default", team, "ANA@o2.ai")
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|r| r.id)
+                    .collect();
+            ids.sort();
+            assert_eq!(ids, expected, "team {team:?}");
+        }
     }
 
     /// The ladder clock starts once, at the first held page, and never on a closed record.
