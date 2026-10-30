@@ -1,5 +1,12 @@
 # OpenObserve — project rules
 
+## Engineering guidelines
+
+- [.agents/engineering-guidelines.md](.agents/engineering-guidelines.md) governs judgment: task
+  tiers, what counts as a hack / over-engineering / over-complication, TDD and the review loop.
+  Read it before any change bigger than a one-cause patch; reviewers apply its §2 tests. On
+  anything mechanical (ordering, comments, lint thresholds, schema, PR rules) this file wins.
+
 ## Build & workflow
 
 - Build with `cargo build` (debug). Never use `--release` unless explicitly asked.
