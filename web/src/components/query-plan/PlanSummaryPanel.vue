@@ -129,20 +129,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
 
-    <div class="flex flex-col items-start gap-2" data-test="query-plan-run-cta">
-      <p class="text-text-secondary m-0 text-xs leading-normal">
+    <div
+      class="bg-surface-subtle rounded-default flex flex-col gap-2 p-2.5"
+      data-test="query-plan-run-cta"
+    >
+      <p class="text-text-body m-0 text-xs leading-normal">
         {{ t("search.queryProfile.planOnlyNote") }}
       </p>
       <OButton
         variant="outline"
         size="sm"
+        block
         icon-left="speed"
         icon-right="arrow-forward"
         data-test="query-plan-go-analyze"
         @click="emit('analyze')"
-        >{{
-          t("search.queryProfile.measureWithAnalyze", { command: raw("EXPLAIN ANALYZE") })
-        }}</OButton
+        >{{ t("search.queryProfile.measureWithAnalyze") }}</OButton
       >
     </div>
   </div>
