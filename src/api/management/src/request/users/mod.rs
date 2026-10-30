@@ -782,7 +782,7 @@ pub async fn authentication(
         // Native CE browser logins receive an opaque, revocable server-side session.
         // Keep the legacy cookie format when idle enforcement is disabled.
         #[cfg(not(feature = "enterprise"))]
-        let access_token = if cfg.common.session_idle_timeout > 0 {
+        let access_token = if cfg.auth.session_idle_timeout > 0 {
             let lifetime = db::password_policy::cookie_max_age_secs().await;
             match openobserve_core::session::create_native_session(&access_token, lifetime).await {
                 Ok(id) => format!("session {id}"),
@@ -836,7 +836,7 @@ pub async fn authentication(
 pub async fn native_session_activity(headers: HeaderMap) -> Response {
     use axum_extra::extract::cookie::CookieJar;
 
-    if get_config().common.session_idle_timeout <= 0 {
+    if get_config().auth.session_idle_timeout <= 0 {
         return StatusCode::NO_CONTENT.into_response();
     }
     // A cookie-authenticated heartbeat must not be triggerable cross-site.
