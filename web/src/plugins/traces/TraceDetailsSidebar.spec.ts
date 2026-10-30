@@ -329,6 +329,7 @@ describe("TraceDetailsSidebar", async () => {
 
   async function mountDefault() {
     wrapper = mountSidebar();
+    await router.isReady();
     await wrapper.vm.$nextTick();
   }
 
@@ -785,6 +786,7 @@ describe("TraceDetailsSidebar", async () => {
   describe("Tabs functionality", () => {
     beforeEach(async () => {
       wrapper = mountSidebar({}, true);
+      await router.isReady();
       await wrapper.vm.$nextTick();
     });
 
@@ -1492,6 +1494,7 @@ describe("TraceDetailsSidebar", async () => {
     it("should respect activeTab prop when provided", async () => {
       wrapper.unmount();
       wrapper = mountSidebar({ activeTab: "events" });
+      await router.isReady();
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.activeTabModel).toBe("events");
     });
@@ -1562,6 +1565,7 @@ describe("TraceDetailsSidebar", async () => {
       });
       wrapper.unmount();
       wrapper = mountSidebar();
+      await router.isReady();
       await wrapper.vm.$nextTick();
 
       const errorIcon = wrapper.find(
@@ -2391,6 +2395,7 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
       streamName: "default",
       ...props,
     });
+    await router.isReady();
     await flushPromises();
     return w;
   }
@@ -2599,6 +2604,7 @@ describe("TraceDetailsSidebar — span to profile link", () => {
 
   async function mountWith(spanOverrides: Record<string, unknown> = {}, props = {}) {
     const w = mountSidebar({ span: { ...SPAN, ...spanOverrides }, ...props });
+    await router.isReady();
     await flushPromises();
     return w;
   }

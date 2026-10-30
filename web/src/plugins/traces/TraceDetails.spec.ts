@@ -297,6 +297,7 @@ describe("TraceDetails", () => {
 
   async function mountDefault() {
     wrapper = mount(TraceDetails, mountOptions);
+    await router.isReady();
     await flushPromises();
   }
 
@@ -304,6 +305,7 @@ describe("TraceDetails", () => {
   async function remount() {
     wrapper.unmount();
     wrapper = mount(TraceDetails, mountOptions);
+    await router.isReady();
     await flushPromises();
     return wrapper;
   }
@@ -629,6 +631,7 @@ describe("TraceDetails", () => {
           ...props,
         },
       });
+      await router.isReady();
       await flushPromises();
       wrapper.vm.searchObj.data.traceDetails.selectedSpanId = null;
       await flushPromises();
@@ -847,6 +850,7 @@ describe("TraceDetails", () => {
           ],
         },
       });
+      await router.isReady();
       await flushPromises();
 
       expect(treeShowsCriticalPath()).toBe(true);
@@ -898,6 +902,7 @@ describe("TraceDetails", () => {
           spanListProp: spans,
         },
       });
+      await router.isReady();
       await flushPromises();
       wrapper.vm.activeTab = "map";
       await flushPromises();
@@ -1274,6 +1279,7 @@ describe("TraceDetails", () => {
             },
           },
         });
+        await router.isReady();
 
         await flushPromises();
       });
@@ -1426,6 +1432,7 @@ describe("TraceDetails", () => {
           },
         },
       });
+      await router.isReady();
 
       await flushPromises();
     });
@@ -3784,6 +3791,7 @@ describe("TraceDetails", () => {
           },
         },
       });
+      await router.isReady();
       await flushPromises();
 
       // No correlation data has been loaded for this span yet.
