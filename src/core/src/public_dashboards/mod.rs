@@ -355,12 +355,6 @@ impl LinkValues {
         Self::from_values(dash, values)
     }
 
-    fn from_values(dash: &Dashboard, values: BTreeMap<String, serde_json::Value>) -> Self {
-        Self {
-            vars: QueryVars::new(dash, values, None),
-        }
-    }
-
     /// The panel's query text as its build substitutes it; the window only sizes `$__interval`.
     pub fn substitute(&self, tab_id: &str, panel_id: &str, text: &str, query_type: &str) -> String {
         let now = now_micros();
@@ -379,6 +373,12 @@ impl LinkValues {
         let now = now_micros();
         let vars = self.vars.for_panel(tab_id, &panel.id);
         plan_promql(panel, &vars, now - 3_600_000_000, now)
+    }
+
+    fn from_values(dash: &Dashboard, values: BTreeMap<String, serde_json::Value>) -> Self {
+        Self {
+            vars: QueryVars::new(dash, values, None),
+        }
     }
 }
 
@@ -1538,7 +1538,7 @@ async fn authorize_variable_edit(
 ) -> Result<(), anyhow::Error> {
     let sources = match changed_ranges {
         Some(ranges) => {
-            range_edit_sources(&ENGINE, link, dash, frozen, ranges, user_id, now_micros()).await
+            range_edit_sources(&ENGINE, link, dash, frozen, ranges, user_id, now_micros()).await?
         }
         None => variable_edit_sources(link, dash, frozen),
     };
@@ -1593,8 +1593,7 @@ fn variable_edit_sources(
     dedup(sources)
 }
 
-/// Every query the link runs in each range, its values queries run as `user_id` as a build runs
-/// them.
+/// Every query the link runs in each range, with its values queries run as the editor.
 #[cfg(feature = "enterprise")]
 async fn range_edit_sources(
     search: &dyn PanelSearch,
@@ -1604,13 +1603,12 @@ async fn range_edit_sources(
     ranges: &[TimeRange],
     user_id: &str,
     now: i64,
-) -> Vec<crate::authz::QuerySource> {
+) -> Result<Vec<crate::authz::QuerySource>, anyhow::Error> {
     use crate::authz::QuerySource;
 
     let Some(v8) = dash.v8.as_ref() else {
-        return vec![];
+        return Ok(vec![]);
     };
-    // A denied values query runs as the editor only to be named in the refusal.
     let editor = PublicDashboard {
         published_by: user_id.to_string(),
         ..link.clone()
@@ -1649,20 +1647,27 @@ async fn range_edit_sources(
                     name: name.clone(),
                 })
         }));
-        if !filled.denied.is_empty() {
-            continue;
+        if let Some(key) = filled.denied.first() {
+            return Err(Forbidden(format!(
+                "Unauthorized Access: no read permission for the values of variable {key}"
+            ))
+            .into());
+        }
+        // A later build may resolve the value, so an unchecked panel must not be saved.
+        if let Some(key) = filled.failed.first() {
+            return Err(Invalid(format!(
+                "The values of variable {key} could not be loaded to check stream access for this range. Try again."
+            ))
+            .into());
         }
         let values = LinkValues::from_values(dash, filled.values);
         for tab in &v8.tabs {
             for panel in &tab.panels {
-                // The build fails a panel whose values query failed, so it sends nothing.
-                if !panel_keys(&values, tab, panel).any(|key| filled.failed.contains(&key)) {
-                    sources.extend(panel_sources(&link.org_id, &values, tab, panel));
-                }
+                sources.extend(panel_sources(&link.org_id, &values, tab, panel));
             }
         }
     }
-    dedup(sources)
+    Ok(dedup(sources))
 }
 
 /// Keys of the scoped values the panel's queries read.
@@ -1692,7 +1697,7 @@ fn panel_sources(
     use crate::authz::QuerySource;
 
     let mut sources = Vec::new();
-    if panel.typ == "custom_chart" {
+    if panel.typ == "custom_chart" || withholds_vrl(org_id, panel) {
         return sources;
     }
     let promql = panel.query_type == "promql";
@@ -1734,6 +1739,23 @@ fn panel_sources(
         }
     }
     sources
+}
+
+/// Whether the build withholds the panel for a VRL whose reads it cannot prove, as `run_sql_panel`
+/// does.
+#[cfg(feature = "enterprise")]
+fn withholds_vrl(org_id: &str, panel: &Panel) -> bool {
+    panel.query_type != "promql"
+        && panel.queries.iter().any(|q| {
+            q.vrl_function_query
+                .as_deref()
+                .map(str::trim)
+                .filter(|f| !f.is_empty())
+                .is_some_and(|vrl| {
+                    transform::enrichment_tables_read(vrl, org_id).is_err()
+                        || skips_vrl_in_search(vrl)
+                })
+        })
 }
 
 #[cfg(feature = "enterprise")]
@@ -4408,8 +4430,9 @@ mod tests {
             hits: 1,
             ..Default::default()
         };
-        let sources =
-            range_edit_sources(&search, &link, &dash, &frozen, &ranges, "editor@x", 0).await;
+        let sources = range_edit_sources(&search, &link, &dash, &frozen, &ranges, "editor@x", 0)
+            .await
+            .unwrap();
         let mut texts: Vec<String> = sources
             .into_iter()
             .map(|s| match s {
@@ -4434,14 +4457,20 @@ mod tests {
             refuse: Some((NotAvailableReason::Unauthorized, "FROM \"names\"")),
             ..Default::default()
         };
-        let sources =
-            range_edit_sources(&denied, &link, &dash, &frozen, &ranges, "editor@x", 0).await;
-        assert!(
-            sources
-                .iter()
-                .all(|s| matches!(s, crate::authz::QuerySource::Stream { .. })),
-            "a denied values query is named by its stream: {sources:?}"
-        );
+        let err = range_edit_sources(&denied, &link, &dash, &frozen, &ranges, "editor@x", 0)
+            .await
+            .unwrap_err();
+        assert!(err.downcast_ref::<Forbidden>().is_some(), "{err}");
+        // A failed lookup leaves the dependent panels unchecked, so the edit cannot be saved.
+        let failed = FakeSearch {
+            hits: 1,
+            fail_sql: Some("FROM \"names\""),
+            ..Default::default()
+        };
+        let err = range_edit_sources(&failed, &link, &dash, &frozen, &ranges, "editor@x", 0)
+            .await
+            .unwrap_err();
+        assert!(err.downcast_ref::<Invalid>().is_some(), "{err}");
     }
 
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
