@@ -116,7 +116,10 @@ def test_ser07_inuse_per_bucket_no_rate(client: OpenObserveClient, ref: RefData)
 
 def test_ser08_inuse_two_instances_in_one_bucket_summed(client: OpenObserveClient, ref: RefData):
     t2, t5 = ref.t0_us + 2 * 60 * US, ref.t0_us + 5 * 60 * US
-    step = next(s for s in (600, 1800, 3600, 86400) if t2 // (s * US) == t5 // (s * US))
+    # Buckets are epoch-aligned, so pick a step with no bucket edge between the two profiles (e.g. at UTC midnight).
+    steps = [s for s in range(600, 86_400) if t2 // (s * US) == t5 // (s * US)]
+    assert steps, f"no step in 600..86399 s keeps {t2} and {t5} in one bucket"
+    step = steps[0]
     body = _series_ok(client, ref.stream, ref.win(service_name="payments", step=str(step), **INUSE))
     assert [v for _, v in _points(body)] == [6 * MIB]
 
@@ -168,19 +171,20 @@ def test_ser12_13_group_limit_folds_others(client: OpenObserveClient, ref: RefDa
 def test_ser14_group_limit_default_and_max(client: OpenObserveClient, prof_stream: str):
     b = ProfilesBuilder()
     t = now_ns() - 60 * NS
-    for i in range(12):
+    for i in range(52):
         b.resource(
             [b.profile([b.sample(["gl_leaf"], values=[(i + 1) * 10])], time_ns=t)],
             {"service.name": "svc-gl", "service.version": f"v{i:02d}", "service.instance.id": f"gl-{i}"},
         )
     ingest_ok(client, prof_stream, b.model())
-    wait_merge_total(client, prof_stream, recent_window(**cpu()), 780)
+    wait_merge_total(client, prof_stream, recent_window(**cpu()), 13_780)
     default = _series_ok(client, prof_stream, recent_window(**cpu(group_by="service_version")))
-    assert [g["value"] for g in default["groups"]] == [f"v{i:02d}" for i in range(11, 1, -1)] + [""]
-    assert (default["groups"][-1]["others"], default["groups"][-1]["total"]) == (True, 30.0)
+    assert [g["value"] for g in default["groups"]] == [f"v{i:02d}" for i in range(51, 41, -1)] + [""]
+    assert (default["groups"][-1]["others"], default["groups"][-1]["total"]) == (True, 9030.0)
     capped = _series_ok(client, prof_stream, recent_window(**cpu(group_by="service_version", group_limit=51)))
-    assert [g["value"] for g in capped["groups"]] == [f"v{i:02d}" for i in range(11, -1, -1)]
-    assert not any(g["others"] for g in capped["groups"])
+    assert [g["value"] for g in capped["groups"]] == [f"v{i:02d}" for i in range(51, 1, -1)] + [""]
+    assert [g["others"] for g in capped["groups"]] == [False] * 50 + [True]
+    assert capped["groups"][-1]["total"] == 30.0
 
 
 def test_ser15_rows_missing_label_form_empty_group(client: OpenObserveClient, prof_stream: str):

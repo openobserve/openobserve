@@ -509,8 +509,7 @@ def search_rows(
         "_search?type=profiles",
         json={"query": {"sql": sql, "start_time": start_us, "end_time": end_us, "from": 0, "size": size}},
     )
-    if resp.status_code != 200:
-        return []
+    assert resp.status_code == 200, f"_search on {stream} -> {resp.status_code} {resp.text[:300]}"
     return resp.json().get("hits", [])
 
 

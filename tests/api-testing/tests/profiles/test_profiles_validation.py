@@ -31,7 +31,6 @@ from .profiles_helpers import (
 A_STACKS = [(["a_leaf", "a_work", "a_main"], 300), (["a_work", "a_main"], 100)]
 SAMPLE0 = "resource_profiles[0].scope_profiles[0].profiles[0].samples[0]"
 PROFILE0 = "resource_profiles[0].scope_profiles[0].profiles[0]"
-PARTIAL_1 = {"partialSuccess": {"rejectedProfiles": "1", "errorMessage": PARTIAL_MSG}}
 
 
 def _assert_invalid(resp, message: str) -> None:

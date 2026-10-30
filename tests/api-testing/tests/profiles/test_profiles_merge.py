@@ -38,6 +38,7 @@ from .profiles_helpers import (
     wait_rows,
 )
 
+MAX_MAX_NODES = 16_384
 CHECKOUT_TOP = [
     {"name": "db_query", "self": 6_000_000_000, "total": 6_000_000_000},
     {"name": "json_encode", "self": 4_000_000_000, "total": 4_000_000_000},
@@ -218,7 +219,17 @@ def test_mrg17_max_nodes_clamped_to_minimal_tree(client: OpenObserveClient, ref:
     assert [(c["name"], c["total"]) for c in body["root"]["children"]] == [("other", CATALOG_TOTAL)]
 
 
-def test_mrg18_max_nodes_clamped_to_maximum(client: OpenObserveClient, ref: RefData):
+def test_mrg18_max_nodes_clamped_to_maximum(client: OpenObserveClient, prof_stream: str):
+    body = _ingest_stacks(client, prof_stream, [([f"mx_{i:05d}", "mx_root"], 1) for i in range(20_000)], 20_000)
+    assert count_nodes(body["root"]) == 2048
+    clamped = merge_ok(client, prof_stream, recent_window(**cpu(max_nodes=999_999)))
+    assert count_nodes(clamped["root"]) == MAX_MAX_NODES
+    assert clamped["tree_truncated"] is True
+    assert clamped["total"] == 20_000
+    assert_tree_sums(clamped["root"])
+
+
+def test_mrg18_full_tree_under_maximum_not_cut(client: OpenObserveClient, ref: RefData):
     body = merge_ok(client, ref.stream, _catalog(ref, max_nodes=999_999))
     assert count_nodes(body["root"]) == 1303
     assert body["tree_truncated"] is False
