@@ -13220,6 +13220,8 @@
       "rollingOut": "9db241c99a7ad23f"
     },
     "install": {
+      "clusterName": "5e1da20e906fada1",
+      "clusterNameHint": "889c2d8d147bdd24",
       "connected": "61c25fd130b4a6cd",
       "dockerNote": "0a229149a30c95e6",
       "envRefNote": "90bf2de66efabe94",

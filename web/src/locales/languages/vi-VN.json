@@ -27827,6 +27827,8 @@
       "joinsFleetNoConfig": "Các collector cài đặt bằng token này tham gia fleet {fleet}, hiện chưa có cấu hình.",
       "envRefNote": "Dùng tham chiếu {ref} cho thông tin xác thực trong cấu hình, để secret ở lại trên máy chủ.",
       "websocketTransport": "Dùng WebSocket (đẩy cấu hình tức thì; proxy phải hỗ trợ)",
+      "clusterName": "Tên cluster",
+      "clusterNameHint": "Được thêm vào dữ liệu của cluster này dưới dạng {attribute}.",
       "kubernetesNote": "Triển khai một DaemonSet chạy supervisor và collector trong một container. Nâng cấp bằng cách đổi image tag.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",
