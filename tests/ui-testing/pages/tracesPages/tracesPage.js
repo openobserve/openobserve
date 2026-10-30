@@ -117,6 +117,12 @@ export class TracesPage {
     this.tracesNoStreamCard = '[data-test="traces-no-stream-select-stream-card"]';
     // Duration latency heatmap — source: web/src/plugins/traces/metrics/TracesLatencyHeatmap.vue
     this.latencyHeatmap = '[data-test="traces-latency-heatmap"]';
+    // A drawn box opens a popover; nothing is applied until one of its actions is clicked.
+    this.heatmapSelectionBox = '[data-test="traces-latency-heatmap-selection"]';
+    this.heatmapSelectionCount = '[data-test="traces-latency-heatmap-selection-count"]';
+    this.heatmapSelectionFilter = '[data-test="traces-latency-heatmap-selection-filter"]';
+    this.heatmapSelectionDrillDown = '[data-test="traces-latency-heatmap-selection-drill-down"]';
+    this.heatmapSelectionClear = '[data-test="traces-latency-heatmap-selection-clear"]';
     // Auto Run (live mode) toggle in the Run Query dropdown — source: web/src/plugins/traces/SearchBar.vue
     this.liveModeToggleItem = '[data-test="traces-search-bar-live-mode-toggle-btn"]';
 
@@ -131,7 +137,9 @@ export class TracesPage {
     this.comparisonBaselineBefore = '[data-test="traces-comparison-baseline-toggle-before"]';
     this.comparisonBaselineOutside = '[data-test="traces-comparison-baseline-toggle-outside"]';
     this.comparisonFieldCards = '[data-test^="traces-comparison-field-"]';
-    this.drillDownBackButton = '[data-test="traces-drill-down-back-btn"]';
+    // The comparison opens in a side drawer (ODrawer) that closes from its × button.
+    this.drillDownPanel = '[data-test="traces-drill-down-panel"]';
+    this.drillDownCloseButton = '[data-test="traces-drill-down-panel"] [data-test="o-drawer-close-btn"]';
 
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
@@ -2041,6 +2049,12 @@ export class TracesPage {
     return '';
   }
 
+  /** Close the Drill down drawer with its × button and wait for it to leave. */
+  async closeComparison() {
+    await this.page.locator(this.drillDownCloseButton).click();
+    await this.page.locator(this.drillDownPanel).waitFor({ state: 'hidden', timeout: 15000 });
+  }
+
   /** @returns {Promise<{ name: string, score: number }[]>} the comparison cards in render order */
   async getComparisonCards() {
     return await this.page.locator(this.comparisonFieldCards).evaluateAll((cards) =>
@@ -2217,17 +2231,41 @@ export class TracesPage {
   }
 
   /**
-   * Drag across both axes of the Duration panel so the selection carries a real
-   * duration band; a flat horizontal drag collapses it to a single value.
-   * @returns {Promise<boolean>} true when the drag was performed
+   * Draw a box on the Duration heatmap and wait for its popover; the box alone writes nothing.
+   * @param {{ startRatio?: number, endRatio?: number, yStartRatio?: number, yEndRatio?: number }} [range]
+   * @returns {Promise<boolean>} true when the box was drawn and its popover opened
+   */
+  async boxDurationBand(range = { startRatio: 0.25, endRatio: 0.8, yStartRatio: 0.15, yEndRatio: 0.85 }) {
+    if (!(await this.zoomOnMetricsPanel('Duration', range))) return false;
+    return await this.page
+      .locator(this.heatmapSelectionCount)
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /** Click "Filter to selection" in the open heatmap popover and wait for the popover to close. */
+  async filterToHeatmapSelection() {
+    await this.page.locator(this.heatmapSelectionFilter).click();
+    await this.page.locator(this.heatmapSelectionCount).waitFor({ state: 'hidden', timeout: 15000 });
+    await this.page.waitForTimeout(1000);
+  }
+
+  /** Click "Drill down" in the open heatmap popover; returns the comparison's terminal state. */
+  async drillDownHeatmapSelection() {
+    await this.page.locator(this.heatmapSelectionDrillDown).click();
+    return await this.waitForComparisonState();
+  }
+
+  /**
+   * Box a real duration band on the Duration heatmap and apply it with "Filter to selection",
+   * which writes the band into the editor.
+   * @returns {Promise<boolean>} true when the box was drawn and applied
    */
   async zoomDurationBand() {
-    return await this.zoomOnMetricsPanel('Duration', {
-      startRatio: 0.25,
-      endRatio: 0.8,
-      yStartRatio: 0.15,
-      yEndRatio: 0.85,
-    });
+    if (!(await this.boxDurationBand())) return false;
+    await this.filterToHeatmapSelection();
+    return true;
   }
 
   /**

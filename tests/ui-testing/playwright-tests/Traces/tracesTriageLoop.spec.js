@@ -108,19 +108,23 @@ test.describe('Traces triage loop', () => {
       await searchWith(USER_FILTER);
       const preBox = queries.filter(isTableSearch).at(-1);
 
-      // Step 2: box the slow rows across the whole range, where the just-seeded spans are; manual mode sends no table search.
+      // Step 2: box the slow rows across the whole range, where the just-seeded spans are; the box only opens its popover.
       const beforeBox = queries.length;
       expect(
-        await pm.tracesPage.zoomOnMetricsPanel('Duration', { startRatio: 0.2, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.45 }),
-        'Heatmap must accept the box drag',
+        await pm.tracesPage.boxDurationBand({ startRatio: 0.2, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.45 }),
+        'Heatmap must accept the box drag and open its popover',
       ).toBeTruthy();
-      await page.waitForTimeout(2000);
+      expect((await pm.tracesPage.getQueryEditorContent()).trim(), 'The box alone writes nothing').toBe(USER_FILTER);
+      expect(queries.slice(beforeBox).filter(isTableSearch), 'A box alone must not search').toHaveLength(0);
+
+      // Filter to selection writes the band; manual mode keeps it staged until Run.
+      await pm.tracesPage.filterToHeatmapSelection();
       const editor = (await pm.tracesPage.getQueryEditorContent()).trim();
       expect(editor.startsWith(`(${USER_FILTER}) and `), `Editor keeps the user filter: ${editor}`).toBeTruthy();
       const band = bandSql(editor.slice(`(${USER_FILTER}) and `.length));
       expect(band, `The box must write a duration bound: ${editor}`).not.toBe('');
       if (!live) {
-        expect(queries.slice(beforeBox).filter(isTableSearch), 'Manual mode must not search on a box').toHaveLength(0);
+        expect(queries.slice(beforeBox).filter(isTableSearch), 'Manual mode must not search on Filter to selection').toHaveLength(0);
       }
 
       // Step 3: Drill down runs on the pending selection, without Run.
@@ -189,12 +193,12 @@ test.describe('Traces triage loop', () => {
       expect(applied).toContain(top.name);
       if (!live) {
         expect(queries.slice(beforeApply).filter(isTableSearch), 'Manual mode stages the value until Run').toHaveLength(0);
-        await expect(page.locator(pm.tracesPage.comparisonPage), 'The page stays open until Run').toBeVisible();
+        await expect(page.locator(pm.tracesPage.drillDownPanel), 'The panel stays open until Run').toBeVisible();
         await pm.tracesPage.runTraceSearch();
         await pm.tracesPage.waitForTraceSearchResults();
       }
-      // A search started from the applied value closes the page.
-      await expect(page.locator(pm.tracesPage.comparisonPage)).toBeHidden({ timeout: 15000 });
+      // A search started from the applied value closes the panel.
+      await expect(page.locator(pm.tracesPage.drillDownPanel)).toBeHidden({ timeout: 15000 });
       const tableAfter = queries.slice(beforeApply).filter(isTableSearch);
       expect(tableAfter.length, 'Applying a value must search').toBeGreaterThan(0);
       const restored = tableAfter.at(-1);
@@ -202,10 +206,10 @@ test.describe('Traces triage loop', () => {
       expect(Math.abs(restored.start - preBox.start)).toBeLessThan(10000000);
       expect(Math.abs(restored.end - preBox.end)).toBeLessThan(10000000);
 
-      // Step 7: the heatmap is back and accepts another box.
+      // Step 7: the heatmap is back and accepts another box, which Filter to selection applies.
       expect((await pm.tracesPage.waitForMetricsPanels()).includes('Duration')).toBeTruthy();
+      await page.waitForTimeout(2000);
       expect(await pm.tracesPage.zoomDurationBand()).toBeTruthy();
-      await page.waitForTimeout(1500);
       expect((await pm.tracesPage.getQueryEditorContent()).trim()).toMatch(/duration (>=|<) '\d+(us|ms|s)'$/);
       if (live) await pm.tracesPage.setLiveMode(false);
     });
@@ -219,11 +223,11 @@ test.describe('Traces triage loop', () => {
     await searchWith('', '24h');
     const range = queries.filter(isTableSearch).at(-1);
     expect(
-      await pm.tracesPage.zoomOnMetricsPanel('Duration', { startRatio: 0.85, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.85 }),
+      await pm.tracesPage.boxDurationBand({ startRatio: 0.85, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.85 }),
     ).toBeTruthy();
-    await page.waitForTimeout(2000);
     const beforeOpen = queries.length;
-    const state = await pm.tracesPage.openComparison();
+    // Drill down from the box's popover compares the drawn box without applying it.
+    const state = await pm.tracesPage.drillDownHeatmapSelection();
     testLogger.info('Capped-baseline comparison state', { state });
     // When every span falls inside the box the capped baseline is empty, and its note still states the cap.
     expect([pm.tracesPage.comparisonPage, pm.tracesPage.comparisonEmptyBaseline]).toContain(state);

@@ -14783,23 +14783,32 @@
       },
       "noData": "No data",
       "unavailable": "The latency heatmap is not available for this search",
-      "loadFailed": "Failed to load the latency heatmap"
+      "loadFailed": "Failed to load the latency heatmap",
+      "selection": {
+        "label": "Heatmap selection",
+        "reopen": "Show selection actions",
+        "count": "{count} span selected | {count} spans selected",
+        "range": "{band} · {window}",
+        "filter": "Filter to selection",
+        "drillDown": "Drill down",
+        "clear": "Clear selection"
+      }
     },
     "comparison": {
-      "title": "Compare selection",
-      "baselineOutside": "Outside the selection",
-      "baselineBefore": "Just before",
+      "baselineOutside": "Rest of range",
+      "baselineBefore": "Before selection",
       "sampleNote": "Selection: {selection} · Baseline: {baseline}",
       "sampleNoteAll": "all {count} span | all {count} spans",
       "sampleCapped": "{sampled} sampled of {total} spans",
       "noiseNote": "Differences under {pts} pts are within sampling noise",
       "loading": "Sampling spans…",
-      "loadFailed": "Could not compare the selection",
+      "loadFailed": "Could not load the drill down",
       "sampleOverflow": "The sample does not match the span count, for example because late data arrived. Retry to count again.",
       "baselineCapped": "Baseline limited to {range}, up to 3 h either side of the selection",
       "baselineLimited": "Baseline limited to {range} by this stream's {hours}-hour query limit",
-      "rangeClamped": "The server shortened the time range, so the comparison would be incomplete",
+      "rangeClamped": "The server shortened the time range, so the drill down would be incomplete",
       "rangeTooLong": "The selection is longer than this stream's {hours}-hour query limit",
+      "presetRangeTooLong": "The time range is longer than this stream's {hours}-hour query limit",
       "retry": "Retry",
       "noSelectionTitle": "Select spans to compare",
       "noSelectionBody": "Draw a box on the Duration heatmap, or brush the Errors or Rate chart, then open Drill down.",
@@ -14826,7 +14835,20 @@
       "summaryErrors": "Errors · {window}",
       "summaryBand": "{window} · {band}"
     },
-    "drillDownBackTarget": "results",
+    "drillDownPanel": {
+      "counts": "{selected} vs {baseline}",
+      "selectedTraces": "{count} selected trace | {count} selected traces",
+      "baselineTraces": "{count} baseline trace | {count} baseline traces",
+      "selectedSpans": "{count} selected span | {count} selected spans",
+      "baselineSpans": "{count} baseline span | {count} baseline spans",
+      "baseline": "Baseline",
+      "presetsTitle": "Or start from a preset",
+      "presetErrors": "Errors vs rest",
+      "presetSlowest": "Slowest 10% vs rest",
+      "presetRecent": "Recent vs earlier",
+      "presetEmpty": "No span durations in this range to rank",
+      "presetNoMatch": "That preset found no spans to compare in this range"
+    },
     "metrics": {
       "perSecond": {
         "traces": "traces/s",
