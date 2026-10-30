@@ -90,11 +90,31 @@ pub async fn list_objects_for_user(
     permission: &str,
     object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
-    let openfga_config = o2_openfga::config::get_config();
-    if crate::user::is_root_user(user_id)
-        || !openfga_config.enabled
-        || !openfga_config.list_only_permitted
-    {
+    if !o2_openfga::config::get_config().list_only_permitted {
+        return Ok(None);
+    }
+    list_permitted_objects(org_id, user_id, permission, object_type).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn list_objects_for_user(
+    _org_id: &str,
+    _user_id: &str,
+    _permission: &str,
+    _object_type: &str,
+) -> anyhow::Result<Option<Vec<String>>> {
+    Ok(None)
+}
+
+/// [`list_objects_for_user`] whatever `list_only_permitted` says, for lists that carry secrets.
+#[cfg(feature = "enterprise")]
+pub async fn list_permitted_objects(
+    org_id: &str,
+    user_id: &str,
+    permission: &str,
+    object_type: &str,
+) -> anyhow::Result<Option<Vec<String>>> {
+    if crate::user::is_root_user(user_id) || !o2_openfga::config::get_config().enabled {
         return Ok(None);
     }
 
@@ -113,18 +133,10 @@ pub async fn list_objects_for_user(
     )
     .await
     .map_err(|_| anyhow::anyhow!("Unauthorized Access"))?;
-    log::debug!("list_objects_for_user for user {user_id} from {org_id} org returns: {objects:#?}");
+    log::debug!(
+        "list_permitted_objects for user {user_id} from {org_id} org returns: {objects:#?}"
+    );
     Ok(Some(objects))
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn list_objects_for_user(
-    _org_id: &str,
-    _user_id: &str,
-    _permission: &str,
-    _object_type: &str,
-) -> anyhow::Result<Option<Vec<String>>> {
-    Ok(None)
 }
 
 /// OpenFGA object and parent type of `obj`; `None` when either type is unmapped.
