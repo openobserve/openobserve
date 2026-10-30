@@ -157,11 +157,12 @@ export class MetricsPage {
         this.shareErrorToast = page.locator('[data-test-variant="error"][data-test-message*="Error shortening link"]');
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
 
-        // Query history drawer (QueryHistoryDrawer.vue)
         this.historyButton = page.locator('[data-test="metrics-history-btn"]');
-        this.historyTable = page.locator('[data-test="metrics-history-table"]');
-        this.historySearch = page.locator('[data-test="metrics-history-search"] input');
-        this.historyStarredOnly = page.locator('[data-test="metrics-history-starred-only"]');
+        this.historyPopover = page.locator('[data-test="recent-searches-popover"]');
+        this.historyViewAll = this.historyPopover.locator('[data-test="recent-searches-view-all"]');
+        this.historyDrawer = page.locator('[data-test="recent-searches-drawer"]');
+        this.historySearch = this.historyDrawer.locator('[data-test="recent-searches-search"] input');
+        this.historyStarredOnly = this.historyDrawer.locator('[data-test="recent-searches-starred-only"]');
     }
 
     /**
@@ -2793,7 +2794,8 @@ export class MetricsPage {
 
     async openQueryHistory() {
         await this.historyButton.click();
-        await this.historyTable.waitFor({ state: 'visible', timeout: 15000 });
+        await this.historyViewAll.click();
+        await this.historyDrawer.waitFor({ state: 'visible', timeout: 15000 });
     }
 
     /** Resolves once the filtered list answers: a click landing mid-re-render is lost. */
@@ -2805,24 +2807,33 @@ export class MetricsPage {
         await listed;
     }
 
-    /** The history row whose query cell is exactly `query`. */
+    /** The drawer row whose query text contains `query`. */
     historyRow(query) {
-        return this.historyTable.locator('[data-test^="o2-table-row-"]').filter({
-            has: this.page.locator('[data-test="o2-table-cell-query"]', { hasText: query }),
+        return this.historyDrawer.locator('[data-test^="recent-searches-drawer-row-"]').filter({
+            has: this.page.locator('[data-test="recent-searches-drawer-query"]', { hasText: query }),
         });
     }
 
     /** A row's star toggle; its data-test carries the entry id, so match the prefix. */
     historyStarButton(query) {
-        return this.historyRow(query).locator('[data-test^="metrics-history-star-"]');
+        return this.historyRow(query).locator('[data-test^="recent-searches-star-"]');
     }
 
+    /** Picks `action` (load, delete, copy-link, copy-query) from a row's "More" menu. */
+    async historyRowAction(query, action) {
+        const rowTest = await this.historyRow(query).getAttribute('data-test');
+        const id = rowTest.replace('recent-searches-drawer-row-', '');
+        await this.historyRow(query).locator(`[data-test="recent-searches-more-${id}"]`).click();
+        await this.page.locator(`[data-test="recent-searches-${action}-${id}"]`).click();
+    }
+
+    /** The DELETE is sent once the row's Undo toast closes, so callers wait for it. */
     async deleteHistoryEntry(query) {
-        await this.historyRow(query).locator('[data-test^="metrics-history-delete-"]').click();
+        await this.historyRowAction(query, 'delete');
     }
 
-    /** Clicking a row's query cell loads the entry into the open editor. */
+    /** Loads the entry into the editor without running it. */
     async loadHistoryEntry(query) {
-        await this.historyRow(query).locator('[data-test="o2-table-cell-query"]').click();
+        await this.historyRowAction(query, 'load');
     }
 }

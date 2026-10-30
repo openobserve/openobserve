@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           handleLimitNumberOfSeriesWarningMessage
                         "
                         @sparkline-warning-update="handleSparklineWarningUpdate"
-                        @error="handleChartApiError"
+                        @error="onRendererError"
                         @updated:data-zoom="handleDataZoom"
                         @updated:vrl-function-field-list="updateVrlFunctionFieldList"
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -679,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             handleLimitNumberOfSeriesWarningMessage
                           "
                           @sparkline-warning-update="handleSparklineWarningUpdate"
-                          @error="handleChartApiError"
+                          @error="onRendererError"
                           @updated:data-zoom="handleDataZoom"
                           @updated:vrl-function-field-list="updateVrlFunctionFieldList"
                           @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -1345,6 +1345,12 @@ const editMode = computed(() => props.editMode);
 
 const handleVariablesDataUpdated = (data: PanelEditorVariablesData) => {
   emit("variablesDataUpdated", data);
+};
+
+// The editor shows the error itself; pages that classify a run (Metrics history) need it too.
+const onRendererError = (error: { message?: unknown; code?: unknown } | string | null) => {
+  handleChartApiError(error);
+  emit("renderer-error", error);
 };
 
 const handleDataZoom = (event: any) => {
