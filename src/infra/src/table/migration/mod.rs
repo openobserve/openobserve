@@ -829,7 +829,10 @@ mod tests {
         ),
         (127, "m20261028_000001_add_group_label_set_to_alert_states"),
         (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
-        (129, "m20261030_000002_create_org_domain_ownership_req_table"),
+        (
+            129,
+            "m20261030_000002_create_org_domain_ownership_req_table",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
