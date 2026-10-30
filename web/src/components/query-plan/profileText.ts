@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import { RELATIVE_PERIOD_PATTERN, formatToTimeCompact } from "@/utils/date";
 import {
   isPlaceholderScan,
   operatorLabel,
@@ -29,6 +30,15 @@ import {
 import { CATEGORY_STYLE, VARIANT_ROLE_KEY } from "./profileStyles";
 
 const MAX_NAMES = 3;
+
+const PAST_PERIOD_KEY: Record<string, I18nKey> = {
+  s: "common.pastSecond",
+  m: "common.pastMinute",
+  h: "common.pastHour",
+  d: "common.pastDay",
+  w: "common.pastWeek",
+  M: "common.pastMonth",
+};
 
 export function nodeName(model: ProfileModel, nodeKey: string): string {
   for (const s of model.stages) {
@@ -86,6 +96,21 @@ export function operatorWhere(t: TranslateFn, model: ProfileModel, op: ProfileOp
     category: categoryLabel(t, op),
     node: model.profile.node_name || model.profile.node_address,
   });
+}
+
+/** The logs page time range in words: "Past 1 Day" for a relative period, else start → end. */
+export function timeRangeLabel(
+  t: TranslateFn,
+  dt: { type?: string; relativeTimePeriod?: string; startTime?: number; endTime?: number } | null,
+): I18nText | null {
+  if (!dt) return null;
+  const rel = dt.type === "relative" ? dt.relativeTimePeriod?.match(RELATIVE_PERIOD_PATTERN) : null;
+  if (rel && PAST_PERIOD_KEY[rel[2]]) {
+    const count = Number(rel[1]);
+    return t(PAST_PERIOD_KEY[rel[2]], { count }, count);
+  }
+  if (!dt.startTime || !dt.endTime) return null;
+  return raw(`${formatToTimeCompact(dt.startTime)} → ${formatToTimeCompact(dt.endTime)}`);
 }
 
 /** Card and panel title; the placeholder scan that every node replaces at run time is named by its stream. */

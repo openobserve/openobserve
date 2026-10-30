@@ -22,6 +22,7 @@ import {
   cleanPlanExpr,
   computeTimeNs,
   extractProfile,
+  formatElapsed,
   formatPlanValue,
   layoutProfile,
   metricSections,
@@ -567,6 +568,7 @@ describe("parseSearchStream / extractProfile", () => {
     expect(result.hits.map((h) => h.plan)).toEqual(["A", "B"]);
     expect(result.took_detail!.total).toBe(9);
     expect(result.scan_size).toBe(4);
+    expect(result.took).toBe(5);
     expect(result.scan_records).toBe(100);
   });
 
@@ -702,5 +704,14 @@ describe("physicalPlanToProfile", () => {
 
   it("returns null for an empty plan", () => {
     expect(physicalPlanToProfile("")).toBeNull();
+  });
+});
+
+describe("formatElapsed", () => {
+  it("formats a running clock as m:ss", () => {
+    expect(formatElapsed(0)).toBe("0:00");
+    expect(formatElapsed(7_900)).toBe("0:07");
+    expect(formatElapsed(65_000)).toBe("1:05");
+    expect(formatElapsed(-5)).toBe("0:00");
   });
 });

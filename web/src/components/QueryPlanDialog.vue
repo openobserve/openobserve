@@ -48,24 +48,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem value="plan" size="sm" data-test="query-plan-mode-plan">{{
           t("search.queryProfile.modePlan")
         }}</OToggleGroupItem>
-        <OToggleGroupItem value="analyze" size="sm" data-test="query-plan-mode-analyze">{{
-          t("search.queryProfile.modeAnalyze")
-        }}</OToggleGroupItem>
         <OToggleGroupItem value="text" size="sm" data-test="query-plan-mode-text">{{
           t("search.queryProfile.modeText")
         }}</OToggleGroupItem>
+        <OToggleGroupItem value="analyze" size="sm" data-test="query-plan-mode-analyze">
+          {{ t("search.queryProfile.modeAnalyze") }}
+          <span v-if="analyzeBusy" class="ms-1.5 inline-flex items-center gap-1">
+            <OSpinner size="xs" />
+            <span
+              class="text-2xs font-mono tabular-nums"
+              data-test="query-plan-mode-analyze-elapsed"
+              >{{ elapsedLabel }}</span
+            >
+          </span>
+          <span
+            v-else-if="analyzeState === 'done' || analyzeState === 'failed'"
+            role="img"
+            class="ms-1.5 inline-block size-1.5 rounded-full"
+            :class="analyzeState === 'done' ? 'bg-status-positive' : 'bg-status-negative'"
+            :aria-label="
+              analyzeState === 'done'
+                ? t('search.queryProfile.analyzeSucceeded')
+                : t('search.queryProfile.analyzeFailedShort')
+            "
+            :data-test="`query-plan-mode-analyze-${analyzeState}`"
+          />
+        </OToggleGroupItem>
       </OToggleGroup>
-      <OButton
-        :variant="hasAnalyze ? 'outline' : 'primary'"
-        size="sm"
-        :icon-left="hasAnalyze ? 'refresh' : 'play-arrow'"
-        :loading="profileLoading"
-        data-test="query-plan-run-btn"
-        @click="runAnalyze"
-      >
-        {{ hasAnalyze ? t("search.queryProfile.rerun") : t("search.queryProfile.runAnalyze") }}
-        <OTooltip :content="t('search.queryProfile.runAnalyzeTooltip')" />
-      </OButton>
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
@@ -81,50 +90,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="min-h-0 flex-1">
         <div
-          v-if="loadingText"
+          v-if="mode === 'analyze'"
+          class="flex h-full min-h-0 flex-col"
+          data-test="query-plan-analyze"
+        >
+          <template v-if="hasResults && (analyzeState === 'done' || analyzeState === 'rerunning')">
+            <AnalyzeResultBar
+              :ran-at="lastRun?.ranAt ?? ''"
+              :took="lastRun ? formatTime(lastRun.tookMs) : null"
+              :nodes="resultNodes"
+              :busy="analyzeBusy"
+              @rerun="runAnalyze"
+            />
+            <div class="relative min-h-0 flex-1">
+              <div
+                class="h-full"
+                :class="analyzeBusy ? 'pointer-events-none opacity-35 saturate-50' : ''"
+                :inert="analyzeBusy"
+                data-test="query-plan-analyze-results"
+              >
+                <QueryProfileView v-if="profile" :profile="profile" :stream="streamResult" />
+                <div
+                  v-else
+                  class="flex h-full flex-col gap-3 overflow-y-auto p-4"
+                  data-test="query-plan-analyze-fallback"
+                >
+                  <MetricsSummaryCard v-if="summaryMetrics" :metrics="summaryMetrics" />
+                  <div
+                    class="bg-card-glass-bg border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border border-solid"
+                  >
+                    <div
+                      class="border-card-glass-border bg-surface-base border-b border-solid px-4 py-2.5"
+                    >
+                      <span class="text-text-label text-xs font-semibold">{{
+                        t("search.executionPlan")
+                      }}</span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto px-4 py-3">
+                      <QueryPlanTree v-if="analyzeTree" :tree="analyzeTree" :is-analyze="true" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-if="analyzeBusy"
+                class="absolute inset-0 z-30 flex items-center justify-center overflow-auto p-6"
+              >
+                <AnalyzeRunningCard
+                  :elapsed="elapsedLabel"
+                  rerun
+                  :reference="lastRun ? formatTime(lastRun.tookMs) : null"
+                  @cancel="cancelAnalyze"
+                />
+              </div>
+            </div>
+          </template>
+          <div
+            v-else
+            class="bg-surface-panel flex h-full items-center justify-center overflow-auto p-6 max-md:p-4"
+          >
+            <AnalyzeRunningCard
+              v-if="analyzeBusy"
+              :elapsed="elapsedLabel"
+              :rerun="false"
+              :reference="lastSearchTook"
+              @cancel="cancelAnalyze"
+            />
+            <AnalyzeStartCard
+              v-else
+              :facts="analyzeFacts"
+              :notice="analyzeNotice"
+              :retry="analyzeState === 'failed'"
+              @run="runAnalyze"
+            />
+          </div>
+        </div>
+
+        <div
+          v-else-if="planLoading"
           class="flex h-full flex-col items-center justify-center gap-3 p-6"
           data-test="query-plan-loading"
         >
           <OSpinner variant="dots" size="lg" />
-          <div class="text-text-secondary text-sm">{{ loadingText }}</div>
+          <div class="text-text-secondary text-sm">{{ t("search.loadingPlan") }}</div>
         </div>
 
-        <div v-else-if="errorText" class="p-4" data-test="query-plan-error">
-          <OBanner variant="error" icon="error" :content="raw(errorText)" />
+        <div v-else-if="mode === 'plan' && planError" class="p-4" data-test="query-plan-error">
+          <OBanner variant="error" icon="error" :content="raw(planError)" />
         </div>
 
         <QueryPlanView
           v-else-if="mode === 'plan' && planProfile"
           :profile="planProfile"
-          :running="profileLoading"
-          @run="runAnalyze"
+          @analyze="mode = 'analyze'"
         />
-
-        <QueryProfileView
-          v-else-if="mode === 'analyze' && profile"
-          :profile="profile"
-          :stream="streamResult"
-        />
-
-        <div
-          v-else-if="mode === 'analyze' && analyzePlan"
-          class="flex h-full flex-col gap-3 overflow-y-auto p-4"
-          data-test="query-plan-analyze-fallback"
-        >
-          <MetricsSummaryCard v-if="summaryMetrics" :metrics="summaryMetrics" />
-          <div
-            class="bg-card-glass-bg border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border border-solid"
-          >
-            <div class="border-card-glass-border bg-surface-base border-b border-solid px-4 py-2.5">
-              <span class="text-text-label text-xs font-semibold">{{
-                t("search.executionPlan")
-              }}</span>
-            </div>
-            <div class="flex-1 overflow-y-auto px-4 py-3">
-              <QueryPlanTree v-if="analyzeTree" :tree="analyzeTree" :is-analyze="true" />
-            </div>
-          </div>
-        </div>
 
         <QueryPlanText
           v-else-if="mode === 'text'"
@@ -138,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-secondary px-4 py-6 text-center text-sm"
           data-test="query-plan-empty"
         >
-          {{ mode === "plan" ? t("search.noPhysicalPlan") : t("search.noAnalyzePlanFound") }}
+          {{ t("search.noPhysicalPlan") }}
         </div>
       </div>
     </div>
@@ -146,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -154,8 +213,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -164,34 +223,55 @@ import { generateTraceContext } from "@/utils/zincutils";
 import {
   calculateSummaryMetrics,
   findRemoteExecNode,
+  formatTime,
   parseQueryPlanTree,
   type OperatorNode,
   type SummaryMetrics,
 } from "@/utils/queryPlanParser";
 import {
+  buildProfileModel,
+  clusterNodes,
   extractProfile,
+  formatElapsed,
   parseSearchStream,
   physicalPlanToProfile,
   type PlanHit,
   type QueryProfile,
   type SearchStreamResult,
 } from "@/utils/queryProfile";
+import AnalyzeResultBar from "@/components/query-plan/AnalyzeResultBar.vue";
+import AnalyzeRunningCard from "@/components/query-plan/AnalyzeRunningCard.vue";
+import AnalyzeStartCard from "@/components/query-plan/AnalyzeStartCard.vue";
 import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanText from "@/components/query-plan/QueryPlanText.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import QueryPlanView from "@/components/query-plan/QueryPlanView.vue";
 import QueryProfileView from "@/components/query-plan/QueryProfileView.vue";
+import type { AnalyzeFact, AnalyzeNotice } from "@/components/query-plan/profileStyles";
+import { timeRangeLabel } from "@/components/query-plan/profileText";
 
-type PlanMode = "plan" | "analyze" | "text";
+type PlanMode = "plan" | "text" | "analyze";
 
-const MODES: PlanMode[] = ["plan", "analyze", "text"];
+type AnalyzeState = "idle" | "running" | "cancelled" | "failed" | "done" | "rerunning";
+
+interface DialogSearchObj {
+  data?: {
+    query?: string;
+    stream?: { selectedStream?: string[] };
+    datetime?: Parameters<typeof timeRangeLabel>[1];
+    queryResults?: { took?: number };
+  };
+}
+
+const MODES: PlanMode[] = ["plan", "text", "analyze"];
+const TICK_MS = 1000;
 
 defineOptions({ name: "QueryPlanDialog" });
 
 const props = withDefaults(
   defineProps<{
     modelValue?: boolean;
-    searchObj: { data?: { query?: string } };
+    searchObj: DialogSearchObj;
   }>(),
   { modelValue: false },
 );
@@ -209,14 +289,22 @@ const planLoading = ref(false);
 const planError = ref("");
 const logicalPlan = ref("");
 const physicalPlan = ref("");
-const profileLoading = ref(false);
-const profileError = ref("");
+const analyzeState = ref<AnalyzeState>("idle");
+const analyzeError = ref("");
+const stoppedAfterMs = ref(0);
+const runStartedAt = ref(0);
+const now = ref(0);
+const lastRun = ref<{ ranAt: string; tookMs: number } | null>(null);
 const streamResult = ref<SearchStreamResult | null>(null);
 const profile = ref<QueryProfile | null>(null);
 const analyzePlan = ref("");
 const analyzeTree = ref<OperatorNode | null>(null);
 // a reopened dialog must ignore responses from requests sent before it was reset
 let requestEpoch = 0;
+// bumped on cancel and reset so a response that lands afterwards is dropped
+let analyzeEpoch = 0;
+let analyzeTraceId = "";
+let ticker: ReturnType<typeof setInterval> | null = null;
 
 const showDialog = computed({
   get: () => props.modelValue,
@@ -228,14 +316,22 @@ const sqlOneLine = computed(() => raw(sqlQuery.value.replace(/\s+/g, " ").trim()
 const planProfile = computed(() =>
   physicalPlan.value ? physicalPlanToProfile(physicalPlan.value) : null,
 );
-const hasAnalyze = computed(() => !!profile.value || !!analyzePlan.value);
+const hasResults = computed(() => !!profile.value || !!analyzePlan.value);
+const analyzeBusy = computed(
+  () => analyzeState.value === "running" || analyzeState.value === "rerunning",
+);
+const elapsedLabel = computed(() => formatElapsed(now.value - runStartedAt.value));
 
 const summaryMetrics = computed<SummaryMetrics | null>(() =>
   analyzePlan.value ? calculateSummaryMetrics(analyzePlan.value) : null,
 );
 
+const resultNodes = computed(() =>
+  profile.value ? clusterNodes(buildProfileModel(profile.value)).length : 0,
+);
+
 const analyzeText = computed<string | null>(() => {
-  if (!streamResult.value) return null;
+  if (!streamResult.value || !hasResults.value) return null;
   return [...streamResult.value.hits]
     .sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0))
     .map((h) => (h.plan ?? "").replace(/\s+$/, ""))
@@ -243,15 +339,54 @@ const analyzeText = computed<string | null>(() => {
     .join("\n");
 });
 
-const loadingText = computed<I18nText | null>(() => {
-  if (mode.value === "analyze")
-    return profileLoading.value ? t("search.queryProfile.runningAnalyze") : null;
-  return planLoading.value ? t("search.loadingPlan") : null;
+const lastSearchTook = computed(() => {
+  const took = Number(props.searchObj?.data?.queryResults?.took);
+  return took > 0 ? formatTime(took) : null;
 });
 
-const errorText = computed(() => {
-  if (mode.value === "analyze") return profileError.value;
-  return mode.value === "plan" ? planError.value : "";
+const analyzeFacts = computed<AnalyzeFact[]>(() => {
+  const data = props.searchObj?.data;
+  const streams = data?.stream?.selectedStream ?? [];
+  const count = Math.max(1, streams.length);
+  const facts: AnalyzeFact[] = [
+    {
+      key: "stream",
+      label: t("search.queryProfile.streamTile", { count }, count),
+      value: streams.join(", ") || "—",
+    },
+  ];
+  const range = timeRangeLabel(t, data?.datetime ?? null);
+  if (range) facts.push({ key: "range", label: t("search.queryProfile.timeRange"), value: range });
+  if (lastSearchTook.value) {
+    facts.push({
+      key: "took",
+      label: t("search.queryProfile.lastSearchTook"),
+      value: lastSearchTook.value,
+      sub: t("search.queryProfile.fromCurrentResults"),
+    });
+  }
+  facts.push({
+    key: "nodes",
+    label: t("search.queryProfile.runsOn"),
+    value: t("search.queryProfile.allNodes"),
+    sub: t("search.queryProfile.queriersAndIngesters"),
+  });
+  return facts;
+});
+
+const analyzeNotice = computed<AnalyzeNotice | null>(() => {
+  const elapsed = formatElapsed(stoppedAfterMs.value);
+  if (analyzeState.value === "cancelled") {
+    return { variant: "info", text: t("search.queryProfile.cancelledAfter", { elapsed }) };
+  }
+  if (analyzeState.value !== "failed") return null;
+  const message = analyzeError.value.replace(/[.\s]+$/, "");
+  return {
+    variant: "error",
+    text: stoppedAfterMs.value
+      ? t("search.queryProfile.failedAfter", { elapsed, message })
+      : t("search.queryProfile.failedNow", { message }),
+  };
 });
 
 function explainPayload(prefix: string) {
@@ -260,8 +395,10 @@ function explainPayload(prefix: string) {
   return { ...queryReq, query: { ...queryReq.query, sql: `${prefix} ${queryReq.query.sql}` } };
 }
 
-async function search(query: Record<string, unknown>): Promise<SearchStreamResult | null> {
-  const { traceId } = generateTraceContext();
+async function search(
+  query: Record<string, unknown>,
+  traceId: string,
+): Promise<SearchStreamResult | null> {
   const response = await streamingSearch.search({
     org_identifier: store.state.selectedOrganization.identifier,
     query,
@@ -317,12 +454,31 @@ function parseAnalyzeHits(hits: PlanHit[]) {
   analyzeTree.value = tree;
 }
 
-function resetAnalyze() {
-  profileError.value = "";
+function clearResults() {
   streamResult.value = null;
   profile.value = null;
   analyzePlan.value = "";
   analyzeTree.value = null;
+  lastRun.value = null;
+}
+
+function startTicker() {
+  stopTicker();
+  runStartedAt.value = Date.now();
+  now.value = runStartedAt.value;
+  ticker = setInterval(() => (now.value = Date.now()), TICK_MS);
+}
+
+function stopTicker() {
+  if (ticker) clearInterval(ticker);
+  ticker = null;
+  now.value = Date.now();
+}
+
+function clockTime(date: Date): string {
+  return [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map((n) => String(n).padStart(2, "0"))
+    .join(":");
 }
 
 async function fetchExplainPlan() {
@@ -333,7 +489,7 @@ async function fetchExplainPlan() {
   physicalPlan.value = "";
   try {
     const payload = explainPayload("EXPLAIN");
-    const parsed = payload ? await search(payload) : null;
+    const parsed = payload ? await search(payload, generateTraceContext().traceId) : null;
     if (epoch !== requestEpoch) return;
     if (!payload) planError.value = t("search.errorFetchingPlan");
     else if (parsed) parseExplainHits(parsed.hits);
@@ -349,52 +505,110 @@ async function fetchExplainPlan() {
   }
 }
 
+function failAnalyze(message: string) {
+  stopTicker();
+  stoppedAfterMs.value = analyzeBusy.value ? now.value - runStartedAt.value : 0;
+  clearResults();
+  analyzeError.value = message;
+  analyzeState.value = "failed";
+}
+
+function finishAnalyze(parsed: SearchStreamResult | null) {
+  stopTicker();
+  const elapsedMs = now.value - runStartedAt.value;
+  if (parsed) {
+    parseAnalyzeHits(parsed.hits);
+    streamResult.value = parsed;
+    profile.value = extractProfile(parsed.hits);
+  }
+  if (!parsed || !hasResults.value) {
+    failAnalyze(t("search.noAnalyzePlanFound"));
+    return;
+  }
+  const tookMs = parsed.took_detail?.total || parsed.took || elapsedMs;
+  lastRun.value = { ranAt: clockTime(new Date()), tookMs };
+  analyzeState.value = "done";
+}
+
 async function runAnalyze() {
-  if (profileLoading.value) return;
-  const epoch = requestEpoch;
-  mode.value = "analyze";
-  profileLoading.value = true;
-  profileError.value = "";
+  if (analyzeBusy.value) return;
+  const payload = explainPayload("EXPLAIN ANALYZE");
+  if (!payload) {
+    failAnalyze(t("search.errorRunningAnalyze"));
+    return;
+  }
+  const epoch = ++analyzeEpoch;
+  analyzeTraceId = generateTraceContext().traceId;
+  analyzeError.value = "";
+  analyzeState.value = hasResults.value ? "rerunning" : "running";
+  startTicker();
   try {
-    const payload = explainPayload("EXPLAIN ANALYZE");
-    const parsed = payload ? await search(payload) : null;
-    if (epoch !== requestEpoch) return;
-    resetAnalyze();
-    if (!payload) {
-      profileError.value = t("search.errorRunningAnalyze");
-      return;
-    }
-    if (parsed) {
-      parseAnalyzeHits(parsed.hits);
-      streamResult.value = parsed;
-      profile.value = extractProfile(parsed.hits);
-    }
-    if (!profile.value && !analyzePlan.value) profileError.value = t("search.noAnalyzePlanFound");
+    const parsed = await search(payload, analyzeTraceId);
+    if (epoch === analyzeEpoch) finishAnalyze(parsed);
   } catch (err: unknown) {
-    if (epoch !== requestEpoch) return;
+    if (epoch !== analyzeEpoch) return;
     console.error("Error running analyze:", err);
-    resetAnalyze();
-    profileError.value = errorMessage(err, t("search.errorRunningAnalyze"));
-  } finally {
-    if (epoch === requestEpoch) profileLoading.value = false;
+    failAnalyze(errorMessage(err, t("search.errorRunningAnalyze")));
   }
 }
 
+function stopServerQuery() {
+  analyzeEpoch++;
+  stopTicker();
+  const traceId = analyzeTraceId;
+  analyzeTraceId = "";
+  if (!traceId) return;
+  Promise.resolve()
+    .then(() =>
+      streamingSearch.cancelStream({
+        org_identifier: store.state.selectedOrganization.identifier,
+        traceId,
+      }),
+    )
+    .catch((err: unknown) => console.error("Error cancelling analyze:", err));
+}
+
+function cancelAnalyze() {
+  if (!analyzeBusy.value) return;
+  const afterMs = Date.now() - runStartedAt.value;
+  const rerun = analyzeState.value === "rerunning";
+  stopServerQuery();
+  if (rerun) {
+    analyzeState.value = "done";
+    toast({
+      variant: "info",
+      message: t("search.queryProfile.rerunCancelled", { elapsed: formatElapsed(afterMs) }),
+    });
+    return;
+  }
+  stoppedAfterMs.value = afterMs;
+  analyzeState.value = "cancelled";
+}
+
+function resetAnalyze() {
+  if (analyzeBusy.value) stopServerQuery();
+  analyzeEpoch++;
+  stopTicker();
+  analyzeState.value = "idle";
+  analyzeError.value = "";
+  stoppedAfterMs.value = 0;
+  clearResults();
+}
+
 function onMode(value: unknown) {
-  if (!MODES.includes(value as PlanMode)) return;
-  mode.value = value as PlanMode;
-  if (mode.value === "analyze" && !hasAnalyze.value && !profileLoading.value) runAnalyze();
+  if (MODES.includes(value as PlanMode)) mode.value = value as PlanMode;
 }
 
 watch(
   () => props.modelValue,
   (open) => {
+    resetAnalyze();
     if (!open || !props.searchObj) return;
     mode.value = "plan";
     sqlExpanded.value = false;
-    profileLoading.value = false;
-    resetAnalyze();
     fetchExplainPlan();
   },
 );
+
+onBeforeUnmount(resetAnalyze);
 </script>
