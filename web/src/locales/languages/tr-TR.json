@@ -11451,6 +11451,8 @@
       "pagerdutyIntegrationKeyLength": "PagerDuty entegrasyon anahtarı 32 karakter olmalıdır",
       "pagerdutySeverity": "Varsayılan Önem Derecesi",
       "pagerdutySeverityHelp": "PagerDuty vakaları için varsayılan önem derecesini seçin",
+      "pagerdutyEuRegion": "AB hizmet bölgesi",
+      "pagerdutyEuRegionHelp": "PagerDuty hesabınız AB hizmet bölgesindeyse etkinleştirin",
       "severityCritical": "Kritik",
       "severityError": "Hata",
       "severityWarning": "Uyarı",

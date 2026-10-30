@@ -11451,6 +11451,8 @@
       "pagerdutyIntegrationKeyLength": "PagerDuty 集成密钥应为 32 个字符",
       "pagerdutySeverity": "默认严重级别",
       "pagerdutySeverityHelp": "选择 PagerDuty 事件的默认严重级别",
+      "pagerdutyEuRegion": "欧盟服务区域",
+      "pagerdutyEuRegionHelp": "如果您的 PagerDuty 账户位于欧盟服务区域，请启用",
       "severityCritical": "严重",
       "severityError": "错误",
       "severityWarning": "警告",

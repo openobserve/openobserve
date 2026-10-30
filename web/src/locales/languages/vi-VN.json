@@ -11451,6 +11451,8 @@
       "pagerdutyIntegrationKeyLength": "Khóa tích hợp PagerDuty phải có 32 ký tự",
       "pagerdutySeverity": "Mức độ nghiêm trọng mặc định",
       "pagerdutySeverityHelp": "Chọn mức độ nghiêm trọng mặc định cho sự cố PagerDuty",
+      "pagerdutyEuRegion": "Khu vực dịch vụ EU",
+      "pagerdutyEuRegionHelp": "Bật nếu tài khoản PagerDuty của bạn nằm trong khu vực dịch vụ EU",
       "severityCritical": "Nghiêm trọng",
       "severityError": "Lỗi",
       "severityWarning": "Cảnh báo",

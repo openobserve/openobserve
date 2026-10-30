@@ -11446,6 +11446,8 @@
       "pagerdutyIntegrationKeyLength": "PagerDuty 整合金鑰應為 32 個字元",
       "pagerdutySeverity": "預設嚴重性",
       "pagerdutySeverityHelp": "選擇 PagerDuty 事件的預設嚴重性",
+      "pagerdutyEuRegion": "歐盟服務區域",
+      "pagerdutyEuRegionHelp": "如果您的 PagerDuty 帳戶位於歐盟服務區域，請啟用",
       "severityCritical": "嚴重",
       "severityError": "錯誤",
       "severityWarning": "警告",

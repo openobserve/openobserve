@@ -11451,6 +11451,8 @@
       "pagerdutyIntegrationKeyLength": "Der PagerDuty-Integrationsschlüssel sollte 32 Zeichen lang sein",
       "pagerdutySeverity": "Standard-Schweregrad",
       "pagerdutySeverityHelp": "Wählen Sie den Standard-Schweregrad für PagerDuty-Vorfälle",
+      "pagerdutyEuRegion": "EU-Serviceregion",
+      "pagerdutyEuRegionHelp": "Aktivieren, wenn Ihr PagerDuty-Konto in der EU-Serviceregion liegt",
       "severityCritical": "Kritisch",
       "severityError": "Fehler",
       "severityWarning": "Warnung",

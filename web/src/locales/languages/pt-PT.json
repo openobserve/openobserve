@@ -11451,6 +11451,8 @@
       "pagerdutyIntegrationKeyLength": "A chave de integração do PagerDuty deve ter 32 caracteres",
       "pagerdutySeverity": "Gravidade Predefinida",
       "pagerdutySeverityHelp": "Selecione a gravidade predefinida para incidentes do PagerDuty",
+      "pagerdutyEuRegion": "Região de serviço da UE",
+      "pagerdutyEuRegionHelp": "Ative se a sua conta PagerDuty estiver na região de serviço da UE",
       "severityCritical": "Crítico",
       "severityError": "Erro",
       "severityWarning": "Aviso",
