@@ -477,11 +477,6 @@ fn same_account(saved: &Endpoint, url: &str, deployment: &str, email: &str) -> b
 
 /// Why a Jira destination cannot go on this alert, or `None` when it can.
 pub(crate) fn save_refusal(alert: &Alert, destination: &str) -> Option<String> {
-    let grouping = alert
-        .deduplication
-        .as_ref()
-        .and_then(|d| d.grouping.as_ref())
-        .is_some_and(|g| g.enabled);
     if alert.is_real_time {
         Some(format!(
             "Jira destination '{destination}' does not support real-time alerts yet."
@@ -489,10 +484,6 @@ pub(crate) fn save_refusal(alert: &Alert, destination: &str) -> Option<String> {
     } else if alert.query_condition.multi_alert_enabled() {
         Some(format!(
             "Jira destination '{destination}' does not support multi-alert SQL yet. Use a webhook destination, or turn off multi-alert."
-        ))
-    } else if grouping {
-        Some(format!(
-            "Jira destination '{destination}' does not support notification grouping yet."
         ))
     } else if alert.trigger_condition.silence < MIN_SILENCE_MINUTES {
         Some(format!(
@@ -1145,9 +1136,6 @@ mod tests {
         let mut multi = ok.clone();
         multi.query_condition.query_type = QueryType::PromQL;
         multi.query_condition.promql_multi_alert = true;
-        let mut grouped = ok.clone();
-        grouped.deduplication =
-            Some(serde_json::from_value(json!({"grouping": {"enabled": true}})).unwrap());
         let mut noisy = ok.clone();
         noisy.trigger_condition.silence = MIN_SILENCE_MINUTES - 1;
         for (alert, said) in [
@@ -1158,10 +1146,6 @@ mod tests {
             (
                 multi,
                 "Jira destination 'Jira OPS' does not support multi-alert SQL yet. Use a webhook destination, or turn off multi-alert.",
-            ),
-            (
-                grouped,
-                "Jira destination 'Jira OPS' does not support notification grouping yet.",
             ),
             (
                 noisy,
