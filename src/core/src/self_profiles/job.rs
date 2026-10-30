@@ -48,11 +48,10 @@ pub async fn run() {
     let cpu_secs = cfg.self_profiles.cpu_secs;
     let lock = Arc::new(Mutex::new(()));
     log::info!(
-        "[SELF-PROFILES] starting background loop: interval={}s cpu={}s memory={} stream={} url={}",
+        "[SELF-PROFILES] starting background loop: interval={}s cpu={}s memory={} url={}",
         cfg.self_profiles.interval_secs,
         cpu_secs,
-        memory_enabled(),
-        cfg.self_profiles.stream,
+        cfg!(feature = "profiling"),
         if cfg.self_profiles.url.is_empty() {
             "local"
         } else {
@@ -85,7 +84,7 @@ async fn run_cycle(cpu_secs: u64) -> Result<(), String> {
     ingest_sample("CPU", cpu, &extra).await;
 
     #[cfg(feature = "profiling")]
-    if memory_enabled() {
+    {
         let memory = sample::dump_memory_pprof().await;
         ingest_sample("memory", memory, &extra).await;
     }
@@ -109,8 +108,4 @@ async fn ingest_sample(kind: &str, sampled: Result<Vec<u8>, String>, extra: &[(&
         }
         Err(e) => log::error!("[SELF-PROFILES] {kind} convert failed: {e}"),
     }
-}
-
-fn memory_enabled() -> bool {
-    cfg!(feature = "profiling") && config::get_config().self_profiles.memory_enabled
 }

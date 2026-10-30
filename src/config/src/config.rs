@@ -1149,18 +1149,6 @@ pub struct SelfProfiles {
     )]
     pub cpu_secs: u64,
     #[env_config(
-        name = "ZO_SELF_PROFILES_MEMORY_ENABLED",
-        default = true,
-        help = "Also sample jemalloc heap profiles each cycle; needs the `profiling` build feature"
-    )]
-    pub memory_enabled: bool,
-    #[env_config(
-        name = "ZO_SELF_PROFILES_STREAM",
-        default = "self_profiles",
-        help = "Profiles stream to write into, locally or on the remote ZO_SELF_PROFILES_URL"
-    )]
-    pub stream: String,
-    #[env_config(
         name = "ZO_SELF_PROFILES_URL",
         default = "",
         help = "Empty = in-process ingest; set to POST OTLP Profiles protobuf to a remote URL"
