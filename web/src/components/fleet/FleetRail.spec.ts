@@ -20,7 +20,6 @@ import store from "@/test/unit/helpers/store";
 import fleet from "@/services/fleet";
 import { queryClient } from "@/composables/query/queryClient";
 import FleetRail from "./FleetRail.vue";
-import FleetMoveDialog from "./FleetMoveDialog.vue";
 import { apiFleet } from "./fleet.fixtures";
 import { toFleetRow } from "./useFleetApi";
 
@@ -39,7 +38,6 @@ vi.mock("@/services/fleet", () => ({
     renameFleet: vi.fn(),
     deleteFleet: vi.fn(),
     listFleets: vi.fn(),
-    moveCollectors: vi.fn(),
   },
 }));
 
@@ -152,83 +150,5 @@ describe("FleetRail", () => {
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({ variant: "error", message: "fleet edge exists" }),
     );
-  });
-});
-
-describe("FleetMoveDialog", () => {
-  let wrapper: VueWrapper;
-
-  afterEach(() => {
-    wrapper?.unmount();
-    queryClient.clear();
-    vi.clearAllMocks();
-  });
-
-  const DialogStub = {
-    name: "ODialog",
-    props: ["open", "title", "primaryButtonDisabled"],
-    emits: ["click:primary"],
-    template: `<div v-if="open"><span data-test="title">{{ title }}</span><slot /></div>`,
-  };
-
-  async function mountMove(ids: string[], source = "default") {
-    vi.mocked(fleet.listFleets).mockResolvedValue({
-      data: {
-        items: [
-          apiFleet(),
-          apiFleet({
-            id: "f1",
-            name: "edge",
-            state: {
-              desired: null,
-              stable: { config: "edge", version: 4 },
-              rollout: null,
-              collectors: 0,
-              online: 0,
-              at_desired: 0,
-            },
-          }),
-        ],
-      },
-    } as any);
-    const w = mount(FleetMoveDialog, {
-      props: { open: true, collectorIds: ids, sourceFleetId: source },
-      global: { plugins: [i18n, store], stubs: { ODialog: DialogStub } },
-    });
-    await flushPromises();
-    return w;
-  }
-
-  it("leaves the source out and says the collectors get the destination's stable version", async () => {
-    wrapper = await mountMove(["c1", "c2"]);
-    const select = wrapper.findComponent({ name: "OSelect" });
-    expect(select.props("options").map((o: { value: string }) => o.value)).toEqual(["f1"]);
-    select.vm.$emit("update:modelValue", "f1");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-move-dialog-effect"]').text()).toContain(
-      "edge's stable version, edge v4, at once",
-    );
-  });
-
-  it("moves in one request and reports the count", async () => {
-    vi.mocked(fleet.moveCollectors).mockResolvedValue({ data: { moved: 2 } } as any);
-    wrapper = await mountMove(["c1", "c2"]);
-    wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", "f1");
-    await flushPromises();
-    wrapper.findComponent(DialogStub).vm.$emit("click:primary");
-    await flushPromises();
-    expect(fleet.moveCollectors).toHaveBeenCalledWith(org(), ["c1", "c2"], "f1");
-    expect(wrapper.emitted("moved")).toHaveLength(1);
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "success", message: "Moved 2 collectors" }),
-    );
-  });
-
-  it("refuses more than a thousand collectors at once", async () => {
-    wrapper = await mountMove(Array.from({ length: 1001 }, (_, i) => `c${i}`));
-    wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", "f1");
-    await flushPromises();
-    expect(wrapper.findComponent(DialogStub).props("primaryButtonDisabled")).toBe(true);
-    expect(wrapper.find('[data-test="fleet-move-dialog-too-many"]').exists()).toBe(true);
   });
 });

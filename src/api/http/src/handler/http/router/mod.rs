@@ -2497,7 +2497,6 @@ fn fleet_router() -> Router {
             "/{org_id}/fleet/fleets",
             get(fleet::list_fleets).post(fleet::create_fleet),
         )
-        .route("/{org_id}/fleet/fleets/move", post(fleet::move_collectors))
         .route(
             "/{org_id}/fleet/fleets/{fleet_id}",
             get(fleet::get_fleet)
