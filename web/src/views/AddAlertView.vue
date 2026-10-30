@@ -37,7 +37,6 @@ import { fetchAlertRead } from "@/services/alerts.readFence";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
-import { templateKeys } from "@/services/alert_templates.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
@@ -63,7 +62,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const destinations = ref([]);
-    const templates = ref<any[]>([]);
+    const templates = ref<unknown[]>([]);
     const isUpdated = ref(false);
 
     /**
@@ -150,14 +149,19 @@ export default defineComponent({
       await getDestinations();
     };
 
-    // The Advanced tab lists these as the template override options.
-    const getTemplates = async () => {
+    // The mount read stays cache-first; only the form's refresh button forces a server read.
+    const getTemplates = async (force = false) => {
+      const options = templatesQuery(store.state.selectedOrganization.identifier);
       try {
-        templates.value = await queryClient.fetchQuery(
-          templatesQuery(store.state.selectedOrganization.identifier),
-        );
-      } catch (error: any) {
-        if (error?.response?.status === 403) return;
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        templates.value = await queryClient.fetchQuery(options);
+      } catch {
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
@@ -165,13 +169,7 @@ export default defineComponent({
       }
     };
 
-    const refreshTemplates = async () => {
-      await queryClient.invalidateQueries({
-        queryKey: templateKeys.list(store.state.selectedOrganization.identifier),
-        exact: true,
-      });
-      await getTemplates();
-    };
+    const refreshTemplates = () => getTemplates(true);
 
     const handleUpdateList = (folderId?: string, options?: AlertSavedOptions) => {
       const resolvedFolder = folderId || (route.query.folder as string) || "default";
