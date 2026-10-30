@@ -476,7 +476,7 @@ where
                 }
             } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 // Legacy cookies are supported only with idle enforcement disabled.
-                if config::get_config().common.session_idle_timeout > 0 {
+                if config::get_config().auth.session_idle_timeout > 0 {
                     String::new()
                 } else {
                     access_token
