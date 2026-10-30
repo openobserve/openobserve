@@ -623,6 +623,8 @@ function useSavedGrantsFixture() {
 const mountEditRoleVm = async () => (await mountEditRole()).vm;
 
 beforeEach(() => {
+  // A draft one test leaves behind would open the restore dialog on the next mount of the same role.
+  localStorage.clear();
   // resourcesQuery is cached by TanStack, so without this the second mount
   // never re-calls getResources and the call-order pins go stale.
   queryClient.clear();
@@ -2747,22 +2749,10 @@ describe("EditRole - tabs and dirty state [characterization]", () => {
     expect(vm.isUsersDirty).toBe(false);
   });
 
-  // The leave guard holds the navigation in a promise the dialog resolves.
-  it("resolves the held navigation with the user's answer and forgets the resolver", async () => {
+  it("opens with no leave or restore dialog", async () => {
     const vm = await mountEditRoleVm();
-    const resolve = vi.fn();
-    vm.leaveConfirm = { show: true, resolve };
-
-    vm.onLeaveConfirm(true);
-
-    expect(resolve).toHaveBeenCalledWith(true);
-    expect(vm.leaveConfirm.show).toBe(false);
-    expect(vm.leaveConfirm.resolve).toBeNull();
-  });
-
-  it("opens with no dialog and nothing to resolve", async () => {
-    const vm = await mountEditRoleVm();
-    expect(vm.leaveConfirm).toEqual({ show: false, resolve: null });
+    expect(vm.roleDraft.state.leaveOpen).toBe(false);
+    expect(vm.roleDraft.state.restoreOpen).toBe(false);
   });
 });
 
@@ -3842,21 +3832,6 @@ describe("EditRole - save toast", () => {
     expect(await toastAfterSave(vm)).toEqual([
       { variant: "success", message: i18n.global.t("iam.editRole.updateSuccess") },
     ]);
-  });
-});
-
-describe("EditRole - leave dialog labels", () => {
-  // Discard stays the primary button, which the leave E2E clicks; Keep Editing is the safe default.
-  it("labels the primary button Discard and the secondary Keep Editing", async () => {
-    const wrapper = await mountEditRole();
-    const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
-
-    expect(dialog.props("okLabel")).toBe(i18n.global.t("iam.editRole.leaveConfirm.discard"));
-    expect(dialog.props("cancelLabel")).toBe(
-      i18n.global.t("iam.editRole.leaveConfirm.keepEditing"),
-    );
-    expect(dialog.props("okVariant") ?? "primary").toBe("primary");
-    expect(dialog.props("focusCancel")).toBe(true);
   });
 });
 

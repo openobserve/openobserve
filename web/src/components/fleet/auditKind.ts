@@ -33,7 +33,6 @@ const KIND_OF: Record<string, AuditKind> = {
   updatedFleetSettings: "fleet",
   enrolledCollector: "collector",
   movedByToken: "collector",
-  movedCollectors: "collector",
   removedCollector: "collector",
   renamedCollector: "collector",
   restartedCollector: "collector",

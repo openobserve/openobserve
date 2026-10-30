@@ -32,8 +32,6 @@ pub const DEFAULT_GATE_WINDOW_SECS: u32 = 5 * 60;
 pub const DEFAULT_GATE_PASS_PERCENT: u32 = 95;
 pub const DEFAULT_PAGE_LIMIT: usize = 100;
 pub const MAX_PAGE_LIMIT: usize = 1000;
-/// Bulk moves accept at most this many collectors (§4.4).
-pub const MAX_MOVE_COLLECTORS: usize = 1000;
 
 /// Issues keyed by pipeline id; the empty key holds document-level issues.
 pub type Issues = BTreeMap<String, Vec<ConfigIssue>>;
@@ -628,19 +626,6 @@ pub struct CreateFleetRequest {
 #[serde(deny_unknown_fields)]
 pub struct RenameFleetRequest {
     pub name: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct MoveCollectorsRequest {
-    pub collector_ids: Vec<String>,
-    /// Destination fleet id.
-    pub to_fleet: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct MoveCollectorsResponse {
-    pub moved: usize,
 }
 
 /// Why a reference-protected delete was refused (409).
@@ -1315,12 +1300,7 @@ mod tests {
     }
 
     #[test]
-    fn move_and_fleet_types_serialize_as_the_api_documents() {
-        let req: MoveCollectorsRequest =
-            serde_json::from_str(r#"{"collector_ids":["c1"],"to_fleet":"f2"}"#).unwrap();
-        assert_eq!((req.collector_ids.len(), req.to_fleet.as_str()), (1, "f2"));
-        let old = r#"{"collector_ids":[],"dst_folder_id":"f"}"#;
-        assert!(serde_json::from_str::<MoveCollectorsRequest>(old).is_err());
+    fn fleet_types_serialize_as_the_api_documents() {
         let list = FleetList {
             total: 1,
             items: vec![Fleet {

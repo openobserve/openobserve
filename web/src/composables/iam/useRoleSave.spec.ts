@@ -200,9 +200,10 @@ describe("useRoleSave preset and save interlock", () => {
 
     const first = saveRole();
     await flushPromises();
-    await saveRole();
+    // False, so the editor draft is not marked saved by the click that sent nothing.
+    expect(await saveRole()).toBe(false);
     finish({});
-    await first;
+    expect(await first).toBe(true);
 
     expect(deps.updateRoleOne.mutateAsync).toHaveBeenCalledTimes(1);
   });

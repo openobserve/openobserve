@@ -224,6 +224,7 @@ import { useSearchQuery } from "./useSearchQuery";
 import { buildLogsSignature } from "./useAutoRun";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { gt } from "@/types/i18n";
+import { REFRESH_QUERY_ORIGIN, withQueryOrigin } from "./logsRowNav";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1615,5 +1616,28 @@ describe("useSearchQuery › free text (item 1)", () => {
 
     expect(validateFilterForMultiStream()).toBe(true);
     expect(mockState.searchObj.data.filterErrMsg).toBe("");
+  });
+});
+
+describe("useSearchQuery › getQueryReq and the open detail drawer", () => {
+  beforeEach(() => {
+    mockState = createMockState();
+    vi.clearAllMocks();
+    (mockState.searchObj.data.stream as any).streamLists = [
+      { label: "my-stream", value: "my-stream" },
+    ];
+    (mockState.searchObj.meta as any).showDetailTab = true;
+  });
+
+  it("an auto-refresh query keeps the drawer open", () => {
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(withQueryOrigin(REFRESH_QUERY_ORIGIN, () => getQueryReq(false))).not.toBeNull();
+    expect((mockState.searchObj.meta as any).showDetailTab).toBe(true);
+  });
+
+  it("any other full query closes it", () => {
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getQueryReq(false)).not.toBeNull();
+    expect((mockState.searchObj.meta as any).showDetailTab).toBe(false);
   });
 });

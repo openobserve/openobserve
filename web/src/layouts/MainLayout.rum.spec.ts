@@ -270,6 +270,7 @@ describe("MainLayout — RUM identity and account", () => {
     await flushPromises();
 
     (wrapper.vm as any).signout();
+    await flushPromises();
 
     expect(openobserveRum.stopSessionReplayRecording).toHaveBeenCalled();
     expect(openobserveRum.clearUser).toHaveBeenCalled();

@@ -275,6 +275,7 @@ const handleOpenChange = (open: boolean) => {
       <OButton
         data-test="connect-data-source-popup-connect-btn"
         variant="primary"
+        size="cta"
         class="w-full"
         @click="connectDataSource"
       >

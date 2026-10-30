@@ -123,9 +123,10 @@ export class RolesPage {
 
         // ---------- leaving with unsaved changes ----------
         // ConfirmDialog renders inside ODialog, so the buttons carry the dialog's slugs.
-        this.leaveConfirm = page.locator('[data-test="confirm-dialog"]');
-        this.leaveConfirmOk = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-        this.leaveConfirmCancel = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
+        // The shared unsaved-changes dialog: Discard drops the changes, closing it stays on the editor.
+        this.leaveConfirm = page.locator('[data-test="editor-draft-leave-dialog"]');
+        this.leaveConfirmOk = page.locator('[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]');
+        this.leaveConfirmCancel = page.locator('[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-close-btn"]');
 
         // ---------- unsaved drawer ----------
         this.drawer = page.locator('[data-test="edit-role-unsaved-drawer"]');

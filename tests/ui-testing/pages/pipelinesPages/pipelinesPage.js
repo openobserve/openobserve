@@ -335,6 +335,10 @@ export class PipelinesPage {
         this.queryNode = page.locator('[data-test="pipeline-node-input-query-node"]');
         this.queryNodeDeleteBtn = page.locator('[data-test="pipeline-node-input-delete-btn"]');
         this.cancelPipelineBtn = page.locator('[data-test="add-pipeline-cancel-btn"]');
+        // Editor drafts: Cancel/leave with unsaved changes opens the shared leave dialog
+        this.draftLeaveDialog = page.locator('[data-test="editor-draft-leave-dialog"]');
+        this.draftLeaveDiscardBtn = this.draftLeaveDialog.locator('[data-test="o-dialog-neutral-btn"]');
+        this.draftLeaveCloseBtn = this.draftLeaveDialog.locator('[data-test="o-dialog-close-btn"]');
         this.dashboardsMenuLink = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         // PipelineEditor emits a toast "Please connect all nodes before saving"
         // when the user clicks Save without joining nodes. OToast renders it via
@@ -2233,7 +2237,7 @@ export class PipelinesPage {
     async cancelAndDeletePipeline(pipelineName, searchPrefix = 'automatepi') {
         // Click the cancel/back button
         await this.page.locator('[data-test="add-pipeline-cancel-btn"]').click();
-        await this.confirmButton.click();
+        await this.discardDraftIfAsked();
         await this.page.waitForTimeout(2000);
 
         // Search for the pipeline
@@ -2846,6 +2850,19 @@ export class PipelinesPage {
      */
     async clickCancelPipelineBtn() {
         await this.cancelPipelineBtn.click();
+        await this.discardDraftIfAsked();
+    }
+
+    /** Discards unsaved changes through the leave dialog when it opens, so no draft is left behind. */
+    async discardDraftIfAsked() {
+        const asked = await this.draftLeaveDialog
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => true)
+            .catch(() => false);
+        if (asked) {
+            await this.draftLeaveDiscardBtn.click();
+            await this.draftLeaveDialog.waitFor({ state: 'hidden', timeout: 10000 });
+        }
     }
 
     /**
@@ -2856,8 +2873,8 @@ export class PipelinesPage {
     }
 
     async acceptUnsavedChangesPromptAndExpectDashboards() {
-        await expect(this.discardChangesOkBtn, 'Leaving an unsaved pipeline must show the confirm dialog').toBeVisible({ timeout: 10000 });
-        await this.discardChangesOkBtn.click();
+        await expect(this.draftLeaveDialog, 'Leaving an unsaved pipeline must show the leave dialog').toBeVisible({ timeout: 10000 });
+        await this.draftLeaveDiscardBtn.click();
         await expect(this.page).toHaveURL(/dashboards/, { timeout: 15000 });
     }
 
@@ -3220,8 +3237,7 @@ export class PipelinesPage {
      */
     async cleanupPipelineCreation() {
         await this.cancelPipelineBtn.click().catch(() => {});
-        await this.page.waitForTimeout(500);
-        await this.confirmButton.click().catch(() => {});
+        await this.discardDraftIfAsked();
         testLogger.info('Pipeline creation cleanup completed');
     }
 
@@ -3524,6 +3540,7 @@ export class PipelinesPage {
      */
     async clickCancelPipelineBtnForce() {
         await this.cancelPipelineBtn.click({ force: true });
+        await this.discardDraftIfAsked();
         testLogger.info('Clicked cancel pipeline button (force)');
     }
 

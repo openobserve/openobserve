@@ -1112,7 +1112,7 @@ test.describe('RUM Product Analytics', () => {
 
       await pa.eventCancelBtn.click();
       await expect(pa.eventDiscardDialog).toBeVisible({ timeout: 20000 });
-      await expect(pa.eventDiscardDialog).toContainText('Discard changes?');
+      await expect(pa.eventDiscardDialog).toContainText('Leave with unsaved changes?');
       await pa.eventDiscardConfirmBtn.click();
       await expect(pa.namedEventsList).toBeVisible({ timeout: 20000 });
       expect(w.writes, 'leaving the editor writes nothing').toEqual([]);

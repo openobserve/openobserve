@@ -35,7 +35,6 @@ type SaveDeps = {
   updateRoleOne: {
     mutateAsync: (vars: { role_id: string; payload: Record<string, unknown> }) => Promise<unknown>;
   };
-  /** The rail module a resource is counted under, so "in 2 modules" matches the rail. */
   /** Drawer rows and modules, the numbers the Review Changes badge shows. */
   pendingCounts: () => { changes: number; modules: number };
   /** Resolves once a preset still staging has finished, so the save carries its grants. */
@@ -71,7 +70,8 @@ export const useRoleSave = (deps: SaveDeps) => {
     });
   };
 
-  const send = () => {
+  /** Resolves true once the backend accepted the changes; false when there was nothing to send or it failed. */
+  const send = (): Promise<boolean> => {
     if (permissionsUiType.value === "json") updateJsonInTable();
 
     // Users and service accounts are both sent as users; merge the two staging
@@ -97,7 +97,7 @@ export const useRoleSave = (deps: SaveDeps) => {
         message: t("iam.editRole.noUpdatesDetected"),
       });
 
-      return;
+      return Promise.resolve(false);
     }
 
     const message = savedMessage([...payload.add, ...payload.remove]);
@@ -137,6 +137,7 @@ export const useRoleSave = (deps: SaveDeps) => {
         addedServiceAccounts.value = new Set([]);
 
         removedServiceAccounts.value = new Set([]);
+        return true;
       })
       .catch((err) => {
         if (err?.response?.status != 403) {
@@ -146,19 +147,20 @@ export const useRoleSave = (deps: SaveDeps) => {
           });
         }
         console.log(err);
+        return false;
       });
   };
 
   const isSaving = ref(false);
 
   // A preset staging past the payload would be absorbed by commit() unsent, so the save waits for it.
-  const saveRole = async () => {
+  const saveRole = async (): Promise<boolean> => {
     // A second click while the PUT is in flight would send the same changes twice.
-    if (isSaving.value) return;
+    if (isSaving.value) return false;
     isSaving.value = true;
     try {
       await presetSettled();
-      await send();
+      return await send();
     } finally {
       isSaving.value = false;
     }

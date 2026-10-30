@@ -510,7 +510,7 @@ const columns: OTableColumnDef[] = [
     id: "actions",
     header: t("common.actions"),
     accessorKey: "actions",
-    meta: { align: "center", actionCount: 4 },
+    meta: { align: "center", actionCount: 5 },
     isAction: true,
     size: 128,
   },

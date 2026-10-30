@@ -101,13 +101,6 @@ pub struct AlertHistoryEntry {
     pub evaluation_took_in_secs: Option<f64>,
     pub source_node: Option<String>,
     pub query_took: Option<i64>,
-    // Deduplication information
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dedup_enabled: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dedup_suppressed: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dedup_count: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grouped: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -428,9 +421,6 @@ pub async fn get_alert_history(
                         .and_then(|v| v.as_f64()),
                     source_node: None,
                     query_took: None,
-                    dedup_enabled: None,
-                    dedup_suppressed: None,
-                    dedup_count: None,
                     grouped: None,
                     group_size: None,
                     anomaly_count: Some(anomaly_count as i32),
@@ -825,13 +815,6 @@ pub async fn get_alert_history(
                 .and_then(|v| v.as_str())
                 .map(String::from),
             query_took: hit.get("query_took").and_then(|v| v.as_i64()),
-            // Deduplication fields - populated from trigger data if available
-            dedup_enabled: hit.get("dedup_enabled").and_then(|v| v.as_bool()),
-            dedup_suppressed: hit.get("dedup_suppressed").and_then(|v| v.as_bool()),
-            dedup_count: hit
-                .get("dedup_count")
-                .and_then(|v| v.as_i64())
-                .map(|v| v as i32),
             grouped: hit.get("grouped").and_then(|v| v.as_bool()),
             group_size: hit
                 .get("group_size")
@@ -1259,9 +1242,6 @@ mod tests {
             evaluation_took_in_secs: Some(1.5),
             source_node: Some("node1".to_string()),
             query_took: Some(100),
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1321,9 +1301,6 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1372,9 +1349,6 @@ mod tests {
             evaluation_took_in_secs: Some(5.5),
             source_node: Some("node2".to_string()),
             query_took: Some(500),
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1605,9 +1579,6 @@ mod tests {
             evaluation_took_in_secs: Some(1.5),
             source_node: Some("node1".to_string()),
             query_took: Some(500),
-            dedup_enabled: Some(true),
-            dedup_suppressed: Some(false),
-            dedup_count: Some(1),
             grouped: Some(false),
             group_size: None,
             anomaly_count: None,
@@ -1631,7 +1602,6 @@ mod tests {
         assert_eq!(deserialized.alert_name, entry.alert_name);
         assert_eq!(deserialized.org, entry.org);
         assert_eq!(deserialized.status, entry.status);
-        assert_eq!(deserialized.dedup_enabled, entry.dedup_enabled);
     }
 
     #[test]
@@ -1653,9 +1623,6 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1689,7 +1656,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alert_history_entry_dedup_fields_absent_when_none() {
+    fn test_alert_history_entry_optional_fields_absent_when_none() {
         let entry = AlertHistoryEntry {
             timestamp: 0,
             alert_name: "a".to_string(),
@@ -1707,9 +1674,6 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1727,16 +1691,13 @@ mod tests {
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
-        assert!(!obj.contains_key("dedup_enabled"));
-        assert!(!obj.contains_key("dedup_suppressed"));
-        assert!(!obj.contains_key("dedup_count"));
         assert!(!obj.contains_key("grouped"));
         assert!(!obj.contains_key("group_size"));
         assert!(!obj.contains_key("anomaly_count"));
     }
 
     #[test]
-    fn test_alert_history_entry_dedup_fields_present_when_some() {
+    fn test_alert_history_entry_optional_fields_present_when_some() {
         let entry = AlertHistoryEntry {
             timestamp: 0,
             alert_name: "a".to_string(),
@@ -1754,9 +1715,6 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
-            dedup_enabled: Some(true),
-            dedup_suppressed: Some(false),
-            dedup_count: Some(5),
             grouped: Some(true),
             group_size: Some(3),
             anomaly_count: Some(2),
@@ -1774,9 +1732,6 @@ mod tests {
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
-        assert!(obj.contains_key("dedup_enabled"));
-        assert!(obj.contains_key("dedup_suppressed"));
-        assert!(obj.contains_key("dedup_count"));
         assert!(obj.contains_key("grouped"));
         assert!(obj.contains_key("group_size"));
         assert!(obj.contains_key("anomaly_count"));

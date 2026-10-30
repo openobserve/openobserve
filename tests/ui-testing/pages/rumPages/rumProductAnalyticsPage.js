@@ -169,8 +169,8 @@ export class RumProductAnalyticsPage {
         this.addRuleBtn = page.locator('[data-test="rum-analytics-named-events-add-rule-btn"]');
         this.eventPreview = page.locator('[data-test="rum-analytics-named-events-preview"]');
         this.eventCancelBtn = page.locator('[data-test="rum-analytics-event-editor-cancel-btn"]');
-        this.eventDiscardDialog = page.locator('[data-test="rum-analytics-event-editor-discard-dialog"]');
-        this.eventDiscardConfirmBtn = this.eventDiscardDialog.locator('[data-test="o-dialog-primary-btn"]');
+        this.eventDiscardDialog = page.locator('[data-test="editor-draft-leave-dialog"]');
+        this.eventDiscardConfirmBtn = this.eventDiscardDialog.locator('[data-test="o-dialog-neutral-btn"]');
         this.eventRules = page.locator('[data-test^="rum-analytics-named-events-rule-"][data-test$="-kind"]');
 
         this.sessionsTable = page.locator('[data-test="rum-sessions-table"]');
