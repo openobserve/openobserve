@@ -29,6 +29,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { onMounted, onUnmounted, watch } from "vue";
 import { expireSession } from "@/utils/sessionServices";
+import auth from "@/services/auth";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import { getLocale, isRtlLocale } from "@/locales";
 import { ConfigProvider } from "reka-ui";
@@ -54,12 +55,26 @@ export default {
       router.push("/logs");
     }
 
-    // Client-side defense in depth. Server-side enforcement is required separately.
+    // Only real user interaction triggers a heartbeat; API polling never does.
     const idleLimitMs = 30 * 60 * 1000;
+    const heartbeatIntervalMs = 60 * 1000;
     let lastInteraction = Date.now();
+    let lastHeartbeat = 0;
+    let heartbeatPending = false;
     let idleCheck: ReturnType<typeof setInterval> | undefined;
     const markInteraction = () => {
-      if (document.visibilityState === "visible") lastInteraction = Date.now();
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      lastInteraction = now;
+      if (!store.state.loginState || heartbeatPending ||
+          now - lastHeartbeat < heartbeatIntervalMs) return;
+      lastHeartbeat = now;
+      heartbeatPending = true;
+      void auth.session_activity()
+        .catch((error: any) => {
+          if (error?.response?.status === 401) expireSession(store);
+        })
+        .finally(() => { heartbeatPending = false; });
     };
     const interactionEvents = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
     onMounted(() => {
