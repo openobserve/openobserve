@@ -449,6 +449,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     // Select destination using POM locator
     const destDropdown = pm.alertsPage.getAlertDestinationsSelectLocator();
     await destDropdown.waitFor({ state: 'visible', timeout: 10000 });
+    await pm.alertsPage.settleIntoView(destDropdown);
     await destDropdown.click();
     await page.waitForTimeout(1000);
 
