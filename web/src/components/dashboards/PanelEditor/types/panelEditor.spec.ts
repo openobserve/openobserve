@@ -325,6 +325,7 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("node-graph");
         expect(ALL_CHART_TYPES).toContain("alert-list");
         expect(ALL_CHART_TYPES).toContain("flame-graph");
+        expect(ALL_CHART_TYPES).toContain("boxplot");
         expect(ALL_CHART_TYPES).toContain("hostmap");
         expect(ALL_CHART_TYPES).toContain("treemap");
       });
@@ -406,6 +407,7 @@ describe("panelEditor types and utilities", () => {
               "distribution",
               "alert-list",
               "flame-graph",
+              "boxplot",
             ].includes(type),
         );
 
