@@ -116,7 +116,7 @@ const scrollToSection = (id: string): void => {
   section.querySelector<HTMLElement>("[data-snap-heading]")?.focus({ preventScroll: true });
 };
 
-// With snapping on, only a stop is a resting place, so land on the last one at or above the element.
+// With snapping on, a stop is a resting place, so land on the last one at or above the element when it shows from there.
 const revealElement = (el: HTMLElement): void => {
   const scroller = root.value;
   if (!scroller || !scroller.contains(el)) return;
@@ -127,8 +127,17 @@ const revealElement = (el: HTMLElement): void => {
   markStops();
   const top = offsetOf(el);
   const above = stopList(false).filter((s) => s.at <= top + EDGE);
+  const stop = above[above.length - 1] ?? { at: 0, to: 0 };
+  const view = scroller.clientHeight;
+  let rest = stop.to;
+  if (top + el.getBoundingClientRect().height > rest + view - EDGE) {
+    // A section taller than the view rests anywhere it covers the view, so the element can sit just under the header.
+    const section = el.closest<HTMLElement>("[data-snap-section]");
+    const lastCovered = section ? offsetOf(section) + section.offsetHeight - view : rest;
+    rest = Math.min(top - (stop.at - stop.to), Math.max(rest, lastCovered));
+  }
   scroller.scrollTo({
-    top: above.length ? above[above.length - 1].to : 0,
+    top: Math.max(0, Math.min(rest, scroller.scrollHeight - view)),
     behavior: REVEAL_BEHAVIOR,
   });
 };

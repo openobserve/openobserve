@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { computed, defineComponent, h, ref } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { useAlertEditHeader, type AlertEditHeader } from "./useAlertEditHeader";
@@ -65,6 +65,12 @@ describe("useAlertEditHeader", () => {
     toastSpy.mockReset();
     downtimesEnabled.value = true;
     listRows = [];
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(ENDS_AT / 1000 - 3_600_000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("is not muted until a mute lands, then reads Muted until HH:MM", async () => {
@@ -79,6 +85,31 @@ describe("useAlertEditHeader", () => {
     );
     expect(api().muted.value).toEqual({ id: "dt1", ends_at: ENDS_AT, version: 1 });
     expect(api().mutedUntilText.value).toBe("Muted until 14:00");
+  });
+
+  it("lets a list read that started after a local mute decide again", async () => {
+    createMute.mockResolvedValue({ downtime_id: "dt1", version: 1, ends_at: ENDS_AT });
+    const api = host();
+    await flushPromises();
+    await api().muteFor(3600);
+    expect(api().muted.value?.id).toBe("dt1");
+    listRows = [{ alert_id: "a1", enabled: true, active_downtime: null }];
+    api().refresh();
+    await flushPromises();
+    expect(api().muted.value).toBeNull();
+  });
+
+  it("stops reading Muted once the mute's end time passes", async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(ENDS_AT / 1000 - 60_000);
+    createMute.mockResolvedValue({ downtime_id: "dt1", version: 1, ends_at: ENDS_AT });
+    const api = host();
+    await api().muteFor(60);
+    expect(api().muted.value?.id).toBe("dt1");
+    vi.advanceTimersByTime(61_000);
+    expect(api().muted.value).toBeNull();
+    expect(api().mutedUntilText.value).toBe("");
   });
 
   it("Unmute cancels the mute through the alert route and clears the state", async () => {

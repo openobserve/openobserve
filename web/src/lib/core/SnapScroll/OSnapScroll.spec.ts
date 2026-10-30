@@ -139,6 +139,40 @@ describe("OSnapScroll.revealElement", () => {
     expect(scrollTo).toHaveBeenCalledWith({ top: 400, behavior: "instant" });
   });
 
+  describe("inside a block taller than the view", () => {
+    const tallLayout = (w: VueWrapper, targetTop: number) => {
+      const { root, scrollTo } = layOut(w);
+      Object.defineProperty(root, "scrollHeight", { configurable: true, value: 3000 });
+      root.querySelector<HTMLElement>("#three")!.getBoundingClientRect = () => rect(2400);
+      const section = root.querySelector<HTMLElement>("#two")!;
+      Object.defineProperty(section, "offsetHeight", { value: 1800 });
+      const block = document.createElement("div");
+      block.setAttribute("data-snap-stop", "");
+      block.style.setProperty("scroll-margin-top", "48px");
+      Object.defineProperty(block, "offsetHeight", { value: 1400 });
+      block.getBoundingClientRect = () => rect(450);
+      const target = document.createElement("button");
+      target.getBoundingClientRect = () => rect(targetTop);
+      block.appendChild(target);
+      section.appendChild(block);
+      return { scrollTo, target };
+    };
+
+    it("rests just under the header above the element instead of on the block's start", () => {
+      wrapper = mountScroll();
+      const { scrollTo, target } = tallLayout(wrapper, 1600);
+      reveal(wrapper, target);
+      expect(scrollTo).toHaveBeenCalledWith({ top: 1552, behavior: "instant" });
+    });
+
+    it("stops where the section still covers the view when the element sits near its end", () => {
+      wrapper = mountScroll();
+      const { scrollTo, target } = tallLayout(wrapper, 2000);
+      reveal(wrapper, target);
+      expect(scrollTo).toHaveBeenCalledWith({ top: 1700, behavior: "instant" });
+    });
+  });
+
   it("centres the element instantly when snapping is off", () => {
     wrapper = mountScroll(false);
     const { root, scrollTo } = layOut(wrapper);
