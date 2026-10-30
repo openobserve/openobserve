@@ -375,9 +375,13 @@ export function operatorCategory(name: string): OperatorCategory {
 
 /** Short card title: the operator name without its `Exec` suffix, plus the aggregate mode. */
 export function operatorLabel(op: Pick<ProfileOperator, "name" | "detail">): string {
-  const base = op.name.replace(/Exec$/, "") || op.name;
-  const mode = op.detail.match(/mode=(\w+)/);
-  return mode ? `${base} · ${mode[1]}` : base;
+  const variant = op.name.match(/^(\w+?)Exec\((\w+)\)$/);
+  const base = variant ? variant[1] : op.name.replace(/Exec$/, "") || op.name;
+  const mode =
+    variant?.[2] ??
+    op.detail.match(/mode=(\w+)/)?.[1] ??
+    (/(^|:\s*)TopK\(/.test(op.detail) ? "TopK" : null);
+  return mode ? `${base} · ${mode}` : base;
 }
 
 export function isPlaceholderScan(op: Pick<ProfileOperator, "name">): boolean {

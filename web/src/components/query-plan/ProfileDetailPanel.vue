@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex flex-col gap-4 px-4 pt-3">
       <template v-if="stage">
-        <div class="grid grid-cols-3 gap-1.5">
+        <div class="grid grid-cols-2 gap-1.5 xl:grid-cols-3">
           <ProfileStatTile
             :label="t('search.queryProfile.wall')"
             :value="formatNs(stage.maxWallUs * 1000)"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-else>
-        <div class="grid grid-cols-3 gap-1.5">
+        <div class="grid grid-cols-2 gap-1.5 xl:grid-cols-3">
           <ProfileStatTile
             :label="computeLabel"
             :value="value.on ? formatNs(value.computeNs) : '—'"
