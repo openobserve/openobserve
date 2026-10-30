@@ -21224,6 +21224,17 @@
       "moreInfoAbout": "Подробнее о поле {field}",
       "moreInfo": "Подробнее"
     },
+    "streamPicker": {
+      "internalStreams": "Внутренние потоки",
+      "hiddenCount": "Скрыто: {count}",
+      "matchCount": "{count} скрытое совпадение | {count} скрытых совпадений",
+      "hide": "Скрыть",
+      "show": "Показать",
+      "hideInternal": "Скрыть внутренние потоки",
+      "showInternal": "Показать внутренние потоки",
+      "announceHidden": "Внутренние потоки скрыты",
+      "announceShown": "Внутренние потоки показаны"
+    },
     "templateInput": {
       "suggestions": "Подсказки переменных"
     },

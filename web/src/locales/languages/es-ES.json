@@ -21224,6 +21224,17 @@
       "moreInfoAbout": "Más información sobre {field}",
       "moreInfo": "Más información"
     },
+    "streamPicker": {
+      "internalStreams": "Streams internos",
+      "hiddenCount": "{count} ocultos",
+      "matchCount": "{count} coincidencia oculta | {count} coincidencias ocultas",
+      "hide": "Ocultar",
+      "show": "Mostrar",
+      "hideInternal": "Ocultar streams internos",
+      "showInternal": "Mostrar streams internos",
+      "announceHidden": "Streams internos ocultos",
+      "announceShown": "Streams internos mostrados"
+    },
     "templateInput": {
       "suggestions": "Sugerencias de variables"
     },

@@ -21224,6 +21224,17 @@
       "moreInfoAbout": "{field} hakkında daha fazla bilgi",
       "moreInfo": "Daha fazla bilgi"
     },
+    "streamPicker": {
+      "internalStreams": "Dahili akışlar",
+      "hiddenCount": "{count} gizli",
+      "matchCount": "{count} gizli eşleşme | {count} gizli eşleşme",
+      "hide": "Gizle",
+      "show": "Göster",
+      "hideInternal": "Dahili akışları gizle",
+      "showInternal": "Dahili akışları göster",
+      "announceHidden": "Dahili akışlar gizlendi",
+      "announceShown": "Dahili akışlar gösterildi"
+    },
     "templateInput": {
       "suggestions": "Değişken önerileri"
     },

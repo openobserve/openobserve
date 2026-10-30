@@ -21219,6 +21219,17 @@
       "moreInfoAbout": "關於{field}的更多資訊",
       "moreInfo": "更多資訊"
     },
+    "streamPicker": {
+      "internalStreams": "內部串流",
+      "hiddenCount": "已隱藏 {count} 個",
+      "matchCount": "隱藏 {count} 個符合項目 | 隱藏 {count} 個符合項目",
+      "hide": "隱藏",
+      "show": "顯示",
+      "hideInternal": "隱藏內部串流",
+      "showInternal": "顯示內部串流",
+      "announceHidden": "內部串流已隱藏",
+      "announceShown": "內部串流已顯示"
+    },
     "templateInput": {
       "suggestions": "變數建議"
     },

@@ -21224,6 +21224,17 @@
       "moreInfoAbout": "مزيد من المعلومات حول {field}",
       "moreInfo": "مزيد من المعلومات"
     },
+    "streamPicker": {
+      "internalStreams": "التدفقات الداخلية",
+      "hiddenCount": "{count} مخفي",
+      "matchCount": "{count} تطابق مخفي | {count} تطابقات مخفية",
+      "hide": "إخفاء",
+      "show": "إظهار",
+      "hideInternal": "إخفاء التدفقات الداخلية",
+      "showInternal": "إظهار التدفقات الداخلية",
+      "announceHidden": "تم إخفاء التدفقات الداخلية",
+      "announceShown": "تم إظهار التدفقات الداخلية"
+    },
     "templateInput": {
       "suggestions": "اقتراحات المتغيرات"
     },

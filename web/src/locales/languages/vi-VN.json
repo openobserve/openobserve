@@ -21224,6 +21224,17 @@
       "moreInfoAbout": "Thêm thông tin về {field}",
       "moreInfo": "Thêm thông tin"
     },
+    "streamPicker": {
+      "internalStreams": "Stream nội bộ",
+      "hiddenCount": "{count} ẩn",
+      "matchCount": "{count} mục khớp bị ẩn | {count} mục khớp bị ẩn",
+      "hide": "Ẩn",
+      "show": "Hiện",
+      "hideInternal": "Ẩn stream nội bộ",
+      "showInternal": "Hiện stream nội bộ",
+      "announceHidden": "Đã ẩn stream nội bộ",
+      "announceShown": "Đã hiện stream nội bộ"
+    },
     "templateInput": {
       "suggestions": "Gợi ý biến"
     },
