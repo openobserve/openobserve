@@ -101,10 +101,15 @@ describe("hostsQueries — liveness & last-seen ride the 1-series-per-host load 
 });
 
 describe("hostsQueries — utilization shapes", () => {
-  it("CPU is the 1 - idle form, never a partial state sum", () => {
+  it("CPU is the idle-to-total ratio, correct with or without the per-core cpu label", () => {
     expect(HOSTS_CPU_QUERY).toBe(
-      '100 * (1 - avg by (host_name)(irate(system_cpu_time{state="idle",' + GUARD + "}[5m])))",
+      '100 * (1 - sum by (host_name)(irate(system_cpu_time{state="idle",' +
+        GUARD +
+        "}[5m])) / sum by (host_name)(irate(system_cpu_time{" +
+        GUARD +
+        "}[5m])))",
     );
+    expect(HOSTS_CPU_QUERY).not.toContain("avg");
   });
 
   // The collector computes every state as ratio(state, MemTotal) against ONE
@@ -180,9 +185,11 @@ describe("hostsQueries — utilization shapes", () => {
   it("counts cores off the DEFAULT-ON cpu metric, one series per cpu", () => {
     // system_cpu_logical_count is opt-in and this fleet emits zero series of it.
     expect(HOSTS_CORES_QUERY).toBe(
-      'count by (host_name)(count by (host_name, cpu)(system_cpu_time{state="idle",' +
+      'count by (host_name)(count by (host_name, cpu)(system_cpu_time{state="idle",cpu!="",' +
         GUARD +
-        "}))",
+        "})) or round(sum by (host_name)(rate(system_cpu_time{" +
+        GUARD +
+        "}[5m])))",
     );
     expect(HOSTS_CORES_QUERY).not.toContain("system_cpu_logical_count");
     // One state only: without it each cpu contributes a series per state.
