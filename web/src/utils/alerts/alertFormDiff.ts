@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import { sectionOfField, type AlertSectionId } from "@/components/alerts/alertFormSections";
+import {
+  AGGREGATION_ENABLED_FIELD,
+  sectionOfField,
+  type AlertSectionId,
+} from "@/components/alerts/alertFormSections";
 
 /** One field whose value differs from the loaded alert. */
 export interface AlertFieldChange {
@@ -82,6 +86,7 @@ const FIELD_LABELS: Record<string, I18nKey> = {
   composite_condition: "alerts.editMode.unsaved.fields.composite",
   children: "alerts.editMode.unsaved.fields.children",
   enabled: "alerts.editMode.unsaved.fields.enabled",
+  [AGGREGATION_ENABLED_FIELD]: "alerts.editMode.unsaved.fields.aggregation",
 };
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>

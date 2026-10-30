@@ -48,7 +48,7 @@ export interface AlertSettingTierDef {
   row?: AlertAddRow;
 }
 
-// From the Oct 2026 introspect usage study of hand-written alerts: Core (25%+) shown, Common (5-25%) one click, Rare (<5%) tucked.
+// From a usage study of hand-written alerts, Oct 2026: Core (25%+) shown, Common (5-25%) one click, Rare (<5%) tucked.
 export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
   { id: "warning", section: "condition", tier: "tucked", nameKey: "alerts.tiers.names.warning" },
   { id: "holdFor", section: "condition", tier: "tucked", nameKey: "alerts.tiers.names.holdFor" },

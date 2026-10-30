@@ -107,6 +107,24 @@ describe("describeAlertInPlainWords", () => {
     expect(text).toContain("when the query returns ≥ 3 rows in 10 minutes");
     expect(text).not.toContain("latency_ms");
   });
+
+  it("reads the per-row value test of a SQL multi-alert", () => {
+    const text = describeAlertInPlainWords(
+      alert({
+        query_condition: {
+          type: "sql",
+          aggregation: {
+            multi_alert: true,
+            function: "count",
+            having: { column: "cpu_percent", operator: ">", value: 90 },
+          },
+        },
+      }),
+      t,
+    );
+    expect(text).toContain("when the query returns a row where cpu_percent is > 90 in 10 minutes");
+    expect(text).not.toContain("rows in");
+  });
 });
 
 describe("describeCompositeInPlainWords", () => {
