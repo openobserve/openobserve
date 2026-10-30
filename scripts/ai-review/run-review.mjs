@@ -31,6 +31,7 @@ import {
   REVIEW_HEADING,
   REVIEW_TITLE,
   bodyAtPassLimit,
+  bodyAtUnreviewedHead,
   claimedReviewBody,
   finishReviewBody,
   parseMaxPasses,
@@ -50,7 +51,7 @@ import {
   rightSideLines,
   selectInlineComments,
 } from "./src/inline.mjs";
-import { changedCodeEvidence, mergeConfidence, severityCounts, unfinishedReviewers } from "./src/confidence.mjs";
+import { changedCodeEvidence, mergeConfidence, reviewerFinished, severityCounts, unfinishedReviewers } from "./src/confidence.mjs";
 import { OpencodeServer, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
 import { fetchPinnedDiff, prefixDiffPaths, reviewerDiff } from "./src/pr-diff.mjs";
 import {
@@ -992,7 +993,7 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
       return `<reviewer name="${r.agentName}">\n${xml}\n</reviewer>`;
     }).join("\n");
 
-  const failedAgents = agentResults.filter(r => r.error);
+  const failedAgents = agentResults.filter(r => !r.skipped && !reviewerFinished(r));
   const failedNote = failedAgents.length > 0
     ? `\n<failed_reviewers>${failedAgents.map(r => r.agentName).join(", ")}</failed_reviewers>`
     : "";
@@ -1000,7 +1001,7 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   // Authoritative list of reviewers that actually ran (not skipped, not failed). The coordinator
   // must render the "Reviewers" row from THIS, not infer it — a reviewer with no findings sends no
   // <reviewer> block, so without this the LLM guesses and can invent an agent that never ran.
-  const ranReviewers = agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName);
+  const ranReviewers = agentResults.filter(reviewerFinished).map(r => r.agentName);
 
   const userPrompt = [
     `<coordinator_task>`,
@@ -1026,7 +1027,7 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     "gen_ai.request.model": MODEL_ID,
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
-    "review.failed_agents": agentResults.filter(r => r.error).length,
+    "review.failed_agents": failedAgents.length,
   }, parentSpan);
 
   console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
@@ -1111,14 +1112,22 @@ function claimReviewPass(prNumber, existingComment, count, key) {
 }
 
 // Advisory like the review: the skip stands whether or not the note lands.
-function noteSkippedPush(prNumber, comment, key) {
-  const body = bodyAtPassLimit(comment.body, REVIEW_MAX_PASSES, key);
+function noteOnComment(prNumber, comment, body) {
   if (body === comment.body) return;
   try {
     updateReviewComment(prNumber, comment.id, body);
   } catch (err) {
-    console.warn(`[${isoNow()}] Could not update the pass limit note: ${execErrorText(err).slice(0, 300)}`);
+    console.warn(`[${isoNow()}] Could not update the review comment: ${execErrorText(err).slice(0, 300)}`);
   }
+}
+
+// Costs no pass: nothing was reviewed, but a verdict covers one commit and this push is not that commit.
+function noteUnreviewedHead(prNumber, comment, key) {
+  if (comment) noteOnComment(prNumber, comment, bodyAtUnreviewedHead(comment.body, key));
+}
+
+function noteSkippedPush(prNumber, comment, key) {
+  noteOnComment(prNumber, comment, bodyAtPassLimit(comment.body, REVIEW_MAX_PASSES, key));
 }
 
 function postReviewComment(prNumber, body) {
@@ -1347,6 +1356,7 @@ async function main() {
       const detail = execErrorText(err);
       console.error(`Failed to fetch PR diff: ${detail}`);
       TRACE.endSpan(diffSpan, {}, err);
+      noteUnreviewedHead(prNumber, existingComment, headKey);
       throw new Error(`Failed to fetch PR diff: ${detail}`);
     }
 
@@ -1366,6 +1376,7 @@ async function main() {
 
     if (changedLines === 0) {
       console.log("No meaningful changes to review after filtering. Skipping.");
+      noteUnreviewedHead(prNumber, existingComment, headKey);
       outcome = "skipped";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,

@@ -81,7 +81,11 @@ function findInlineBlocks(source) {
   while ((start = startRe.exec(source)) !== null) {
     const bodyAt = start.index + start[0].length;
     let end = source.indexOf("-->", bodyAt);
-    if (end === -1) break;
+    // Nothing closes it, so its findings cannot be read: it still counts as a block, and only the opener is cut so a reader sees the rest.
+    if (end === -1) {
+      blocks.push({ from: start.index, to: bodyAt, json: null, raw: "" });
+      continue;
+    }
     const firstEnd = end;
     let json = null;
     while (end !== -1) {
