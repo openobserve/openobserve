@@ -417,14 +417,20 @@ describe("ConfigPanel", () => {
     });
 
     it("drops decimals instead of storing an empty string when the field is cleared", async () => {
-      wrapper = createWrapper();
-      const config = wrapper.vm.dashboardPanelData.data.config;
-      config.decimals = 3;
+      const dataSectionExpanded = DEFAULT_EXPANDED_SECTIONS.data;
+      DEFAULT_EXPANDED_SECTIONS.data = true;
+      try {
+        wrapper = createWrapper();
+        const config = wrapper.vm.dashboardPanelData.data.config;
+        config.decimals = 3;
 
-      const decimalsInput = wrapper.findComponent('[data-test="dashboard-config-decimals"]');
-      await decimalsInput.vm.$emit("update:modelValue", "");
+        const decimalsInput = wrapper.findComponent('[data-test="dashboard-config-decimals"]');
+        await decimalsInput.vm.$emit("update:modelValue", "");
 
-      expect("decimals" in config).toBe(false);
+        expect("decimals" in config).toBe(false);
+      } finally {
+        DEFAULT_EXPANDED_SECTIONS.data = dataSectionExpanded;
+      }
     });
 
     it("should handle empty description", () => {
