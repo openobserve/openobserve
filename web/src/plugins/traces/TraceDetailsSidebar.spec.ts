@@ -323,29 +323,37 @@ function mountSidebar(
 describe("TraceDetailsSidebar", async () => {
   let wrapper: any;
 
-  beforeEach(async () => {
-    wrapper = mountSidebar();
-    await wrapper.vm.$nextTick();
+  beforeEach(() => {
+    wrapper = undefined;
   });
 
+  async function mountDefault() {
+    wrapper = mountSidebar();
+    await wrapper.vm.$nextTick();
+  }
+
   afterEach(() => {
-    wrapper.unmount();
+    wrapper?.unmount();
     vi.clearAllMocks();
   });
 
-  it("should display operation name in header", () => {
+  it("should display operation name in header", async () => {
+    await mountDefault();
     const operationName = wrapper.find('[data-test="trace-details-sidebar-header-operation-name"]');
     expect(operationName.exists()).toBe(true);
     expect(operationName.text()).toBe(mockSpan.operation_name);
   });
 
-  it("should display service name", () => {
+  it("should display service name", async () => {
+    await mountDefault();
     const serviceName = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-service"]');
     expect(serviceName.exists()).toBe(true);
     expect(serviceName.text()).toContain(mockSpan.service_name);
   });
 
   describe("span start offset", () => {
+    beforeEach(mountDefault);
+
     const startText = () => wrapper.vm.getStartTime;
 
     it("measures the start from the trace root, not the waterfall axis start", async () => {
@@ -367,6 +375,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("service icon", () => {
+    beforeEach(mountDefault);
+
     it("should render service icon img inside the service chip", () => {
       const serviceChip = wrapper.find(
         '[data-test="trace-details-sidebar-header-toolbar-service"]',
@@ -395,25 +405,29 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
-  it("should display duration", () => {
+  it("should display duration", async () => {
+    await mountDefault();
     const duration = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-duration"]');
     expect(duration.exists()).toBe(true);
     expect(duration.text()).toContain("321.37ms");
   });
 
-  it("should display start time", () => {
+  it("should display start time", async () => {
+    await mountDefault();
     const startTime = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-start-time"]');
     expect(startTime.exists()).toBe(true);
     expect(startTime.text()).toContain("0us");
   });
 
-  it("should display span ID", () => {
+  it("should display span ID", async () => {
+    await mountDefault();
     const spanId = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-span-id"]');
     expect(spanId.exists()).toBe(true);
     expect(spanId.text()).toContain(mockSpan.span_id);
   });
 
-  it("wraps the header chips and keeps the action group from shrinking", () => {
+  it("wraps the header chips and keeps the action group from shrinking", async () => {
+    await mountDefault();
     const chips = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-chips"]');
     const actions = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-actions"]');
     expect(chips.classes()).toEqual(expect.arrayContaining(["flex-wrap", "min-w-0"]));
@@ -425,6 +439,7 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   it("should emit close when close button is clicked", async () => {
+    await mountDefault();
     const closeBtn = wrapper.find('[data-test="trace-details-sidebar-header-close-btn"]');
     expect(closeBtn.exists()).toBe(true);
 
@@ -434,6 +449,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("viewSpanLogs", () => {
+    beforeEach(mountDefault);
+
     let dispatchSpy: ReturnType<typeof vi.spyOn>;
     let pushSpy: ReturnType<typeof vi.spyOn>;
     let viewLogsWrapper: any;
@@ -727,6 +744,7 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   it("should copy span ID when copy button is clicked", async () => {
+    await mountDefault();
     const copyBtn = wrapper.find(
       '[data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"]',
     );
@@ -741,6 +759,7 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   it("should show error notification when copy fails", async () => {
+    await mountDefault();
     // Mock clipboard API to fail for this specific test
     const originalWriteText = navigator.clipboard.writeText;
     (navigator.clipboard.writeText as any) = vi
@@ -765,7 +784,6 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Tabs functionality", () => {
     beforeEach(async () => {
-      wrapper.unmount();
       wrapper = mountSidebar({}, true);
       await wrapper.vm.$nextTick();
     });
@@ -819,6 +837,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Attributes tab content", () => {
+    beforeEach(mountDefault);
+
     it("should display attributes table", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
@@ -842,6 +862,8 @@ describe("TraceDetailsSidebar", async () => {
   // message renderer (LLMContentRenderer.vue) and the Thread tab
   // (threadView.utils.ts), not just `type: "text"`.
   describe("System instructions parsing (parsedSystemInstructions)", () => {
+    beforeEach(mountDefault);
+
     it("renders a reasoning part, not just text parts", () => {
       const w = mountSidebar({
         span: {
@@ -905,6 +927,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Service information in Attributes tab", () => {
+    beforeEach(mountDefault);
+
     it("should display service information", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
@@ -924,6 +948,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Events tab", () => {
+    beforeEach(mountDefault);
+
     beforeEach(async () => {
       await wrapper.setProps({ activeTab: "events" });
       const eventsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-events"]');
@@ -1242,6 +1268,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Error tab", () => {
+    beforeEach(mountDefault);
+
     beforeEach(async () => {
       await wrapper.setProps({ activeTab: "error" });
       const exceptionsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-error"]');
@@ -1289,6 +1317,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Links tab", () => {
+    beforeEach(mountDefault);
+
     beforeEach(async () => {
       await wrapper.setProps({ activeTab: "links" });
       const linksTab = wrapper.find('[data-test="trace-details-sidebar-tabs-links"]');
@@ -1402,6 +1432,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Attributes tab", () => {
+    beforeEach(mountDefault);
+
     beforeEach(async () => {
       const attributesTab = wrapper.find('[data-test="trace-details-sidebar-tabs-attributes"]');
       await attributesTab.trigger("click");
@@ -1423,6 +1455,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Search highlighting", () => {
+    beforeEach(mountDefault);
+
     it("should highlight search terms in attributes", async () => {
       await wrapper.setProps({
         searchQuery: "GET",
@@ -1453,6 +1487,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("activeTab prop", () => {
+    beforeEach(mountDefault);
+
     it("should respect activeTab prop when provided", async () => {
       wrapper.unmount();
       wrapper = mountSidebar({ activeTab: "events" });
@@ -1471,6 +1507,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("spanHttpResendCount", () => {
+    beforeEach(mountDefault);
+
     it("should return null when http_request_resend_count is not present", () => {
       expect(wrapper.vm.spanHttpResendCount).toBeNull();
     });
@@ -1511,6 +1549,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("hasSpanError", () => {
+    beforeEach(mountDefault);
+
     it("should be false for a normal span (mock default)", () => {
       expect(wrapper.vm.hasSpanError).toBe(false);
     });
@@ -1545,6 +1585,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Error handling", () => {
+    beforeEach(mountDefault);
+
     it("should handle invalid events JSON gracefully", async () => {
       await wrapper.setProps({
         span: {
@@ -1614,6 +1656,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("correlateForMetrics — no data found", () => {
+    beforeEach(mountDefault);
+
     let correlationWrapper: any;
 
     beforeEach(async () => {
@@ -1644,6 +1688,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Component props — selectedLogStreams and showLogStreamSelector", () => {
+    beforeEach(mountDefault);
+
     it("should accept selectedLogStreams prop", () => {
       // Component should work with selectedLogStreams prop
       const testWrapper = mountSidebar({
@@ -1672,6 +1718,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("View Logs button — current implementation", () => {
+    beforeEach(mountDefault);
+
     it("should have tooltip functionality with viewLogsTooltipContent", () => {
       const testWrapper = mountSidebar({
         parentMode: "standalone",
@@ -1834,6 +1882,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS", () => {
+    beforeEach(mountDefault);
+
     // getFilterValue is explicitly returned from setup() and is part of the component's
     // public API. We call it directly here to unit-test its branching logic in isolation
     // before verifying the full emit path through DOM interaction below.
@@ -1903,6 +1953,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("getFormattedSpanDetails — _start_time_ns / _end_time_ns are never injected", () => {
+    beforeEach(mountDefault);
+
     // The NS patching pipeline no longer injects _start_time_ns / _end_time_ns shadow
     // fields onto span objects. getFormattedSpanDetails must therefore not expose them
     // in the rendered attributes, and the component must not attempt to delete them.
@@ -1934,6 +1986,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("apply-filter-immediately emit — getFilterValue called at the emit site", () => {
+    beforeEach(mountDefault);
+
     // This describe block mounts a separate wrapper with JsonPreview stubbed to render
     // its #field-dropdown slot directly in the DOM (no popup layer).
     // This lets us click the filter item without needing popup mechanics.
@@ -2048,6 +2102,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("LLM Preview tab — LLMContentRenderer instance-id", () => {
+    beforeEach(mountDefault);
+
     const LLM_SPAN_ID = "d9603ec7f76eb499";
 
     const mockLLMSpan = {
@@ -2250,6 +2306,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("CSS verification — .vjs-tree presence", () => {
+    beforeEach(mountDefault);
+
     it("should reference .vjs-tree for LLM panel hover suppression", () => {
       // The LLM preview panel now includes .vjs-tree hover-suppression
       // rules to prevent unwanted hover effects on VueJsonPretty elements.
@@ -2260,6 +2318,8 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Scores block — enterprise/cloud only (scoring itself is not an OSS feature)", () => {
+    beforeEach(mountDefault);
+
     const mockScoredLLMSpan = {
       ...mockSpan,
       span_id: "score-span-1",

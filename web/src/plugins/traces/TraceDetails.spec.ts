@@ -123,9 +123,9 @@ describe("TraceDetails", () => {
   let wrapper: any;
   let mountOptions: any;
 
-  beforeEach(async () => {
-    // The active tab and tab order persist to localStorage, so a test that
-    // switches tabs would otherwise leak its selection into every later test.
+  beforeEach(() => {
+    wrapper = undefined;
+    // Persisted tab settings must not leak into the next fixture.
     localStorage.removeItem("o2_trace_active_tab");
     localStorage.removeItem("o2_trace_tab_order");
     localStorage.removeItem("o2_trace_critical_path");
@@ -293,16 +293,14 @@ describe("TraceDetails", () => {
         },
       },
     };
-
-    wrapper = mount(TraceDetails, mountOptions);
-
-    await flushPromises();
   });
 
-  /**
-   * Re-mounts with the same options. Needed by tests that assert on state read
-   * from localStorage during setup, which only runs at mount time.
-   */
+  async function mountDefault() {
+    wrapper = mount(TraceDetails, mountOptions);
+    await flushPromises();
+  }
+
+  // Persisted settings are read during setup, so these assertions require a fresh mount.
   async function remount() {
     wrapper.unmount();
     wrapper = mount(TraceDetails, mountOptions);
@@ -318,12 +316,15 @@ describe("TraceDetails", () => {
     vi.restoreAllMocks();
   });
 
-  it("should mount TraceDetails component", () => {
+  it("should mount TraceDetails component", async () => {
+    await mountDefault();
     expect(wrapper.exists()).toBe(true);
     expect(wrapper.find(".trace-details").exists()).toBe(true);
   });
 
   describe("Toolbar functionality", () => {
+    beforeEach(mountDefault);
+
     beforeEach(() => {
       vi.waitFor(() => {}, {
         timeout: 1000,
@@ -406,6 +407,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Search functionality", () => {
+    beforeEach(mountDefault);
+
     it("should handle search query changes", async () => {
       // OInput wraps the native input in a div; find the inner element
       const searchInputWrapper = wrapper.find('[data-test="trace-details-search-input"]');
@@ -449,6 +452,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Stream selection", () => {
+    beforeEach(mountDefault);
+
     it("should display stream selector with placeholder", () => {
       const streamSelector = wrapper.find('[data-test="trace-details-log-streams-select"]');
       expect(streamSelector.exists()).toBe(true);
@@ -495,6 +500,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Span interaction", () => {
+    beforeEach(mountDefault);
+
     // The trace tree, header and span sidebar all live inside the waterfall
     // view. The component defaults to the flame graph, so opt in explicitly.
     beforeEach(async () => {
@@ -570,6 +577,8 @@ describe("TraceDetails", () => {
   // });
 
   describe("J/K follow the visible span order (item 4a §3.5)", () => {
+    beforeEach(mountDefault);
+
     const template = tracesMockData.tracesDetails.traceSpans.hits[0];
     const base = template.start_time;
     const span = (spanId: string, parentId: string, offsetMs: number, name: string) => ({
@@ -745,6 +754,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Critical path", () => {
+    beforeEach(mountDefault);
+
     const toggle = () => wrapper.find('[data-test="trace-details-critical-path-toggle-btn"]');
     const treeShowsCriticalPath = () =>
       wrapper.findComponent('[data-test="trace-details-tree"]').props("showCriticalPath");
@@ -867,7 +878,7 @@ describe("TraceDetails", () => {
     let fakeChart: any;
 
     async function mountMap() {
-      wrapper.unmount();
+      wrapper?.unmount();
       wrapper = mount(TraceDetails, {
         ...mountOptions,
         global: {
@@ -1078,6 +1089,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Data processing", () => {
+    beforeEach(mountDefault);
+
     it("should process span data correctly", () => {
       expect(wrapper.vm.spanList).toEqual(tracesMockData.tracesDetails.traceSpans.hits);
     });
@@ -1105,6 +1118,8 @@ describe("TraceDetails", () => {
   // });
 
   describe("Component lifecycle", () => {
+    beforeEach(mountDefault);
+
     it("should setup trace details on mount", async () => {
       expect(wrapper.vm.searchObj.data.traceDetails.spanList).toEqual(
         tracesMockData.tracesDetails.traceSpans.hits,
@@ -1118,6 +1133,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Utility functions", () => {
+    beforeEach(mountDefault);
+
     it("should format time correctly", () => {
       const time = 10000000; // 1 second in nanoseconds
       const result = wrapper.vm.convertTimeFromNsToMs(time);
@@ -1139,6 +1156,8 @@ describe("TraceDetails", () => {
 
   describe("Props: Mode control", () => {
     describe("mode prop - standalone", () => {
+      beforeEach(mountDefault);
+
       it("should default to standalone mode", () => {
         expect(wrapper.props("mode")).toBe("standalone");
       });
@@ -1470,6 +1489,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Props: UI visibility controls", () => {
+    beforeEach(mountDefault);
+
     describe("showBackButton prop", () => {
       it("should show back button when true in standalone mode", () => {
         const backBtn = wrapper.find('[data-test="trace-details-back-btn"]');
@@ -1667,6 +1688,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Props: Correlation-specific props", () => {
+    beforeEach(mountDefault);
+
     describe("correlatedLogStream prop", () => {
       it("should use correlatedLogStream when expanding to full view", async () => {
         const embeddedWrapper = mount(TraceDetails, {
@@ -1819,6 +1842,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Integration: Mode switching scenarios", () => {
+    beforeEach(mountDefault);
+
     it("should open a new window when handleExpandToFullView is called in standalone mode", () => {
       // handleExpandToFullView has no mode guard — it opens in a new tab from any mode
       const windowOpenSpy = vi.spyOn(window, "open").mockImplementation();
@@ -1947,6 +1972,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Props validation and defaults", () => {
+    beforeEach(mountDefault);
+
     it("should have correct default values for all props", () => {
       const defaultWrapper = mount(TraceDetails, {
         attachTo: "#app",
@@ -2000,6 +2027,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Current functionality verification", () => {
+    beforeEach(mountDefault);
+
     it("should have isViewLogsDisabled computed property", () => {
       // The component HAS isViewLogsDisabled computed property
       expect(wrapper.vm.isViewLogsDisabled).toBeDefined();
@@ -2087,6 +2116,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: redirectToLogs edge cases", () => {
+    beforeEach(mountDefault);
+
     it("should return early when selectedTrace is not available (line 1815)", () => {
       const routerPushSpy = vi.spyOn(router, "push");
       wrapper.vm.searchObj.data.traceDetails.selectedTrace = null;
@@ -2123,6 +2154,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: redirectToSessionReplay edge cases", () => {
+    beforeEach(mountDefault);
+
     it("should not navigate when no span has a replayable RUM session", () => {
       const routerPushSpy = vi.spyOn(router, "push");
       wrapper.vm.searchObj.data.traceDetails.spanList =
@@ -2164,6 +2197,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: filterStreamFn function", () => {
+    beforeEach(mountDefault);
+
     // Note: logStreams is NOT exported from the component, so we can't directly manipulate it
     // We can only test filterStreamFn with the streams that are already loaded via loadLogStreams()
 
@@ -2209,6 +2244,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: openTraceDetails function", () => {
+    beforeEach(mountDefault);
+
     it("should set showSpanDetails and showTraceDetails to true (lines 1877-1878)", () => {
       wrapper.vm.searchObj.data.traceDetails.showSpanDetails = false;
       wrapper.vm.showTraceDetails = false;
@@ -2231,6 +2268,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: routeToTracesList with datetime handling", () => {
+    beforeEach(mountDefault);
+
     it("should use period for relative datetime (default case)", async () => {
       const routerPushSpy = vi.spyOn(router, "push");
       wrapper.vm.searchObj.data.datetime.type = "relative";
@@ -2323,6 +2362,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: openTraceLink function", () => {
+    beforeEach(mountDefault);
+
     it("should call openTraceLink and verify trace details are reset (lines 1952-1953)", async () => {
       // Call the function
       await wrapper.vm.openTraceLink();
@@ -2348,6 +2389,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: RUM session integration", () => {
+    beforeEach(mountDefault);
+
     it("should show session replay button when a RUM session with a replay exists", async () => {
       wrapper.vm.searchObj.data.traceDetails.spanList = [
         {
@@ -2419,6 +2462,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: Stream filtering integration", () => {
+    beforeEach(mountDefault);
+
     it("should filter streams when user types in search", async () => {
       wrapper.vm.logStreams = ["app-logs", "system-logs", "error-logs", "debug-logs"];
 
@@ -2434,6 +2479,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Priority 1: RUM Integration - formatRumEventsAsSpans", () => {
+    beforeEach(mountDefault);
+
     // formatRumEventsAsSpans(tracedResources, viewEvents, actionEvents, allViewEvents)
     // tracedResources: RUM events with _oo_trace_id (the resource linked to a backend trace)
     // viewEvents:      type='view' events fetched via fetchViewEvents
@@ -2770,6 +2817,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Bug fix: invalid span_id in URL query param", () => {
+    beforeEach(mountDefault);
+
     // Helper that builds a full mount with a custom route query so we can
     // control which span_id (if any) arrives via the URL.
     function mountWithSpanQuery(spanId: string | undefined) {
@@ -2985,6 +3034,8 @@ describe("TraceDetails", () => {
   // Regression: a bare Number() on absent query params produced NaN, which
   // passes the `!= null` guard in search.ts and reaches the API as "NaN".
   describe("Bug fix: missing from/to in URL query params", () => {
+    beforeEach(mountDefault);
+
     // Records the details URL the component actually requested, so we can
     // assert on what reached the wire rather than only on internal state.
     let requestedUrl: string;
@@ -3129,6 +3180,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Priority 3: Search Navigation", () => {
+    beforeEach(mountDefault);
+
     let mockTraceTreeRef: any;
 
     beforeEach(() => {
@@ -3353,6 +3406,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Sidebar active tab", () => {
+    beforeEach(mountDefault);
+
     it("should initialize sidebarActiveTab to 'attributes'", () => {
       expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
     });
@@ -3471,6 +3526,8 @@ describe("TraceDetails", () => {
   });
 
   describe("effectiveSpanId", () => {
+    beforeEach(mountDefault);
+
     it("should return hoveredSpanId when hovering over a span", () => {
       wrapper.vm.hoveredSpanId = "hovered-span-1";
       wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "selected-span-1";
@@ -3487,6 +3544,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Hover span handlers", () => {
+    beforeEach(mountDefault);
+
     it("should set hoveredSpanId when onHoverSpan is called", () => {
       wrapper.vm.onHoverSpan("hovered-span-42");
       expect(wrapper.vm.hoveredSpanId).toBe("hovered-span-42");
@@ -3513,6 +3572,8 @@ describe("TraceDetails", () => {
   });
 
   describe("TraceTree hover integration", () => {
+    beforeEach(mountDefault);
+
     it("should pass hoveredSpanId prop to TraceTree child component", async () => {
       // TraceTree only renders inside the waterfall view.
       wrapper.vm.activeTab = "waterfall";
@@ -3526,6 +3587,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Migrated filters drawer (ODrawer)", () => {
+    beforeEach(mountDefault);
+
     const drawerSelector = '[data-test="trace-details-filters-drawer-stub"]';
 
     it("renders the ODrawer with migrated props (width, title, button labels)", () => {
@@ -3599,6 +3662,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Tab order and active-tab persistence", () => {
+    beforeEach(mountDefault);
+
     const ORDER_KEY = "o2_trace_tab_order";
     const ACTIVE_KEY = "o2_trace_active_tab";
 
@@ -3703,6 +3768,8 @@ describe("TraceDetails", () => {
   });
 
   describe("Tree view: View Logs on a span", () => {
+    beforeEach(mountDefault);
+
     it("selects the span and runs the sidebar's own View Logs (which loads correlation)", async () => {
       const viewSpanLogs = vi.fn().mockResolvedValue(undefined);
       const baseStub = mountOptions.global.stubs["trace-details-sidebar"];
