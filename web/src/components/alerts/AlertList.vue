@@ -42,7 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="inline-flex">
             <OButton data-test="alert-list-add-alert-btn" variant="primary" size="sm" disabled>
               <template #icon-left>
-                <OIcon name="lock" size="sm" data-test="alert-list-add-anomaly-lock" />
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="alert-list-add-anomaly-lock"
+                />
               </template>
               {{ t(`alerts.add`) }}
             </OButton>
@@ -185,13 +190,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="tab.value"
                         size="sm"
                         :icon-left="tab.icon"
-                        :title="lgUp && !tab.locked ? undefined : tab.label"
+                        :icon-right="tab.locked ? 'lock' : undefined"
+                        :tooltip="tab.locked ? anomalyLockedReason : undefined"
+                        :title="lgUp || tab.locked ? undefined : tab.label"
                         :data-test="`alert-list-tab-${tab.value}`"
                       >
                         <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
-                        <template v-if="tab.locked" #icon-right>
-                          <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
-                        </template>
                       </OToggleGroupItem>
                     </template>
                   </OToggleGroup>
@@ -584,6 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         :data-row-action="row.enabled ? 'pause' : 'resume'"
                         :data-test="`alert-list-${row.name}-pause-start-alert`"
+                        :aria-label="row.enabled ? t('alerts.pause') : t('alerts.start')"
                         variant="ghost"
                         size="icon-sm"
                         icon-left="lock"
@@ -616,6 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         data-row-action="edit"
                         :data-test="`alert-list-${row.name}-update-alert`"
+                        :aria-label="t('alerts.edit')"
                         variant="ghost"
                         size="icon-sm"
                         icon-left="lock"
@@ -706,11 +712,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="!!alertStateLoadingMap[row.uuid] || anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
                       @select="toggleAlertState(row)"
                     >
                       <template #icon-left>
                         <OIcon
+                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
                           :name="
                             anomalyRowLocked(row) ? 'lock' : row.enabled ? 'pause' : 'play-arrow'
                           "
@@ -722,33 +731,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="rowAnomalyLocked(row)"
+                      :focusable-unavailable="rowAnomalyLocked(row)"
+                      :description="rowAnomalyLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-update-alert-menu`"
                       @select="editAlert(row)"
                     >
                       <template #icon-left>
-                        <OIcon :name="rowAnomalyLocked(row) ? 'lock' : 'edit'" size="sm" />
+                        <OIcon
+                          :class="rowAnomalyLocked(row) ? 'text-icon-locked' : undefined"
+                          :name="rowAnomalyLocked(row) ? 'lock' : 'edit'"
+                          size="sm"
+                        />
                       </template>
                       {{ t("alerts.edit") }}
                     </ODropdownItem>
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="isSloRow(row) || anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-clone-alert-menu`"
                       @select="duplicateAlert(row)"
                     >
                       <template #icon-left>
-                        <OIcon :name="anomalyRowLocked(row) ? 'lock' : 'content-copy'" size="sm" />
+                        <OIcon
+                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
+                          :name="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
+                          size="sm"
+                        />
                       </template>
                       {{ t("alerts.clone") }}
                     </ODropdownItem>
                     <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
                       :disabled="anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
                     >
                       <template #icon-left>
                         <OIcon
+                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
                           :name="anomalyRowLocked(row) ? 'lock' : 'drive-file-move'"
                           size="sm"
                         />
@@ -801,25 +825,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownSeparator />
                     <ODropdownItem
                       :disabled="anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-delete-alert`"
                       variant="destructive"
                       shortcut-id="alertsRowDelete"
                       @select="showDeleteDialogFn({ row })"
                     >
                       <template #icon-left>
-                        <OIcon :name="anomalyRowLocked(row) ? 'lock' : 'delete'" size="sm" />
+                        <OIcon
+                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
+                          :name="anomalyRowLocked(row) ? 'lock' : 'delete'"
+                          size="sm"
+                        />
                       </template>
                       {{ t("alerts.delete") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <ODropdownItem
                       :disabled="anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-export-alert`"
                       shortcut-id="alertsRowExport"
                       @select="exportAlert(row)"
                     >
                       <template #icon-left>
-                        <OIcon size="sm" :name="anomalyRowLocked(row) ? 'lock' : 'download'" />
+                        <OIcon
+                          size="sm"
+                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
+                          :name="anomalyRowLocked(row) ? 'lock' : 'download'"
+                        />
                       </template>
                       {{ t("common.export") }}
                     </ODropdownItem>
@@ -828,12 +864,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="row.type === 'anomaly'">
                       <ODropdownItem
                         :disabled="anomalyLicenseLocked"
+                        :focusable-unavailable="anomalyLicenseLocked"
+                        :description="anomalyLicenseLocked ? anomalyLockedReason : undefined"
                         :data-test="`alert-list-${row.name}-trigger-detection`"
                         @select="triggerAlert(row)"
                       >
                         <template #icon-left>
                           <OIcon
                             size="sm"
+                            :class="anomalyLicenseLocked ? 'text-icon-locked' : undefined"
                             :name="anomalyLicenseLocked ? 'lock' : 'sound-sampler'"
                           />
                         </template>
@@ -841,11 +880,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ODropdownItem>
                       <ODropdownItem
                         :disabled="anomalyLicenseLocked"
+                        :focusable-unavailable="anomalyLicenseLocked"
+                        :description="anomalyLicenseLocked ? anomalyLockedReason : undefined"
                         :data-test="`alert-list-${row.name}-retrain-anomaly`"
                         @select="retrainAnomaly(row)"
                       >
                         <template #icon-left>
-                          <OIcon size="sm" :name="anomalyLicenseLocked ? 'lock' : 'replay'" />
+                          <OIcon
+                            size="sm"
+                            :class="anomalyLicenseLocked ? 'text-icon-locked' : undefined"
+                            :name="anomalyLicenseLocked ? 'lock' : 'replay'"
+                          />
                         </template>
                         {{ t("alerts.retrain") }}
                       </ODropdownItem>

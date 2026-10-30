@@ -300,7 +300,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   #icon-left
                 >
-                  <OIcon name="lock" size="sm" data-test="metrics-detail-drilldown-lock" />
+                  <OIcon
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="metrics-detail-drilldown-lock"
+                  />
                 </template>
                 <span class="max-md:hidden">{{
                   t("metrics.explorer.detail.drilldown.button")

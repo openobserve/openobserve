@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="locked"
               role="img"
               :aria-label="lockedLabel"
-              class="text-warning-600 inline-flex shrink-0"
+              class="text-icon-locked inline-flex shrink-0"
               data-test="app-page-header-locked"
             >
               <OIcon name="lock" size="sm" />

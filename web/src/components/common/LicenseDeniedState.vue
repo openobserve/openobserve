@@ -24,7 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('featureLock.toastMessage', { features: raw(featureNames(features)) })
         : t('featureLock.toastMessageGeneric')
     "
-  />
+  >
+    <template v-if="$slots.actions" #actions><slot name="actions" /></template>
+  </OEmptyState>
 </template>
 
 <script setup lang="ts">

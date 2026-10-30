@@ -859,7 +859,7 @@ describe("useManagementRoutes", () => {
       const names = children().map((child: any) => child.name);
       expect(names.indexOf("telephonySettings")).toBe(names.indexOf("pipelineDestinations") + 1);
       expect(findRoute().path).toBe("telephony");
-      expect(findRoute().meta).toEqual({ titleKey: "telephony.title" });
+      expect(findRoute().meta).toEqual({ titleKey: "telephony.title", licenseFeature: "oncall" });
       expect(typeof findRoute().component).toBe("function");
     });
 

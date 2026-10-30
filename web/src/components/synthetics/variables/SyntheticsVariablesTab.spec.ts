@@ -82,6 +82,17 @@ describe("SyntheticsVariablesTab — landing on a new environment", () => {
     vi.clearAllMocks();
   });
 
+  it("passes a license denial to the list as the forbidden state", async () => {
+    listEnvironments.mockRejectedValue({
+      response: { status: 403, data: { code: 40001, error_detail: "synthetics" } },
+    });
+    wrapper = await mountTab();
+
+    expect(wrapper.findComponent(SyntheticsVariablesList).props("forbidden")).toEqual([
+      "synthetics",
+    ]);
+  });
+
   it("starts on Global", async () => {
     wrapper = await mountTab();
 

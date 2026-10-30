@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           v-if="section.disabled"
           name="lock"
+          class="text-icon-locked"
           size="xs"
           aria-hidden="true"
           :data-test="`dbm-section-tab-lock-${section.key}`"

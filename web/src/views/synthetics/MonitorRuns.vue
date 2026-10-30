@@ -87,14 +87,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
     <template v-else>
-      <OTabs v-model="activeTab" class="px-page-edge border-border-default shrink-0 border-b">
-        <OTab name="overview" data-test="monitor-runs-tab-overview">
-          {{ t("synthetics.runs.tabOverview") }}
-        </OTab>
-        <OTab v-if="isBrowser" name="steps" data-test="monitor-runs-tab-steps">
-          {{ t("synthetics.runs.tabSteps") }}
-        </OTab>
-      </OTabs>
+      <FeatureLockExempt class="contents">
+        <OTabs v-model="activeTab" class="px-page-edge border-border-default shrink-0 border-b">
+          <OTab name="overview" data-test="monitor-runs-tab-overview">
+            {{ t("synthetics.runs.tabOverview") }}
+          </OTab>
+          <OTab v-if="isBrowser" name="steps" data-test="monitor-runs-tab-steps">
+            {{ t("synthetics.runs.tabSteps") }}
+          </OTab>
+        </OTabs>
+      </FeatureLockExempt>
 
       <div class="min-h-0 flex-1">
         <OTabPanels v-model="activeTab" grow scroll="y" class="h-full min-h-0">
@@ -1125,6 +1127,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

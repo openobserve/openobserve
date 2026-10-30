@@ -84,11 +84,6 @@ describe("AiToolsets license lock", () => {
           ConfirmDialog: true,
           OTable: { template: "<div><slot name='empty' /></div>" },
           OEmptyState: { name: "OEmptyState", template: "<div data-test='empty-stub' />" },
-          LicenseDeniedState: {
-            name: "LicenseDeniedState",
-            props: ["features"],
-            template: "<div data-test='denied-stub' />",
-          },
         },
       },
     });
@@ -102,25 +97,25 @@ describe("AiToolsets license lock", () => {
     store.state.zoConfig.features = {};
   });
 
-  it("requests no toolsets and shows the license-denied state when ai_toolsets is locked", async () => {
-    store.state.zoConfig.features = { ai_toolsets: "locked" };
-    const w = mountWithEmpty();
-    await flushPromises();
-    expect(aiToolsetsService.list).not.toHaveBeenCalled();
-    expect(w.findComponent({ name: "LicenseDeniedState" }).props("features")).toEqual([
-      "ai_toolsets",
-    ]);
-    await (w.vm as any).refreshData();
-    expect(aiToolsetsService.list).not.toHaveBeenCalled();
-    w.unmount();
-  });
+  it.each(["ai_toolsets", "ai_assistant"])(
+    "requests no toolsets while %s is locked and leaves the dimmed page's table empty",
+    async (feature) => {
+      store.state.zoConfig.features = { [feature]: "locked" };
+      const w = mountWithEmpty();
+      await flushPromises();
+      expect(aiToolsetsService.list).not.toHaveBeenCalled();
+      expect(w.find("[data-test='empty-stub']").exists()).toBe(true);
+      await (w.vm as any).refreshData();
+      expect(aiToolsetsService.list).not.toHaveBeenCalled();
+      w.unmount();
+    },
+  );
 
   it("loads the toolsets and keeps the regular empty state when ai_toolsets is enabled", async () => {
     store.state.zoConfig.features = { ai_toolsets: "enabled" };
     const w = mountWithEmpty();
     await flushPromises();
     expect(aiToolsetsService.list).toHaveBeenCalled();
-    expect(w.find("[data-test='denied-stub']").exists()).toBe(false);
     expect(w.find("[data-test='empty-stub']").exists()).toBe(true);
     w.unmount();
   });

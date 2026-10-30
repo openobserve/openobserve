@@ -2654,6 +2654,8 @@ describe("useRoutes (router.ts)", () => {
       ["metrics", "metrics"],
       ["metricsEditor", "metrics"],
       ["promqlBuilder", "metrics"],
+      ["alertDestinations", "alerts"],
+      ["alertTemplates", "alerts"],
     ])("tags %s with meta.licenseFeature %s", (name, feature) => {
       expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe(feature);
     });
@@ -2663,8 +2665,6 @@ describe("useRoutes (router.ts)", () => {
     });
 
     it.each([
-      "alertDestinations",
-      "alertTemplates",
       "pipeline",
       "functionList",
       "importFunction",

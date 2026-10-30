@@ -940,6 +940,7 @@
   --color-icon-chip-success-text: var(--color-success-400);
   --color-icon-chip-warning-bg: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
   --color-icon-chip-warning-text: var(--color-warning-400);
+  --color-icon-locked: var(--color-warning-400);
   --color-icon-chip-error-bg: color-mix(in srgb, var(--color-error-500) 15%, transparent);
   --color-icon-chip-error-text: var(--color-error-400);
   --color-icon-chip-info-bg: color-mix(in srgb, var(--color-blue-500) 15%, transparent);

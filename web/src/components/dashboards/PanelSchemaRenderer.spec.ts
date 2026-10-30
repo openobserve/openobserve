@@ -2841,14 +2841,17 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuValue).toBe(75);
     });
 
-    it("opens no alert menu while alerts is license-locked", () => {
+    it("opens the alert menu locked while alerts is license-locked", async () => {
       const zoConfig = store.state.zoConfig as any;
       const previous = zoConfig.features;
       zoConfig.features = { alerts: "locked" };
       try {
         wrapper = createWrapper({ allowAlertCreation: true });
         wrapper.vm.onChartDomContextMenu({ x: 150, y: 250, value: 75 });
-        expect(wrapper.vm.contextMenuVisible).toBe(false);
+        await nextTick();
+        expect(wrapper.vm.contextMenuVisible).toBe(true);
+        expect(wrapper.vm.alertsLocked).toBe(true);
+        expect(wrapper.vm.alertsLockedReason).toContain("Locked: needs");
       } finally {
         zoConfig.features = previous;
       }

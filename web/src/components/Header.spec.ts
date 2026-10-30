@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { computed, nextTick } from "vue";
 import i18n from "@/locales";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
@@ -490,6 +491,25 @@ describe("Header Component", () => {
       expect(aiButton.exists()).toBe(true);
       expect(aiButton.attributes("disabled")).toBeUndefined();
 
+      aiWrapper.unmount();
+    });
+
+    it("keeps the AI logo with a lock badge and under a locked license", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: {
+          state: { zoConfig: { ai_enabled: true, features: { ai_assistant: "locked" } } },
+        },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      const aiButton = aiWrapper.find('[data-test="menu-link-ai-locked"]');
+      expect(aiButton.exists()).toBe(true);
+      expect(aiButton.find("img").exists()).toBe(true);
+      expect(aiButton.findComponent(OLockBadge).exists()).toBe(true);
+      expect(aiButton.attributes("aria-label")).toContain("Locked: needs");
       aiWrapper.unmount();
     });
 
@@ -1564,6 +1584,40 @@ describe("Header Component", () => {
         name: "onCallMine",
         query: { org_identifier: "test-org" },
       });
+      w.unmount();
+    });
+
+    it("marks My on-call with a lock under a locked on-call license", () => {
+      const store = {
+        ...mockStore,
+        state: {
+          ...mockStore.state,
+          zoConfig: {
+            ...mockStore.state.zoConfig,
+            oncall_enabled: false,
+            features: { oncall: "locked" },
+          },
+        },
+      };
+      const w = mount(Header, {
+        props: { ...defaultProps, store, router: { ...mockRouter, hasRoute: vi.fn(() => true) } },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            ThemeSwitcher: true,
+            OrganizationSelector: true,
+            EnterpriseUpgradeDialog: true,
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            ODropdownItem: {
+              template:
+                '<div role="menuitem"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+            },
+          },
+        },
+      });
+      expect(w.find('[data-test="header-my-oncall"]').exists()).toBe(true);
+      expect(w.find('[data-test="header-my-oncall-license-lock"]').exists()).toBe(true);
       w.unmount();
     });
 

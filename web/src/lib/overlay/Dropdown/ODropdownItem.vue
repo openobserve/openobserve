@@ -75,7 +75,12 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
       :aria-disabled="isDisabled || undefined"
     >
       <slot name="icon-left">
-        <OIcon v-if="props.iconLeft" :name="props.iconLeft" size="sm" />
+        <OIcon
+          v-if="props.iconLeft"
+          :name="props.iconLeft"
+          size="sm"
+          :class="props.iconLeft === 'lock' ? 'text-icon-locked' : undefined"
+        />
       </slot>
       <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span><slot /></span>

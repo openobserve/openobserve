@@ -132,7 +132,7 @@
           aria-hidden="true"
           class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
         >
-          <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
+          <OIcon name="lock" size="xs" class="text-icon-locked size-2.5!" />
         </span>
         <OTooltip
           v-if="aiAccess.allowed"

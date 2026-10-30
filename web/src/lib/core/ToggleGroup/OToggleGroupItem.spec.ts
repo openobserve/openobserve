@@ -43,6 +43,12 @@ describe("OToggleGroupItem", () => {
     expect(wrapper.find('[data-testid="icon-right"]').exists()).toBe(true);
   });
 
+  it.each(["iconLeft", "iconRight"])("paints a %s lock with the locked-icon token", (prop) => {
+    const wrapper = mountItem({ value: "x", [prop]: "lock" }, { default: () => h("span", "A") });
+    expect(wrapper.find(".text-icon-locked").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it("applies base item classes", () => {
     const wrapper = mountItem({ value: "x" }, { default: () => h("span", "A") });
     const btn = wrapper.find("button");

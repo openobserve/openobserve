@@ -284,6 +284,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="!row.org_storage_enabled"
                   :icon-left="byobLocked ? 'lock' : 'cloud-upload'"
                   :disabled="byobLocked"
+                  :focusable-unavailable="byobLocked"
+                  :description="byobLocked ? byobLockedReason : null"
                   class="md:hidden"
                   data-test="org-management-storage-enable-btn-menu"
                   @select="toggleOrgStorage(row)"

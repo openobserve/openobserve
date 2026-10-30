@@ -172,37 +172,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            DbmSectionTabs, one level down — OTabs/OTab with a hint tooltip, and
            the Callers tab locked with the same lock+tooltip treatment when the
            vantage that fills it reported nothing. -->
-      <OTabs
-        v-if="hasQuery"
-        :model-value="activeTab"
-        align="left"
-        bordered
-        class="px-page-edge shrink-0"
-        data-test="dbm-detail-tabs"
-        @change="onTabChange"
-      >
-        <OTab
-          v-for="tab in detailTabs"
-          :key="tab.key"
-          :name="tab.key"
-          :disable="tab.disabled"
-          :data-test="`dbm-detail-tab-${tab.key}`"
+      <FeatureLockExempt v-if="hasQuery" class="contents">
+        <OTabs
+          :model-value="activeTab"
+          align="left"
+          bordered
+          class="px-page-edge shrink-0"
+          data-test="dbm-detail-tabs"
+          @change="onTabChange"
         >
-          <span>{{ tab.label }}</span>
-          <!-- The lock is what makes an empty tab read as "nothing measured
-               this" rather than "broken" — the same reason the L2 strip locks
-               its gated tabs instead of hiding them. Decorative for AT; the
-               tooltip carries the sentence. -->
-          <OIcon
-            v-if="tab.disabled"
-            name="lock"
-            size="xs"
-            aria-hidden="true"
-            :data-test="`dbm-detail-tab-lock-${tab.key}`"
-          />
-          <OTooltip side="bottom" :content="tab.hint" />
-        </OTab>
-      </OTabs>
+          <OTab
+            v-for="tab in detailTabs"
+            :key="tab.key"
+            :name="tab.key"
+            :disable="tab.disabled"
+            :data-test="`dbm-detail-tab-${tab.key}`"
+          >
+            <span>{{ tab.label }}</span>
+            <!-- The lock is what makes an empty tab read as "nothing measured
+                 this" rather than "broken" — the same reason the L2 strip locks
+                 its gated tabs instead of hiding them. Decorative for AT; the
+                 tooltip carries the sentence. -->
+            <OIcon
+              v-if="tab.disabled"
+              name="lock"
+              class="text-icon-locked"
+              size="xs"
+              aria-hidden="true"
+              :data-test="`dbm-detail-tab-lock-${tab.key}`"
+            />
+            <OTooltip side="bottom" :content="tab.hint" />
+          </OTab>
+        </OTabs>
+      </FeatureLockExempt>
 
       <OTabPanels v-if="hasQuery" :model-value="activeTab" data-test="dbm-detail-tab-panels">
         <!-- ── Overview ────────────────────────────────────────────────────
@@ -1245,6 +1247,7 @@ import DbmLockEmptyState, {
   type DbmLockEmptyAction,
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

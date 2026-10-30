@@ -30,16 +30,9 @@
       </div>
 
       <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
-        <OEmptyState
+        <LicenseDeniedState
           v-if="Array.isArray(forbidden)"
-          size="hero"
-          preset="no-access"
-          :title="t('featureLock.toastTitle')"
-          :description="
-            forbidden.length
-              ? t('featureLock.toastMessage', { features: raw(featureNames(forbidden)) })
-              : t('featureLock.toastMessageGeneric')
-          "
+          :features="forbidden"
           data-test="llm-providers-license-denied"
         />
         <OEmptyState v-else size="hero" preset="no-access" data-test="llm-providers-forbidden" />
@@ -201,7 +194,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -224,17 +217,16 @@ import {
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
-import { useFeatureNames } from "@/composables/useFeatureLock";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
-const { featureNames } = useFeatureNames();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();

@@ -5,7 +5,6 @@
     "description": "Your administrator can add it by updating the license, or contact sales to get a license that includes it.",
     "thisFeature": "This feature",
     "contactSales": "Contact sales",
-    "locked": "Requires a license",
     "toastTitle": "Not included in your license",
     "toastMessage": "Your license does not include: {features}. Ask your administrator to update the license.",
     "toastMessageGeneric": "Your license does not include this feature. Ask your administrator to update the license.",

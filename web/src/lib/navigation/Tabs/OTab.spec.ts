@@ -25,6 +25,9 @@ function mountTab(
     dense?: boolean;
     reorderable?: boolean;
     disableDrag?: boolean;
+    suffixIcon?: string;
+    suffixLabel?: string;
+    tooltip?: string;
     slots?: Record<string, string>;
   } = {},
 ) {
@@ -38,6 +41,9 @@ function mountTab(
     dense = false,
     reorderable = false,
     disableDrag = false,
+    suffixIcon,
+    suffixLabel,
+    tooltip,
     slots = {},
   } = options;
 
@@ -59,7 +65,7 @@ function mountTab(
         })),
       );
       return {
-        tabProps: { name, label, icon, disable, disableDrag },
+        tabProps: { name, label, icon, disable, disableDrag, suffixIcon, suffixLabel, tooltip },
         modelValue: activeTab,
         orientation: isVertical ? "vertical" : "horizontal",
       };
@@ -144,6 +150,30 @@ describe("OTab", () => {
     expect(wrapper.find(".o-tab__icon").exists()).toBe(true);
     // 'home' is a registered OIcon — rendered as SVG inside the span, not as text
     expect(wrapper.find(".o-tab__icon").html()).not.toBe("");
+  });
+
+  // --- Lock suffix ---
+
+  it("paints a lock suffix with the locked-icon token", () => {
+    const wrapper = mountTab({ label: "Alerts", suffixIcon: "lock" });
+    expect(wrapper.find(".text-icon-locked").exists()).toBe(true);
+  });
+
+  it("does not paint other suffix icons", () => {
+    const wrapper = mountTab({ label: "Alerts", suffixIcon: "add" });
+    expect(wrapper.find(".text-icon-locked").exists()).toBe(false);
+  });
+
+  it("gives a lock suffix screen-reader text from suffixLabel, else the tooltip", () => {
+    const explicit = mountTab({
+      label: "Alerts",
+      suffixIcon: "lock",
+      suffixLabel: "Locked: needs Alerts",
+      tooltip: "tip",
+    });
+    expect(explicit.get(".sr-only").text()).toBe("Locked: needs Alerts");
+    const fallback = mountTab({ label: "Alerts", suffixIcon: "lock", tooltip: "Locked: needs X" });
+    expect(fallback.get(".sr-only").text()).toBe("Locked: needs X");
   });
 
   // --- Default slot (custom content) ---

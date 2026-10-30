@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           rail="recommended"
           :tab="pickTab"
           :rest-label="t('ingestion.firstSource.recommended')"
+          :locked="lockedTabs.has(pickTab.name)"
         />
         <ORouteTab
           v-for="tab in tabs.filter((tab) => tab.name !== pickTab?.name)"

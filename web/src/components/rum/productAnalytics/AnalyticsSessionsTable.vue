@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="none"
       :show-global-filter="false"
       :frame="false"
-      @row-click="(row: SessionRow) => !rumLocked && emit('open', row)"
+      v-on="rowClickListeners"
     >
       <template #cell-replay="{ row, index }">
         <OTag
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="lock"
               size="sm"
-              class="text-text-secondary"
+              class="text-icon-locked"
               :data-test="`${dataTestPrefix}-row-${index}-locked`"
             />
           </span>
@@ -186,6 +186,9 @@ const { t } = useI18nTyped();
 const store = useStore();
 const { locked: rumLocked, lockedReason: rumLockedReason } = useLicenseLock("rum");
 const dash = raw("—");
+const rowClickListeners = computed(() =>
+  rumLocked.value ? {} : { rowClick: (row: SessionRow) => emit("open", row) },
+);
 
 const tz = () => store.state.timezone || "UTC";
 const fmt = (ms: number) =>
