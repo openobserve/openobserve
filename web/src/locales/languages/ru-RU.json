@@ -1356,6 +1356,8 @@
     "scanSize": "Размер сканирования",
     "deltaScanSize": "Дельта размера сканирования",
     "scannedSoFar": "Просканировано {size}",
+    "quickModeHiddenFields": "Быстрый режим включён. В этой строке показано {shown} из {total} полей.",
+    "turnOffQuickMode": "Выключить быстрый режим",
     "resultsProgressLabel": "Прогресс поиска",
     "histogramTitleError": "Ошибка при формировании заголовка гистограммы.",
     "selectLogStream": "Выбрать поток логов",

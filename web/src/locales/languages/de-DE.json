@@ -1356,6 +1356,8 @@
     "scanSize": "Scan-Größe",
     "deltaScanSize": "Delta-Scan-Größe",
     "scannedSoFar": "Gescannt: {size}",
+    "quickModeHiddenFields": "Schnellmodus ist aktiv. Diese Zeile zeigt {shown} von {total} Feldern.",
+    "turnOffQuickMode": "Schnellmodus ausschalten",
     "resultsProgressLabel": "Suchfortschritt",
     "histogramTitleError": "Fehler beim Generieren des Histogrammtitels.",
     "selectLogStream": "Logs-Stream auswählen",

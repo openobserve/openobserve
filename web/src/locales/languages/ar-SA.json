@@ -1356,6 +1356,8 @@
     "scanSize": "حجم المسح",
     "deltaScanSize": "حجم دلتا سكان",
     "scannedSoFar": "تم فحص {size}",
+    "quickModeHiddenFields": "الوضع السريع مفعّل. يعرض هذا الصف {shown} من {total} حقلًا.",
+    "turnOffQuickMode": "إيقاف الوضع السريع",
     "resultsProgressLabel": "تقدم البحث",
     "histogramTitleError": "خطأ أثناء إنشاء عنوان المدرج التكراري.",
     "selectLogStream": "اختر تدفق السجلات",

@@ -1356,6 +1356,8 @@
     "scanSize": "Tarama Boyutu",
     "deltaScanSize": "Delta Tarama Boyutu",
     "scannedSoFar": "Taranan: {size}",
+    "quickModeHiddenFields": "Hızlı mod açık. Bu satır {total} alandan {shown} tanesini gösteriyor.",
+    "turnOffQuickMode": "Hızlı modu kapat",
     "resultsProgressLabel": "Arama ilerlemesi",
     "histogramTitleError": "Histogram başlığı oluşturulurken hata.",
     "selectLogStream": "Günlükler akışını seçin",
