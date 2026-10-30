@@ -49,8 +49,6 @@ pub mod auto_investigate_decisions;
 pub mod backfill;
 pub mod composite;
 pub mod composite_graph_lock;
-#[cfg(feature = "enterprise")]
-pub mod deduplication;
 pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
@@ -62,8 +60,6 @@ pub mod lifecycle;
 #[cfg(feature = "enterprise")]
 pub mod mute;
 pub mod notifications;
-#[cfg(feature = "enterprise")]
-pub mod org_config;
 mod prom_rule;
 #[cfg(feature = "enterprise")]
 pub mod rca_live;
