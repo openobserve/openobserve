@@ -1,3 +1,5 @@
+import { LOADER_DIRS, LOADER_FILES } from "./sanitize.mjs";
+
 export const MAX_APPROVE_LINES = 100;
 export const MAX_APPROVE_FILES = 5;
 // Reviewer prompts are cut at 150k characters with the PR text ahead of the diff, so a long body could push the diff out of view.
@@ -22,8 +24,8 @@ export const SENSITIVE_PATHS = [
   /(?:^|\/)package[^/]*\.json$/i,
   /(?:^|\/)(?:[^/]*\.lock|[^/]*-lock\.(?:json|ya?ml)|npm-shrinkwrap\.json|go\.sum)$/i,
   /^src\/config\/src\/config\.rs$/i,
-  /(?:^|\/)(?:AGENTS|CLAUDE)\.md$/i,
-  /(?:^|\/)\.claude\//i,
+  // Built from the sanitizer's own names, so whatever it treats as an instruction loader also needs a human.
+  new RegExp(`(?:^|/)(?:${[...LOADER_FILES, ...LOADER_DIRS].join("|").replace(/\./g, "\\.")})(?:/|$)`, "i"),
   /(?:^|\/)\.?opencode[^/]*(?:\/|$)/i,
   /(?:^|\/)\.env[^/]*(?:\/|$)/i,
   /\.proto$/i,
