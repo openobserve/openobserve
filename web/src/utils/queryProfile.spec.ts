@@ -19,8 +19,10 @@ import {
   CARD_W,
   buildProfileModel,
   clusterNodes,
+  cleanPlanExpr,
   computeTimeNs,
   extractProfile,
+  formatPlanValue,
   layoutProfile,
   metricSections,
   metricsForScope,
@@ -28,12 +30,19 @@ import {
   operatorCategory,
   operatorLabel,
   operatorNodeRows,
+  parsePlanDetail,
   parseSearchStream,
+  physicalPlanToProfile,
+  planAggregate,
   planFingerprint,
+  planOperatorSummary,
+  planScanInfo,
   queryPhases,
   scopedValue,
   shareTone,
   skew,
+  splitTopLevel,
+  summarizePlan,
   summarizeProfile,
   type ProfileLayout,
   type ProfileModel,
@@ -41,7 +50,12 @@ import {
   type QueryProfile,
   type RemoteNodeProfile,
 } from "./queryProfile";
-import { T0, joinProfile } from "./__fixtures__/queryProfile.fixture";
+import {
+  AGG_PHYSICAL_PLAN,
+  T0,
+  TOPN_PHYSICAL_PLAN,
+  joinProfile,
+} from "./__fixtures__/queryProfile.fixture";
 
 const MS = 1_000_000;
 
@@ -571,5 +585,122 @@ describe("parseSearchStream / extractProfile", () => {
     ).toBe("q-1");
     expect(extractProfile([{ phase: 0, profile: "{not json" }])).toBeNull();
     expect(extractProfile([{ phase: 0, plan: "x" }])).toBeNull();
+  });
+});
+
+describe("plan detail parsing", () => {
+  it("splits on top-level commas only, honouring quotes and escapes", () => {
+    expect(splitTopLevel(`a=[x, y], b=f(1, 2), c="p, \\"q\\"", d`)).toEqual([
+      "a=[x, y]",
+      "b=f(1, 2)",
+      `c="p, \\"q\\""`,
+      "d",
+    ]);
+  });
+
+  it("strips column indexes, self aliases and Utf8 wrappers", () => {
+    expect(cleanPlanExpr("k8s_namespace_name@0 as k8s_namespace_name")).toBe("k8s_namespace_name");
+    expect(cleanPlanExpr("count(Int64(1))@1 as cnt")).toBe("count(Int64(1)) as cnt");
+    expect(cleanPlanExpr('level = Utf8("error")')).toBe("level = 'error'");
+  });
+
+  it("parses key=value pairs and keeps positional parts with an empty key", () => {
+    expect(
+      parsePlanDetail("FilterExec: level@1 = error, projection=[k8s_namespace_name@0]"),
+    ).toEqual([
+      { key: "", value: "level = error" },
+      { key: "projection", value: "[k8s_namespace_name]" },
+    ]);
+    expect(
+      parsePlanDetail(
+        String.raw`NewEmptyExec: name="app_logs", filters=["level = Utf8(\"error\")"], sort_order=timestamp_desc`,
+      ).map((e) => e.key),
+    ).toEqual(["name", "filters", "sort_order"]);
+    expect(parsePlanDetail("CoalescePartitionsExec")).toEqual([]);
+  });
+
+  it("formats list values as a plain comma list", () => {
+    expect(formatPlanValue('["a", "b"]')).toBe("a, b");
+    expect(formatPlanValue('"app_logs"')).toBe("app_logs");
+    expect(formatPlanValue("10")).toBe("10");
+  });
+});
+
+describe("physicalPlanToProfile", () => {
+  const model = buildProfileModel(physicalPlanToProfile(AGG_PHYSICAL_PLAN)!, [], {
+    planOnly: true,
+  });
+  const byName = (name: string) => opsNamed(model, name);
+
+  it("turns the subtree under RemoteScanExec into one stage with no runtime numbers", () => {
+    expect(model.planOnly).toBe(true);
+    expect(model.stages).toHaveLength(1);
+    expect(model.stages[0].variants).toHaveLength(1);
+    const remote = byName("RemoteScanExec")[0];
+    expect(remote.remoteStageId).toBe(model.stages[0].id);
+    expect(model.operators[remote.childIds[0]].name).toBe("AggregateExec");
+    expect(model.totalComputeNs).toBe(0);
+    expect(model.order).toHaveLength(12);
+    expect(model.order.filter((id) => model.operators[id].stageId)).toHaveLength(5);
+  });
+
+  it("keeps the placeholder scan as a scan with its stream and pushdown", () => {
+    const scan = byName("NewEmptyExec")[0];
+    expect(scan.category).toBe("scan");
+    expect(planScanInfo(scan)).toEqual({
+      opId: scan.id,
+      stream: "app_logs",
+      filters: ["level = 'error'"],
+      columns: ["k8s_namespace_name", "level"],
+      sortOrder: "",
+    });
+  });
+
+  it("summarises each operator in one readable line", () => {
+    const summary = (name: string, i = 0) => planOperatorSummary(byName(name)[i]);
+    expect(summary("FilterExec")).toBe("level = error");
+    expect(summary("SortExec")).toBe("count(Int64(1)) DESC · fetch=10");
+    expect(summary("SortPreservingMergeExec")).toBe("cnt DESC · fetch=10");
+    expect(summary("RepartitionExec", 0)).toBe("Hash(k8s_namespace_name) · 10");
+    expect(summary("RepartitionExec", 1)).toBe("RoundRobinBatch · 10");
+    expect(summary("ProjectionExec")).toBe("k8s_namespace_name, count(Int64(1)) as cnt");
+    expect(planAggregate(byName("AggregateExec")[0].detail)).toEqual({
+      groupBy: ["k8s_namespace_name"],
+      aggr: ["count(Int64(1))"],
+    });
+  });
+
+  it("summarises the plan: streams, operator split, limit and pushdown", () => {
+    const plan = summarizePlan(model);
+    expect(plan.streams).toEqual(["app_logs"]);
+    expect(plan.leaderOps).toBe(7);
+    expect(plan.remoteOps).toBe(5);
+    expect(plan.fetch).toBe(10);
+    expect(plan.scans).toHaveLength(1);
+    expect(plan.leaderCategories).toEqual(["sort", "projection", "agg", "exchange"]);
+  });
+
+  it("reads sort order pushdown from a top-N plan", () => {
+    const topn = buildProfileModel(physicalPlanToProfile(TOPN_PHYSICAL_PLAN)!, [], {
+      planOnly: true,
+    });
+    const plan = summarizePlan(topn);
+    expect(topn.stages).toHaveLength(1);
+    expect(plan.fetch).toBe(100);
+    expect(plan.scans[0].sortOrder).toBe("timestamp_desc");
+    expect(plan.scans[0].columns).toHaveLength(5);
+    expect(planOperatorSummary(opsNamed(topn, "FilterExec")[0])).toBe("level = error");
+  });
+
+  it("lays plan cards out with the same card size as a profile", () => {
+    const layout = layoutProfile(model);
+    expect(layout.cards).toHaveLength(model.order.length);
+    expect(layout.stages).toHaveLength(1);
+    expect(layout.width).toBeGreaterThanOrEqual(CARD_W);
+    expect(layout.height).toBeGreaterThanOrEqual(CARD_H * 12);
+  });
+
+  it("returns null for an empty plan", () => {
+    expect(physicalPlanToProfile("")).toBeNull();
   });
 });

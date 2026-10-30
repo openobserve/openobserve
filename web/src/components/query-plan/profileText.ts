@@ -15,6 +15,11 @@
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import {
+  isPlaceholderScan,
+  operatorLabel,
+  planAggregate,
+  planOperatorSummary,
+  planScanInfo,
   scopeNodeKey,
   type ProfileModel,
   type ProfileOperator,
@@ -62,6 +67,14 @@ export function operatorWhere(t: TranslateFn, model: ProfileModel, op: ProfileOp
     const stage = model.stageById[op.remoteStageId];
     return t("search.queryProfile.exchangeStage", { index: stage.index });
   }
+  if (model.planOnly) {
+    return op.stageId
+      ? t("search.queryProfile.inStagePlan", {
+          category: categoryLabel(t, op),
+          index: model.stageById[op.stageId].index,
+        })
+      : t("search.queryProfile.onLeaderPlan", { category: categoryLabel(t, op) });
+  }
   if (op.stageId && op.variantId) {
     return t("search.queryProfile.inStage", {
       category: categoryLabel(t, op),
@@ -73,4 +86,34 @@ export function operatorWhere(t: TranslateFn, model: ProfileModel, op: ProfileOp
     category: categoryLabel(t, op),
     node: model.profile.node_name || model.profile.node_address,
   });
+}
+
+/** Card and panel title; the placeholder scan that every node replaces at run time is named by its stream. */
+export function operatorTitle(t: TranslateFn, op: ProfileOperator): I18nText {
+  const stream = isPlaceholderScan(op) ? planScanInfo(op).stream : "";
+  return stream ? t("search.queryProfile.scanTitle", { stream }) : raw(operatorLabel(op));
+}
+
+/** The second line of a plan card, which has no runtime numbers to show. */
+export function planCardDetail(t: TranslateFn, model: ProfileModel, op: ProfileOperator): I18nText {
+  if (op.remoteStageId) {
+    return t("search.queryProfile.sendsStage", { index: model.stageById[op.remoteStageId].index });
+  }
+  if (op.category === "scan") return scanDetail(t, op);
+  if (op.category === "agg") {
+    const { groupBy, aggr } = planAggregate(op.detail);
+    return groupBy.length
+      ? t("search.queryProfile.groupBy", { columns: groupBy.join(", ") })
+      : raw(aggr.join(", "));
+  }
+  return raw(planOperatorSummary(op));
+}
+
+function scanDetail(t: TranslateFn, op: ProfileOperator): I18nText {
+  const { stream, columns } = planScanInfo(op);
+  const count = columns.length;
+  if (!count) return raw(stream || planOperatorSummary(op));
+  return stream
+    ? t("search.queryProfile.scanColumns", { stream, count }, count)
+    : t("search.queryProfile.columnsCount", { count }, count);
 }

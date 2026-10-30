@@ -256,3 +256,28 @@ export function joinProfile(): QueryProfile {
     plan,
   };
 }
+
+export const AGG_PHYSICAL_PLAN = String.raw`SortPreservingMergeExec: [cnt@1 DESC], fetch=10
+  ProjectionExec: expr=[k8s_namespace_name@0 as k8s_namespace_name, count(Int64(1))@1 as cnt]
+    SortExec: TopK(fetch=10), expr=[count(Int64(1))@1 DESC], preserve_partitioning=[true]
+      AggregateExec: mode=FinalPartitioned, gby=[k8s_namespace_name@0 as k8s_namespace_name], aggr=[count(Int64(1))]
+        RepartitionExec: partitioning=Hash([k8s_namespace_name@0], 10), input_partitions=10
+          RepartitionExec: partitioning=RoundRobinBatch(10), input_partitions=1
+            RemoteScanExec: input_partitions=output_partitions=1
+              AggregateExec: mode=PartialReduce, gby=[k8s_namespace_name@0 as k8s_namespace_name], aggr=[count(Int64(1))]
+                RepartitionExec: partitioning=Hash([k8s_namespace_name@0], 10), input_partitions=10
+                  AggregateExec: mode=Partial, gby=[k8s_namespace_name@0 as k8s_namespace_name], aggr=[count(Int64(1))]
+                    FilterExec: level@1 = error, projection=[k8s_namespace_name@0]
+                      NewEmptyExec: name="app_logs", projection=["k8s_namespace_name", "level"], filters=["level = Utf8(\"error\")"]`;
+
+export const AGG_LOGICAL_PLAN = `Sort: cnt DESC NULLS FIRST, fetch=10
+  Projection: app_logs.k8s_namespace_name, count(Int64(1)) AS cnt
+    Aggregate: groupBy=[[app_logs.k8s_namespace_name]], aggr=[[count(Int64(1))]]
+      Filter: app_logs.level = Utf8("error")
+        TableScan: app_logs projection=[k8s_namespace_name, level], partial_filters=[app_logs.level = Utf8("error")]`;
+
+export const TOPN_PHYSICAL_PLAN = String.raw`SortPreservingMergeExec: [_timestamp@0 DESC], fetch=100
+  RemoteScanExec: input_partitions=output_partitions=1
+    SortPreservingMergeExec: [_timestamp@0 DESC], fetch=100
+      FilterExec: level@4 = error, fetch=100
+        NewEmptyExec: name="app_logs", projection=["_timestamp", "body", "k8s_namespace_name", "k8s_pod_name", "level"], filters=["level = Utf8(\"error\")"], sort_order=timestamp_desc`;

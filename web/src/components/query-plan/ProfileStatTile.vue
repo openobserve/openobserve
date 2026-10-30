@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-subtle rounded-default min-w-0 px-2.5 py-2" :data-test="dataTest">
     <div class="text-text-secondary text-2xs">{{ label }}</div>
-    <div
-      class="text-text-heading text-lg leading-tight font-semibold whitespace-nowrap tabular-nums"
+    <OTruncatedText
+      as="div"
+      class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+      >{{ value }}</OTruncatedText
     >
-      {{ value }}
-    </div>
     <OTruncatedText v-if="sub" as="div" class="text-text-secondary text-2xs">{{
       sub
     }}</OTruncatedText>

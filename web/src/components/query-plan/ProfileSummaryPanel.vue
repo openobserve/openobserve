@@ -16,15 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-3.5" data-test="query-profile-summary">
-    <div class="flex flex-col gap-1.5">
-      <h3 class="text-text-heading m-0 text-sm font-semibold">
-        {{ t("search.queryProfile.title") }}
-      </h3>
-      <pre
-        class="bg-code-bg text-text-code rounded-default text-2xs m-0 max-h-40 overflow-auto px-2 py-1.5 font-mono leading-normal break-words whitespace-pre-wrap"
-        data-test="query-profile-sql"
-        >{{ sql }}</pre>
-    </div>
+    <h3 class="text-text-heading m-0 text-sm font-semibold">
+      {{ t("search.queryProfile.title") }}
+    </h3>
 
     <div class="grid grid-cols-2 gap-1.5">
       <ProfileStatTile
@@ -218,7 +212,6 @@ import { variantLabel } from "./profileText";
 const props = defineProps<{
   model: ProfileModel;
   summary: ProfileSummary;
-  sql: string;
   scope: StageScope;
   selectedId: string | null;
 }>();

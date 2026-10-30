@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ProfileSummaryPanel
           :model="model"
           :summary="summary"
-          :sql="sql"
           :scope="scope"
           :selected-id="selectedId"
           @select="selectedId = $event"
@@ -125,7 +124,6 @@ const PANEL_GAP = 24;
 const props = defineProps<{
   profile: QueryProfile;
   stream?: Partial<SearchStreamResult> | null;
-  sql: string;
 }>();
 
 const { t } = useI18nTyped();

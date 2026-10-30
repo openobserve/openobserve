@@ -27,6 +27,7 @@ export const STAGE_PAD_BOTTOM = 20;
 export const STRAGGLER_FACTOR = 1.8;
 
 const NODE_SCOPE_PREFIX = "node:";
+const PLACEHOLDER_SCAN = "NewEmptyExec";
 
 export type MetricKind =
   "count" | "time" | "bytes" | "gauge" | "ratio" | "pruning" | "timestamp" | "other";
@@ -198,6 +199,12 @@ export interface ProfileModel {
   variantById: Record<string, StageVariant>;
   totalComputeNs: number;
   leaderKey: string;
+  planOnly: boolean;
+}
+
+export interface BuildProfileOptions {
+  /** The profile came from a plain EXPLAIN, so it carries no runtime numbers. */
+  planOnly?: boolean;
 }
 
 export interface ScopedValue {
@@ -305,6 +312,28 @@ export interface ProfileLayout {
   variantLabels: LayoutVariantLabel[];
 }
 
+export interface PlanDetailEntry {
+  key: string;
+  value: string;
+}
+
+export interface PlanScanInfo {
+  opId: string;
+  stream: string;
+  filters: string[];
+  columns: string[];
+  sortOrder: string;
+}
+
+export interface PlanSummary {
+  streams: string[];
+  leaderOps: number;
+  remoteOps: number;
+  fetch: number | null;
+  scans: PlanScanInfo[];
+  leaderCategories: OperatorCategory[];
+}
+
 interface PlanPart {
   nodeKey: string;
   plan: ProfileNode;
@@ -348,6 +377,131 @@ export function operatorLabel(op: Pick<ProfileOperator, "name" | "detail">): str
   const base = op.name.replace(/Exec$/, "") || op.name;
   const mode = op.detail.match(/mode=(\w+)/);
   return mode ? `${base} · ${mode[1]}` : base;
+}
+
+export function isPlaceholderScan(op: Pick<ProfileOperator, "name">): boolean {
+  return op.name === PLACEHOLDER_SCAN;
+}
+
+/** Splits on commas outside brackets, parentheses, braces and quotes. */
+export function splitTopLevel(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote = "";
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === "\\") i++;
+      else if (ch === quote) quote = "";
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if ("([{".includes(ch)) {
+      depth++;
+    } else if (")]}".includes(ch)) {
+      depth = Math.max(0, depth - 1);
+    } else if (ch === "," && depth === 0) {
+      parts.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
+
+/** Drops DataFusion's `@N` column indexes, `x as x` self-aliases and `Utf8("v")` literal wrappers. */
+export function cleanPlanExpr(text: string): string {
+  return text
+    .replace(/([\w)\]"])@\d+\b/g, "$1")
+    .replace(/\b([\w.]+) as \1\b/g, "$1")
+    .replace(/Utf8(?:View)?\("((?:[^"\\]|\\.)*)"\)/g, "'$1'");
+}
+
+function unquote(text: string): string {
+  const m = text.match(/^"((?:[^"\\]|\\.)*)"$/s);
+  return m ? m[1].replace(/\\(.)/g, "$1") : text;
+}
+
+/** Items of a `[a, "b", c]` plan value, unquoted and cleaned. */
+export function planList(value: string): string[] {
+  const inner = value.trim().replace(/^\[(.*)\]$/s, "$1");
+  return splitTopLevel(inner).map((item) => cleanPlanExpr(unquote(item)));
+}
+
+export function formatPlanValue(value: string): string {
+  return /^\[.*\]$/s.test(value.trim()) ? planList(value).join(", ") : unquote(value);
+}
+
+/** Top-level `key=value` pairs of an operator line; positional parts get an empty key. */
+export function parsePlanDetail(detail: string): PlanDetailEntry[] {
+  const body = detail.match(/^\s*\w+:\s?(.*)$/s)?.[1];
+  if (!body) return [];
+  return splitTopLevel(body).map((part) => {
+    const m = part.match(/^([A-Za-z_][\w.]*)=(.*)$/s);
+    return m ? { key: m[1], value: cleanPlanExpr(m[2]) } : { key: "", value: cleanPlanExpr(part) };
+  });
+}
+
+export function planFetch(detail: string): number | null {
+  const m = detail.match(/\bfetch=(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function entryValue(entries: PlanDetailEntry[], key: string): string {
+  return entries.find((e) => e.key === key)?.value ?? "";
+}
+
+export function planScanInfo(op: Pick<ProfileOperator, "id" | "detail">): PlanScanInfo {
+  const entries = parsePlanDetail(op.detail);
+  const list = (key: string) => {
+    const value = entryValue(entries, key);
+    return value ? planList(value) : [];
+  };
+  return {
+    opId: op.id,
+    stream: unquote(entryValue(entries, "name")),
+    filters: list("filters"),
+    columns: list("projection"),
+    sortOrder: entryValue(entries, "sort_order"),
+  };
+}
+
+export function planAggregate(detail: string): { groupBy: string[]; aggr: string[] } {
+  const entries = parsePlanDetail(detail);
+  const list = (key: string) => {
+    const value = entryValue(entries, key);
+    return value ? planList(value) : [];
+  };
+  return { groupBy: list("gby"), aggr: list("aggr") };
+}
+
+function sortSummary(entries: PlanDetailEntry[], detail: string): string {
+  const exprs = entryValue(entries, "expr") || entries.find((e) => /^\[/.test(e.value))?.value;
+  const fetch = planFetch(detail);
+  const parts = [exprs ? planList(exprs).join(", ") : "", fetch !== null ? `fetch=${fetch}` : ""];
+  return parts.filter(Boolean).join(" · ");
+}
+
+function partitioningSummary(value: string): string {
+  const m = value.match(/^(\w+)\((.*)\)$/s);
+  if (!m) return value;
+  const args = splitTopLevel(m[2]);
+  if (args.length < 2) return `${m[1]} · ${args[0] ?? ""}`;
+  return `${m[1]}(${formatPlanValue(args[0])}) · ${args[args.length - 1]}`;
+}
+
+/** Readable one-line detail for a plan card; scans, aggregates and remote scans are worded by the caller. */
+export function planOperatorSummary(
+  op: Pick<ProfileOperator, "name" | "detail" | "category">,
+): string {
+  const entries = parsePlanDetail(op.detail);
+  const positional = entries.filter((e) => !e.key).map((e) => e.value);
+  if (op.category === "filter") return positional[0] ?? "";
+  if (op.category === "sort") return sortSummary(entries, op.detail);
+  if (op.category === "projection") return formatPlanValue(entryValue(entries, "expr"));
+  const partitioning = entryValue(entries, "partitioning");
+  if (partitioning) return partitioningSummary(partitioning);
+  return entries.map((e) => (e.key ? `${e.key}=${formatPlanValue(e.value)}` : e.value)).join(", ");
 }
 
 export function nodeScope(nodeKey: string): StageScope {
@@ -469,6 +623,60 @@ export function textPlanToProfile(node: OperatorNode): ProfileNode {
     partitions: 0,
     metrics,
     children: node.children.map(textPlanToProfile),
+  };
+}
+
+function planOnlyRemote(plan: ProfileNode): RemoteNodeProfile {
+  return {
+    partition: 0,
+    node_name: "",
+    node_address: "",
+    role: "",
+    region: "",
+    cluster: "",
+    start_us: 0,
+    first_batch_us: 0,
+    end_us: 0,
+    output_rows: 0,
+    output_batches: 0,
+    output_bytes: 0,
+    fetch_ns: 0,
+    decode_ns: 0,
+    assigned_files: 0,
+    skipped: false,
+    error: "",
+    peak_memory: 0,
+    plan,
+  };
+}
+
+function planRoot(nodes: OperatorNode[]): ProfileNode {
+  if (nodes.length === 1) return planNodeToProfile(nodes[0]);
+  return { name: "Plan", detail: "", partitions: 0, children: nodes.map(planNodeToProfile) };
+}
+
+function planNodeToProfile(node: OperatorNode): ProfileNode {
+  const base = { name: node.name, detail: node.fullText, partitions: 0 };
+  if (!/^Remote\w*Exec/i.test(node.name)) {
+    return { ...base, children: node.children.map(planNodeToProfile) };
+  }
+  // the text under a remote scan is the plan every remote node runs, so it becomes one stage entry
+  const remote = node.children.length ? [planOnlyRemote(planRoot(node.children))] : [];
+  return { ...base, children: [], remote };
+}
+
+/** Turns a plain EXPLAIN physical plan into a profile without runtime numbers; null when it has no operators. */
+export function physicalPlanToProfile(planText: string): QueryProfile | null {
+  const root = parseQueryPlanTree(planText);
+  if (!root.children.length) return null;
+  return {
+    version: 0,
+    node_name: "",
+    node_address: "",
+    start_us: 0,
+    end_us: 0,
+    output_rows: 0,
+    plan: planRoot(root.children),
   };
 }
 
@@ -642,7 +850,11 @@ function buildStage(
   return stage;
 }
 
-export function buildProfileModel(profile: QueryProfile, hits: PlanHit[] = []): ProfileModel {
+export function buildProfileModel(
+  profile: QueryProfile,
+  hits: PlanHit[] = [],
+  options: BuildProfileOptions = {},
+): ProfileModel {
   const ctx: BuildContext = { ops: {}, order: [], stages: [], hits, usedHits: new Set() };
   const leaderKey = profile.node_name || profile.node_address || "leader";
   const rootId = addOperator(
@@ -665,6 +877,7 @@ export function buildProfileModel(profile: QueryProfile, hits: PlanHit[] = []): 
     variantById,
     totalComputeNs: ctx.order.reduce((a, id) => a + ctx.ops[id].totalComputeNs, 0),
     leaderKey,
+    planOnly: !!options.planOnly,
   };
 }
 
@@ -931,6 +1144,23 @@ export function summarizeProfile(
     hotspots: hotspotIds(model),
     timeline: timeline(model),
     stragglers: stragglers(model),
+  };
+}
+
+/** What a plain EXPLAIN plan tells before it runs: streams, operator split, limit and scan pushdown. */
+export function summarizePlan(model: ProfileModel): PlanSummary {
+  const ops = model.order.map((id) => model.operators[id]);
+  const scans = ops.filter((op) => op.category === "scan").map(planScanInfo);
+  const leader = ops.filter((op) => !op.stageId);
+  return {
+    streams: [...new Set(scans.map((s) => s.stream).filter(Boolean))],
+    leaderOps: leader.length,
+    remoteOps: ops.length - leader.length,
+    fetch: planFetch(model.operators[model.rootId].detail),
+    scans,
+    leaderCategories: [
+      ...new Set(leader.filter((op) => op.category !== "remote").map((op) => op.category)),
+    ],
   };
 }
 

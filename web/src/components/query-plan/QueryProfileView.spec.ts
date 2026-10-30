@@ -32,7 +32,7 @@ const took = {
 
 function mountView() {
   return mount(QueryProfileView, {
-    props: { profile: joinProfile(), stream: { hits: [], took_detail: took }, sql: "SELECT 1" },
+    props: { profile: joinProfile(), stream: { hits: [], took_detail: took } },
     global: { plugins: [store, i18n] },
     attachTo: document.body,
   });
@@ -62,7 +62,6 @@ describe("QueryProfileView", () => {
 
   it("shows the summary tiles, phases and the straggler note", () => {
     wrapper = mountView();
-    expect(wrapper.find('[data-test="query-profile-sql"]').text()).toBe("SELECT 1");
     expect(wrapper.find('[data-test="query-profile-tile-nodes"]').text()).toContain("4Q · 2I");
     expect(wrapper.find('[data-test="query-profile-phases"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="query-profile-straggler-note"]').text()).toContain("q-2");
@@ -99,5 +98,34 @@ describe("QueryProfileView", () => {
     expect(table.exists()).toBe(true);
     expect(wrapper.find('[data-test="query-profile-node-q-2"]').text()).toContain("Straggler");
     expect(wrapper.find('[data-test="query-profile-node-q-0"]').text()).not.toContain("Straggler");
+  });
+
+  it("adds files and disk cache per node for an operator inside a stage", async () => {
+    wrapper = mountView();
+    const model = buildProfileModel(joinProfile());
+    const logsScan = model.order.find((id) => {
+      const op = model.operators[id];
+      return op.name === "DataSourceExec" && model.stageById[op.stageId!].nodes.length === 6;
+    })!;
+    await wrapper.find(`[data-test="query-profile-card-${logsScan}"]`).trigger("click");
+    await flushPromises();
+    const table = wrapper.find('[data-test="query-profile-op-nodes"]');
+    expect(table.text()).toContain("Files");
+    expect(table.text()).toContain("Cache");
+    const straggler = table.findAll("tr").find((r) => r.text().includes("q-2"))!;
+    expect(straggler.text()).toContain("104");
+    expect(straggler.text()).toContain("8.7%");
+    expect(straggler.find(".text-status-error-text").exists()).toBe(true);
+  });
+
+  it("leaves the cache column out when no node reports one", async () => {
+    wrapper = mountView();
+    await wrapper
+      .find(`[data-test="query-profile-card-${opIdByName("DataSourceExec", 2)}"]`)
+      .trigger("click");
+    await flushPromises();
+    const table = wrapper.find('[data-test="query-profile-op-nodes"]');
+    expect(table.text()).toContain("Files");
+    expect(table.text()).not.toContain("Cache");
   });
 });
